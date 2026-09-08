@@ -872,8 +872,31 @@ export default function App() {
         return;
       }
 
-      // Esc: Deselect
+      // Vector Tool Activation Shortcuts (Photoshop / Illustrator style)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !isInput && !isFabricEditing) {
+        const k = e.key.toLowerCase();
+        if (k === 'v') {
+          setActiveTool('select');
+        } else if (k === 't') {
+          setActiveTool('text');
+        } else if (k === 'b') {
+          setActiveTool('barcode');
+        } else if (k === 'm') {
+          setActiveTool('qrcode');
+        } else if (k === 'r') {
+          setActiveTool('rect');
+        } else if (k === 'l') {
+          setActiveTool('line');
+        } else if (k === 'c') {
+          setActiveTool('circle');
+        } else if (k === 'g') {
+          setActiveTool('table');
+        }
+      }
+
+      // Esc: Deselect & revert tool to select
       if (e.key === 'Escape' && !isInput && !isFabricEditing) {
+        setActiveTool('select');
         if (canvasRef.current) {
           canvasRef.current.discardActiveObject();
           canvasRef.current.renderAll();
