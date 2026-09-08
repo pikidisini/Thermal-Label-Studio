@@ -1,4 +1,4 @@
-﻿name: CI Quality Gate & Automated Tests
+name: CI Quality Gate & Automated Tests
 
 on:
   push:
@@ -82,7 +82,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build Docker Image (Smoke Test)
         uses: docker/build-push-action@v5
