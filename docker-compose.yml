@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  thermal-label-studio:
+    build:
+      context: ..
+      dockerfile: web_app/Dockerfile
+    container_name: thermal-label-studio
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../assets/templates:/app/assets/templates
+      - ../assets/samples:/app/assets/samples
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEFAULT_DPI=203.2
+    restart: unless-stopped

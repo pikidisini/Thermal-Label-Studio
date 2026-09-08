@@ -1,0 +1,31 @@
+﻿# Node / Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+.npm
+.package-lock.json
+
+# Python / Backend
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.pytest_cache/
+.venv/
+venv/
+env/
+ENV/
+backend/data/out/*
+!backend/data/out/.gitkeep
+
+# IDE / Editor & Temp
+.history/
+.dontread/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.*

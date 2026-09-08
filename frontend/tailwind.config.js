@@ -1,0 +1,71 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        studio: {
+          darkest: '#121316',
+          darker: '#1a1b1e',
+          dark: '#25262b',
+          panel: '#2c2e33',
+          border: '#373a40',
+          hover: '#3b3e45',
+          accent: '#3b82f6',
+          accentHover: '#2563eb',
+          amber: '#f59e0b',
+          emerald: '#10b981',
+          rose: '#f43f5e',
+        },
+        surface: {
+          DEFAULT: '#121316',
+          dim: '#121316',
+          bright: '#38393c',
+          container: '#1f1f23',
+          'container-lowest': '#0d0e11',
+          'container-low': '#1b1b1f',
+          'container-high': '#292a2d',
+          'container-highest': '#343538',
+        },
+        'on-surface': '#e3e2e6',
+        'on-surface-variant': '#c2c6d6',
+        outline: '#8c909f',
+        'outline-variant': '#424754',
+        primary: {
+          DEFAULT: '#adc6ff',
+          container: '#4d8eff',
+          fixed: '#d8e2ff',
+        },
+        'on-primary': '#002e6a',
+        'on-primary-container': '#00285d',
+        secondary: {
+          DEFAULT: '#ffb95f',
+          container: '#ee9800',
+        },
+        'on-secondary': '#472a00',
+        tertiary: {
+          DEFAULT: '#4edea3',
+          container: '#00a572',
+          fixed: '#6ffbbe',
+        },
+        'on-tertiary': '#003824',
+      },
+      fontFamily: {
+        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        'code-coordinate': ['JetBrains Mono', 'monospace'],
+        'code-matrix': ['JetBrains Mono', 'monospace'],
+      },
+      fontSize: {
+        'label-sm': ['10px', { lineHeight: '12px', letterSpacing: '0.04em', fontWeight: '600' }],
+        'label-md': ['11px', { lineHeight: '14px', letterSpacing: '0.02em', fontWeight: '500' }],
+        'code-coordinate': ['11px', { lineHeight: '14px', letterSpacing: '-0.02em', fontWeight: '500' }],
+        'code-matrix': ['10px', { lineHeight: '12px', letterSpacing: '-0.03em', fontWeight: '400' }],
+      }
+    },
+  },
+  plugins: [],
+}

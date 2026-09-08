@@ -1,0 +1,921 @@
+<!DOCTYPE html><html class="dark" lang="en" style=""><svg class="inline-defs-container" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"></svg><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={"darkMode":"class","theme":{"extend":{"colors":{"on-surface":"#e3e2e6","error":"#ffb4ab","surface":"#121316","tertiary-fixed":"#6ffbbe","on-primary-container":"#00285d","on-secondary-container":"#5b3800","secondary-fixed":"#ffddb8","surface-container-highest":"#343538","surface-container":"#1f1f23","tertiary-fixed-dim":"#4edea3","surface-dim":"#121316","on-secondary-fixed-variant":"#653e00","primary-fixed":"#d8e2ff","primary-container":"#4d8eff","on-secondary-fixed":"#2a1700","surface-container-lowest":"#0d0e11","surface-tint":"#adc6ff","on-primary-fixed-variant":"#004395","on-tertiary-fixed-variant":"#005236","on-tertiary":"#003824","secondary":"#ffb95f","on-tertiary-container":"#00311f","surface-bright":"#38393c","tertiary-container":"#00a572","on-primary":"#002e6a","on-surface-variant":"#c2c6d6","inverse-primary":"#005ac2","on-tertiary-fixed":"#002113","background":"#121316","outline":"#8c909f","on-error":"#690005","on-secondary":"#472a00","primary":"#adc6ff","on-error-container":"#ffdad6","on-background":"#e3e2e6","tertiary":"#4edea3","outline-variant":"#424754","surface-container-low":"#1b1b1f","on-primary-fixed":"#001a42","inverse-surface":"#e3e2e6","primary-fixed-dim":"#adc6ff","surface-container-high":"#292a2d","secondary-fixed-dim":"#ffb95f","error-container":"#93000a","secondary-container":"#ee9800","inverse-on-surface":"#2f3034","surface-variant":"#343538"},"borderRadius":{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},"spacing":{"zero":"0px","control-h-standard":"26px","xl":"16px","lg":"12px","xs":"4px","panel-header":"28px","control-h-compact":"22px","hairline":"1px","toolbar-w":"36px","inspector-w":"280px","sm":"6px","md":"8px","xxl":"24px","xxs":"2px"},"fontFamily":{"label-md":["Inter"],"code-coordinate":["JetBrains Mono"],"headline-md":["Inter"],"label-sm":["Inter"],"display":["Inter"],"headline-lg":["Inter"],"body-md":["JetBrains Mono"],"body-sm":["JetBrains Mono"],"label-lg":["Inter"],"headline-sm":["Inter"],"code-matrix":["JetBrains Mono"],"body-lg":["JetBrains Mono"]},"fontSize":{"label-md":["11px",{"lineHeight":"14px","letterSpacing":"0.02em","fontWeight":"500"}],"code-coordinate":["11px",{"lineHeight":"14px","letterSpacing":"-0.02em","fontWeight":"500"}],"headline-md":["14px",{"lineHeight":"18px","letterSpacing":"0em","fontWeight":"600"}],"label-sm":["10px",{"lineHeight":"12px","letterSpacing":"0.04em","fontWeight":"600"}],"display":["20px",{"lineHeight":"24px","letterSpacing":"-0.01em","fontWeight":"600"}],"headline-lg":["16px",{"lineHeight":"20px","letterSpacing":"-0.005em","fontWeight":"600"}],"body-md":["12px",{"lineHeight":"16px","letterSpacing":"0em","fontWeight":"400"}],"body-sm":["11px",{"lineHeight":"14px","letterSpacing":"0em","fontWeight":"400"}],"label-lg":["12px",{"lineHeight":"16px","letterSpacing":"0.01em","fontWeight":"500"}],"headline-sm":["12px",{"lineHeight":"16px","letterSpacing":"0.02em","fontWeight":"600"}],"code-matrix":["10px",{"lineHeight":"12px","letterSpacing":"-0.03em","fontWeight":"400"}],"body-lg":["13px",{"lineHeight":"18px","letterSpacing":"0em","fontWeight":"400"}]}}}};</script></head><body class="bg-surface text-on-surface select-none antialiased"><svg class="inline-defs-container" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"></svg><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={"darkMode":"class","theme":{"extend":{"colors":{"on-surface":"#e3e2e6","error":"#ffb4ab","surface":"#121316","tertiary-fixed":"#6ffbbe","on-primary-container":"#00285d","on-secondary-container":"#5b3800","secondary-fixed":"#ffddb8","surface-container-highest":"#343538","surface-container":"#1f1f23","tertiary-fixed-dim":"#4edea3","surface-dim":"#121316","on-secondary-fixed-variant":"#653e00","primary-fixed":"#d8e2ff","primary-container":"#4d8eff","on-secondary-fixed":"#2a1700","surface-container-lowest":"#0d0e11","surface-tint":"#adc6ff","on-primary-fixed-variant":"#004395","on-tertiary-fixed-variant":"#005236","on-tertiary":"#003824","secondary":"#ffb95f","on-tertiary-container":"#00311f","surface-bright":"#38393c","tertiary-container":"#00a572","on-primary":"#002e6a","on-surface-variant":"#c2c6d6","inverse-primary":"#005ac2","on-tertiary-fixed":"#002113","background":"#121316","outline":"#8c909f","on-error":"#690005","on-secondary":"#472a00","primary":"#adc6ff","on-error-container":"#ffdad6","on-background":"#e3e2e6","tertiary":"#4edea3","outline-variant":"#424754","surface-container-low":"#1b1b1f","on-primary-fixed":"#001a42","inverse-surface":"#e3e2e6","primary-fixed-dim":"#adc6ff","surface-container-high":"#292a2d","secondary-fixed-dim":"#ffb95f","error-container":"#93000a","secondary-container":"#ee9800","inverse-on-surface":"#2f3034","surface-variant":"#343538"},"borderRadius":{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},"spacing":{"zero":"0px","control-h-standard":"26px","xl":"16px","lg":"12px","xs":"4px","panel-header":"28px","control-h-compact":"22px","hairline":"1px","toolbar-w":"36px","inspector-w":"280px","sm":"6px","md":"8px","xxl":"24px","xxs":"2px"},"fontFamily":{"label-md":["Inter"],"code-coordinate":["JetBrains Mono"],"headline-md":["Inter"],"label-sm":["Inter"],"display":["Inter"],"headline-lg":["Inter"],"body-md":["JetBrains Mono"],"body-sm":["JetBrains Mono"],"label-lg":["Inter"],"headline-sm":["Inter"],"code-matrix":["JetBrains Mono"],"body-lg":["JetBrains Mono"]},"fontSize":{"label-md":["11px",{"lineHeight":"14px","letterSpacing":"0.02em","fontWeight":"500"}],"code-coordinate":["11px",{"lineHeight":"14px","letterSpacing":"-0.02em","fontWeight":"500"}],"headline-md":["14px",{"lineHeight":"18px","letterSpacing":"0em","fontWeight":"600"}],"label-sm":["10px",{"lineHeight":"12px","letterSpacing":"0.04em","fontWeight":"600"}],"display":["20px",{"lineHeight":"24px","letterSpacing":"-0.01em","fontWeight":"600"}],"headline-lg":["16px",{"lineHeight":"20px","letterSpacing":"-0.005em","fontWeight":"600"}],"body-md":["12px",{"lineHeight":"16px","letterSpacing":"0em","fontWeight":"400"}],"body-sm":["11px",{"lineHeight":"14px","letterSpacing":"0em","fontWeight":"400"}],"label-lg":["12px",{"lineHeight":"16px","letterSpacing":"0.01em","fontWeight":"500"}],"headline-sm":["12px",{"lineHeight":"16px","letterSpacing":"0.02em","fontWeight":"600"}],"code-matrix":["10px",{"lineHeight":"12px","letterSpacing":"-0.03em","fontWeight":"400"}],"body-lg":["13px",{"lineHeight":"18px","letterSpacing":"0em","fontWeight":"400"}]}}}};</script><header class="fixed top-0 left-0 right-0 z-50 flex flex-col bg-surface-container-lowest"><div class="h-[40px] px-md flex items-center justify-between border-b border-outline-variant bg-surface-container-lowest"><div class="flex items-center gap-md"><div class="flex items-center gap-xs"><div class="w-[24px] h-[24px] bg-primary-container text-on-primary-container flex items-center justify-center"><span class="material-symbols-outlined text-[16px]">print</span></div><div class="flex flex-col uppercase font-bold tracking-wider leading-[11px] text-[10px] text-on-surface"><span class="text-on-surface">THERMAL LABEL</span><span class="text-primary text-[9px] tracking-widest">STUDIO</span></div></div><nav class="hidden lg:flex items-center gap-xxs ml-md border-l border-outline-variant pl-md" data-active-classes="bg-surface-container-highest text-on-surface"><a aria-current="page" class="px-xs py-xxs font-label-sm text-label-sm text-on-surface border border-outline-variant hover:bg-surface-container" data-path="designer" href="#">File</a><a class="px-xs py-xxs font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface" data-path="object-matrix" href="#">Edit</a><a class="px-xs py-xxs font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface" data-path="symbology-rules" href="#">Object</a><a class="px-xs py-xxs font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface" data-path="sap-mappings" href="#">Template</a><a class="px-xs py-xxs font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface" data-path="print-queue" href="#">Thermal</a><a class="px-xs py-xxs font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container hover:text-on-surface" data-path="diagnostics" href="#">Help</a></nav></div><div class="flex items-center bg-surface-container-low border border-outline-variant"><button class="px-sm py-xxs font-label-sm text-label-sm bg-surface-container-highest text-on-surface border-r border-outline-variant" type="button">Vector Designer</button><button class="px-sm py-xxs font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface border-r border-outline-variant" type="button">Side-by-side Split</button><button class="px-sm py-xxs font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface" type="button">1-Bit Printhead Sim</button></div><div class="flex items-center gap-md"><div class="flex items-center gap-sm bg-surface-container-low px-xs py-xxs border border-outline-variant font-code-matrix text-code-matrix"><div class="flex items-center gap-xxs"><span class="w-[6px] h-[6px] bg-tertiary-container"></span><span class="text-on-surface-variant">Spooler:</span><span class="text-tertiary">Ready</span></div><span class="text-outline">|</span><span class="text-on-surface-variant">IP: 192.168.1.200:9100</span></div><button class="h-[24px] px-sm bg-surface-container-high hover:bg-surface-bright text-on-surface font-label-sm text-label-sm flex items-center gap-xxs border border-outline-variant" type="button"><span class="material-symbols-outlined text-[14px]">sync</span><span class="">Live Render</span></button><button class="h-[24px] px-sm bg-tertiary-container hover:bg-tertiary text-on-tertiary font-label-sm text-label-sm flex items-center gap-xxs font-semibold" type="button"><span class="material-symbols-outlined text-[14px]">bolt</span><span class="">Print &amp; Dispatch</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div><div class="h-[36px] px-md flex items-center justify-between border-b border-outline-variant bg-surface-container-low"><div class="flex items-center gap-md"><div class="flex items-center gap-xxs bg-surface px-xs py-xxs border border-outline-variant font-code-coordinate text-code-coordinate"><span class="text-outline font-label-sm text-label-sm pr-xxs">DIM</span><span class="text-primary">200.0 × 80.0 mm</span><span class="text-outline px-xxs">@</span><span class="text-on-surface-variant">203.2 DPI</span><span class="text-outline-variant">(8 dpmm)</span></div><div class="flex items-center gap-xxs"><div class="flex items-center bg-surface border border-outline-variant h-[22px] px-xxs"><span class="font-label-sm text-label-sm text-outline px-xxs">X</span><span class="font-code-coordinate text-code-coordinate text-on-surface">45.20</span><span class="text-outline-variant text-[9px] pl-xxs">mm</span></div><div class="flex items-center bg-surface border border-outline-variant h-[22px] px-xxs"><span class="font-label-sm text-label-sm text-outline px-xxs">Y</span><span class="font-code-coordinate text-code-coordinate text-on-surface">18.70</span><span class="text-outline-variant text-[9px] pl-xxs">mm</span></div><div class="flex items-center bg-surface border border-outline-variant h-[22px] px-xxs"><span class="font-label-sm text-label-sm text-outline px-xxs">W</span><span class="font-code-coordinate text-code-coordinate text-on-surface">120.00</span><span class="text-outline-variant text-[9px] pl-xxs">mm</span></div><div class="flex items-center bg-surface border border-outline-variant h-[22px] px-xxs"><span class="font-label-sm text-label-sm text-outline px-xxs">H</span><span class="font-code-coordinate text-code-coordinate text-on-surface">32.50</span><span class="text-outline-variant text-[9px] pl-xxs">mm</span></div><div class="flex items-center bg-surface border border-outline-variant h-[22px] px-xxs"><span class="font-label-sm text-label-sm text-outline px-xxs">∠</span><span class="font-code-coordinate text-code-coordinate text-on-surface">0.0°</span></div></div><div class="flex items-center gap-xxs border-l border-outline-variant pl-md"><span class="font-label-sm text-label-sm text-on-surface-variant mr-xxs">Symbology:</span><div class="h-[22px] px-xs bg-surface border border-outline-variant font-code-matrix text-code-matrix flex items-center text-primary">CODE128 Auto</div></div></div><div class="flex items-center gap-xs"><button class="h-[22px] px-xs bg-surface border border-outline-variant text-primary font-label-sm text-label-sm flex items-center gap-xxs" type="button"><span class="material-symbols-outlined text-[13px]">grid_on</span><span class="">Snap: 1.0mm</span></button><button class="h-[22px] px-xs bg-surface border border-outline-variant text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm flex items-center gap-xxs" type="button"><span class="material-symbols-outlined text-[13px]">straighten</span><span class="">Guides</span></button></div></div></header><aside class="fixed left-0 top-[76px] bottom-[24px] w-[36px] bg-surface-container-low border-r border-outline-variant z-40 flex flex-col justify-between items-center py-xs"><nav class="flex flex-col gap-xxs w-full items-center" data-active-classes="bg-surface-container-high text-primary border-l-2 border-primary"><a aria-current="page" class="px-xs py-xxs font-label-sm text-label-sm text-on-surface border border-outline-variant hover:bg-surface-container" data-path="designer" href="#">File</a><a class="w-[30px] h-[30px] flex items-center justify-center text-on-surface-variant hover:bg-surface-container hover:text-on-surface" data-path="symbology-rules" href="#" title="Barcode Generator Tool"><span class="material-symbols-outlined text-[16px]">qr_code_2</span></a><a class="w-[30px] h-[30px] flex items-center justify-center text-on-surface-variant hover:bg-surface-container hover:text-on-surface" data-path="object-matrix" href="#" title="Text &amp; Variable String Box"><span class="material-symbols-outlined text-[16px]">title</span></a><a class="w-[30px] h-[30px] flex items-center justify-center text-on-surface-variant hover:bg-surface-container hover:text-on-surface" data-path="sap-mappings" href="#" title="Industrial Vector Shape (Box/Line)"><span class="material-symbols-outlined text-[16px]">check_box_outline_blank</span></a><a class="w-[30px] h-[30px] flex items-center justify-center text-on-surface-variant hover:bg-surface-container hover:text-on-surface" data-path="print-queue" href="#" title="Bitmap Graphic Anchor"><span class="material-symbols-outlined text-[16px]">image</span></a><a class="w-[30px] h-[30px] flex items-center justify-center text-on-surface-variant hover:bg-surface-container hover:text-on-surface" data-path="diagnostics" href="#" title="RFID Inlay Encoder Map"><span class="material-symbols-outlined text-[16px]">nfc</span></a></nav><div class="flex flex-col gap-xxs w-full items-center"><button class="w-[30px] h-[30px] flex items-center justify-center text-on-surface-variant hover:bg-surface-container hover:text-on-surface" title="Zoom Workspace" type="button"><span class="material-symbols-outlined text-[16px]">zoom_in</span></button><button class="w-[30px] h-[30px] flex items-center justify-center text-on-surface-variant hover:bg-surface-container hover:text-on-surface" title="System Workspace Setup" type="button"><span class="material-symbols-outlined text-[16px]">settings</span></button></div></aside><div class="pl-[36px]"><main class="pt-[76px] pb-[24px] w-full min-h-[calc(100vh-24px)] bg-surface flex flex-col"><div class="flex flex-col w-full select-none text-on-surface font-body-sm text-body-sm">
+<!-- CAD Interactive Canvas & Workbench Shell -->
+<div class="relative w-full h-[calc(100vh-100px)] overflow-hidden flex bg-surface-dim">
+<!-- 1. LEFT SLIM TOOLBOX & TOKEN DRAWER -->
+<div class="flex shrink-0 z-30 shadow-md">
+<!-- 48px CAD Icon Dock -->
+<aside class="w-[48px] bg-surface-container-lowest flex flex-col items-center py-xs justify-between">
+<div class="flex flex-col items-center gap-xxs w-full">
+<!-- Selection (Active) -->
+<button class="relative group w-[38px] h-[34px] flex items-center justify-center bg-surface-container-highest text-primary shadow-sm" onclick="setActiveTool(this, 'Select (V)')" title="Pointer / Vector Select (V)" type="button">
+<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-primary"></div>
+<span class="material-symbols-outlined text-[19px]">near_me</span>
+<span class="absolute left-[52px] bg-surface-container-highest text-on-surface px-xs py-xxs shadow-md text-code-matrix font-code-matrix opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Select (V)</span>
+</button>
+<!-- Direct Node Edit -->
+<button class="relative group w-[38px] h-[34px] flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface" onclick="setActiveTool(this, 'Direct Edit (A)')" title="Direct Node Edit (A)" type="button">
+<span class="material-symbols-outlined text-[19px]">gesture</span>
+<span class="absolute left-[52px] bg-surface-container-highest text-on-surface px-xs py-xxs shadow-md text-code-matrix font-code-matrix opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Direct Edit (A)</span>
+</button>
+<!-- Text Typography -->
+<button class="relative group w-[38px] h-[34px] flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface" onclick="setActiveTool(this, 'Text (T)')" title="Text Box &amp; Variable (T)" type="button">
+<span class="material-symbols-outlined text-[19px]">title</span>
+<span class="absolute left-[52px] bg-surface-container-highest text-on-surface px-xs py-xxs shadow-md text-code-matrix font-code-matrix opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Text (T)</span>
+</button>
+<!-- 1D Barcode Generator -->
+<button class="relative group w-[38px] h-[34px] flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface" onclick="setActiveTool(this, '1D Barcode')" title="1D Linear Barcode (Code 128 / EAN)" type="button">
+<span class="material-symbols-outlined text-[19px]">barcode</span>
+<span class="absolute left-[52px] bg-surface-container-highest text-on-surface px-xs py-xxs shadow-md text-code-matrix font-code-matrix opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">1D Barcode (B)</span>
+</button>
+<!-- 2D Matrix / QR -->
+<button class="relative group w-[38px] h-[34px] flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface" onclick="setActiveTool(this, '2D DataMatrix')" title="2D DataMatrix &amp; QR Generator" type="button">
+<span class="material-symbols-outlined text-[19px]">qr_code_2</span>
+<span class="absolute left-[52px] bg-surface-container-highest text-on-surface px-xs py-xxs shadow-md text-code-matrix font-code-matrix opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">2D Matrix (M)</span>
+</button>
+<!-- Rectangle Box -->
+<button class="relative group w-[38px] h-[34px] flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface" onclick="setActiveTool(this, 'Rectangle (R)')" title="Industrial Box / Frame (R)" type="button">
+<span class="material-symbols-outlined text-[19px]">check_box_outline_blank</span>
+<span class="absolute left-[52px] bg-surface-container-highest text-on-surface px-xs py-xxs shadow-md text-code-matrix font-code-matrix opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Box (R)</span>
+</button>
+<!-- Line / Separator -->
+<button class="relative group w-[38px] h-[34px] flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface" onclick="setActiveTool(this, 'Rule (L)')" title="Vector Hairline Rule (L)" type="button">
+<span class="material-symbols-outlined text-[19px]">horizontal_rule</span>
+<span class="absolute left-[52px] bg-surface-container-highest text-on-surface px-xs py-xxs shadow-md text-code-matrix font-code-matrix opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Rule Line (L)</span>
+</button>
+<!-- Shape / Badge -->
+<button class="relative group w-[38px] h-[34px] flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface" onclick="setActiveTool(this, 'Circle (C)')" title="Ellipse &amp; Seal Primitive (C)" type="button">
+<span class="material-symbols-outlined text-[19px]">radio_button_unchecked</span>
+<span class="absolute left-[52px] bg-surface-container-highest text-on-surface px-xs py-xxs shadow-md text-code-matrix font-code-matrix opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Ellipse (C)</span>
+</button>
+<!-- GHS Pictograms -->
+<button class="relative group w-[38px] h-[34px] flex items-center justify-center text-secondary hover:bg-surface-container-high" onclick="setActiveTool(this, 'GHS Hazard Diamond')" title="GHS Hazardous Safety Diamond" type="button">
+<span class="material-symbols-outlined text-[19px]">warning</span>
+<span class="absolute left-[52px] bg-surface-container-highest text-on-surface px-xs py-xxs shadow-md text-code-matrix font-code-matrix opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">GHS Safety (G)</span>
+</button>
+<!-- Grid Table -->
+<button class="relative group w-[38px] h-[34px] flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface" onclick="setActiveTool(this, 'Table Grid')" title="Dynamic Manifest Table Tool" type="button">
+<span class="material-symbols-outlined text-[19px]">table_chart</span>
+<span class="absolute left-[52px] bg-surface-container-highest text-on-surface px-xs py-xxs shadow-md text-code-matrix font-code-matrix opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Table Grid (T)</span>
+</button>
+</div>
+<!-- Tool Bottom Anchors -->
+<div class="flex flex-col items-center gap-xxs w-full">
+<button class="w-[38px] h-[34px] flex items-center justify-center bg-surface-container-high text-primary hover:bg-surface-bright" id="toggleDrawerBtn" onclick="toggleDrawer()" title="Toggle SAP Contract Drawer" type="button">
+<span class="material-symbols-outlined text-[18px]">data_object</span>
+</button>
+<div class="w-[20px] h-[1px] bg-surface-container-highest my-xxs"></div>
+<button class="w-[38px] h-[30px] flex items-center justify-center text-on-surface-variant hover:text-on-surface text-code-matrix font-code-matrix" title="Workspace Zoom 100%" type="button">
+            1:1
+          </button>
+</div>
+</aside>
+<!-- Expandable Flyout Sub-Drawer: SAP Dynamic Variable Tokens -->
+<section class="w-[220px] bg-surface-container-low flex flex-col transition-all duration-150 ease-out shadow-lg" id="sapTokenDrawer">
+<!-- Header -->
+<div class="h-[28px] px-sm bg-surface-container flex items-center justify-between">
+<div class="flex items-center gap-xs">
+<span class="w-[6px] h-[6px] bg-tertiary-container"></span>
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface">SAP Tokens</span>
+</div>
+<span class="font-code-matrix text-code-matrix text-primary px-xs bg-surface-container-highest">BIND</span>
+</div>
+<div class="p-xs text-on-surface-variant font-code-matrix text-code-matrix bg-surface-container-lowest">
+          Drag &amp; drop token or click to apply to current selection:
+        </div>
+<!-- Token Draggable Stream -->
+<div class="flex-1 overflow-y-auto p-xs space-y-xs">
+<!-- Token item 1 -->
+<div class="p-xs bg-surface-container hover:bg-surface-container-high cursor-grab active:cursor-grabbing transition-colors group shadow-sm" draggable="true" onclick="applyToken('{{material_number}}')">
+<div class="flex items-center justify-between">
+<span class="text-primary font-code-matrix text-code-matrix group-hover:text-tertiary">{{material_number}}</span>
+<span class="text-on-surface-variant font-label-sm text-label-sm">CHAR18</span>
+</div>
+<div class="mt-xxs flex items-center justify-between text-on-surface font-code-coordinate text-code-coordinate bg-surface-container-lowest px-xs py-xxs">
+<span class="">MAT-88402-A</span>
+<span class="material-symbols-outlined text-[12px] text-tertiary">check_circle</span>
+</div>
+</div>
+<!-- Token item 2 -->
+<div class="p-xs bg-surface-container hover:bg-surface-container-high cursor-grab active:cursor-grabbing transition-colors group shadow-sm" draggable="true" onclick="applyToken('{{batch_number}}')">
+<div class="flex items-center justify-between">
+<span class="text-primary font-code-matrix text-code-matrix group-hover:text-tertiary">{{batch_number}}</span>
+<span class="text-on-surface-variant font-label-sm text-label-sm">CHAR10</span>
+</div>
+<div class="mt-xxs flex items-center justify-between text-on-surface font-code-coordinate text-code-coordinate bg-surface-container-lowest px-xs py-xxs">
+<span class="">LOT-2025-08X</span>
+<span class="material-symbols-outlined text-[12px] text-tertiary">check_circle</span>
+</div>
+</div>
+<!-- Token item 3 -->
+<div class="p-xs bg-surface-container hover:bg-surface-container-high cursor-grab active:cursor-grabbing transition-colors group shadow-sm" draggable="true" onclick="applyToken('{{vendor_name}}')">
+<div class="flex items-center justify-between">
+<span class="text-primary font-code-matrix text-code-matrix group-hover:text-tertiary">{{vendor_name}}</span>
+<span class="text-on-surface-variant font-label-sm text-label-sm">CHAR35</span>
+</div>
+<div class="mt-xxs flex items-center justify-between text-on-surface font-code-coordinate text-code-coordinate bg-surface-container-lowest px-xs py-xxs">
+<span class="truncate max-w-[140px]">BASF SE CHEMICALS</span>
+<span class="material-symbols-outlined text-[12px] text-tertiary">check_circle</span>
+</div>
+</div>
+<!-- Token item 4 -->
+<div class="p-xs bg-surface-container hover:bg-surface-container-high cursor-grab active:cursor-grabbing transition-colors group shadow-sm" draggable="true" onclick="applyToken('{{production_date}}')">
+<div class="flex items-center justify-between">
+<span class="text-primary font-code-matrix text-code-matrix group-hover:text-tertiary">{{production_date}}</span>
+<span class="text-on-surface-variant font-label-sm text-label-sm">DATS</span>
+</div>
+<div class="mt-xxs flex items-center justify-between text-on-surface font-code-coordinate text-code-coordinate bg-surface-container-lowest px-xs py-xxs">
+<span class="">2025-05-18</span>
+<span class="material-symbols-outlined text-[12px] text-tertiary">check_circle</span>
+</div>
+</div>
+<!-- Token item 5 -->
+<div class="p-xs bg-surface-container hover:bg-surface-container-high cursor-grab active:cursor-grabbing transition-colors group shadow-sm" draggable="true" onclick="applyToken('{{gross_weight_kg}}')">
+<div class="flex items-center justify-between">
+<span class="text-primary font-code-matrix text-code-matrix group-hover:text-tertiary">{{gross_weight_kg}}</span>
+<span class="text-on-surface-variant font-label-sm text-label-sm">DEC13.3</span>
+</div>
+<div class="mt-xxs flex items-center justify-between text-on-surface font-code-coordinate text-code-coordinate bg-surface-container-lowest px-xs py-xxs">
+<span class="">24.85 KG</span>
+<span class="material-symbols-outlined text-[12px] text-tertiary">check_circle</span>
+</div>
+</div>
+<!-- Token item 6 -->
+<div class="p-xs bg-surface-container hover:bg-surface-container-high cursor-grab active:cursor-grabbing transition-colors group shadow-sm" draggable="true" onclick="applyToken('{{ghs_hazard_class}}')">
+<div class="flex items-center justify-between">
+<span class="text-secondary font-code-matrix text-code-matrix group-hover:text-on-surface">{{ghs_hazard_class}}</span>
+<span class="text-on-surface-variant font-label-sm text-label-sm">GHS_CAT</span>
+</div>
+<div class="mt-xxs flex items-center justify-between text-secondary font-code-coordinate text-code-coordinate bg-surface-container-lowest px-xs py-xxs">
+<span class="truncate max-w-[140px]">FLAM. 3 / TOX. 4</span>
+<span class="material-symbols-outlined text-[12px] text-secondary">warning</span>
+</div>
+</div>
+</div>
+<div class="p-xs bg-surface-container-lowest flex items-center justify-between font-code-matrix text-code-matrix text-on-surface-variant">
+<span class="">Target RFC: EWM_DISP</span>
+<span class="text-tertiary">OK</span>
+</div>
+</section>
+</div>
+<!-- 2. CENTER CAD VIEWPORT WITH METRIC RULERS -->
+<div class="relative flex-1 flex flex-col overflow-hidden bg-[#121316]">
+<!-- Top Ruler Header Row -->
+<div class="h-[20px] bg-surface-container-lowest flex shrink-0 z-20 select-none">
+<!-- Origin (0,0) Corner Box -->
+<div class="w-[24px] h-[20px] bg-surface-container flex items-center justify-center font-code-matrix text-[9px] text-primary cursor-pointer hover:bg-surface-container-highest" title="Unit origin: Metric Millimeters [mm]">
+          mm
+        </div>
+<!-- Horizontal Ruler Ribbon (SVG Millimeters from -20 to 220) -->
+<div class="flex-1 overflow-hidden relative bg-surface-container-lowest" id="topRulerTrack">
+<svg class="w-full h-[20px] block" preserveAspectRatio="none" viewBox="0 0 1200 20" xmlns="http://www.w3.org/2000/svg">
+<g fill="none" stroke="#424754" stroke-width="1">
+<!-- Grid background baseline -->
+<line stroke="#343538" x1="0" x2="1200" y1="19.5" y2="19.5"></line>
+<!-- -20 to 220 mm ticks mapped: 100px offset = 0mm, 4.5px per mm -->
+<!-- Repeating procedural tick pattern -->
+<pattern height="20" id="rulerMajorX" patternUnits="userSpaceOnUse" width="90">
+<line stroke="#8c909f" stroke-width="1" x1="0" x2="0" y1="8" y2="20"></line>
+<line stroke="#424754" stroke-width="1" x1="9" x2="9" y1="14" y2="20"></line>
+<line stroke="#424754" stroke-width="1" x1="18" x2="18" y1="14" y2="20"></line>
+<line stroke="#424754" stroke-width="1" x1="27" x2="27" y1="14" y2="20"></line>
+<line stroke="#424754" stroke-width="1" x1="36" x2="36" y1="14" y2="20"></line>
+<line stroke="#8c909f" stroke-width="1" x1="45" x2="45" y1="11" y2="20"></line>
+<line stroke="#424754" stroke-width="1" x1="54" x2="54" y1="14" y2="20"></line>
+<line stroke="#424754" stroke-width="1" x1="63" x2="63" y1="14" y2="20"></line>
+<line stroke="#424754" stroke-width="1" x1="72" x2="72" y1="14" y2="20"></line>
+<line stroke="#424754" stroke-width="1" x1="81" x2="81" y1="14" y2="20"></line>
+</pattern>
+<rect fill="url(#rulerMajorX)" height="20" width="1200" x="0" y="0"></rect>
+</g>
+<!-- Labeled Coordinates on ruler (mm) -->
+<g fill="#c2c6d6" font-family="JetBrains Mono" font-size="9px" font-weight="500">
+<text x="5" y="10">-20</text>
+<text x="85" y="10">0</text>
+<text x="175" y="10">20</text>
+<text x="265" y="10">40</text>
+<text x="355" y="10">60</text>
+<text x="445" y="10">80</text>
+<text x="535" y="10">100</text>
+<text x="625" y="10">120</text>
+<text x="715" y="10">140</text>
+<text x="805" y="10">160</text>
+<text x="895" y="10">180</text>
+<text x="985" y="10">200</text>
+<text x="1075" y="10">220</text>
+</g>
+<!-- Cyan dynamic cursor tracking marker on X ruler -->
+<polygon fill="#4d8eff" id="rulerMarkerX" points="693,19 697,13 689,13"></polygon>
+</svg>
+</div>
+</div>
+<!-- Main Canvas Body: Left Ruler + Dot Grid Center Surface -->
+<div class="flex-1 flex overflow-hidden relative">
+<!-- Left Vertical Ruler (SVG Millimeters from -20 to 100mm) -->
+<div class="w-[24px] bg-surface-container-lowest shrink-0 select-none overflow-hidden relative">
+<svg class="w-[24px] h-full block" preserveAspectRatio="none" viewBox="0 0 24 600" xmlns="http://www.w3.org/2000/svg">
+<g fill="none" stroke="#424754" stroke-width="1">
+<line stroke="#343538" x1="23.5" x2="23.5" y1="0" y2="600"></line>
+<!-- Pattern for 20mm step (mapped to 80px) -->
+<pattern height="80" id="rulerMajorY" patternUnits="userSpaceOnUse" width="24">
+<line stroke="#8c909f" stroke-width="1" x1="10" x2="24" y1="0" y2="0"></line>
+<line stroke="#424754" stroke-width="1" x1="16" x2="24" y1="8" y2="8"></line>
+<line stroke="#424754" stroke-width="1" x1="16" x2="24" y1="16" y2="16"></line>
+<line stroke="#424754" stroke-width="1" x1="16" x2="24" y1="24" y2="24"></line>
+<line stroke="#424754" stroke-width="1" x1="16" x2="24" y1="32" y2="32"></line>
+<line stroke="#8c909f" stroke-width="1" x1="12" x2="24" y1="40" y2="40"></line>
+<line stroke="#424754" stroke-width="1" x1="16" x2="24" y1="48" y2="48"></line>
+<line stroke="#424754" stroke-width="1" x1="16" x2="24" y1="56" y2="56"></line>
+<line stroke="#424754" stroke-width="1" x1="16" x2="24" y1="64" y2="64"></line>
+<line stroke="#424754" stroke-width="1" x1="16" x2="24" y1="72" y2="72"></line>
+</pattern>
+<rect fill="url(#rulerMajorY)" height="600" width="24" x="0" y="0"></rect>
+</g>
+<!-- Labeled Coordinates on Y ruler -->
+<g fill="#c2c6d6" font-family="JetBrains Mono" font-size="8px" font-weight="500">
+<text x="1" y="14">-20</text>
+<text x="3" y="94">0</text>
+<text x="3" y="174">20</text>
+<text x="3" y="254">40</text>
+<text x="3" y="334">60</text>
+<text x="3" y="414">80</text>
+<text x="1" y="494">100</text>
+</g>
+<!-- Dynamic cursor indicator marker on Y ruler -->
+<polygon fill="#4d8eff" id="rulerMarkerY" points="23,600 17,604 17,596"></polygon>
+</svg>
+</div>
+<!-- Infinite CAD Workspace Floor with Dot-Matrix Grid -->
+<div class="flex-1 overflow-auto relative flex items-center justify-center p-xxl cursor-crosshair" id="cadViewport" style="background-color: #121316; background-image: radial-gradient(#2d323f 1px, transparent 1px); background-size: 16px 16px;">
+<!-- Virtual Label Artboard Outer Guide (200mm x 80mm equivalent scaled) -->
+<div class="relative shadow-2xl transition-transform" style="width: 790px; height: 316px;">
+<!-- Label Paper Geometry (Pure Crisp White Thermal Stock) -->
+<div class="relative w-full h-full bg-[#ffffff] text-[#000000] overflow-hidden select-none font-sans" id="artboardSheet">
+<!-- 2mm Printhead Safe Margin Bleed Line (Hairline Inset) -->
+<div class="absolute inset-[8px] pointer-events-none" style="background-image: repeating-linear-gradient(0deg, #d2d6dc, #d2d6dc 4px, transparent 4px, transparent 8px), repeating-linear-gradient(90deg, #d2d6dc, #d2d6dc 4px, transparent 4px, transparent 8px), repeating-linear-gradient(180deg, #d2d6dc, #d2d6dc 4px, transparent 4px, transparent 8px), repeating-linear-gradient(270deg, #d2d6dc, #d2d6dc 4px, transparent 4px, transparent 8px); background-size: 1px 100%, 100% 1px, 1px 100%, 100% 1px; background-position: 0 0, 0 0, 100% 0, 0 100%; background-repeat: no-repeat;"></div>
+<!-- Bleed Zone Corner Registration Marks -->
+<div class="absolute top-[4px] left-[4px] w-[12px] h-[12px] pointer-events-none">
+<div class="absolute left-0 top-0 w-[8px] h-[1px] bg-[#9ca3af]"></div>
+<div class="absolute left-0 top-0 w-[1px] h-[8px] bg-[#9ca3af]"></div>
+</div>
+<div class="absolute top-[4px] right-[4px] w-[12px] h-[12px] pointer-events-none">
+<div class="absolute right-0 top-0 w-[8px] h-[1px] bg-[#9ca3af]"></div>
+<div class="absolute right-0 top-0 w-[1px] h-[8px] bg-[#9ca3af]"></div>
+</div>
+<div class="absolute bottom-[4px] left-[4px] w-[12px] h-[12px] pointer-events-none">
+<div class="absolute left-0 bottom-0 w-[8px] h-[1px] bg-[#9ca3af]"></div>
+<div class="absolute left-0 bottom-0 w-[1px] h-[8px] bg-[#9ca3af]"></div>
+</div>
+<div class="absolute bottom-[4px] right-[4px] w-[12px] h-[12px] pointer-events-none">
+<div class="absolute right-0 bottom-0 w-[8px] h-[1px] bg-[#9ca3af]"></div>
+<div class="absolute right-0 bottom-0 w-[1px] h-[8px] bg-[#9ca3af]"></div>
+</div>
+<!-- ================= INDUSTRIAL CONTENT ================= -->
+<div class="relative w-full h-full p-[14px] flex flex-col justify-between">
+<!-- TOP HEADER BAR: CONTRACT MANIFEST -->
+<div class="flex items-center justify-between bg-[#000000] text-[#ffffff] px-sm py-[3px]">
+<div class="flex items-center gap-sm">
+<span class="font-bold text-[11px] tracking-wider uppercase font-mono">SAP ERP DISPATCH MANIFEST — CONTRACT v1.1</span>
+<span class="bg-[#ffffff] text-[#000000] text-[9px] font-mono px-[3px] font-bold">LIVE-PO</span>
+</div>
+<div class="flex items-center gap-xs font-mono text-[10px]">
+<span class="opacity-80">PLANT:</span>
+<span class="font-bold">1040 (LOGISTICS HUB DUS)</span>
+</div>
+</div>
+<!-- MIDDLE GRID (Barcodes, DataMatrix, GHS Safety) -->
+<div class="flex-1 grid grid-cols-12 gap-sm my-[6px] items-stretch">
+<!-- Left: 1D Code 128 Barcode Section (WITH VECTOR CAD BOUNDING BOX) -->
+<div class="col-span-5 relative bg-[#ffffff] p-[6px] flex flex-col justify-center cursor-move" id="barcodeSelectionElement" onclick="selectBarcode()">
+<!-- Element Tag Header -->
+<div class="flex items-center justify-between text-[9px] font-mono text-[#4b5563] mb-[2px]">
+<span class="font-bold">MATERIAL / SSCC-18</span>
+<span class="bg-[#e5e7eb] px-[3px] py-[1px] font-mono text-[8px] text-[#1f2937] font-semibold">CODE 128</span>
+</div>
+<!-- Authentic Vector SVG Code 128 (Sharp crisp thermal simulation) -->
+<div class="w-full flex items-center justify-center overflow-hidden py-[2px]">
+<svg class="w-full h-[62px]" preserveAspectRatio="none" viewBox="0 0 280 62" xmlns="http://www.w3.org/2000/svg">
+<g fill="#000000">
+<!-- Barcode start pattern -->
+<rect height="62" width="3" x="0" y="0"></rect>
+<rect height="62" width="2" x="5" y="0"></rect>
+<rect height="62" width="5" x="10" y="0"></rect>
+<rect height="62" width="1" x="18" y="0"></rect>
+<rect height="62" width="4" x="22" y="0"></rect>
+<!-- Data Bars: MAT-88402-A -->
+<rect height="62" width="2" x="29" y="0"></rect>
+<rect height="62" width="6" x="33" y="0"></rect>
+<rect height="62" width="2" x="42" y="0"></rect>
+<rect height="62" width="4" x="47" y="0"></rect>
+<rect height="62" width="1" x="54" y="0"></rect>
+<rect height="62" width="5" x="58" y="0"></rect>
+<rect height="62" width="3" x="66" y="0"></rect>
+<rect height="62" width="2" x="72" y="0"></rect>
+<rect height="62" width="6" x="77" y="0"></rect>
+<rect height="62" width="3" x="86" y="0"></rect>
+<rect height="62" width="1" x="92" y="0"></rect>
+<rect height="62" width="5" x="96" y="0"></rect>
+<rect height="62" width="2" x="104" y="0"></rect>
+<rect height="62" width="6" x="109" y="0"></rect>
+<rect height="62" width="2" x="118" y="0"></rect>
+<rect height="62" width="4" x="123" y="0"></rect>
+<rect height="62" width="1" x="130" y="0"></rect>
+<rect height="62" width="7" x="134" y="0"></rect>
+<rect height="62" width="2" x="144" y="0"></rect>
+<rect height="62" width="5" x="149" y="0"></rect>
+<rect height="62" width="3" x="157" y="0"></rect>
+<rect height="62" width="1" x="163" y="0"></rect>
+<rect height="62" width="6" x="167" y="0"></rect>
+<rect height="62" width="2" x="176" y="0"></rect>
+<rect height="62" width="4" x="181" y="0"></rect>
+<rect height="62" width="2" x="188" y="0"></rect>
+<rect height="62" width="6" x="193" y="0"></rect>
+<rect height="62" width="1" x="202" y="0"></rect>
+<rect height="62" width="5" x="206" y="0"></rect>
+<rect height="62" width="3" x="214" y="0"></rect>
+<rect height="62" width="2" x="220" y="0"></rect>
+<rect height="62" width="6" x="225" y="0"></rect>
+<rect height="62" width="1" x="234" y="0"></rect>
+<rect height="62" width="4" x="238" y="0"></rect>
+<rect height="62" width="2" x="245" y="0"></rect>
+<rect height="62" width="6" x="250" y="0"></rect>
+<rect height="62" width="3" x="259" y="0"></rect>
+<rect height="62" width="2" x="265" y="0"></rect>
+<rect height="62" width="4" x="270" y="0"></rect>
+<rect height="62" width="3" x="277" y="0"></rect>
+</g>
+</svg>
+</div>
+<!-- Human Readable Text -->
+<div class="flex items-center justify-between mt-[2px] font-mono text-[11px] font-bold tracking-widest text-[#000000]">
+<span id="barcodeHumanReadableText" class="">MAT-88402-A-992</span>
+<span class="text-[8px] bg-[#dbeafe] text-[#1e40af] font-mono px-[2px]">[MARA-MATNR]</span>
+</div>
+<!-- ACTIVE SELECTION CAD BOUNDING BOX OVERLAY -->
+<div class="absolute -inset-[3px] pointer-events-none" id="selectionBoundingBox">
+<!-- 1px Electric Blue Illustrator Style Outline -->
+<div class="absolute inset-0 border border-primary-container"></div>
+<!-- 8 Square Anchor Handles -->
+<div class="absolute -top-[3px] -left-[3px] w-[7px] h-[7px] bg-[#ffffff] border border-primary-container"></div>
+<div class="absolute -top-[3px] left-1/2 -translate-x-1/2 w-[7px] h-[7px] bg-[#ffffff] border border-primary-container"></div>
+<div class="absolute -top-[3px] -right-[3px] w-[7px] h-[7px] bg-[#ffffff] border border-primary-container"></div>
+<div class="absolute top-1/2 -left-[3px] -translate-y-1/2 w-[7px] h-[7px] bg-[#ffffff] border border-primary-container"></div>
+<div class="absolute top-1/2 -right-[3px] -translate-y-1/2 w-[7px] h-[7px] bg-[#ffffff] border border-primary-container"></div>
+<div class="absolute -bottom-[3px] -left-[3px] w-[7px] h-[7px] bg-[#ffffff] border border-primary-container"></div>
+<div class="absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-[7px] h-[7px] bg-[#ffffff] border border-primary-container"></div>
+<div class="absolute -bottom-[3px] -right-[3px] w-[7px] h-[7px] bg-[#ffffff] border border-primary-container"></div>
+<!-- Center Pivot Crosshair Anchor -->
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[9px] h-[9px] flex items-center justify-center">
+<div class="w-[9px] h-[1px] bg-primary-container"></div>
+<div class="h-[9px] w-[1px] bg-primary-container absolute"></div>
+<div class="w-[5px] h-[5px] rounded-full border border-primary-container absolute bg-surface"></div>
+</div>
+<!-- Floating Coordinate Tooltip Tag -->
+<div class="absolute -top-[24px] left-0 bg-primary-container text-[#ffffff] font-code-matrix text-[9px] px-xs py-zero shadow-md flex items-center gap-xs tracking-tight">
+<span class="font-bold">CODE128</span>
+<span class="">X: 12.5mm</span>
+<span class="">Y: 34.0mm</span>
+<span class="">W: 65.0mm</span>
+<span class="">H: 25.0mm</span>
+</div>
+</div>
+</div>
+<!-- Center: 2D DataMatrix QR Matrix with Asset String -->
+<div class="col-span-3 p-[6px] flex flex-col items-center justify-between">
+<div class="w-full flex items-center justify-between text-[9px] font-mono text-[#4b5563]">
+<span class="font-bold">DATAMATRIX ECC200</span>
+<span class="font-mono text-[8px] bg-[#f3f4f6] px-[2px]">32x32</span>
+</div>
+<!-- Authentic SVG DataMatrix Representation -->
+<div class="w-[74px] h-[74px] my-[2px] bg-[#ffffff] flex items-center justify-center">
+<svg class="w-[72px] h-[72px]" shape-rendering="crispEdges" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+<!-- Solid L-finder shape bottom and left -->
+<rect fill="#000000" height="16" width="1" x="0" y="0"></rect>
+<rect fill="#000000" height="1" width="16" x="0" y="15"></rect>
+<!-- Alternating timing pattern top and right -->
+<rect fill="#000000" height="1" width="1" x="2" y="0"></rect>
+<rect fill="#000000" height="1" width="1" x="4" y="0"></rect>
+<rect fill="#000000" height="1" width="1" x="6" y="0"></rect>
+<rect fill="#000000" height="1" width="1" x="8" y="0"></rect>
+<rect fill="#000000" height="1" width="1" x="10" y="0"></rect>
+<rect fill="#000000" height="1" width="1" x="12" y="0"></rect>
+<rect fill="#000000" height="1" width="1" x="14" y="0"></rect>
+<rect fill="#000000" height="1" width="1" x="15" y="1"></rect>
+<rect fill="#000000" height="1" width="1" x="15" y="3"></rect>
+<rect fill="#000000" height="1" width="1" x="15" y="5"></rect>
+<rect fill="#000000" height="1" width="1" x="15" y="7"></rect>
+<rect fill="#000000" height="1" width="1" x="15" y="9"></rect>
+<rect fill="#000000" height="1" width="1" x="15" y="11"></rect>
+<rect fill="#000000" height="1" width="1" x="15" y="13"></rect>
+<!-- Data Payload Cells -->
+<rect fill="#000000" height="2" width="2" x="2" y="2"></rect>
+<rect fill="#000000" height="3" width="1" x="5" y="2"></rect>
+<rect fill="#000000" height="1" width="3" x="8" y="2"></rect>
+<rect fill="#000000" height="2" width="2" x="12" y="3"></rect>
+<rect fill="#000000" height="1" width="2" x="2" y="5"></rect>
+<rect fill="#000000" height="2" width="2" x="7" y="5"></rect>
+<rect fill="#000000" height="3" width="1" x="10" y="5"></rect>
+<rect fill="#000000" height="1" width="2" x="12" y="6"></rect>
+<rect fill="#000000" height="2" width="3" x="3" y="7"></rect>
+<rect fill="#000000" height="2" width="1" x="7" y="8"></rect>
+<rect fill="#000000" height="2" width="1" x="13" y="8"></rect>
+<rect fill="#000000" height="2" width="2" x="2" y="10"></rect>
+<rect fill="#000000" height="1" width="2" x="5" y="11"></rect>
+<rect fill="#000000" height="2" width="3" x="9" y="10"></rect>
+<rect fill="#000000" height="3" width="1" x="13" y="11"></rect>
+<rect fill="#000000" height="1" width="3" x="2" y="13"></rect>
+<rect fill="#000000" height="1" width="2" x="6" y="13"></rect>
+<rect fill="#000000" height="1" width="2" x="10" y="13"></rect>
+</svg>
+</div>
+<div class="text-[8px] font-mono text-center text-[#4b5563] tracking-tighter">
+                      UID: 01040188402A992
+                    </div>
+</div>
+<!-- Right: GHS Hazard Diamonds & Signal Words -->
+<div class="col-span-4 p-[6px] flex flex-col justify-between">
+<div class="flex items-center justify-between text-[9px] font-mono text-[#4b5563]">
+<span class="font-bold">GHS / HAZMAT CLASS 3</span>
+<span class="bg-[#fee2e2] text-[#991b1b] font-bold px-[3px] text-[8px]">REGULATED</span>
+</div>
+<!-- GHS Red Diamonds Pair -->
+<div class="flex items-center justify-around py-xs">
+<!-- GHS 02 Flammable Diamond -->
+<div class="relative w-[48px] h-[48px] flex items-center justify-center">
+<!-- Red Diamond Outline (Rotated 45deg) -->
+<div class="absolute inset-[4px] border-[2.5px] border-[#dc2626] rotate-45 bg-[#ffffff]"></div>
+<!-- Flame SVG Pictogram -->
+<svg class="w-[24px] h-[24px] z-10 text-[#000000]" fill="currentColor" viewBox="0 0 24 24">
+<path d="M12 2.5C11.5 5.5 8.5 7.5 8.5 11c0 2 1.5 3.5 3.5 3.5s3.5-1.5 3.5-3.5c0-1.8-1-3.2-2-4.5-.5 1-1.5 1.5-1.5 2.5 0 .8.7 1.5 1.5 1.5.8 0 1.2-.5 1.2-1 0-.5-.3-.9-.7-1.2 0-3.3-2-5.3-2-5.8zM6.5 13.5C6.5 17.1 9.4 20 13 20c3.9 0 6.5-2.8 6.5-6.5 0-3-1.8-5.3-3.5-7.5-.2 1.5-1 2.8-2 3.5 1.5.3 2.5 1.5 2.5 3 0 1.9-1.6 3.5-3.5 3.5s-3.5-1.6-3.5-3.5c0-1.2.6-2.2 1.5-2.8-2 1-4.5 2.1-4.5 3.8z"></path>
+</svg>
+</div>
+<!-- GHS 06 Skull Toxic Diamond -->
+<div class="relative w-[48px] h-[48px] flex items-center justify-center">
+<!-- Red Diamond Outline -->
+<div class="absolute inset-[4px] border-[2.5px] border-[#dc2626] rotate-45 bg-[#ffffff]"></div>
+<!-- Skull & Crossbones SVG -->
+<svg class="w-[24px] h-[24px] z-10 text-[#000000]" fill="currentColor" viewBox="0 0 24 24">
+<path d="M12 2C8.69 2 6 4.69 6 8c0 1.94.93 3.66 2.37 4.75l-.87.88-2.12-2.13-1.42 1.42 2.13 2.12-2.13 2.12 1.42 1.42 2.12-2.13.88.88C9.47 20.36 10.66 21 12 21s2.53-.64 3.62-1.69l.88-.88 2.12 2.13 1.42-1.42-2.13-2.12 2.13-2.12-1.42-1.42-2.12 2.13-.87-.88C17.07 11.66 18 9.94 18 8c0-3.31-2.69-6-6-6zm-2 7.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm4 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM10.5 13h3v1.5h-3V13z"></path>
+</svg>
+</div>
+</div>
+<!-- GHS Hazard Warnings -->
+<div class="bg-[#000000] text-[#ffffff] px-xs py-[2px] text-center font-mono text-[9px] font-black tracking-wider uppercase">
+                      DANGER / GEFAHR
+                    </div>
+</div>
+</div>
+<!-- BOTTOM TABULAR SPECIFICATION GRID -->
+<div class="w-full text-[#000000] font-mono text-[10px]">
+<div class="grid grid-cols-12 bg-[#000000] text-[#ffffff] font-bold text-[9px] py-[2px] px-xs">
+<div class="col-span-5 uppercase tracking-wider">Material Description / Name</div>
+<div class="col-span-3 uppercase tracking-wider">Storage Bin</div>
+<div class="col-span-2 uppercase tracking-wider">Net Qty</div>
+<div class="col-span-2 uppercase tracking-wider text-right">Exp. Date</div>
+</div>
+<div class="grid grid-cols-12 py-[3px] px-xs font-semibold text-[10px] bg-[#f9fafb] items-center">
+<div class="col-span-5 truncate text-[#111827]">ETHYL ACETATE ULTRA-PURE REAGENT</div>
+<div class="col-span-3 font-mono text-[#1f2937]">BIN-B14-R02</div>
+<div class="col-span-2 font-bold text-[#111827]">1,250 PCS</div>
+<div class="col-span-2 font-mono text-right text-[#111827]">2028-11-30</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 3. RIGHT DOCKABLE INSPECTOR PANELS (320px Obsidian/Graphite Suite) -->
+<aside class="w-[320px] bg-surface-container-low flex flex-col shrink-0 z-30 shadow-lg select-none">
+<!-- Dock Tab Header -->
+<div class="h-[32px] bg-surface-container-lowest flex items-center px-xs justify-between">
+<div class="flex items-center gap-xxs h-full">
+<button class="h-full px-sm font-label-sm text-label-sm text-primary bg-surface-container flex items-center gap-xxs shadow-sm" id="tabBtnLayers" onclick="switchRightTab('layers')" type="button">
+<span class="material-symbols-outlined text-[14px]">layers</span>
+<span class="">Layers</span>
+</button>
+<button class="h-full px-sm font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface flex items-center gap-xxs" id="tabBtnContract" onclick="switchRightTab('contract')" type="button">
+<span class="material-symbols-outlined text-[14px]">hub</span>
+<span class="">SAP Matrix</span>
+</button>
+<button class="h-full px-sm font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface flex items-center gap-xxs" id="tabBtnDiagnostics" onclick="switchRightTab('diagnostics')" type="button">
+<span class="material-symbols-outlined text-[14px]">thermostat</span>
+<span class="">Head Sim</span>
+</button>
+</div>
+<button class="w-[24px] h-[24px] flex items-center justify-center text-on-surface-variant hover:text-on-surface" title="Inspector Settings" type="button">
+<span class="material-symbols-outlined text-[14px]">more_vert</span>
+</button>
+</div>
+<!-- Tab Content 1: Layers & Hierarchy Tree -->
+<div class="flex-1 flex flex-col overflow-y-auto" id="tabContentLayers">
+<!-- Z-Index Quick Action Strip -->
+<div class="p-xs bg-surface-container flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Hierarchy Stack (6)</span>
+<div class="flex items-center gap-xxs">
+<button class="w-[22px] h-[22px] bg-surface-container-high hover:bg-surface-bright flex items-center justify-center text-on-surface" onclick="notifyZIndex('Bring to Front')" title="Bring Forward" type="button">
+<span class="material-symbols-outlined text-[14px]">flip_to_front</span>
+</button>
+<button class="w-[22px] h-[22px] bg-surface-container-high hover:bg-surface-bright flex items-center justify-center text-on-surface" onclick="notifyZIndex('Send to Back')" title="Send Backward" type="button">
+<span class="material-symbols-outlined text-[14px]">flip_to_back</span>
+</button>
+<button class="w-[22px] h-[22px] bg-surface-container-high hover:bg-surface-bright flex items-center justify-center text-on-surface" title="Group Objects" type="button">
+<span class="material-symbols-outlined text-[14px]">workspaces</span>
+</button>
+</div>
+</div>
+<!-- Layer List (CAD Item Rows) -->
+<div class="flex-1 overflow-y-auto divide-y divide-surface-container-highest">
+<!-- Layer 1: ACTIVE HIGHLIGHTED BARCODE -->
+<div class="flex items-center justify-between px-xs py-xxs bg-surface-container-high text-primary cursor-pointer">
+<div class="flex items-center gap-xs min-w-0">
+<button class="text-on-surface-variant hover:text-on-surface" onclick="toggleLayerVis(this, event)" type="button">
+<span class="material-symbols-outlined text-[14px]">visibility</span>
+</button>
+<button class="text-on-surface-variant hover:text-on-surface" onclick="toggleLayerLock(this, event)" type="button">
+<span class="material-symbols-outlined text-[14px]">lock_open</span>
+</button>
+<span class="material-symbols-outlined text-[15px] text-primary">barcode</span>
+<div class="truncate">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Barcode 1D (Code 128)</span>
+<span class="block font-code-matrix text-code-matrix text-primary">{{material_number}}</span>
+</div>
+</div>
+<span class="font-code-matrix text-code-matrix bg-surface px-xs py-zero text-tertiary">BOUND</span>
+</div>
+<!-- Layer 2: 2D DataMatrix -->
+<div class="flex items-center justify-between px-xs py-xxs hover:bg-surface-container cursor-pointer text-on-surface-variant">
+<div class="flex items-center gap-xs min-w-0">
+<button class="text-on-surface-variant hover:text-on-surface" onclick="toggleLayerVis(this, event)" type="button">
+<span class="material-symbols-outlined text-[14px]">visibility</span>
+</button>
+<button class="text-on-surface-variant hover:text-on-surface" onclick="toggleLayerLock(this, event)" type="button">
+<span class="material-symbols-outlined text-[14px]">lock_open</span>
+</button>
+<span class="material-symbols-outlined text-[15px]">qr_code_2</span>
+<div class="truncate">
+<span class="font-label-md text-label-md text-on-surface">2D DataMatrix ECC200</span>
+<span class="block font-code-matrix text-code-matrix text-on-surface-variant">Tracking Serial UID</span>
+</div>
+</div>
+<span class="font-code-matrix text-code-matrix bg-surface-container-lowest px-xs py-zero">32x32</span>
+</div>
+<!-- Layer 3: GHS Hazard Diamond -->
+<div class="flex items-center justify-between px-xs py-xxs hover:bg-surface-container cursor-pointer text-on-surface-variant">
+<div class="flex items-center gap-xs min-w-0">
+<button class="text-on-surface-variant hover:text-on-surface" onclick="toggleLayerVis(this, event)" type="button">
+<span class="material-symbols-outlined text-[14px]">visibility</span>
+</button>
+<button class="text-on-surface-variant hover:text-on-surface" onclick="toggleLayerLock(this, event)" type="button">
+<span class="material-symbols-outlined text-[14px]">lock_open</span>
+</button>
+<span class="material-symbols-outlined text-[15px] text-secondary">warning</span>
+<div class="truncate">
+<span class="font-label-md text-label-md text-on-surface">GHS Pictogram Group</span>
+<span class="block font-code-matrix text-code-matrix text-secondary">FLAM. 3 &amp; TOXIC 4</span>
+</div>
+</div>
+<span class="font-code-matrix text-code-matrix bg-surface-container-lowest px-xs py-zero text-secondary">HAZ</span>
+</div>
+<!-- Layer 4: Text Header -->
+<div class="flex items-center justify-between px-xs py-xxs hover:bg-surface-container cursor-pointer text-on-surface-variant">
+<div class="flex items-center gap-xs min-w-0">
+<button class="text-on-surface-variant hover:text-on-surface" onclick="toggleLayerVis(this, event)" type="button">
+<span class="material-symbols-outlined text-[14px]">visibility</span>
+</button>
+<button class="text-on-surface-variant hover:text-on-surface" onclick="toggleLayerLock(this, event)" type="button">
+<span class="material-symbols-outlined text-[14px]">lock_open</span>
+</button>
+<span class="material-symbols-outlined text-[15px]">title</span>
+<div class="truncate">
+<span class="font-label-md text-label-md text-on-surface">Text: Header Banner</span>
+<span class="block font-code-matrix text-code-matrix text-on-surface-variant">DISPATCH MANIFEST v1.1</span>
+</div>
+</div>
+<span class="font-code-matrix text-code-matrix text-outline">FIXED</span>
+</div>
+<!-- Layer 5: Table Grid -->
+<div class="flex items-center justify-between px-xs py-xxs hover:bg-surface-container cursor-pointer text-on-surface-variant">
+<div class="flex items-center gap-xs min-w-0">
+<button class="text-on-surface-variant hover:text-on-surface" onclick="toggleLayerVis(this, event)" type="button">
+<span class="material-symbols-outlined text-[14px]">visibility</span>
+</button>
+<button class="text-on-surface-variant hover:text-on-surface" onclick="toggleLayerLock(this, event)" type="button">
+<span class="material-symbols-outlined text-[14px]">lock_open</span>
+</button>
+<span class="material-symbols-outlined text-[15px]">table_chart</span>
+<div class="truncate">
+<span class="font-label-md text-label-md text-on-surface">Spec Table Grid</span>
+<span class="block font-code-matrix text-code-matrix text-on-surface-variant">4 Col Multi-Row Vector</span>
+</div>
+</div>
+<span class="font-code-matrix text-code-matrix bg-surface-container-lowest px-xs py-zero">V-TAB</span>
+</div>
+<!-- Layer 6: Safe Margin (Locked) -->
+<div class="flex items-center justify-between px-xs py-xxs bg-surface-container-lowest opacity-70 cursor-not-allowed">
+<div class="flex items-center gap-xs min-w-0">
+<span class="material-symbols-outlined text-[14px] text-outline">visibility</span>
+<span class="material-symbols-outlined text-[14px] text-secondary">lock</span>
+<span class="material-symbols-outlined text-[15px] text-outline">straighten</span>
+<div class="truncate">
+<span class="font-label-md text-label-md text-on-surface-variant">Safe Margin Bleed Guide</span>
+<span class="block font-code-matrix text-code-matrix text-outline">2.0mm Inset Peripheral</span>
+</div>
+</div>
+<span class="font-code-matrix text-code-matrix text-outline">LOCK</span>
+</div>
+</div>
+<!-- Bottom Element Inspector Box (Transform, Coordinates, Symbology) -->
+<div class="p-xs bg-surface-container space-y-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface font-semibold">Transform Inspector</span>
+<span class="font-code-matrix text-code-matrix text-primary">Selected: Code128</span>
+</div>
+<!-- 9-Point Origin Anchor + Steppers -->
+<div class="flex items-center gap-sm">
+<!-- 9-Point Anchor Box -->
+<div class="w-[42px] h-[42px] bg-surface-container-lowest grid grid-cols-3 p-xxs gap-[2px] shrink-0">
+<button class="w-full h-full bg-surface-container-highest hover:bg-primary" type="button"></button>
+<button class="w-full h-full bg-surface-container-highest hover:bg-primary" type="button"></button>
+<button class="w-full h-full bg-surface-container-highest hover:bg-primary" type="button"></button>
+<button class="w-full h-full bg-surface-container-highest hover:bg-primary" type="button"></button>
+<button class="w-full h-full bg-primary" title="Center Anchor Active" type="button"></button>
+<button class="w-full h-full bg-surface-container-highest hover:bg-primary" type="button"></button>
+<button class="w-full h-full bg-surface-container-highest hover:bg-primary" type="button"></button>
+<button class="w-full h-full bg-surface-container-highest hover:bg-primary" type="button"></button>
+<button class="w-full h-full bg-surface-container-highest hover:bg-primary" type="button"></button>
+</div>
+<!-- Coordinate Numerical Inputs Grid -->
+<div class="flex-1 grid grid-cols-2 gap-xxs font-code-coordinate text-code-coordinate">
+<div class="flex items-center bg-surface-container-lowest px-xs py-xxs justify-between">
+<span class="text-outline font-label-sm text-label-sm">X</span>
+<span class="text-on-surface">12.50 mm</span>
+</div>
+<div class="flex items-center bg-surface-container-lowest px-xs py-xxs justify-between">
+<span class="text-outline font-label-sm text-label-sm">Y</span>
+<span class="text-on-surface">34.00 mm</span>
+</div>
+<div class="flex items-center bg-surface-container-lowest px-xs py-xxs justify-between">
+<span class="text-outline font-label-sm text-label-sm">W</span>
+<span class="text-on-surface">65.00 mm</span>
+</div>
+<div class="flex items-center bg-surface-container-lowest px-xs py-xxs justify-between">
+<span class="text-outline font-label-sm text-label-sm">H</span>
+<span class="text-on-surface">25.00 mm</span>
+</div>
+</div>
+</div>
+<!-- Symbology Rule Parameters -->
+<div class="p-xs bg-surface-container-lowest space-y-xxs font-code-matrix text-code-matrix">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="">Narrow Bar Ratio:</span>
+<span class="text-on-surface font-semibold">1 : 2.5 (High Density)</span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="">Check Digit (Modulo 103):</span>
+<span class="text-tertiary font-semibold">Auto-Computed [OK]</span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="">Quiet Zone Margin:</span>
+<span class="text-on-surface">10 × X-Dim (2.54mm)</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Tab Content 2: Live SAP Data Contract JSON Viewer (Initially Hidden) -->
+<div class="flex-1 flex flex-col overflow-y-auto p-xs space-y-xs hidden" id="tabContentContract">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface font-semibold">Contract RFC Payload</span>
+<span class="font-code-matrix text-code-matrix bg-tertiary-container text-on-tertiary px-xs py-zero">LIVE BINDING</span>
+</div>
+<div class="bg-surface-container-lowest p-xs font-mono text-[11px] leading-[18px] text-on-surface-variant overflow-x-auto">
+<div class="text-outline">{</div>
+<div class="pl-md"><span class="text-primary">"$schema"</span>: <span class="text-secondary">"sap.ewm.label/v1.1"</span>,</div>
+<div class="pl-md"><span class="text-primary">"plant_id"</span>: <span class="text-secondary">"PLANT_1040"</span>,</div>
+<div class="pl-md"><span class="text-primary">"workstation"</span>: <span class="text-secondary">"WS_DUS_PACK04"</span>,</div>
+<div class="pl-md"><span class="text-primary">"bindings"</span>: {</div>
+<div class="pl-xl"><span class="text-tertiary">"MARA-MATNR"</span>: <span class="text-on-surface">"MAT-88402-A"</span>,</div>
+<div class="pl-xl"><span class="text-tertiary">"MCH1-CHARG"</span>: <span class="text-on-surface">"LOT-2025-08X"</span>,</div>
+<div class="pl-xl"><span class="text-tertiary">"LFA1-NAME1"</span>: <span class="text-on-surface">"BASF SE CHEMICALS"</span>,</div>
+<div class="pl-xl"><span class="text-tertiary">"MSEG-MENGE"</span>: <span class="text-secondary">1250.000</span>,</div>
+<div class="pl-xl"><span class="text-tertiary">"LAGP-LGPLA"</span>: <span class="text-on-surface">"BIN-B14-R02"</span>,</div>
+<div class="pl-xl"><span class="text-tertiary">"GHS_CLASS"</span>: [<span class="text-secondary">"GHS02"</span>, <span class="text-secondary">"GHS06"</span>]</div>
+<div class="pl-md">},</div>
+<div class="pl-md"><span class="text-primary">"sync_latency_ms"</span>: <span class="text-tertiary">14.2</span>,</div>
+<div class="pl-md"><span class="text-primary">"hash_sha256"</span>: <span class="text-outline text-[10px]">"9f8a...3e01"</span></div>
+<div class="text-outline">}</div>
+</div>
+<div class="p-xs bg-surface-container flex items-center justify-between text-code-matrix font-code-matrix">
+<span class="text-on-surface-variant">ERP Handshake:</span>
+<span class="text-tertiary flex items-center gap-xxs">
+<span class="w-[6px] h-[6px] bg-tertiary-container rounded-full"></span>
+            SYNCED (100%)
+          </span>
+</div>
+</div>
+<!-- Tab Content 3: Printhead Diagnostics Simulation (Initially Hidden) -->
+<div class="flex-1 flex flex-col overflow-y-auto p-xs space-y-xs hidden" id="tabContentDiagnostics">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface font-semibold">Thermal Head Diagnostics</span>
+<span class="font-code-matrix text-code-matrix text-tertiary">SIMULATION ACTIVE</span>
+</div>
+<!-- Metric Telemetry Dashboard -->
+<div class="grid grid-cols-2 gap-xs">
+<div class="bg-surface-container-lowest p-xs">
+<div class="font-label-sm text-label-sm text-on-surface-variant">Resolution</div>
+<div class="font-code-coordinate text-code-coordinate text-primary mt-xxs">203.2 DPI</div>
+<div class="text-outline font-code-matrix text-[9px]">8 dots/mm pitch</div>
+</div>
+<div class="bg-surface-container-lowest p-xs">
+<div class="font-label-sm text-label-sm text-on-surface-variant">Effective Width</div>
+<div class="font-code-coordinate text-code-coordinate text-on-surface mt-xxs">104.0 mm</div>
+<div class="text-outline font-code-matrix text-[9px]">832 thermal dots</div>
+</div>
+<div class="bg-surface-container-lowest p-xs">
+<div class="font-label-sm text-label-sm text-on-surface-variant">Burn Time Strobe</div>
+<div class="font-code-coordinate text-code-coordinate text-tertiary mt-xxs">3.4 ms</div>
+<div class="text-outline font-code-matrix text-[9px]">Safe pulse margin</div>
+</div>
+<div class="bg-surface-container-lowest p-xs">
+<div class="font-label-sm text-label-sm text-on-surface-variant">Darkness Setting</div>
+<div class="font-code-coordinate text-code-coordinate text-secondary mt-xxs">14 / 30</div>
+<div class="text-outline font-code-matrix text-[9px]">Resin ribbon profile</div>
+</div>
+</div>
+<!-- Burn Ratio & Duty Cycle Gauge -->
+<div class="p-xs bg-surface-container-lowest space-y-xs">
+<div class="flex items-center justify-between font-label-sm text-label-sm">
+<span class="text-on-surface">Printhead Duty Heat Load</span>
+<span class="text-tertiary font-code-coordinate">42.8%</span>
+</div>
+<div class="w-full h-[6px] bg-surface-container-highest overflow-hidden flex">
+<div class="bg-tertiary-container h-full w-[43%]"></div>
+<div class="bg-secondary-container h-full w-[15%] opacity-40"></div>
+</div>
+<div class="flex items-center justify-between font-code-matrix text-code-matrix text-on-surface-variant">
+<span class="">Ribbon Saver: ACTIVE</span>
+<span class="">Speed: 150 mm/sec</span>
+</div>
+</div>
+<div class="bg-surface-container p-xs flex items-center gap-xs">
+<span class="material-symbols-outlined text-tertiary text-[18px]">verified</span>
+<div class="font-code-matrix text-code-matrix text-on-surface">
+            No hot spots detected on 832-element thermal line array.
+          </div>
+</div>
+</div>
+</aside>
+</div>
+<!-- Notification Toast (Ephemeral CAD Feedback) -->
+<div class="fixed bottom-[32px] left-1/2 -translate-x-1/2 bg-surface-container-highest text-on-surface px-md py-xs shadow-xl font-code-matrix text-code-matrix z-50 flex items-center gap-xs pointer-events-none transition-opacity duration-200 opacity-0" id="cadToast">
+<span class="material-symbols-outlined text-[14px] text-tertiary" id="toastIcon">check_circle</span>
+<span id="toastMsg" class="">Action executed</span>
+</div>
+<!-- Inline Studio Interactive Scripting -->
+<script>
+    function triggerToast(msg, icon = 'check_circle') {
+      const toast = document.getElementById('cadToast');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastIcon = document.getElementById('toastIcon');
+      if (!toast) return;
+      toastMsg.textContent = msg;
+      toastIcon.textContent = icon;
+      toast.classList.remove('opacity-0');
+      toast.classList.add('opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0');
+      }, 1600);
+    }
+
+    function setActiveTool(btn, toolName) {
+      document.querySelectorAll('aside button').forEach(b => {
+        b.classList.remove('bg-surface-container-highest', 'text-primary', 'shadow-sm');
+        const indicator = b.querySelector('.bg-primary');
+        if (indicator && indicator.classList.contains('w-[2px]')) {
+          indicator.remove();
+        }
+      });
+      btn.classList.add('bg-surface-container-highest', 'text-primary', 'shadow-sm');
+      const line = document.createElement('div');
+      line.className = 'absolute left-0 top-0 bottom-0 w-[2px] bg-primary';
+      btn.prepend(line);
+      triggerToast('Active CAD Tool: ' + toolName, 'build');
+    }
+
+    function toggleDrawer() {
+      const drawer = document.getElementById('sapTokenDrawer');
+      if (!drawer) return;
+      if (drawer.classList.contains('hidden')) {
+        drawer.classList.remove('hidden');
+        triggerToast('SAP Contract Tokens Drawer: Expanded');
+      } else {
+        drawer.classList.add('hidden');
+        triggerToast('SAP Contract Tokens Drawer: Collapsed');
+      }
+    }
+
+    function applyToken(token) {
+      const textElem = document.getElementById('barcodeHumanReadableText');
+      if (textElem) {
+        if (token.includes('material_number')) textElem.textContent = 'MAT-88402-A-992';
+        else if (token.includes('batch_number')) textElem.textContent = 'LOT-2025-08X';
+        else if (token.includes('vendor_name')) textElem.textContent = 'BASF-CHEM-EU';
+        else if (token.includes('production_date')) textElem.textContent = '2025-05-18';
+        else if (token.includes('gross_weight_kg')) textElem.textContent = '24.85-KG-NET';
+        else textElem.textContent = 'VAL-' + Math.floor(1000 + Math.random() * 9000);
+      }
+      triggerToast('Applied ' + token + ' to Barcode Element', 'bolt');
+    }
+
+    function selectBarcode() {
+      const box = document.getElementById('selectionBoundingBox');
+      if (box) {
+        box.classList.toggle('hidden');
+        triggerToast('Selection toggled: CODE128 Primary Node');
+      }
+    }
+
+    function switchRightTab(tabKey) {
+      const layersContent = document.getElementById('tabContentLayers');
+      const contractContent = document.getElementById('tabContentContract');
+      const diagContent = document.getElementById('tabContentDiagnostics');
+
+      const btnLayers = document.getElementById('tabBtnLayers');
+      const btnContract = document.getElementById('tabBtnContract');
+      const btnDiag = document.getElementById('tabBtnDiagnostics');
+
+      // reset contents
+      layersContent.classList.add('hidden');
+      contractContent.classList.add('hidden');
+      diagContent.classList.add('hidden');
+
+      // reset tabs
+      [btnLayers, btnContract, btnDiag].forEach(btn => {
+        btn.classList.remove('text-primary', 'bg-surface-container', 'shadow-sm');
+        btn.classList.add('text-on-surface-variant');
+      });
+
+      if (tabKey === 'layers') {
+        layersContent.classList.remove('hidden');
+        btnLayers.classList.add('text-primary', 'bg-surface-container', 'shadow-sm');
+        btnLayers.classList.remove('text-on-surface-variant');
+      } else if (tabKey === 'contract') {
+        contractContent.classList.remove('hidden');
+        btnContract.classList.add('text-primary', 'bg-surface-container', 'shadow-sm');
+        btnContract.classList.remove('text-on-surface-variant');
+      } else if (tabKey === 'diagnostics') {
+        diagContent.classList.remove('hidden');
+        btnDiag.classList.add('text-primary', 'bg-surface-container', 'shadow-sm');
+        btnDiag.classList.remove('text-on-surface-variant');
+      }
+    }
+
+    function notifyZIndex(action) {
+      triggerToast('Layer Stack Action: ' + action, 'swap_vert');
+    }
+
+    function toggleLayerVis(btn, e) {
+      e.stopPropagation();
+      const icon = btn.querySelector('.material-symbols-outlined');
+      if (icon.textContent === 'visibility') {
+        icon.textContent = 'visibility_off';
+        triggerToast('Layer visibility hidden');
+      } else {
+        icon.textContent = 'visibility';
+        triggerToast('Layer visibility visible');
+      }
+    }
+
+    function toggleLayerLock(btn, e) {
+      e.stopPropagation();
+      const icon = btn.querySelector('.material-symbols-outlined');
+      if (icon.textContent === 'lock_open') {
+        icon.textContent = 'lock';
+        triggerToast('Layer node locked');
+      } else {
+        icon.textContent = 'lock_open';
+        triggerToast('Layer node unlocked');
+      }
+    }
+
+    // Dynamic mouse cursor tracker on millimeter rulers
+    const viewport = document.getElementById('cadViewport');
+    const markerX = document.getElementById('rulerMarkerX');
+    const markerY = document.getElementById('rulerMarkerY');
+
+    if (viewport && markerX && markerY) {
+      viewport.addEventListener('mousemove', (e) => {
+        const rect = viewport.getBoundingClientRect();
+        const mouseX = Math.max(0, Math.min(1200, (e.clientX - rect.left) * 1.1));
+        const mouseY = Math.max(0, Math.min(600, (e.clientY - rect.top) * 0.9));
+        markerX.setAttribute('points', `${mouseX},19 ${mouseX + 4},13 ${mouseX - 4},13`);
+        markerY.setAttribute('points', `23,${mouseY} 17,${mouseY + 4} 17,${mouseY - 4}`);
+      });
+    }
+  </script>
+</div></main></div><footer class="fixed bottom-0 left-0 right-0 h-[24px] bg-surface-container-lowest border-t border-outline-variant z-50 flex items-center justify-between px-md font-code-coordinate text-code-coordinate text-on-surface-variant"><div class="flex items-center gap-md"><div class="flex items-center gap-xs"><span class="text-outline">POS:</span><span class="text-on-surface">X: 45.2 mm</span><span class="text-outline">|</span><span class="text-on-surface">Y: 18.7 mm</span></div><div class="flex items-center gap-xs border-l border-outline-variant pl-md"><span class="text-outline">TARGET:</span><span class="text-primary font-mono">Barcode Code128 [MARA-MATNR]</span></div></div><div class="flex items-center gap-md"><div class="flex items-center gap-xs border-r border-outline-variant pr-md"><span class="w-[6px] h-[6px] bg-tertiary-container"></span><span class="font-label-sm text-label-sm text-on-surface">Thermal Engine Ready (203.2 DPI / 8 dpmm)</span></div><div class="flex items-center gap-xxs bg-surface border border-outline-variant px-xs py-zero"><span class="text-outline font-label-sm text-label-sm">ZOOM:</span><select class="bg-transparent text-on-surface border-none outline-none font-code-matrix text-code-matrix cursor-pointer"><option value="fit">Fit Label</option><option value="50">50%</option><option selected="" value="100">100% (1:1)</option><option value="200">200%</option><option value="400">400%</option></select></div></div></footer>
+
+</body></html>
