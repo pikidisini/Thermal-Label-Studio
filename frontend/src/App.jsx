@@ -1010,6 +1010,8 @@ export default function App() {
             pxPerMm={pxPerMm}
             fitTrigger={fitTrigger}
             reset100Trigger={reset100Trigger}
+            activeTool={activeTool}
+            onFinishDrawing={() => setActiveTool('select')}
           />
         </div>
 
