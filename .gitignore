@@ -19,6 +19,10 @@ ENV/
 backend/data/out/*
 !backend/data/out/.gitkeep
 
+# Executables & Binary Assets
+engine/bin/*.exe
+!engine/bin/.gitkeep
+
 # IDE / Editor & Temp
 .history/
 .dontread/

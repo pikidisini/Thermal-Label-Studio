@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="20mm" height="20mm">
+      <polygon points="50,4 96,50 50,96 4,50" fill="none" stroke="#000000" stroke-width="5" stroke-linejoin="round"/>
+      <!-- Head & Torso with Burst Star -->
+      <circle cx="50" cy="30" r="7" fill="#000000"/>
+      <path d="M35,62 C35,46 65,46 65,62 L65,72 L35,72 Z" fill="#000000"/>
+      <!-- Explosion Star in Chest -->
+      <polygon points="50,47 52,54 59,51 54,56 60,60 53,60 50,67 47,60 40,60 46,56 41,51 48,54" fill="#ffffff"/>
+    </svg>

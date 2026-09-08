@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="20mm" height="20mm">
+      <!-- Hook Shape -->
+      <path d="M48,20 L52,20 L52,48 C52,62 66,62 66,50 L60,50 C60,57 56,57 56,48 L56,20 Z" fill="#000000"/>
+      <!-- Diagonal Prohibitive Red/Black Cross -->
+      <line x1="20" y1="20" x2="80" y2="80" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+      <line x1="80" y1="20" x2="20" y2="80" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+    </svg>

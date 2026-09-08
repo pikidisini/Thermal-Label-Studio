@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80" width="200mm" height="80mm" 
+     shape-rendering="crispEdges" text-rendering="geometricPrecision" 
+     font-family="Arial, 'DejaVu Sans', sans-serif" fill="#000000">
+
+  <!-- Background & Border -->
+  <rect x="0" y="0" width="200" height="80" fill="#ffffff" stroke="none" />
+  <rect x="0.125" y="0.125" width="199.75" height="79.75" fill="none" stroke="#000000" stroke-width="0.25" />
+  <line x1="100" y1="0" x2="100" y2="80" stroke="#000000" stroke-width="0.25" />
+
+  <!-- LEFT PANEL (0 - 100 mm) -->
+  <g id="left-panel">
+    <text x="3" y="8" font-size="7" font-weight="bold" data-field="brand">{{brand}}</text>
+    <text x="97" y="8" font-size="7" font-weight="bold" text-anchor="end" data-field="type_film">{{type_film}}</text>
+    <line x1="2" y1="10" x2="98" y2="10" stroke="#000000" stroke-width="0.375" />
+    
+    <text x="3" y="17" font-size="7" font-weight="bold" data-field="grade">{{grade}}</text>
+    <text x="97" y="17" font-size="3.5" font-weight="bold" text-anchor="end"><tspan data-field="thickness_micron">{{thickness_micron}}</tspan> Mic / <tspan data-field="thickness_gauge">{{thickness_gauge}}</tspan> Ga</text>
+    
+    <text x="3" y="24" font-size="3.5" font-weight="bold"><tspan data-field="width_mm">{{width_mm}}</tspan> mm   x   <tspan data-field="length_m">{{length_m}}</tspan> M</text>
+    <text x="3" y="30" font-size="3.5" font-weight="bold"><tspan data-field="width_inch">{{width_inch}}</tspan> Inch x   <tspan data-field="length_feet">{{length_feet}}</tspan> Feet</text>
+
+    <text x="3" y="40" font-size="2.8">INSIDE</text>
+    <text x="18" y="40" font-size="2.8">: <tspan data-field="treatment_inside">{{treatment_inside}}</tspan></text>
+    
+    <text x="3" y="45" font-size="2.8">OUTSIDE</text>
+    <text x="18" y="45" font-size="2.8">: <tspan data-field="treatment_outside">{{treatment_outside}}</tspan></text>
+    
+    <text x="3" y="50" font-size="2.8">Batch</text>
+    <text x="18" y="50" font-size="2.8" font-weight="bold">: <tspan data-field="batch_text">{{batch_text}}</tspan></text>
+
+    <text x="97" y="38" font-size="2.8" text-anchor="end">NWEIGHT</text>
+    <text x="97" y="44" font-size="3.5" font-weight="bold" text-anchor="end"><tspan data-field="net_weight_kg">{{net_weight_kg}}</tspan> Kg</text>
+    <text x="97" y="50" font-size="3.5" font-weight="bold" text-anchor="end"><tspan data-field="weight_lbs">{{weight_lbs}}</tspan> Lbs</text>
+
+    <rect id="rect_batch_barcode" data-barcode="batch_barcode" data-symbology="CODE128" data-human-readable="false" x="3" y="55" width="40" height="10" fill="none" stroke="#000000" stroke-width="0.25" />
+    <text id="text_batch_barcode" x="23" y="68" font-size="2.5" fill="#000000" text-anchor="middle" data-code="batch_barcode">{{batch_barcode}}</text>
+
+    <text x="60" y="62" font-size="2.2" text-anchor="middle">CORE</text>
+    <text x="60" y="66" font-size="2.2" text-anchor="middle"><tspan data-field="core_inch">{{core_inch}}</tspan></text>
+
+    <text x="85" y="62" font-size="2.2" text-anchor="middle">USED BEFORE</text>
+    <text x="85" y="66" font-size="2.2" text-anchor="middle"><tspan data-field="used_before">{{used_before}}</tspan></text>
+
+    <g id="logo_halal">
+      <rect x="3" y="71" width="22" height="7" fill="none" stroke="#000000" stroke-width="0.25" />
+      <text x="14" y="75.5" font-size="2.2" font-weight="bold" text-anchor="middle">HALAL</text>
+    </g>
+    <g id="logo_iscc">
+      <rect x="27" y="71" width="22" height="7" fill="none" stroke="#000000" stroke-width="0.25" />
+      <text x="38" y="75.5" font-size="2.2" font-weight="bold" text-anchor="middle">ISCC</text>
+    </g>
+  </g>
+
+  <!-- RIGHT PANEL (100 - 200 mm) -->
+  <g id="right-panel">
+    <g id="table_splice">
+      <text x="103" y="5" font-size="2.2">SPLICE AT FROM BEGINNING CORE SIDE</text>
+      <rect x="103" y="7" width="92" height="12" fill="none" stroke="#000000" stroke-width="0.25" />
+      <line x1="103" y1="13" x2="195" y2="13" stroke="#000000" stroke-width="0.25" />
+      <line x1="110" y1="7" x2="110" y2="19" stroke="#000000" stroke-width="0.25" />
+      <line x1="145" y1="7" x2="145" y2="19" stroke="#000000" stroke-width="0.25" />
+      <line x1="151" y1="7" x2="151" y2="19" stroke="#000000" stroke-width="0.25" />
+      <line x1="185" y1="7" x2="185" y2="19" stroke="#000000" stroke-width="0.25" />
+      
+      <text x="104" y="11" font-size="2.2">1st</text>
+      <text x="143" y="11" font-size="2.2" text-anchor="end" data-field="splice_1_m">{{splice_1_m}}</text>
+      <text x="146" y="11" font-size="2.2">m</text>
+      <text x="183" y="11" font-size="2.2" text-anchor="end" data-field="splice_1_feet">{{splice_1_feet}}</text>
+      <text x="187" y="11" font-size="2.2">Feet</text>
+      
+      <text x="104" y="17" font-size="2.2">2nd</text>
+      <text x="143" y="17" font-size="2.2" text-anchor="end" data-field="splice_2_m">{{splice_2_m}}</text>
+      <text x="146" y="17" font-size="2.2">m</text>
+      <text x="183" y="17" font-size="2.2" text-anchor="end" data-field="splice_2_feet">{{splice_2_feet}}</text>
+      <text x="187" y="17" font-size="2.2">Feet</text>
+    </g>
+
+    <rect id="rect_qr_payload" data-qr="qr_payload" x="105" y="25" width="16" height="16" fill="none" stroke="#000000" stroke-width="0.25" />
+    <text id="text_qr_payload" x="113" y="43" font-size="2.5" fill="#000000" text-anchor="middle" data-code="qr_payload">{{qr_payload}}</text>
+    
+    <rect x="125" y="25" width="70" height="16" fill="none" stroke="#000000" stroke-width="0.25" />
+    <line x1="125" y1="31" x2="195" y2="31" stroke="#000000" stroke-width="0.25" />
+    <text x="160" y="29.5" font-size="2.8" text-anchor="middle" data-field="batch_text">{{batch_text}}</text>
+    <text x="160" y="35" font-size="2.2" font-weight="bold" text-anchor="middle" data-field="inner_core">{{inner_core}}</text>
+    <text x="160" y="39.5" font-size="2.8" font-weight="bold" text-anchor="middle" data-field="roll_no">{{roll_no}}</text>
+
+    <text x="103" y="50" font-size="2.2">Batch : <tspan data-field="batch_text">{{batch_text}}</tspan></text>
+    
+    <g id="so_item_box">
+      <text x="190" y="47" font-size="2.2" text-anchor="end">SO/ITEM</text>
+      <text x="190" y="51" font-size="2.2" text-anchor="end" data-field="so_item">{{so_item}}</text>
+    </g>
+
+    <rect id="rect_roll_barcode" data-barcode="roll_barcode" data-symbology="CODE128" data-human-readable="false" x="103" y="54" width="92" height="12" fill="none" stroke="#000000" stroke-width="0.25" />
+    <text id="text_roll_barcode" x="149" y="69" font-size="2.5" fill="#000000" text-anchor="middle" data-code="roll_barcode">{{roll_barcode}}</text>
+  </g>
+</svg>

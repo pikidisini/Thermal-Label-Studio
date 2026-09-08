@@ -12,10 +12,12 @@ from typing import List
 # Ensure Project Root is in sys.path so engine modules can be imported
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 WEB_APP_DIR = BACKEND_DIR.parent
-PROJECT_ROOT = WEB_APP_DIR.parent
+PROJECT_ROOT = WEB_APP_DIR if (WEB_APP_DIR / "engine").exists() else WEB_APP_DIR.parent
 
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+if str(WEB_APP_DIR) not in sys.path:
+    sys.path.insert(0, str(WEB_APP_DIR))
 
 # Directories
 BUILTIN_TEMPLATES_DIR = PROJECT_ROOT / "assets" / "templates"

@@ -1,0 +1,33 @@
+﻿name: 🐛 Laporan Bug (Bug Report)
+description: Laporkan bug, error, atau anomali render label
+title: "[BUG]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: Terima kasih telah melaporkan bug. Mohon berikan informasi selengkap mungkin agar AI agent atau kontributor dapat mereproduksinya secara cepat.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Deskripsi Bug
+      description: Apa yang terjadi secara detail?
+      placeholder: Contoh: Hasil render ZPL menghasilkan karakter rusak saat mencetak QR code...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Langkah Mereproduksi
+      description: Bagaimana cara memicu bug ini?
+      placeholder: |
+        1. Buka halaman Studio
+        2. Pilih template 'label_roll_80x200'
+        3. Masukkan payload JSON berikut...
+        4. Klik 'Render ZPL'
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log / Traceback Error (Jika Ada)
+      render: shell

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="20mm" height="20mm">
+      <polygon points="50,4 96,50 50,96 4,50" fill="none" stroke="#000000" stroke-width="5" stroke-linejoin="round"/>
+      <!-- Flame over Circle -->
+      <circle cx="50" cy="58" r="14" fill="none" stroke="#000000" stroke-width="5"/>
+      <path d="M50,24 C45,30 42,37 45,43 C46,41 49,38 52,40 C50,45 54,49 55,53 C59,47 62,40 58,34 C55,29 50,24 50,24 Z" fill="#000000"/>
+    </svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="20mm" height="20mm">
+      <!-- Wine Glass with Crack -->
+      <path d="M30,16 L70,16 L70,36 C70,52 56,58 53,60 L53,80 L66,80 L66,85 L34,85 L34,80 L47,80 L47,60 C44,58 30,52 30,36 Z" fill="#000000"/>
+      <!-- Crack Lightning Cutout -->
+      <polygon points="50,18 45,30 53,35 48,48 54,46 48,34 54,28" fill="#ffffff"/>
+    </svg>

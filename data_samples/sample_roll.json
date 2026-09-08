@@ -1,0 +1,52 @@
+{
+  "contract_version": "1.1",
+  "label_type": "ROLL",
+  "label_code": "PFO-30",
+  "source": {
+    "matnr": "SR01PFO3000810",
+    "charg": "0000909358",
+    "werks": "1100",
+    "generated_at": "2026-08-19T08:00:00"
+  },
+  "fields": {
+    "brand": "ASTRIA",
+    "base_film": "BOPET",
+    "type_film": "PFO-30",
+    "criteria": "",
+    "width_mm": "810",
+    "length_m": "8000",
+    "width_inch": "31.89",
+    "length_feet": "26240",
+    "thickness_micron": "30",
+    "thickness_gauge": "120",
+    "net_weight_kg": "466,56",
+    "weight_lbs": "1028,58",
+    "gross_weight_kg": "472,10",
+    "batch_text": "0000909358",
+    "roll_no": "1 AGB 063 058 9F 01 05",
+    "so_item": "7001928-10",
+    "lot_number": "L-90218",
+    "order_no": "1009283",
+    "splice_1_m": "1250",
+    "splice_1_feet": "4101",
+    "splice_2_m": "4500",
+    "splice_2_feet": "14763",
+    "core_inch": "6\"",
+    "used_before": "2028.10",
+    "manuf_date": "2026.08.19",
+    "expired_live": "2 YEARS",
+    "inner_core": "CORE-A1",
+    "pallet_no": "",
+    "box_no": "",
+    "total_roll": "",
+    "total_box": "",
+    "treatment_inside": "CORONA SIDE",
+    "treatment_outside": "METALLIZED SIDE"
+  },
+  "codes": {
+    "batch_barcode": "0000909358",
+    "roll_barcode": "1 AGB 063 058 9F 01 05",
+    "pallet_hu_barcode": "",
+    "qr_payload": "MAT:SR01PFO3000810;BAT:0000909358;ROL:1AGB0630589F0105"
+  }
+}

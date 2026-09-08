@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="20mm" height="20mm">
+      <!-- Dual Upward Arrows -->
+      <g fill="#000000">
+        <!-- Left Arrow -->
+        <polygon points="34,16 22,34 30,34 30,72 38,72 38,34 46,34"/>
+        <!-- Right Arrow -->
+        <polygon points="66,16 54,34 62,34 62,72 70,72 70,34 78,34"/>
+        <!-- Bottom Base Bar -->
+        <rect x="18" y="78" width="64" height="6" rx="1"/>
+      </g>
+    </svg>

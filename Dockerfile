@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for Thermal Label Studio
+﻿# Multi-stage Dockerfile for Thermal Label Studio
 # Stage 1: Build React Frontend
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
@@ -26,21 +26,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy root engine dependencies and requirements
-COPY requirements.txt ./
+# Copy requirements and install
+COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
-COPY web_app/backend/requirements.txt ./web_app_requirements.txt
-RUN pip install --no-cache-dir -r web_app_requirements.txt
 
 # Copy source code
 COPY engine/ /app/engine/
 COPY assets/ /app/assets/
-COPY web_app/backend/ /app/web_app/backend/
+COPY data_samples/ /app/data_samples/
+COPY backend/ /app/backend/
 
 # Copy built frontend assets from stage 1
-COPY --from=frontend-builder /app/frontend/dist /app/web_app/frontend/dist
+COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 
 ENV PYTHONPATH=/app
 EXPOSE 8000
 
-CMD ["python", "web_app/backend/run_server.py"]
+CMD ["python", "backend/run_server.py"]

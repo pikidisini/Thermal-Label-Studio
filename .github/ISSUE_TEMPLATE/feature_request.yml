@@ -1,0 +1,27 @@
+﻿name: 🚀 Usulan Fitur / AI Task (Feature Request)
+description: Usulkan fitur baru, endpoint baru, atau instruksi task untuk AI Agent
+title: "[FEAT]: "
+labels: ["enhancement", "ai-ready"]
+body:
+  - type: markdown
+    attributes:
+      value: Gunakan template ini untuk merencanakan fitur baru atau mendefinisikan scope task untuk diselesaikan oleh AI Agent.
+  - type: textarea
+    id: feature-goal
+    attributes:
+      label: Tujuan & Deskripsi Fitur
+      description: Apa tujuan dari fitur ini dan masalah apa yang dipecahkan?
+      placeholder: Contoh: Tambahkan dukungan rotasi teks 90/180/270 derajat pada canvas editor...
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Kriteria Keberhasilan (Acceptance Criteria)
+      description: Daftar kondisi yang harus terpenuhi agar task dianggap selesai
+      placeholder: |
+        - [ ] Backend mendukung parameter rotation_deg pada API render
+        - [ ] Fabric.js canvas memungkinkan user memutar objek secara interaktif
+        - [ ] Unit test baru mencakup pengujian rotasi teks
+    validations:
+      required: true

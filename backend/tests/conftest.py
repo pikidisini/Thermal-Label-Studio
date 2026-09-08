@@ -11,12 +11,14 @@ from fastapi.testclient import TestClient
 TEST_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = TEST_DIR.parent
 WEB_APP_DIR = BACKEND_DIR.parent
-PROJECT_ROOT = WEB_APP_DIR.parent
+PROJECT_ROOT = WEB_APP_DIR if (WEB_APP_DIR / "engine").exists() else WEB_APP_DIR.parent
 
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
+if str(WEB_APP_DIR) not in sys.path:
+    sys.path.insert(0, str(WEB_APP_DIR))
 
 from app.main import app
 

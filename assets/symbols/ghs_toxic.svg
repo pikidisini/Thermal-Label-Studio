@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="20mm" height="20mm">
+      <polygon points="50,4 96,50 50,96 4,50" fill="none" stroke="#000000" stroke-width="5" stroke-linejoin="round"/>
+      <!-- Skull & Crossbones -->
+      <path d="M28,68 L72,32 M72,68 L28,32" stroke="#000000" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="26" cy="30" r="3.5" fill="#000000"/>
+      <circle cx="74" cy="30" r="3.5" fill="#000000"/>
+      <circle cx="26" cy="70" r="3.5" fill="#000000"/>
+      <circle cx="74" cy="70" r="3.5" fill="#000000"/>
+      <!-- Skull Base -->
+      <path d="M50,25 C38,25 32,34 32,44 C32,51 36,56 41,58 L41,64 L59,64 L59,58 C64,56 68,51 68,44 C68,34 62,25 50,25 Z" fill="#000000"/>
+      <!-- Eye Sockets & Nose (White Knockout) -->
+      <ellipse cx="43" cy="42" rx="4" ry="5.5" fill="#ffffff"/>
+      <ellipse cx="57" cy="42" rx="4" ry="5.5" fill="#ffffff"/>
+      <polygon points="50,49 47,55 53,55" fill="#ffffff"/>
+      <!-- Teeth -->
+      <rect x="44" y="60" width="2.5" height="4" fill="#ffffff"/>
+      <rect x="48.75" y="60" width="2.5" height="4" fill="#ffffff"/>
+      <rect x="53.5" y="60" width="2.5" height="4" fill="#ffffff"/>
+    </svg>

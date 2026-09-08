@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 25" width="50mm" height="25mm"
+     shape-rendering="crispEdges" text-rendering="geometricPrecision"
+     font-family="Arial, 'DejaVu Sans', sans-serif" fill="#000000">
+
+  <!-- Background & Border -->
+  <rect x="0" y="0" width="50" height="25" fill="#ffffff" stroke="none" />
+  <rect x="0.3" y="0.3" width="49.4" height="24.4" fill="none" stroke="#000000" stroke-width="0.3" />
+
+  <!-- LEFT: TEXT INFO -->
+  <text x="2.5" y="5" font-size="2.6" font-weight="bold" data-field="brand">{{brand}}</text>
+  <text x="2.5" y="9" font-size="1.8" fill="#555555">ASSET ID:</text>
+  <text x="2.5" y="13.5" font-size="3.2" font-weight="bold" data-field="batch_number">{{batch_number}}</text>
+
+  <text x="2.5" y="17.5" font-size="1.8" fill="#555555">PART NO:</text>
+  <text x="2.5" y="21.5" font-size="2.2" font-weight="bold" data-field="material_number">{{material_number}}</text>
+
+  <!-- RIGHT: 2D QR CODE -->
+  <rect data-qr="qr_traceability" x="30" y="3.5" width="17" height="17" fill="none" stroke="#000000" stroke-width="0.2" />
+  <text x="38.5" y="23" font-size="1.6" text-anchor="middle">ASSET SCAN</text>
+</svg>
