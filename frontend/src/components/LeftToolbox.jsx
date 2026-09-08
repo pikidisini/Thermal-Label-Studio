@@ -142,10 +142,17 @@ export default function LeftToolbox({
           <div className="flex flex-col items-center gap-1 w-full">
             <button
               type="button"
-              onClick={() => onAddText?.('Static Text')}
-              className="relative group w-[38px] h-[32px] flex items-center justify-center text-on-surface-variant hover:bg-surface-container hover:text-on-surface rounded-sm transition"
+              onClick={() => setActiveTool?.(activeTool === 'text' ? 'select' : 'text')}
+              className={`relative group w-[38px] h-[32px] flex items-center justify-center rounded-sm transition ${
+                activeTool === 'text'
+                  ? 'bg-surface-container-highest text-primary shadow-sm'
+                  : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+              }`}
               title="Text Label [T]"
             >
+              {activeTool === 'text' && (
+                <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />
+              )}
               <Type className="w-4 h-4" />
               <span className="absolute left-[52px] bg-surface-container-highest text-on-surface px-1.5 py-0.5 rounded shadow-lg text-[10px] font-mono opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">
                 Text Box [T]
@@ -154,10 +161,17 @@ export default function LeftToolbox({
 
             <button
               type="button"
-              onClick={() => onAddBarcode?.('{{material_number}}')}
-              className="relative group w-[38px] h-[32px] flex items-center justify-center text-primary hover:bg-surface-container rounded-sm transition"
+              onClick={() => setActiveTool?.(activeTool === 'barcode' ? 'select' : 'barcode')}
+              className={`relative group w-[38px] h-[32px] flex items-center justify-center rounded-sm transition ${
+                activeTool === 'barcode'
+                  ? 'bg-surface-container-highest text-primary shadow-sm'
+                  : 'text-primary hover:bg-surface-container'
+              }`}
               title="1D Linear Barcode [B]"
             >
+              {activeTool === 'barcode' && (
+                <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary" />
+              )}
               <Barcode className="w-4 h-4" />
               <span className="absolute left-[52px] bg-surface-container-highest text-on-surface px-1.5 py-0.5 rounded shadow-lg text-[10px] font-mono opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">
                 1D Barcode [B]
@@ -166,10 +180,17 @@ export default function LeftToolbox({
 
             <button
               type="button"
-              onClick={() => onAddQrCode?.('{{material_number}}|{{batch_number}}')}
-              className="relative group w-[38px] h-[32px] flex items-center justify-center text-indigo-400 hover:bg-surface-container rounded-sm transition"
+              onClick={() => setActiveTool?.(activeTool === 'qrcode' ? 'select' : 'qrcode')}
+              className={`relative group w-[38px] h-[32px] flex items-center justify-center rounded-sm transition ${
+                activeTool === 'qrcode'
+                  ? 'bg-surface-container-highest text-indigo-300 shadow-sm'
+                  : 'text-indigo-400 hover:bg-surface-container'
+              }`}
               title="2D DataMatrix / QR [M]"
             >
+              {activeTool === 'qrcode' && (
+                <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-indigo-400" />
+              )}
               <QrCode className="w-4 h-4" />
               <span className="absolute left-[52px] bg-surface-container-highest text-on-surface px-1.5 py-0.5 rounded shadow-lg text-[10px] font-mono opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">
                 2D Matrix / QR [M]
@@ -183,10 +204,17 @@ export default function LeftToolbox({
           <div className="flex flex-col items-center gap-1 w-full">
             <button
               type="button"
-              onClick={onAddRect}
-              className="relative group w-[38px] h-[32px] flex items-center justify-center text-emerald-400 hover:bg-surface-container rounded-sm transition"
+              onClick={() => setActiveTool?.(activeTool === 'rect' ? 'select' : 'rect')}
+              className={`relative group w-[38px] h-[32px] flex items-center justify-center rounded-sm transition ${
+                activeTool === 'rect'
+                  ? 'bg-surface-container-highest text-emerald-300 shadow-sm'
+                  : 'text-emerald-400 hover:bg-surface-container'
+              }`}
               title="Rectangle Frame [R]"
             >
+              {activeTool === 'rect' && (
+                <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-emerald-400" />
+              )}
               <Square className="w-4 h-4" />
               <span className="absolute left-[52px] bg-surface-container-highest text-on-surface px-1.5 py-0.5 rounded shadow-lg text-[10px] font-mono opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">
                 Box Frame [R]
@@ -195,10 +223,17 @@ export default function LeftToolbox({
 
             <button
               type="button"
-              onClick={onAddLine}
-              className="relative group w-[38px] h-[32px] flex items-center justify-center text-amber-400 hover:bg-surface-container rounded-sm transition"
+              onClick={() => setActiveTool?.(activeTool === 'line' ? 'select' : 'line')}
+              className={`relative group w-[38px] h-[32px] flex items-center justify-center rounded-sm transition ${
+                activeTool === 'line'
+                  ? 'bg-surface-container-highest text-amber-300 shadow-sm'
+                  : 'text-amber-400 hover:bg-surface-container'
+              }`}
               title="Separator Line [L]"
             >
+              {activeTool === 'line' && (
+                <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-amber-400" />
+              )}
               <Minus className="w-4 h-4" />
               <span className="absolute left-[52px] bg-surface-container-highest text-on-surface px-1.5 py-0.5 rounded shadow-lg text-[10px] font-mono opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">
                 Separator Line [L]
@@ -207,10 +242,17 @@ export default function LeftToolbox({
 
             <button
               type="button"
-              onClick={onAddCircle}
-              className="relative group w-[38px] h-[32px] flex items-center justify-center text-rose-400 hover:bg-surface-container rounded-sm transition"
+              onClick={() => setActiveTool?.(activeTool === 'circle' ? 'select' : 'circle')}
+              className={`relative group w-[38px] h-[32px] flex items-center justify-center rounded-sm transition ${
+                activeTool === 'circle'
+                  ? 'bg-surface-container-highest text-rose-300 shadow-sm'
+                  : 'text-rose-400 hover:bg-surface-container'
+              }`}
               title="Ellipse / Seal Badge [C]"
             >
+              {activeTool === 'circle' && (
+                <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-rose-400" />
+              )}
               <Circle className="w-4 h-4" />
               <span className="absolute left-[52px] bg-surface-container-highest text-on-surface px-1.5 py-0.5 rounded shadow-lg text-[10px] font-mono opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">
                 Circle / Badge [C]
@@ -219,10 +261,17 @@ export default function LeftToolbox({
 
             <button
               type="button"
-              onClick={onAddTable}
-              className="relative group w-[38px] h-[32px] flex items-center justify-center text-teal-400 hover:bg-surface-container rounded-sm transition"
+              onClick={() => setActiveTool?.(activeTool === 'table' ? 'select' : 'table')}
+              className={`relative group w-[38px] h-[32px] flex items-center justify-center rounded-sm transition ${
+                activeTool === 'table'
+                  ? 'bg-surface-container-highest text-teal-300 shadow-sm'
+                  : 'text-teal-400 hover:bg-surface-container'
+              }`}
               title="Table Grid [G]"
             >
+              {activeTool === 'table' && (
+                <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-teal-400" />
+              )}
               <Table className="w-4 h-4" />
               <span className="absolute left-[52px] bg-surface-container-highest text-on-surface px-1.5 py-0.5 rounded shadow-lg text-[10px] font-mono opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">
                 Manifest Table [G]

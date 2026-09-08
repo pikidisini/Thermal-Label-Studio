@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { fabric } from 'fabric';
+import { barcodeGenerators } from '../utils/barcodeGenerators';
 
 function StudioCanvas({
   labelWidthMm = 200,
@@ -15,7 +16,9 @@ function StudioCanvas({
   onCursorPosChange,
   onDropElement,
   canvasRef,
-  pxPerMm = 4
+  pxPerMm = 4,
+  activeTool = 'select',
+  onFinishDrawing
 }) {
   const viewportRef = useRef(null);
   const canvasContainerRef = useRef(null);
@@ -33,6 +36,7 @@ function StudioCanvas({
     onAutoFit,
     onCursorPosChange,
     onDropElement,
+    onFinishDrawing,
   });
   callbacksRef.current = {
     onSelectionChanged,
@@ -42,7 +46,14 @@ function StudioCanvas({
     onAutoFit,
     onCursorPosChange,
     onDropElement,
+    onFinishDrawing,
   };
+
+  const activeToolRef = useRef(activeTool);
+  activeToolRef.current = activeTool;
+  const isDrawingRef = useRef(false);
+  const drawStartPosRef = useRef({ x: 0, y: 0 });
+  const previewShapeRef = useRef(null);
 
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const zoomRef = useRef(zoom);
@@ -388,6 +399,316 @@ function StudioCanvas({
     canvasRef.current = fabricCanvas;
     callbacksRef.current.onCanvasReady?.(fabricCanvas);
 
+    // Interactive CAD Drawing Listeners (Illustrator / Inkscape workflow)
+    fabricCanvas.on('mouse:down', (opt) => {
+      if (!opt.e) return;
+      if (opt.e.button !== 0 || isSpacePressedRef.current) return;
+
+      const currentTool = activeToolRef.current;
+      if (!currentTool || currentTool === 'select') return;
+
+      const pointer = opt.pointer || fabricCanvas.getPointer(opt.e);
+      const origX = Math.round(pointer.x);
+      const origY = Math.round(pointer.y);
+
+      isDrawingRef.current = true;
+      drawStartPosRef.current = { x: origX, y: origY };
+
+      let preview = null;
+      if (currentTool === 'rect') {
+        preview = new fabric.Rect({
+          left: origX,
+          top: origY,
+          width: 0,
+          height: 0,
+          fill: 'rgba(52, 211, 153, 0.12)',
+          stroke: '#34d399',
+          strokeWidth: 1.5,
+          strokeDashArray: [4, 4],
+          selectable: false,
+          evented: false,
+        });
+      } else if (currentTool === 'circle') {
+        preview = new fabric.Circle({
+          left: origX,
+          top: origY,
+          radius: 0,
+          fill: 'rgba(251, 113, 133, 0.12)',
+          stroke: '#fb7185',
+          strokeWidth: 1.5,
+          strokeDashArray: [4, 4],
+          selectable: false,
+          evented: false,
+        });
+      } else if (currentTool === 'line') {
+        preview = new fabric.Line([origX, origY, origX, origY], {
+          stroke: '#fbbf24',
+          strokeWidth: 1.5,
+          strokeDashArray: [4, 4],
+          selectable: false,
+          evented: false,
+        });
+      } else if (currentTool === 'text') {
+        preview = new fabric.Rect({
+          left: origX,
+          top: origY,
+          width: 0,
+          height: 0,
+          fill: 'rgba(96, 165, 250, 0.12)',
+          stroke: '#60a5fa',
+          strokeWidth: 1.5,
+          strokeDashArray: [4, 4],
+          selectable: false,
+          evented: false,
+        });
+      } else if (currentTool === 'barcode') {
+        preview = new fabric.Rect({
+          left: origX,
+          top: origY,
+          width: 0,
+          height: 0,
+          fill: 'rgba(96, 165, 250, 0.12)',
+          stroke: '#60a5fa',
+          strokeWidth: 1.5,
+          strokeDashArray: [4, 4],
+          selectable: false,
+          evented: false,
+        });
+      } else if (currentTool === 'qrcode') {
+        preview = new fabric.Rect({
+          left: origX,
+          top: origY,
+          width: 0,
+          height: 0,
+          fill: 'rgba(129, 140, 248, 0.12)',
+          stroke: '#818cf8',
+          strokeWidth: 1.5,
+          strokeDashArray: [4, 4],
+          selectable: false,
+          evented: false,
+        });
+      } else if (currentTool === 'table') {
+        preview = new fabric.Rect({
+          left: origX,
+          top: origY,
+          width: 0,
+          height: 0,
+          fill: 'rgba(45, 212, 191, 0.12)',
+          stroke: '#2dd4bf',
+          strokeWidth: 1.5,
+          strokeDashArray: [4, 4],
+          selectable: false,
+          evented: false,
+        });
+      }
+
+      if (preview) {
+        previewShapeRef.current = preview;
+        fabricCanvas.add(preview);
+        fabricCanvas.renderAll();
+      }
+    });
+
+    fabricCanvas.on('mouse:move', (opt) => {
+      if (!isDrawingRef.current || !previewShapeRef.current || !opt.e) return;
+      const pointer = opt.pointer || fabricCanvas.getPointer(opt.e);
+      const origX = drawStartPosRef.current.x;
+      const origY = drawStartPosRef.current.y;
+      const curX = pointer.x;
+      const curY = pointer.y;
+      const currentTool = activeToolRef.current;
+
+      if (currentTool === 'line') {
+        let endX = curX;
+        let endY = curY;
+        if (opt.e.shiftKey) {
+          const dx = curX - origX;
+          const dy = curY - origY;
+          if (Math.abs(dx) > Math.abs(dy) * 1.5) {
+            endY = origY;
+          } else if (Math.abs(dy) > Math.abs(dx) * 1.5) {
+            endX = origX;
+          } else {
+            const d = Math.min(Math.abs(dx), Math.abs(dy));
+            endX = origX + Math.sign(dx) * d;
+            endY = origY + Math.sign(dy) * d;
+          }
+        }
+        previewShapeRef.current.set({ x2: endX, y2: endY });
+      } else if (currentTool === 'circle') {
+        const left = Math.min(origX, curX);
+        const top = Math.min(origY, curY);
+        const w = Math.abs(curX - origX);
+        const h = Math.abs(curY - origY);
+        const radius = Math.max(w, h) / 2;
+        previewShapeRef.current.set({ left, top, radius });
+      } else {
+        const left = Math.min(origX, curX);
+        const top = Math.min(origY, curY);
+        const w = Math.abs(curX - origX);
+        const h = Math.abs(curY - origY);
+        previewShapeRef.current.set({ left, top, width: w, height: h });
+      }
+      fabricCanvas.renderAll();
+    });
+
+    fabricCanvas.on('mouse:up', (opt) => {
+      if (!isDrawingRef.current) return;
+      isDrawingRef.current = false;
+
+      const currentTool = activeToolRef.current;
+      const pointer = opt ? (opt.pointer || fabricCanvas.getPointer(opt.e)) : drawStartPosRef.current;
+      const origX = drawStartPosRef.current.x;
+      const origY = drawStartPosRef.current.y;
+
+      if (previewShapeRef.current) {
+        fabricCanvas.remove(previewShapeRef.current);
+        previewShapeRef.current = null;
+      }
+
+      const dx = pointer.x - origX;
+      const dy = pointer.y - origY;
+      const distance = Math.hypot(dx, dy);
+      const isClick = distance < 5;
+
+      const left = isClick ? origX : Math.min(origX, pointer.x);
+      const top = isClick ? origY : Math.min(origY, pointer.y);
+      const width = isClick ? 0 : Math.abs(dx);
+      const height = isClick ? 0 : Math.abs(dy);
+
+      const finalizeObject = (obj) => {
+        fabricCanvas.add(obj);
+        fabricCanvas.setActiveObject(obj);
+        fabricCanvas.renderAll();
+        callbacksRef.current.onSelectionChanged?.(obj);
+        callbacksRef.current.onCanvasModified?.();
+        callbacksRef.current.onFinishDrawing?.();
+      };
+
+      if (currentTool === 'rect') {
+        const finalW = isClick ? 40 * pxPerMm : Math.max(8, width);
+        const finalH = isClick ? 25 * pxPerMm : Math.max(8, height);
+        const rect = new fabric.Rect({
+          left,
+          top,
+          width: finalW,
+          height: finalH,
+          fill: 'transparent',
+          stroke: '#000000',
+          strokeWidth: 0.5 * pxPerMm,
+        });
+        finalizeObject(rect);
+      } else if (currentTool === 'circle') {
+        const radius = isClick ? 12 * pxPerMm : Math.max(6, Math.max(width, height) / 2);
+        const circle = new fabric.Circle({
+          left,
+          top,
+          radius,
+          fill: 'transparent',
+          stroke: '#000000',
+          strokeWidth: 0.5 * pxPerMm,
+        });
+        finalizeObject(circle);
+      } else if (currentTool === 'line') {
+        let endX = isClick ? origX + 40 * pxPerMm : pointer.x;
+        let endY = isClick ? origY : pointer.y;
+        if (!isClick && opt?.e?.shiftKey) {
+          if (Math.abs(dx) > Math.abs(dy) * 1.5) endY = origY;
+          else if (Math.abs(dy) > Math.abs(dx) * 1.5) endX = origX;
+        }
+        const line = new fabric.Line([origX, origY, endX, endY], {
+          stroke: '#000000',
+          strokeWidth: 0.5 * pxPerMm,
+        });
+        finalizeObject(line);
+      } else if (currentTool === 'text') {
+        const fontSize = isClick ? 4 * pxPerMm : Math.max(10, Math.min(Math.round(height * 0.75), 32));
+        const text = new fabric.IText('Label Text', {
+          left,
+          top,
+          fontFamily: 'Arial',
+          fontSize,
+          fill: '#000000',
+        });
+        finalizeObject(text);
+      } else if (currentTool === 'barcode') {
+        const targetW = isClick ? 50 * pxPerMm : Math.max(20, width);
+        const targetH = isClick ? 20 * pxPerMm : Math.max(15, height);
+        const tokenOrValue = '{{material_number}}';
+        const dataUrl = barcodeGenerators.generateCode128DataUrl(tokenOrValue, {
+          barWidth: 2,
+          barHeight: 40,
+        });
+        if (dataUrl) {
+          fabric.Image.fromURL(dataUrl, (img) => {
+            const scaleX = targetW / (img.width || 1);
+            const scaleY = targetH / (img.height || 1);
+            img.set({
+              left,
+              top,
+              scaleX,
+              scaleY,
+              isBarcode: true,
+              barcodeType: 'code128',
+              barcodeValue: tokenOrValue,
+            });
+            finalizeObject(img);
+          });
+        } else {
+          callbacksRef.current.onFinishDrawing?.();
+        }
+      } else if (currentTool === 'qrcode') {
+        const size = isClick ? 25 * pxPerMm : Math.max(15, Math.min(width, height));
+        const tokenOrValue = '{{material_number}}|{{batch_number}}';
+        barcodeGenerators.generateQrDataUrl(tokenOrValue, { size: 150 }).then((dataUrl) => {
+          if (dataUrl) {
+            fabric.Image.fromURL(dataUrl, (img) => {
+              const scale = size / (img.width || 1);
+              img.set({
+                left,
+                top,
+                scaleX: scale,
+                scaleY: scale,
+                isBarcode: true,
+                barcodeType: 'qrcode',
+                barcodeValue: tokenOrValue,
+              });
+              finalizeObject(img);
+            });
+          } else {
+            callbacksRef.current.onFinishDrawing?.();
+          }
+        });
+      } else if (currentTool === 'table') {
+        const tW = isClick ? 80 * pxPerMm : Math.max(30, width);
+        const tH = isClick ? 25 * pxPerMm : Math.max(20, height);
+        const groupItems = [];
+        const border = new fabric.Rect({
+          left: 0,
+          top: 0,
+          width: tW,
+          height: tH,
+          fill: 'transparent',
+          stroke: '#000000',
+          strokeWidth: 0.5 * pxPerMm,
+        });
+        groupItems.push(border);
+        const headerH = Math.min(tH * 0.35, 10 * pxPerMm);
+        groupItems.push(new fabric.Line([0, headerH, tW, headerH], {
+          stroke: '#000000',
+          strokeWidth: 0.5 * pxPerMm,
+        }));
+        groupItems.push(new fabric.Line([tW / 2, 0, tW / 2, tH], {
+          stroke: '#000000',
+          strokeWidth: 0.5 * pxPerMm,
+        }));
+        const group = new fabric.Group(groupItems, { left, top });
+        finalizeObject(group);
+      } else {
+        callbacksRef.current.onFinishDrawing?.();
+      }
+    });
+
     // Initial fit once mounted
     const initTimer = setTimeout(() => {
       handleResetFitRef.current?.();
@@ -407,6 +728,15 @@ function StudioCanvas({
         return;
       }
       if (e.key === 'Escape') {
+        if (isDrawingRef.current && previewShapeRef.current) {
+          fabricCanvas.remove(previewShapeRef.current);
+          previewShapeRef.current = null;
+          isDrawingRef.current = false;
+          fabricCanvas.renderAll();
+        }
+        if (activeToolRef.current !== 'select') {
+          callbacksRef.current.onFinishDrawing?.();
+        }
         const activeObj = fabricCanvas.getActiveObject();
         if (activeObj) {
           if (activeObj.isEditing) {
@@ -465,6 +795,36 @@ function StudioCanvas({
       canvasRef.current = null;
     };
   }, [canvasWidthPx, canvasHeightPx]);
+
+  // Synchronize Fabric canvas mode with activeTool (Illustrator / Inkscape workflow)
+  useEffect(() => {
+    activeToolRef.current = activeTool;
+    if (!canvasRef.current) return;
+    const c = canvasRef.current;
+
+    // Clean up any in-progress drawing preview if tool changes
+    if (isDrawingRef.current && previewShapeRef.current) {
+      c.remove(previewShapeRef.current);
+      previewShapeRef.current = null;
+      isDrawingRef.current = false;
+    }
+
+    if (activeTool !== 'select') {
+      c.discardActiveObject();
+      c.selection = false;
+      c.skipTargetFind = true;
+      c.defaultCursor = 'crosshair';
+      c.hoverCursor = 'crosshair';
+      c.renderAll();
+      callbacksRef.current.onSelectionChanged?.(null);
+    } else {
+      c.selection = true;
+      c.skipTargetFind = false;
+      c.defaultCursor = isSpacePressedRef.current ? 'grab' : 'default';
+      c.hoverCursor = 'move';
+      c.renderAll();
+    }
+  }, [activeTool]);
 
   // Update canvas dimensions & native Fabric zoom from external prop changes (e.g. status bar buttons)
   useEffect(() => {
