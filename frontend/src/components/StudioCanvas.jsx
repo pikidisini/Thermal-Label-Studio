@@ -911,8 +911,8 @@ function StudioCanvas({
         isPanningRef.current = false;
         setIsPanning(false);
         if (canvasRef.current) {
-          canvasRef.current.defaultCursor = 'default';
-          canvasRef.current.selection = true;
+          canvasRef.current.defaultCursor = activeToolRef.current !== 'select' ? 'crosshair' : 'default';
+          canvasRef.current.selection = activeToolRef.current === 'select';
         }
       }
     };
@@ -1137,8 +1137,8 @@ function StudioCanvas({
           canvasRef.current.defaultCursor = 'grab';
           canvasRef.current.selection = false;
         } else {
-          canvasRef.current.defaultCursor = 'default';
-          canvasRef.current.selection = true;
+          canvasRef.current.defaultCursor = activeToolRef.current !== 'select' ? 'crosshair' : 'default';
+          canvasRef.current.selection = activeToolRef.current === 'select';
         }
       }
     }
