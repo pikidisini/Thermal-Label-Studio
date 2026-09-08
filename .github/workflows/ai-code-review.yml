@@ -1,4 +1,4 @@
-﻿name: AI Pull Request Reviewer & Security Guardrail
+name: AI Pull Request Reviewer & Security Guardrail
 
 on:
   pull_request:
@@ -35,7 +35,7 @@ jobs:
           echo "leak_found=$LEAK_FOUND" >> $GITHUB_OUTPUT
 
       - name: Generate PR Quality Summary
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
