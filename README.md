@@ -34,15 +34,23 @@ web_app/
 
 ---
 
-## 🚀 Cara Menjalankan Server Backend
+## 🚀 Cara Menjalankan Aplikasi
 
-### 1. Jalankan via Script Runner
+### Opsi 1: Menjalankan via Docker (Direkomendasikan)
+```bash
+# Dari direktori web_app/ atau root direktori
+docker compose up -d --build
+```
+- Web UI & API otomatis tersedia di **`http://localhost:8000`**
+- Interactive Swagger UI: **`http://localhost:8000/docs`**
+
+### Opsi 2: Menjalankan Lokal (Python & Node.js)
 ```bash
 python web_app/backend/run_server.py
 ```
-Server akan berjalan di `http://127.0.0.1:8000`.
+Server backend akan berjalan di `http://127.0.0.1:8000`.
 
-### 2. Buka Dokumentasi Interaktif (Swagger UI)
+### Dokumentasi Interaktif (Swagger UI)
 Buka browser dan navigasi ke:
 👉 **`http://127.0.0.1:8000/docs`** atau **`http://127.0.0.1:8000/redoc`**
 

@@ -32,9 +32,27 @@ class TemplateService:
         templates: List[TemplateSummary] = []
         seen_ids = set()
 
-        # 1. Search in BUILTIN_TEMPLATES_DIR
+        # 1. Search in CUSTOM_TEMPLATES_DIR first (User-created and uploaded templates)
+        if CUSTOM_TEMPLATES_DIR.exists():
+            for p in sorted(CUSTOM_TEMPLATES_DIR.glob("*.svg"), key=lambda x: x.stat().st_mtime, reverse=True):
+                tmpl_id = p.stem
+                if tmpl_id not in seen_ids:
+                    seen_ids.add(tmpl_id)
+                    w_mm, h_mm = cls.extract_dimensions_from_file(p)
+                    templates.append(
+                        TemplateSummary(
+                            id=tmpl_id,
+                            name=tmpl_id.replace("_", " ").title(),
+                            filename=p.name,
+                            is_builtin=False,
+                            width_mm=w_mm,
+                            height_mm=h_mm,
+                        )
+                    )
+
+        # 2. Search in BUILTIN_TEMPLATES_DIR
         if BUILTIN_TEMPLATES_DIR.exists():
-            for p in BUILTIN_TEMPLATES_DIR.glob("*.svg"):
+            for p in sorted(BUILTIN_TEMPLATES_DIR.glob("*.svg")):
                 tmpl_id = p.stem
                 if tmpl_id not in seen_ids:
                     seen_ids.add(tmpl_id)
@@ -50,8 +68,8 @@ class TemplateService:
                         )
                     )
 
-        # 2. Check root directory SVG templates if any
-        for root_svg in PROJECT_ROOT.glob("label_*.svg"):
+        # 3. Check root directory SVG templates if any
+        for root_svg in sorted(PROJECT_ROOT.glob("label_*.svg")):
             tmpl_id = root_svg.stem
             if tmpl_id not in seen_ids:
                 seen_ids.add(tmpl_id)
@@ -66,24 +84,6 @@ class TemplateService:
                         height_mm=h_mm,
                     )
                 )
-
-        # 3. Search in CUSTOM_TEMPLATES_DIR
-        if CUSTOM_TEMPLATES_DIR.exists():
-            for p in CUSTOM_TEMPLATES_DIR.glob("*.svg"):
-                tmpl_id = p.stem
-                if tmpl_id not in seen_ids:
-                    seen_ids.add(tmpl_id)
-                    w_mm, h_mm = cls.extract_dimensions_from_file(p)
-                    templates.append(
-                        TemplateSummary(
-                            id=tmpl_id,
-                            name=tmpl_id.replace("_", " ").title(),
-                            filename=p.name,
-                            is_builtin=False,
-                            width_mm=w_mm,
-                            height_mm=h_mm,
-                        )
-                    )
 
         return templates
 
@@ -129,13 +129,13 @@ class TemplateService:
     ) -> TemplateDetail:
         """Parses an SVG content string and returns full details."""
         # Find all {{placeholder}} tokens
-        tokens = sorted(list(set(re.findall(r"\{\{([a-zA-Z0-9_]+)\}\}", svg_content))))
+        tokens = sorted(list(set(re.findall(r"\{\{\s*([a-zA-Z0-9_\-]+)\s*\}\}", svg_content))))
 
-        # Find 1D barcode fields (data-barcode="...")
-        barcodes = sorted(list(set(re.findall(r'data-barcode=["\']([a-zA-Z0-9_]+)["\']', svg_content))))
+        # Find 1D barcode fields (data-barcode="..." or data-field="...")
+        barcodes = sorted(list(set(re.findall(r'data-barcode=["\']([^"\']+)["\']', svg_content))))
 
         # Find QR code fields (data-qr="...")
-        qrs = sorted(list(set(re.findall(r'data-qr=["\']([a-zA-Z0-9_]+)["\']', svg_content))))
+        qrs = sorted(list(set(re.findall(r'data-qr=["\']([^"\']+)["\']', svg_content))))
 
         # Parse XML attributes
         w_mm: Optional[float] = None
@@ -184,6 +184,16 @@ class TemplateService:
         target_file.write_text(svg_content, encoding="utf-8")
 
         return cls.parse_svg_string(svg_content, template_id=tmpl_id, filename=file_name, is_builtin=False)
+
+    @classmethod
+    def delete_custom_template(cls, template_id: str) -> bool:
+        """Deletes a custom template file from CUSTOM_TEMPLATES_DIR."""
+        clean_id = template_id.replace(".svg", "")
+        target_file = CUSTOM_TEMPLATES_DIR / f"{clean_id}.svg"
+        if target_file.exists():
+            target_file.unlink()
+            return True
+        return False
 
     @classmethod
     def extract_dimensions_from_file(cls, path: Path) -> Tuple[Optional[float], Optional[float]]:

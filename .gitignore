@@ -33,3 +33,12 @@ Thumbs.db
 *.log
 .env
 .env.*
+
+# Generated test reports and results
+playwright-report/
+test-results/
+frontend/playwright-report/
+frontend/test-results/
+frontend/recordings/*
+!frontend/recordings/.gitkeep
+**/.last-run.json

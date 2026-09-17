@@ -3,7 +3,14 @@ Tests for Headless SAP Automated Printing Routes and Service.
 """
 
 from unittest.mock import patch
+from copy import deepcopy
+import pytest
 from fastapi.testclient import TestClient
+from pathlib import Path
+import json
+
+from app.models.schemas import SapPrintRequest
+from app.services.sap_service import SapService
 
 
 SAP_ABAP_PAYLOAD = {
@@ -61,6 +68,8 @@ SAP_ABAP_PAYLOAD = {
     },
 }
 
+INLINE_TOKEN_SVG = '<svg xmlns="http://www.w3.org/2000/svg"><text>{{token}}</text></svg>'
+
 
 def test_sap_ping(client: TestClient):
     """Test SAP heartbeat ping endpoint."""
@@ -90,6 +99,72 @@ def test_sap_print_dry_run(client: TestClient):
     assert data["zpl_command"] is not None
     assert "^XA" in data["zpl_command"]
     assert "^XZ" in data["zpl_command"]
+
+
+def test_sample_roll_contract_preserves_root_and_normalizes_source_aliases(client: TestClient):
+    root = Path(__file__).parents[2]
+    sample = json.loads((root / "data_samples" / "sample_roll.json").read_text(encoding="utf-8"))
+    sample["source"]["program"] = "ZMMR_LABEL_JSON"
+    sample["fields"]["optional_note"] = "additional scalar metadata"
+    sample["template_svg"] = '<svg xmlns="http://www.w3.org/2000/svg"><text>{{material_number}} {{batch_number}} {{plant}}</text></svg>'
+    sample["dry_run"] = True
+
+    req = SapPrintRequest.model_validate(sample)
+    normalized, template_id, _ = SapService.resolve_contract_and_template(req)
+    assert normalized["contract_version"] == "1.1"
+    assert normalized["label_type"] == "ROLL"
+    assert normalized["label_code"] == "PFO-30"
+    assert normalized["source"]["matnr"] == "SR01PFO3000810"
+    assert normalized["source"]["charg"] == "0000909358"
+    assert normalized["source"]["werks"] == "1100"
+    assert normalized["source"]["program"] == "ZMMR_LABEL_JSON"
+    assert normalized["fields"]["material_number"] == "SR01PFO3000810"
+    assert normalized["fields"]["batch_number"] == "0000909358"
+    assert normalized["fields"]["plant"] == "1100"
+    assert normalized["fields"]["grade"] == ""
+    assert normalized["fields"]["optional_note"] == "additional scalar metadata"
+    assert template_id == "label_roll_80x200"
+
+    response = client.post("/api/v1/sap/print", json=sample)
+    assert response.status_code == 200
+    assert response.json()["bytes_sent"] == 0
+    assert "Dry-run" in response.json()["message"]
+
+
+@pytest.mark.parametrize("field_name", ["grade", "pallet_no"])
+def test_empty_string_token_is_allowed(client: TestClient, field_name: str):
+    payload = {
+        **deepcopy(SAP_ABAP_PAYLOAD),
+        "fields": {**deepcopy(SAP_ABAP_PAYLOAD["fields"]), field_name: ""},
+        "template_svg": INLINE_TOKEN_SVG.replace("{{token}}", "{{" + field_name + "}}"),
+        "dry_run": True,
+    }
+    response = client.post("/api/v1/sap/print", json=payload)
+    assert response.status_code == 200
+    assert response.json()["bytes_sent"] == 0
+
+
+def test_missing_token_is_rejected(client: TestClient):
+    payload = {
+        **deepcopy(SAP_ABAP_PAYLOAD),
+        "template_svg": INLINE_TOKEN_SVG.replace("{{token}}", "{{not_in_contract}}"),
+        "dry_run": True,
+    }
+    response = client.post("/api/v1/sap/print", json=payload)
+    assert response.status_code == 400
+    assert "not_in_contract" in response.json()["detail"]
+
+
+def test_null_token_is_rejected(client: TestClient):
+    payload = {
+        **deepcopy(SAP_ABAP_PAYLOAD),
+        "fields": {**deepcopy(SAP_ABAP_PAYLOAD["fields"]), "grade": None},
+        "template_svg": INLINE_TOKEN_SVG.replace("{{token}}", "{{grade}}"),
+        "dry_run": True,
+    }
+    response = client.post("/api/v1/sap/print", json=payload)
+    assert response.status_code == 400
+    assert "grade" in response.json()["detail"]
 
 
 def test_sap_print_tcp_mocked(client: TestClient):

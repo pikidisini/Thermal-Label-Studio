@@ -5,7 +5,7 @@ Pydantic Models for Label Engine REST API.
 from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional, Union
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class DataContractMetadata(BaseModel):
@@ -52,18 +52,26 @@ class RenderRequest(BaseModel):
         default=None,
         description="Inline SVG template string if not using template_id"
     )
-    formats: List[str] = Field(
+    formats: List[Literal["all", "png", "bmp", "pdf", "zpl", "tspl", "ipl", "svg"]] = Field(
         default=["png", "pdf", "zpl", "tspl", "ipl"],
         description="Target formats to render ('all', 'png', 'bmp', 'pdf', 'zpl', 'tspl', 'ipl', 'svg')"
     )
-    dpi: float = Field(default=203.2, description="Printhead resolution DPI")
-    rotation: int = Field(default=0, description="Clockwise rotation (0, 90, 180, 270)")
+    dpi: float = Field(default=203.2, gt=0, description="Printhead resolution DPI")
+    rotation: Literal[0, 90, 180, 270] = Field(default=0, description="Clockwise rotation")
     binarization_threshold: Optional[int] = Field(
-        default=None,
+        default=None, ge=0, le=255,
         description="Monochrome 1-bit threshold [0..255] (null = auto Otsu)"
     )
-    width_mm: float = Field(default=200.0, description="Physical width in mm")
-    height_mm: float = Field(default=80.0, description="Physical height in mm")
+    width_mm: float = Field(default=200.0, gt=0, description="Physical width in mm")
+    height_mm: float = Field(default=80.0, gt=0, description="Physical height in mm")
+
+    @model_validator(mode="after")
+    def validate_template_and_dimensions(self) -> "RenderRequest":
+        if not self.template_svg and not self.template_id:
+            raise ValueError("Must provide either 'template_id' or 'template_svg'.")
+        if not self.formats:
+            raise ValueError("At least one render format is required.")
+        return self
 
 
 class RenderResponse(BaseModel):
@@ -83,12 +91,22 @@ class PreviewRequest(BaseModel):
     data: Dict[str, Any]
     template_id: Optional[str] = "label_roll_80x200"
     template_svg: Optional[str] = None
-    preview_type: str = Field(default="png", description="'png', 'monochrome_1bit', or 'svg'")
-    dpi: float = 203.2
-    rotation: int = 0
-    binarization_threshold: Optional[int] = None
-    width_mm: float = 200.0
-    height_mm: float = 80.0
+    preview_type: Literal["png", "monochrome_1bit", "svg"] = Field(default="png", description="Preview output type")
+    dpi: float = Field(default=203.2, gt=0)
+    rotation: Literal[0, 90, 180, 270] = 0
+    binarization_threshold: Optional[int] = Field(default=None, ge=0, le=255)
+    width_mm: float = Field(default=200.0, gt=0)
+    height_mm: float = Field(default=80.0, gt=0)
+
+    @model_validator(mode="after")
+    def validate_template(self) -> "PreviewRequest":
+        if not self.template_svg and not self.template_id:
+            raise ValueError("Must provide either 'template_id' or 'template_svg'.")
+        return self
+
+
+class RawSvgRequest(BaseModel):
+    svg_content: str = Field(..., min_length=1, description="Raw SVG document to inspect")
 
 
 class PrintTcpRequest(BaseModel):
@@ -206,7 +224,10 @@ class SapPrinterTarget(BaseModel):
 
 
 class SapPrintRequest(BaseModel):
-    # Flexible SAP input: accepts either data dict or root-level contract
+    # SAP input accepts either a nested contract or the real root-level contract.
+    contract_version: Optional[str] = Field(default=None, description="SAP contract version")
+    label_type: Optional[str] = Field(default=None, description="Root-level label type metadata")
+    label_code: Optional[str] = Field(default=None, description="Root-level label code metadata")
     data: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Nested label data contract dictionary",
@@ -365,5 +386,3 @@ class PrintBatchResponse(BaseModel):
     target: str
     printer_format: str
     elapsed_ms: float
-
-

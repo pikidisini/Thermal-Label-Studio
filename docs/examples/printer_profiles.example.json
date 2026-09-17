@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0",
+  "description": "Contoh profile printer lokal. Endpoint nyata sengaja tidak dicantumkan; agent mengisi mapping dari konfigurasi lokal yang tidak di-commit.",
+  "profiles": [
+    {
+      "printer_id": "zebra-pilot-01",
+      "vendor": "zebra",
+      "model": "Zebra model to be configured",
+      "language": "zpl",
+      "emulation": "native",
+      "transport": "tcp9100",
+      "host_source": "local_agent_config",
+      "host_env_var": "ZEBRA_PILOT_HOST",
+      "port": 9100,
+      "dpi": 203.2,
+      "dpi_status": "to_be_confirmed",
+      "artifact_extension": "label.zpl",
+      "compatibility_status": "pilot_candidate"
+    },
+    {
+      "printer_id": "pm45-zsim2-test-01",
+      "vendor": "honeywell",
+      "model": "PM45",
+      "language": "zpl",
+      "emulation": "zsim2",
+      "transport": "tcp9100",
+      "host_source": "local_agent_config",
+      "host_env_var": "PM45_ZSIM2_HOST",
+      "port": 9100,
+      "dpi": null,
+      "dpi_status": "to_be_confirmed",
+      "artifact_extension": "label.zpl",
+      "compatibility_status": "requires_model_firmware_test"
+    },
+    {
+      "printer_id": "pm45-pilot-ipl-01",
+      "vendor": "honeywell",
+      "model": "PM45",
+      "language": "ipl",
+      "emulation": "native",
+      "transport": "tcp9100",
+      "host_source": "local_agent_config",
+      "host_env_var": "PM45_PILOT_HOST",
+      "port": 9100,
+      "dpi": null,
+      "dpi_status": "open_question",
+      "artifact_extension": "label.ipl",
+      "compatibility_status": "pilot_primary"
+    }
+  ]
+}

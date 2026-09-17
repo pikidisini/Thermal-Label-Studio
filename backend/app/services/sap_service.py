@@ -1,6 +1,6 @@
 """
 SAP Integration Service for Headless Automated Printing.
-Receives print requests from SAP ECC/S4HANA (T-Code ZLABEL / ZMMR_LABELROL_JSON),
+Receives print requests from an SAP integration producer,
 resolves templates dynamically, renders printer instructions, and dispatches to target printers.
 """
 
@@ -40,14 +40,20 @@ class SapService:
         else:
             # Root-level SAP contract fields
             contract_data = {
-                "schema_version": getattr(req, "schema_version", "1.0"),
-                "generated_at": getattr(req, "generated_at", None),
+                "contract_version": req.contract_version or "1.1",
+                "label_type": req.label_type,
+                "label_code": req.label_code,
                 "source": req.source or {},
                 "fields": req.fields or {},
                 "rules": req.rules or {},
                 "codes": req.codes or {},
                 "metadata": req.metadata or {},
             }
+
+        # Preserve the real root contract when a nested payload is supplied.
+        contract_data.setdefault("contract_version", req.contract_version or "1.1")
+        contract_data.setdefault("label_type", req.label_type)
+        contract_data.setdefault("label_code", req.label_code)
 
         # Ensure 'fields' and 'codes' dictionaries exist
         if "fields" not in contract_data or not isinstance(contract_data["fields"], dict):
@@ -57,9 +63,26 @@ class SapService:
 
         # Merge source metadata into fields if not present (allows {{material}}, {{batch}}, etc.)
         source_dict = contract_data.get("source") or req.source or {}
+        source_aliases = {
+            "matnr": "material_number",
+            "charg": "batch_number",
+            "werks": "plant",
+        }
         for src_key, src_val in source_dict.items():
-            if src_key not in contract_data["fields"] and src_val is not None:
-                contract_data["fields"][src_key] = str(src_val)
+            if src_key in source_aliases and source_aliases[src_key] not in contract_data["fields"] and src_val is not None:
+                contract_data["fields"][source_aliases[src_key]] = src_val
+
+        for root_key in ("label_type", "label_code"):
+            root_value = contract_data.get(root_key)
+            if root_value is not None and root_key not in contract_data["fields"]:
+                contract_data["fields"][root_key] = root_value
+
+        if "criteria" in contract_data["fields"] and "grade" not in contract_data["fields"]:
+            contract_data["fields"]["grade"] = contract_data["fields"]["criteria"]
+        if "type_film" in contract_data["fields"] and "base_film" not in contract_data["fields"]:
+            contract_data["fields"]["base_film"] = contract_data["fields"]["type_film"]
+        elif "base_film" in contract_data["fields"] and "type_film" not in contract_data["fields"]:
+            contract_data["fields"]["type_film"] = contract_data["fields"]["base_film"]
 
         # Merge rules into fields as boolean strings if not present (e.g. {{has_splice}})
         rules_dict = contract_data.get("rules") or req.rules or {}
@@ -73,8 +96,8 @@ class SapService:
 
         if not template_id:
             # Automatic heuristic resolution from SAP Material prefix or Label Type
-            material = str(source_dict.get("material", "")).strip().upper()
-            label_type = str(source_dict.get("label_type", "")).strip().lower()
+            material = str(source_dict.get("matnr") or source_dict.get("material", "")).strip().upper()
+            label_type = str(contract_data.get("label_type") or source_dict.get("label_type", "")).strip().lower()
 
             if material.startswith("SR") or label_type == "roll":
                 template_id = "label_roll_80x200"
@@ -92,8 +115,8 @@ class SapService:
                     resolved = TemplateService.get_template_path(template_id)
             template_file = resolved
 
-        # Scan template for required placeholder tokens and ensure defaults are present
-        # to avoid orphan token failures due to minor schema variations from SAP
+        # Scan template for required placeholders. Missing values are an error;
+        # silently inserting empty strings would make an invalid label look valid.
         svg_content: Optional[str] = None
         if req.template_svg:
             svg_content = req.template_svg
@@ -105,15 +128,14 @@ class SapService:
 
         if svg_content:
             template_tokens = set(re.findall(r"\{\{\s*([a-zA-Z0-9_\-]+)\s*\}\}", svg_content))
-            for tok in template_tokens:
-                if tok not in contract_data["fields"] and tok not in contract_data.get("codes", {}):
-                    # Smart fallbacks for common synonyms
-                    if tok == "base_film" and "type_film" in contract_data["fields"]:
-                        contract_data["fields"]["base_film"] = contract_data["fields"]["type_film"]
-                    elif tok == "type_film" and "base_film" in contract_data["fields"]:
-                        contract_data["fields"]["type_film"] = contract_data["fields"]["base_film"]
-                    else:
-                        contract_data["fields"][tok] = ""
+            available_values = {**contract_data["fields"], **contract_data.get("codes", {})}
+            missing_tokens = [
+                tok for tok in sorted(template_tokens)
+                if tok not in available_values
+                or available_values[tok] is None
+            ]
+            if missing_tokens:
+                raise ValueError(f"Missing required template fields: {', '.join(missing_tokens)}")
 
         return contract_data, template_id or "label_roll_80x200", template_file
 

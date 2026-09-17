@@ -1,0 +1,23 @@
+{
+  "contract_version": "1.0",
+  "job_id": "job-pm45-pilot-accepted-001",
+  "request_id": "sap-request-accepted-001",
+  "created_at": "2026-09-17T10:00:00Z",
+  "expires_at": "2026-09-17T10:05:00Z",
+  "site_id": "pilot-site-01",
+  "printer_id": "pm45-pilot-ipl-01",
+  "printer_language": "ipl",
+  "emulation": "native",
+  "dpi": 203,
+  "copies": 1,
+  "artifact": null,
+  "artifact_sha256": null,
+  "status": "accepted",
+  "attempt_count": 0,
+  "last_error": null,
+  "claim": null,
+  "source": {
+    "producer_type": "sap",
+    "program": "ZMMR_LABEL_JSON"
+  }
+}

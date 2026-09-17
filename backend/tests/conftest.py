@@ -23,6 +23,18 @@ if str(WEB_APP_DIR) not in sys.path:
 from app.main import app
 
 
+@pytest.fixture(autouse=True)
+def isolate_backend_outputs(tmp_path, monkeypatch):
+    """Keep render/SAP artifacts inside pytest's disposable directory."""
+    import app.services.render_service as render_service
+    import app.services.sap_service as sap_service
+
+    output_dir = tmp_path / "render-output"
+    output_dir.mkdir()
+    monkeypatch.setattr(render_service, "STORAGE_OUT_DIR", output_dir)
+    monkeypatch.setattr(sap_service, "STORAGE_OUT_DIR", output_dir)
+
+
 @pytest.fixture
 def client():
     return TestClient(app)

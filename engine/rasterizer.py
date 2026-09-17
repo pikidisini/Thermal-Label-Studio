@@ -138,11 +138,22 @@ def svg_to_png(
 
     # If svg_source is a path to an existing file
     is_file = False
-    if isinstance(svg_source, (str, Path)):
-        p = Path(svg_source)
-        if p.is_file():
-            is_file = True
-            input_file = p
+    if isinstance(svg_source, Path):
+        try:
+            if svg_source.is_file():
+                is_file = True
+                input_file = svg_source
+        except OSError:
+            is_file = False
+    elif isinstance(svg_source, str):
+        if "<svg" not in svg_source and "\n" not in svg_source and len(svg_source) < 1024:
+            try:
+                p = Path(svg_source)
+                if p.is_file():
+                    is_file = True
+                    input_file = p
+            except OSError:
+                is_file = False
 
     temp_svg_file: Optional[Path] = None
     if not is_file:

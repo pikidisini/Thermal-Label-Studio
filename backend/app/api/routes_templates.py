@@ -4,10 +4,12 @@ API Routes for Template Management and Extraction.
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
 from typing import List
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from typing import Optional
+from fastapi import APIRouter, Body, File, Form, HTTPException, Query, UploadFile, status
 
-from ..models.schemas import SaveTemplateRequest, TemplateDetail, TemplateSummary
+from ..models.schemas import RawSvgRequest, SaveTemplateRequest, TemplateDetail, TemplateSummary
 from ..services.template_service import TemplateService
 
 router = APIRouter(prefix="/templates", tags=["Templates"])
@@ -42,6 +44,18 @@ def get_template(template_id: str) -> TemplateDetail:
     return detail
 
 
+@router.delete("/{template_id}", summary="Delete a custom template")
+def delete_template(template_id: str):
+    """Deletes a custom template from server storage."""
+    deleted = TemplateService.delete_custom_template(template_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Custom template '{template_id}' not found or cannot delete built-in templates.",
+        )
+    return {"status": "success", "message": f"Template '{template_id}' deleted successfully."}
+
+
 @router.post("/upload", response_model=TemplateDetail, summary="Upload a custom SVG template")
 async def upload_template(
     file: UploadFile = File(..., description="SVG template file"),
@@ -73,6 +87,28 @@ async def upload_template(
 
 
 @router.post("/parse-raw", response_model=TemplateDetail, summary="Parse raw SVG string")
-def parse_raw_svg(svg_content: str) -> TemplateDetail:
-    """Parses raw SVG content on the fly and returns extracted tokens, barcodes, and QR fields."""
+def parse_raw_svg(
+    req: Optional[RawSvgRequest] = Body(default=None),
+    legacy_svg_content: Optional[str] = Query(default=None, alias="svg_content"),
+) -> TemplateDetail:
+    """Parses raw SVG from a JSON body; query input remains supported for old clients."""
+    svg_content = req.svg_content if req else legacy_svg_content
+    if not svg_content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Request must contain a valid SVG document in 'svg_content'.",
+        )
+    try:
+        root = ET.fromstring(svg_content)
+    except ET.ParseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid SVG XML: {exc}",
+        ) from exc
+
+    if root.tag.rsplit("}", 1)[-1] != "svg":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Root XML element must be 'svg'.",
+        )
     return TemplateService.parse_svg_string(svg_content, template_id="raw_parsed")

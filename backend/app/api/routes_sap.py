@@ -1,6 +1,6 @@
 """
 API Routes for Headless SAP Automated Printing.
-Receives print requests from SAP ECC / S/4HANA (T-Code ZLABEL / ZMMR_LABELROL_JSON).
+Receives print requests from an SAP integration producer.
 """
 
 from __future__ import annotations

@@ -3,6 +3,8 @@ Tests for Data Inspection and Validation Routes.
 """
 
 from fastapi.testclient import TestClient
+from pathlib import Path
+import json
 
 
 def test_get_sample_contract(client: TestClient):
@@ -43,3 +45,34 @@ def test_validate_contract_orphan_token(client: TestClient, sample_payload: dict
     assert res["is_valid"] is False
     assert "unknown_custom_field" in res["orphan_tokens"]
     assert len(res["errors"]) > 0
+
+
+def test_canonical_template_preview_and_single_format_export(client: TestClient):
+    template_path = Path(__file__).parents[2] / "assets" / "templates" / "label_roll_80x200.svg"
+    contract_path = Path(__file__).parents[2] / "data_samples" / "sample_roll.json"
+    svg = template_path.read_text(encoding="utf-8")
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
+
+    validation = client.post("/api/v1/inspect/validate", json={"data": contract, "template_svg": svg})
+    assert validation.status_code == 200
+    assert validation.json()["orphan_tokens"] == []
+
+    preview = client.post("/api/v1/render/preview", json={
+        "data": contract,
+        "template_svg": svg,
+        "preview_type": "png",
+        "width_mm": 80,
+        "height_mm": 200,
+    })
+    assert preview.status_code == 200
+    assert preview.headers["content-type"] == "image/png"
+
+    export = client.post("/api/v1/render", json={
+        "data": contract,
+        "template_svg": svg,
+        "formats": ["zpl"],
+        "width_mm": 80,
+        "height_mm": 200,
+    })
+    assert export.status_code == 200
+    assert "zpl" in export.json()["rendered_formats"]

@@ -134,8 +134,26 @@ class RenderService:
             return final_svg.encode("utf-8"), "image/svg+xml"
 
         # Calculate target dimensions
-        target_w = int(round((req.width_mm / 25.4) * req.dpi))
-        target_h = int(round((req.height_mm / 25.4) * req.dpi))
+        width_mm = req.width_mm
+        height_mm = req.height_mm
+
+        # If request has defaults, check if SVG template defines custom mm width/height
+        import re
+        w_match = re.search(r'<svg[^>]*\bwidth=["\']([\d.]+)mm["\']', svg_content)
+        h_match = re.search(r'<svg[^>]*\bheight=["\']([\d.]+)mm["\']', svg_content)
+        if w_match and (req.width_mm == 200.0 or not req.width_mm):
+            try:
+                width_mm = float(w_match.group(1))
+            except ValueError:
+                pass
+        if h_match and (req.height_mm == 80.0 or not req.height_mm):
+            try:
+                height_mm = float(h_match.group(1))
+            except ValueError:
+                pass
+
+        target_w = int(round((width_mm / 25.4) * req.dpi))
+        target_h = int(round((height_mm / 25.4) * req.dpi))
 
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_png = Path(temp_dir) / "preview.png"

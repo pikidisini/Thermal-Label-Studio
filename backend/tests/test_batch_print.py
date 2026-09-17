@@ -22,12 +22,14 @@ SAMPLE_BATCH_DATA = {
     }
 }
 
+SAMPLE_BATCH_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm"><text>{{material_number}}</text></svg>'
+
 
 def test_batch_print_dry_run_auto_increment(client: TestClient):
     """Test batch print with auto-increment counter on roll_no."""
     req_body = {
         "method": "raw_tcp",
-        "template_id": "label_box_100x50",
+        "template_svg": SAMPLE_BATCH_SVG,
         "copies": 3,
         "increment_config": {
             "field_name": "box_no",
@@ -56,7 +58,7 @@ def test_batch_print_records_array(client: TestClient):
 
     req_body = {
         "method": "raw_tcp",
-        "template_id": "label_box_100x50",
+        "template_svg": SAMPLE_BATCH_SVG,
         "records": [rec1, rec2],
         "dry_run": True,
     }
@@ -77,7 +79,7 @@ def test_batch_print_tcp_mocked(client: TestClient):
             "method": "raw_tcp",
             "host": "192.168.1.188",
             "port": 9100,
-            "template_id": "label_box_100x50",
+            "template_svg": SAMPLE_BATCH_SVG,
             "copies": 2,
             "data": SAMPLE_BATCH_DATA,
             "dry_run": False,
@@ -101,7 +103,7 @@ def test_batch_print_spooler_mocked(client: TestClient):
         req_body = {
             "method": "spooler",
             "printer_name": "ZDesigner ZT411-203dpi",
-            "template_id": "label_box_100x50",
+            "template_svg": SAMPLE_BATCH_SVG,
             "copies": 2,
             "data": SAMPLE_BATCH_DATA,
             "dry_run": False,

@@ -26,10 +26,28 @@
 
 /* Canvas styling */
 .canvas-container {
+  background-color: #ffffff !important;
   box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.canvas-container .lower-canvas,
+.canvas-container > canvas {
+  background-color: #ffffff !important;
 }
 
 /* Fabric.js transform handles styling */
 .canvas-container .upper-canvas {
+  background-color: transparent !important;
   cursor: default;
+}
+
+/* Disable native browser number spinners to eliminate white square artifacts */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }

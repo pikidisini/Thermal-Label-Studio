@@ -1,0 +1,32 @@
+{
+  "contract_version": "1.0",
+  "job_id": "job-pm45-pilot-001",
+  "request_id": "sap-request-001",
+  "created_at": "2026-09-17T10:00:00Z",
+  "expires_at": "2026-09-17T10:05:00Z",
+  "site_id": "pilot-site-01",
+  "printer_id": "pm45-pilot-ipl-01",
+  "printer_language": "ipl",
+  "emulation": "native",
+  "dpi": 203,
+  "copies": 1,
+  "artifact": {
+    "payload_ref": "payload_pm45_ipl_001",
+    "filename": "label.ipl",
+    "media_type": "application/octet-stream",
+    "byte_length": 256
+  },
+  "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "status": "queued",
+  "attempt_count": 0,
+  "last_error": null,
+  "claim": null,
+  "source": {
+    "producer_type": "sap",
+    "program": "ZMMR_LABEL_JSON",
+    "metadata": {
+      "label_type": "ROLL",
+      "label_code": "SR01"
+    }
+  }
+}

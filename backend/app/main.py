@@ -11,7 +11,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from .api import inspect_router, print_router, render_router, sap_router, templates_router
+from .api import inspect_router, print_agent_router, print_router, render_router, sap_router, templates_router
+from .api.routes_print_agent import (
+    cleanup_print_agent_state,
+    initialize_print_agent_state,
+)
 from .config import APP_DESCRIPTION, APP_TITLE, APP_VERSION, CORS_ORIGINS, FRONTEND_DIR
 from .services.cleanup_service import storage_cleanup_worker
 
@@ -19,13 +23,17 @@ from .services.cleanup_service import storage_cleanup_worker
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan context manager managing background worker tasks."""
+    initialize_print_agent_state(app)
     cleanup_task = asyncio.create_task(storage_cleanup_worker(interval_seconds=1800, max_age_seconds=7200))
-    yield
-    cleanup_task.cancel()
     try:
-        await cleanup_task
-    except asyncio.CancelledError:
-        pass
+        yield
+    finally:
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            pass
+        cleanup_print_agent_state(app)
 
 
 app = FastAPI(
@@ -52,9 +60,11 @@ app.include_router(render_router, prefix="/api/v1")
 app.include_router(print_router, prefix="/api/v1")
 app.include_router(inspect_router, prefix="/api/v1")
 app.include_router(sap_router, prefix="/api/v1")
+app.include_router(print_agent_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["System"])
+@app.get("/api/v1/health", tags=["System"])
 def health_check():
     """Health check probe endpoint for containers and load balancers."""
     return {"status": "healthy"}

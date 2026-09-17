@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://thermal-label-studio.invalid/contracts/print-job-v1.schema.json",
+  "title": "Thermal Label Studio Print Job v1",
+  "description": "Strict design-time contract for a webservice print job. This schema does not implement an endpoint or printer dispatch.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "job_id",
+    "request_id",
+    "created_at",
+    "expires_at",
+    "site_id",
+    "printer_id",
+    "printer_language",
+    "emulation",
+    "dpi",
+    "copies",
+    "artifact",
+    "artifact_sha256",
+    "status",
+    "attempt_count",
+    "last_error",
+    "claim",
+    "source"
+  ],
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "job_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "request_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "site_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "printer_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "printer_language": {
+      "type": "string",
+      "enum": ["zpl", "ipl"]
+    },
+    "emulation": {
+      "type": "string",
+      "enum": ["native", "zsim2"]
+    },
+    "dpi": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1200
+    },
+    "copies": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "artifact": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/artifact"}
+      ]
+    },
+    "artifact_sha256": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "accepted",
+        "rendered",
+        "queued",
+        "claimed",
+        "sending",
+        "sent_to_printer",
+        "delivery_unknown",
+        "failed",
+        "expired",
+        "cancelled"
+      ]
+    },
+    "attempt_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10
+    },
+    "last_error": {
+      "type": ["string", "null"],
+      "maxLength": 2000
+    },
+    "claim": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/claim"}
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["producer_type"],
+      "properties": {
+        "producer_type": {
+          "type": "string",
+          "const": "sap"
+        },
+        "program": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "sap_system": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "transaction_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "label_type": {"type": "string", "maxLength": 64},
+            "label_code": {"type": "string", "maxLength": 128},
+            "contract_version": {"type": "string", "maxLength": 32}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "artifact": {
+      "description": "Opaque artifact reference. The agent builds the download endpoint from its trusted base URL; this job never supplies a URL or path.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["payload_ref", "filename", "media_type", "byte_length"],
+      "properties": {
+        "payload_ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"
+        },
+        "filename": {
+          "type": "string",
+          "enum": ["label.ipl", "label.zpl"]
+        },
+        "media_type": {
+          "type": "string",
+          "const": "application/octet-stream"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10485760
+        }
+      }
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_id", "claimed_at", "lease_expires_at"],
+      "properties": {
+        "agent_id": {"$ref": "#/$defs/identifier"},
+        "claimed_at": {"type": "string", "format": "date-time"},
+        "lease_expires_at": {"type": "string", "format": "date-time"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["printer_language"],
+        "properties": {"printer_language": {"const": "ipl"}}
+      },
+      "then": {"properties": {"emulation": {"const": "native"}}}
+    },
+    {
+      "if": {
+        "required": ["emulation"],
+        "properties": {"emulation": {"const": "zsim2"}}
+      },
+      "then": {"properties": {"printer_language": {"const": "zpl"}}}
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"const": "accepted"}}
+      },
+      "then": {
+        "properties": {
+          "artifact": {"const": null},
+          "artifact_sha256": {"const": null},
+          "claim": {"const": null}
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"enum": ["rendered", "queued"]}}
+      },
+      "then": {
+        "properties": {
+          "artifact": {"$ref": "#/$defs/artifact"},
+          "artifact_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "claim": {"const": null}
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {
+          "status": {"enum": ["claimed", "sending", "sent_to_printer", "delivery_unknown"]}
+        }
+      },
+      "then": {
+        "properties": {
+          "artifact": {"$ref": "#/$defs/artifact"},
+          "artifact_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "claim": {"$ref": "#/$defs/claim"}
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["printer_language", "artifact"],
+        "properties": {
+          "printer_language": {"const": "ipl"},
+          "artifact": {"type": "object"}
+        }
+      },
+      "then": {"properties": {"artifact": {"properties": {"filename": {"const": "label.ipl"}}}}}
+    },
+    {
+      "if": {
+        "required": ["printer_language", "artifact"],
+        "properties": {
+          "printer_language": {"const": "zpl"},
+          "artifact": {"type": "object"}
+        }
+      },
+      "then": {"properties": {"artifact": {"properties": {"filename": {"const": "label.zpl"}}}}}
+    }
+  ]
+}

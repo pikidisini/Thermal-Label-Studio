@@ -154,24 +154,45 @@ def inject_barcodes_and_qr(svg_content: str, contract_data: Dict[str, Any]) -> s
     root = ET.fromstring(svg_content)
 
     def resolve_barcode_val(key: str) -> str:
-        val = codes.get(key, "") or fields.get(key, "") or contract_data.get(key, "")
+        clean_key = key.replace("{{", "").replace("}}", "").strip()
+        val = (
+            codes.get(clean_key, "")
+            or fields.get(clean_key, "")
+            or contract_data.get(clean_key, "")
+            or codes.get(key, "")
+            or fields.get(key, "")
+            or contract_data.get(key, "")
+        )
         if not val:
-            if key in ("batch_barcode", "batch_number", "batch_text") or "batch" in key:
+            if clean_key in ("batch_barcode", "batch_number", "batch_text") or "batch" in clean_key:
                 val = fields.get("batch_text") or fields.get("batch_number") or contract_data.get("batch_number") or ""
-            elif key in ("roll_barcode", "roll_no") or "roll" in key:
+            elif clean_key in ("roll_barcode", "roll_no") or "roll" in clean_key:
                 val = fields.get("roll_no") or contract_data.get("roll_no") or ""
-            elif key in ("material_barcode", "matnr", "material_number") or "material" in key or "mat" in key:
+            elif clean_key in ("material_barcode", "matnr", "material_number") or "material" in clean_key or "mat" in clean_key:
                 val = fields.get("material_number") or contract_data.get("material_number") or ""
         return str(val) if val else ""
 
     def resolve_qr_val(key: str) -> str:
-        payload = codes.get(key, "") or fields.get(key, "") or contract_data.get(key, "")
+        clean_key = key.replace("{{", "").replace("}}", "").strip()
+        payload = (
+            codes.get(clean_key, "")
+            or fields.get(clean_key, "")
+            or contract_data.get(clean_key, "")
+            or codes.get(key, "")
+            or fields.get(key, "")
+            or contract_data.get(key, "")
+        )
         if not payload:
-            mat = fields.get("material_number", "") or contract_data.get("material_number", "")
-            bat = fields.get("batch_text") or fields.get("batch_number", "") or contract_data.get("batch_number", "")
-            rol = fields.get("roll_no", "") or contract_data.get("roll_no", "")
-            if mat or bat or rol:
-                payload = f"MAT:{mat};BAT:{bat};ROL:{rol}"
+            if clean_key in ("batch_text", "batch_number") or "batch" in clean_key:
+                payload = fields.get("batch_text") or fields.get("batch_number") or contract_data.get("batch_number") or ""
+            elif clean_key in ("material_number", "matnr") or "material" in clean_key or "mat" in clean_key:
+                payload = fields.get("material_number") or contract_data.get("material_number") or ""
+            else:
+                mat = fields.get("material_number", "") or contract_data.get("material_number", "")
+                bat = fields.get("batch_text") or fields.get("batch_number", "") or contract_data.get("batch_number", "")
+                rol = fields.get("roll_no", "") or contract_data.get("roll_no", "")
+                if mat or bat or rol:
+                    payload = f"MAT:{mat};BAT:{bat};ROL:{rol}"
         return str(payload) if payload else ""
 
     def process_element(parent: ET.Element) -> None:
@@ -217,8 +238,10 @@ def inject_barcodes_and_qr(svg_content: str, contract_data: Dict[str, Any]) -> s
             if is_barcode:
                 key = barcode_key or "batch_barcode"
                 code_val = resolve_barcode_val(key)
+                if not code_val and barcode_key:
+                    code_val = barcode_key
                 if code_val:
-                    if tag == "rect":
+                    if tag in ("rect", "image"):
                         x = float(child.attrib.get("x", 0))
                         y = float(child.attrib.get("y", 0))
                         w = float(child.attrib.get("width", 0))
@@ -235,18 +258,18 @@ def inject_barcodes_and_qr(svg_content: str, contract_data: Dict[str, Any]) -> s
                         parent.insert(i, barcode_group)
                         continue
                     elif tag == "g":
-                        # Fabric group wrapper: find inner rect
-                        inner_rect = None
+                        # Fabric group wrapper: find inner rect or image
+                        inner_target = None
                         for sub in list(child):
                             sub_tag = sub.tag.split("}")[-1] if "}" in sub.tag else sub.tag
-                            if sub_tag == "rect":
-                                inner_rect = sub
+                            if sub_tag in ("rect", "image"):
+                                inner_target = sub
                                 break
-                        if inner_rect is not None:
-                            x = float(inner_rect.attrib.get("x", 0))
-                            y = float(inner_rect.attrib.get("y", 0))
-                            w = float(inner_rect.attrib.get("width", 0))
-                            h = float(inner_rect.attrib.get("height", 0))
+                        if inner_target is not None:
+                            x = float(inner_target.attrib.get("x", 0))
+                            y = float(inner_target.attrib.get("y", 0))
+                            w = float(inner_target.attrib.get("width", 0))
+                            h = float(inner_target.attrib.get("height", 0))
                             barcode_group = create_barcode_svg_group(
                                 code_value=code_val,
                                 x=x,
@@ -254,7 +277,7 @@ def inject_barcodes_and_qr(svg_content: str, contract_data: Dict[str, Any]) -> s
                                 width=w,
                                 height=h,
                             )
-                            child.remove(inner_rect)
+                            child.remove(inner_target)
                             for path_node in list(barcode_group):
                                 child.append(path_node)
                             continue
@@ -262,8 +285,10 @@ def inject_barcodes_and_qr(svg_content: str, contract_data: Dict[str, Any]) -> s
             elif is_qr:
                 key = qr_key or "qr_payload"
                 payload = resolve_qr_val(key)
+                if not payload and qr_key:
+                    payload = qr_key
                 if payload:
-                    if tag == "rect":
+                    if tag in ("rect", "image"):
                         x = float(child.attrib.get("x", 0))
                         y = float(child.attrib.get("y", 0))
                         w = float(child.attrib.get("width", 0))
@@ -280,18 +305,18 @@ def inject_barcodes_and_qr(svg_content: str, contract_data: Dict[str, Any]) -> s
                         parent.insert(i, qr_group)
                         continue
                     elif tag == "g":
-                        # Fabric group wrapper: find inner rect
-                        inner_rect = None
+                        # Fabric group wrapper: find inner rect or image
+                        inner_target = None
                         for sub in list(child):
                             sub_tag = sub.tag.split("}")[-1] if "}" in sub.tag else sub.tag
-                            if sub_tag == "rect":
-                                inner_rect = sub
+                            if sub_tag in ("rect", "image"):
+                                inner_target = sub
                                 break
-                        if inner_rect is not None:
-                            x = float(inner_rect.attrib.get("x", 0))
-                            y = float(inner_rect.attrib.get("y", 0))
-                            w = float(inner_rect.attrib.get("width", 0))
-                            h = float(inner_rect.attrib.get("height", 0))
+                        if inner_target is not None:
+                            x = float(inner_target.attrib.get("x", 0))
+                            y = float(inner_target.attrib.get("y", 0))
+                            w = float(inner_target.attrib.get("width", 0))
+                            h = float(inner_target.attrib.get("height", 0))
                             qr_group = create_qr_svg_group(
                                 payload=payload,
                                 x=x,
@@ -299,7 +324,7 @@ def inject_barcodes_and_qr(svg_content: str, contract_data: Dict[str, Any]) -> s
                                 width=w,
                                 height=h,
                             )
-                            child.remove(inner_rect)
+                            child.remove(inner_target)
                             for path_node in list(qr_group):
                                 child.append(path_node)
                             continue

@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+.git
+.gitignore
+.venv
+__pycache__
+**/*.pyc
+**/*.pyo
+.pytest_cache
+playwright-report
+test-results
+dist
+backend/data/out/*
+!backend/data/out/.gitkeep
+stitch_design

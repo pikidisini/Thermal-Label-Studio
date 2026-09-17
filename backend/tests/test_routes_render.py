@@ -58,6 +58,16 @@ def test_preview_endpoint_monochrome_1bit(client: TestClient, sample_payload: di
     assert len(resp.content) > 100
 
 
+def test_preview_endpoint_rejects_invalid_contract(client: TestClient, sample_payload: dict, sample_custom_svg: str):
+    resp = client.post("/api/v1/render/preview", json={
+        "data": sample_payload,
+        "template_svg": sample_custom_svg,
+        "preview_type": "jpeg",
+        "binarization_threshold": 300,
+    })
+    assert resp.status_code == 422
+
+
 def test_render_orphan_token_fails(client: TestClient, sample_payload: dict):
     orphan_svg = '<svg xmlns="http://www.w3.org/2000/svg"><text>{{missing_token}}</text></svg>'
     req_body = {
