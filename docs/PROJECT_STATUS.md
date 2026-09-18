@@ -10,10 +10,10 @@ Dokumen ini adalah ringkasan kondisi proyek aktif untuk manusia dan AI.
 - Status: aktif dikembangkan; belum boleh dianggap production-ready tanpa verifikasi test, security, observability, backup, dan rollback.
 - Tanggal snapshot dokumen: 2026-09-18
 - Remote baseline terakhir: `origin/main` pada commit `8025353`
-- Branch aktif: `codex/local-print-agent-b2b1-b2b2b-checkpoint`
-- Upstream: `origin/codex/local-print-agent-b2b1-b2b2b-checkpoint`
-- Checkpoint awal branch: `5a2289d` sudah dipush; koreksi B2B2B.2.5 sedang menunggu review/commit.
-- Working tree: dirty karena koreksi B2B2B.2.5 masih menunggu review/commit; belum boleh dianggap committed atau pushed.
+- Source branch checkpoint: `codex/local-print-agent-b2b1-b2b2b-checkpoint`
+- Upstream checkpoint: `origin/codex/local-print-agent-b2b1-b2b2b-checkpoint`
+- Checkpoint awal branch: `5a2289d`; commit koreksi B2B2B.2.5: `a11657d`.
+- Status B2B2B.2.5: verified dan committed; kondisi checkout/remote terkini harus diverifikasi langsung melalui Git.
 
 ## Tujuan produk
 
