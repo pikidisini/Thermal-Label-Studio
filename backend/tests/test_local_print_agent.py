@@ -217,6 +217,93 @@ def test_ambiguous_begin_failure_attempts_one_failure_before_send_recovery() -> 
     assert api.reported == ("failure_before_send", 0)
 
 
+def test_ambiguous_begin_recovery_with_unchanged_attempt_count_yields_uncertain() -> None:
+    api = FakeApi(job())
+    api.begin_response = None
+
+    def ambiguous_begin(job_id: str) -> PrintJob:
+        api.calls.append("begin_delivery")
+        raise TypedAgentApiError(0, "transport_error")
+
+    api.begin_delivery = ambiguous_begin
+    unchanged_final_job = PrintJob.model_validate(
+        job().model_dump() | {"status": PrintJobStatus.FAILED, "attempt_count": 0}
+    )
+    api.report_response = AgentResultResponse(
+        job=unchanged_final_job,
+        outcome="failure_before_send",
+        bytes_sent=0,
+    )
+    transport = MemoryPrinterTransport()
+    result = LocalPrintAgentRunner(config(), api, {"memory": transport}, clock=lambda: NOW).run_once()
+
+    assert result.status is AgentRunStatus.UNCERTAIN
+    assert result.error_category == "AgentValidationError"
+    assert api.calls == ["claim_next", "download_artifact", "begin_delivery", "report_result"]
+    assert api.calls.count("report_result") == 1
+    assert api.calls.count("begin_delivery") == 1
+    assert transport.calls == 0
+    assert len(transport.payloads) == 0
+
+
+def test_ambiguous_begin_recovery_with_incremented_attempt_count_yields_failed_before_send() -> None:
+    api = FakeApi(job())
+    api.begin_response = None
+
+    def ambiguous_begin(job_id: str) -> PrintJob:
+        api.calls.append("begin_delivery")
+        raise TypedAgentApiError(0, "transport_error")
+
+    api.begin_delivery = ambiguous_begin
+    incremented_final_job = PrintJob.model_validate(
+        job().model_dump() | {"status": PrintJobStatus.FAILED, "attempt_count": 1}
+    )
+    api.report_response = AgentResultResponse(
+        job=incremented_final_job,
+        outcome="failure_before_send",
+        bytes_sent=0,
+    )
+    transport = MemoryPrinterTransport()
+    result = LocalPrintAgentRunner(config(), api, {"memory": transport}, clock=lambda: NOW).run_once()
+
+    assert result.status is AgentRunStatus.FAILED_BEFORE_SEND
+    assert result.job is not None and result.job.attempt_count == 1
+    assert api.calls == ["claim_next", "download_artifact", "begin_delivery", "report_result"]
+    assert api.calls.count("report_result") == 1
+    assert api.calls.count("begin_delivery") == 1
+    assert transport.calls == 0
+    assert len(transport.payloads) == 0
+
+
+def test_ambiguous_begin_recovery_with_over_incremented_attempt_count_yields_uncertain() -> None:
+    api = FakeApi(job())
+    api.begin_response = None
+
+    def ambiguous_begin(job_id: str) -> PrintJob:
+        api.calls.append("begin_delivery")
+        raise TypedAgentApiError(0, "transport_error")
+
+    api.begin_delivery = ambiguous_begin
+    over_incremented_job = PrintJob.model_validate(
+        job().model_dump() | {"status": PrintJobStatus.FAILED, "attempt_count": 2}
+    )
+    api.report_response = AgentResultResponse(
+        job=over_incremented_job,
+        outcome="failure_before_send",
+        bytes_sent=0,
+    )
+    transport = MemoryPrinterTransport()
+    result = LocalPrintAgentRunner(config(), api, {"memory": transport}, clock=lambda: NOW).run_once()
+
+    assert result.status is AgentRunStatus.UNCERTAIN
+    assert result.error_category == "AgentValidationError"
+    assert api.calls == ["claim_next", "download_artifact", "begin_delivery", "report_result"]
+    assert api.calls.count("report_result") == 1
+    assert transport.calls == 0
+    assert len(transport.payloads) == 0
+
+
+
 def test_definitive_begin_rejection_does_not_attempt_recovery_callback() -> None:
     api = FakeApi(job())
     def rejected_begin(job_id: str) -> PrintJob:
@@ -496,6 +583,26 @@ def test_malformed_artifact_sha_is_typed_without_raw_validation_error() -> None:
     with pytest.raises(TypedAgentApiError) as raised:
         client.download_artifact("job-test")
     assert raised.value.category == "invalid_artifact_checksum"
+
+
+@pytest.mark.parametrize("response_payload", [
+    {"job": job(status=PrintJobStatus.FAILED).model_dump(mode="json"), "outcome": "failure_before_send", "bytes_sent": 0, "unexpected": True},
+    {"job": {"malformed": True}, "outcome": "success", "bytes_sent": 1},
+])
+def test_report_result_response_is_strict_and_typed(response_payload: dict[str, object]) -> None:
+    settings = config()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=response_payload, request=request)
+
+    client = HttpPrintAgentApiClient(
+        settings,
+        httpx.Client(transport=httpx.MockTransport(handler), base_url=settings.base_url, follow_redirects=False),
+    )
+    with pytest.raises(TypedAgentApiError) as raised:
+        client.report_result("job-test", "failure_before_send", 0)
+    assert raised.value.category == "invalid_result_response"
+    assert "malformed" not in str(raised.value)
 
 
 def make_actual_api(tmp_path: Path, *, job_status: PrintJobStatus = PrintJobStatus.QUEUED) -> tuple[FastAPI, InMemoryPrintJobRepository, PrintAgentConfig]:

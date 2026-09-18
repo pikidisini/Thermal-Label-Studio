@@ -103,7 +103,7 @@ class LocalPrintAgentRunner:
     def _recover_ambiguous_begin(self, job: PrintJob, error: Exception) -> AgentRunResult:
         try:
             response = self.api_client.report_result(job.job_id, "failure_before_send", 0)
-            self._validate_final_response(response, job, "failure_before_send", 0, allow_attempt_increment=True)
+            self._validate_final_response(response, job, "failure_before_send", 0, require_attempt_increment=True)
         except Exception as callback_error:
             return AgentRunResult(AgentRunStatus.UNCERTAIN, job, "failure_before_send", 0, type(callback_error).__name__)
         return AgentRunResult(AgentRunStatus.FAILED_BEFORE_SEND, response.job, "failure_before_send", 0, type(error).__name__)
@@ -115,7 +115,7 @@ class LocalPrintAgentRunner:
         expected_outcome: str,
         expected_bytes: int,
         *,
-        allow_attempt_increment: bool = False,
+        require_attempt_increment: bool = False,
     ) -> None:
         expected_status = {
             "success": PrintJobStatus.SENT_TO_PRINTER,
@@ -134,11 +134,9 @@ class LocalPrintAgentRunner:
             raise AgentValidationError("result response has an unowned or missing claim")
         if reference.claim is not None and job.claim != reference.claim:
             raise AgentValidationError("result response changed claim ownership")
-        if allow_attempt_increment:
-            if job.attempt_count < reference.attempt_count or job.attempt_count > reference.attempt_count + 1:
-                raise AgentValidationError("result response changed attempt count unexpectedly")
-        elif job.attempt_count != reference.attempt_count:
-            raise AgentValidationError("result response changed attempt count")
+        expected_attempt_count = reference.attempt_count + 1 if require_attempt_increment else reference.attempt_count
+        if job.attempt_count != expected_attempt_count:
+            raise AgentValidationError("result response changed attempt count unexpectedly" if require_attempt_increment else "result response changed attempt count")
 
     def _validate_job(self, job: PrintJob) -> LocalPrinterProfile:
         if job.status is not PrintJobStatus.CLAIMED:
