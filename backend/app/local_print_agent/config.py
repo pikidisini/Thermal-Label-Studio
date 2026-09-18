@@ -57,7 +57,6 @@ class PrintAgentConfig:
     request_timeout_seconds: float = 10.0
     max_artifact_bytes: int = 10 * 1024 * 1024
     profiles: tuple[LocalPrinterProfile, ...] = ()
-    follow_redirects: bool = field(default=False, init=False)
 
     def __post_init__(self) -> None:
         parsed = urlsplit(self.base_url)

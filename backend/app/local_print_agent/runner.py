@@ -11,7 +11,7 @@ from ..print_jobs.models import PrintJob, PrintJobStatus, PrinterLanguage
 from .api_client import AgentApiClient
 from .config import LocalPrinterProfile, PrintAgentConfig
 from .models import AgentApiError, AgentResultResponse, AgentRunResult, AgentRunStatus, AgentValidationError, ArtifactPayload, TransportDeliveryUnknown, TransportFailureBeforeSend
-from .transport import PrinterTransport, TransportOutcome
+from .transport import PrinterTransport, TransportOutcome, TransportResult
 
 logger = logging.getLogger(__name__)
 

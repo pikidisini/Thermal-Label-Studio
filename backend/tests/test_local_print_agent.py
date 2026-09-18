@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from pathlib import Path
+from typing import get_type_hints
 
 import httpx
 import pytest
@@ -184,6 +185,11 @@ def test_happy_path_uses_timezone_aware_utc_default_clock() -> None:
     api = FakeApi(job(expires_at=live_now + timedelta(minutes=5), lease_expires_at=live_now + timedelta(minutes=1)))
     result = LocalPrintAgentRunner(config(), api, {"memory": MemoryPrinterTransport()}).run_once()
     assert result.status is AgentRunStatus.COMPLETED
+
+
+def test_runner_transport_result_annotation_resolves() -> None:
+    hints = get_type_hints(LocalPrintAgentRunner._validated_transport_result)
+    assert hints["result"] is TransportResult
 
 
 def test_missing_transport_is_rejected_before_begin_delivery() -> None:
@@ -477,6 +483,40 @@ def test_http_redirect_is_rejected_and_not_followed() -> None:
         client.claim_next()
     assert raised.value.category == "redirect_rejected"
     assert calls == 1
+
+
+def test_invalid_content_disposition_preserves_response_status_code() -> None:
+    settings = config()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            206,
+            headers={
+                "Content-Type": "application/octet-stream",
+                "X-Artifact-SHA256": CHECKSUM,
+                "X-Artifact-Byte-Length": str(len(PAYLOAD)),
+                "Content-Disposition": 'attachment; filename="unexpected.ipl"',
+            },
+            content=PAYLOAD,
+            request=request,
+        )
+
+    client = HttpPrintAgentApiClient(
+        settings,
+        httpx.Client(
+            transport=httpx.MockTransport(handler),
+            base_url=settings.base_url,
+            follow_redirects=False,
+        ),
+    )
+    try:
+        with pytest.raises(TypedAgentApiError) as raised:
+            client.download_artifact("job-test")
+    finally:
+        client.close()
+
+    assert raised.value.category == "invalid_artifact_metadata"
+    assert raised.value.status_code == 206
 
 
 def test_http_artifact_is_typed_and_rejects_extra_job_fields() -> None:

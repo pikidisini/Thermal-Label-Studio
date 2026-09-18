@@ -62,7 +62,9 @@ class HttpPrintAgentApiClient:
                 checksum = response.headers.get("x-artifact-sha256", "")
                 if len(checksum) != 64 or any(char not in "0123456789abcdef" for char in checksum):
                     raise TypedAgentApiError(response.status_code, "invalid_artifact_checksum")
-                filename = self._parse_content_disposition(response.headers.get("content-disposition"))
+                filename = self._parse_content_disposition(
+                    response.headers.get("content-disposition"), response.status_code
+                )
                 chunks: list[bytes] = []
                 total = 0
                 for chunk in response.iter_bytes():
@@ -139,12 +141,12 @@ class HttpPrintAgentApiClient:
         return value
 
     @staticmethod
-    def _parse_content_disposition(value: str | None) -> str:
+    def _parse_content_disposition(value: str | None, status_code: int) -> str:
         if value is None:
-            raise TypedAgentApiError(200, "invalid_artifact_metadata")
+            raise TypedAgentApiError(status_code, "invalid_artifact_metadata")
         match = re.fullmatch(r'attachment; filename="(label\.ipl|label\.zpl)"', value)
         if match is None:
-            raise TypedAgentApiError(200, "invalid_artifact_metadata")
+            raise TypedAgentApiError(status_code, "invalid_artifact_metadata")
         return match.group(1)
 
     @staticmethod
