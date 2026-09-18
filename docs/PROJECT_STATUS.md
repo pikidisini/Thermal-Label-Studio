@@ -8,7 +8,9 @@ Dokumen ini adalah ringkasan kondisi proyek aktif untuk manusia dan AI.
 - Lokasi kerja lokal: `web_app/`
 - Repository referensi: `JSON_LABEL_THERMAL_PRINTER_PARSER`
 - Status: aktif dikembangkan; belum boleh dianggap production-ready tanpa verifikasi test, security, observability, backup, dan rollback.
-- Tanggal snapshot dokumen: 2026-09-17
+- Tanggal snapshot dokumen: 2026-09-18
+- Remote baseline terakhir: `origin/main` pada commit `8025353`
+- Working tree: memiliki pekerjaan lokal yang belum di-commit pada area local print agent.
 
 ## Tujuan produk
 
@@ -27,6 +29,21 @@ Thermal Label Studio adalah web application untuk mendesain, memvalidasi, merend
 Repository root di luar `web_app/` adalah POC desktop dan arsip pengetahuan. Jangan mengubahnya ketika mengerjakan fitur web kecuali pengguna secara eksplisit meminta perubahan pada repository tersebut.
 
 Kode atau konsep dari POC boleh digunakan sebagai referensi, tetapi harus dibandingkan dengan kebutuhan, kontrak, dan test `web_app` sebelum dipindahkan.
+
+## Pekerjaan aktif
+
+- `backend/app/local_print_agent/`: implementasi local print agent masih dalam pengembangan.
+- `backend/tests/test_local_print_agent.py`: test untuk local print agent masih dalam pengembangan.
+- `docs/architecture/print_job_and_local_agent.md`: dokumentasi arsitektur terkait print job/local agent memiliki perubahan lokal yang harus direview.
+- Status fitur, test, dan security review: belum boleh dianggap verified hanya berdasarkan keberadaan file.
+
+## Workflow lintas perangkat dan provider AI
+
+1. Gunakan GitHub sebagai source of truth, bukan folder lokal atau riwayat chat.
+2. Mulai task dengan `git fetch`, pemeriksaan branch/status, dan pembacaan seluruh dokumen konteks.
+3. Gunakan satu branch untuk satu pekerjaan aktif; jangan menjalankan dua AI sebagai penulis pada branch yang sama.
+4. Sebelum berpindah perangkat/provider, update `AI_HANDOFF.md` dan commit/push jika pekerjaan sudah berada pada checkpoint aman.
+5. Setelah berpindah, provider berikutnya harus membaca handoff dan memverifikasi ulang kondisi working tree.
 
 ## Cara memulai task AI
 

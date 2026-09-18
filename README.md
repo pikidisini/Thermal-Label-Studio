@@ -2,6 +2,23 @@
 
 Layanan REST API berbasis **FastAPI** untuk merender template label SVG termal, menginjeksi data kontrak SAP JSON v1.1, menghasilkan barcode/QR vektor, binarisasi monokrom 1-bit, dan mendistribusikan instruksi native printer (Zebra ZPL II, TSC TSPL2, Intermec IPL) melalui jaringan TCP atau Windows Print Spooler.
 
+## 🔁 Workflow Lintas Perangkat dan Provider AI
+
+Repository aktif adalah `Thermal-Label-Studio`. Gunakan GitHub sebagai source of truth ketika berpindah laptop atau provider AI seperti Codex, Claude Desktop, atau Antigravity.
+
+Sebelum bekerja:
+
+```bash
+git fetch origin
+git status --short --branch
+```
+
+Baca `AGENTS.md`, `docs/PROJECT_STATUS.md`, `docs/DECISIONS.md`, dan `docs/AI_HANDOFF.md`. Gunakan satu branch untuk satu task aktif dan jangan menjalankan dua AI sebagai penulis pada branch yang sama.
+
+Sebelum berpindah perangkat/provider, jalankan test yang relevan, perbarui `docs/AI_HANDOFF.md`, lalu commit dan push checkpoint yang aman. Report test, screenshot hasil test, `.last-run.json`, dan artefak sementara tetap lokal sesuai `.gitignore`.
+
+Repository root `JSON_LABEL_THERMAL_PRINTER_PARSER` adalah POC desktop/reference terpisah. Jangan mengubahnya ketika mengerjakan fitur web kecuali diminta secara eksplisit.
+
 ---
 
 ## 🏗️ Struktur Direktori `web_app/`
