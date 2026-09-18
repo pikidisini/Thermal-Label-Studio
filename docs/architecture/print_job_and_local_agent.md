@@ -210,6 +210,18 @@ Model plant dapat dipertimbangkan setelah pilot membuktikan kebutuhan operasiona
 
 Produksi memerlukan enrollment agent, rotasi credential, HTTPS certificate validation, audit retention, observability, dead-letter/manual review untuk `delivery_unknown`, backup metadata job, release/rollback plan, dan uji kompatibilitas per model/firmware. Semua itu belum diimplementasikan pada fase ini.
 
+### Batas Local Print Agent offline
+
+Fondasi `backend/app/local_print_agent/` masih memakai model `PrintJob` dari backend sebagai shared contract sementara. Sebelum agent dipaketkan menjadi proses executable terpisah, model dan kontrak ini perlu dipisahkan atau diterbitkan sebagai package bersama dengan versioning yang jelas. `run_once` pada fase ini hanya menjalankan satu siklus offline dengan API client yang dapat diinjeksi dan `MemoryPrinterTransport`; belum ada polling, heartbeat, executable, atau koneksi printer.
+
+### Ambiguitas request mutasi agent
+
+`begin_delivery` mengubah state job sehingga hasil timeout, transport error, 5xx, atau response sukses yang malformed tidak membuktikan apakah server sudah masuk ke `sending`. Penolakan definitif (401, 403, 404, 409, 410, 422, atau 429) berhenti tanpa recovery callback. Hasil ambigu tidak memanggil transport dan mencoba tepat satu callback `failure_before_send` dengan `bytes_sent: 0`; callback sukses berarti `failed_before_send`, sedangkan callback gagal berarti `uncertain`. Tidak ada retry otomatis.
+
+Artifact response diperlakukan sebagai boundary tidak tepercaya. Client membaca chunk secara bounded, memeriksa media type, ukuran, checksum, dan `Content-Disposition` yang harus persis berupa `attachment; filename="label.ipl"` atau `attachment; filename="label.zpl"`. Header invalid tidak meneruskan `ValidationError` mentah dan tidak pernah mencapai `begin_delivery` atau transport.
+
+Respons `report_result` juga merupakan boundary yang tidak tepercaya. Client mem-parse object `job`, `outcome`, dan `bytes_sent` dengan model strict; property tambahan, bentuk malformed, outcome/bytes yang berbeda dari request, status akhir yang tidak sesuai, atau inkonsistensi pada snapshot immutable job (termasuk claim dan `attempt_count`) membuat hasil menjadi `uncertain`. Untuk callback normal setelah pengiriman berhasil/gagal, `final_job.attempt_count` harus persis sama dengan `sending_job.attempt_count`. Untuk recovery `failure_before_send` setelah begin ambigu, keberhasilan callback membuktikan bahwa server telah mengeksekusi `begin_delivery`, sehingga `final_job.attempt_count` wajib tepat bernilai `claimed_job.attempt_count + 1`; response recovery dengan `attempt_count` yang tidak bertambah (sama dengan claimed) atau melompat tidak wajar ditolak sebagai `uncertain`. Recovery hanya dicoba satu kali pada begin yang ambigu; response recovery yang valid menghasilkan `failed_before_send`, sedangkan response malformed atau tidak konsisten menghasilkan `uncertain`. Setelah transport dipanggil, callback yang tidak dapat divalidasi tidak boleh memicu pengiriman ulang payload.
+
 ## 11. Kekurangan batch legacy sebagai baseline
 
 Batch legacy membaca seluruh byte `DATA.DAX`, membuka TCP lokal port 9100, menulis byte, lalu menutup stream dan koneksi. Baseline ini tidak cukup untuk sistem job modern karena:
