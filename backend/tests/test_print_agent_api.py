@@ -16,6 +16,7 @@ from app.api.routes_print_agent import (
     InMemoryAgentRateLimiter,
     PrintAgentDependencies,
     PrintAgentSettings,
+    build_print_agent_dependencies,
     router,
 )
 from app.main import app as main_app
@@ -114,6 +115,12 @@ def seed(repository: InMemoryPrintJobRepository, storage: TemporaryArtifactStora
 
 def headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {TOKEN}"}
+
+
+def fenced_headers(claimed: dict[str, object]) -> dict[str, str]:
+    claim = claimed["claim"]
+    assert isinstance(claim, dict)
+    return headers() | {"X-Print-Claim-Token": str(claim["fencing_token"])}
 
 
 def test_feature_flag_disabled_returns_503_without_authentication(tmp_path: Path) -> None:
@@ -219,7 +226,12 @@ def test_claim_next_expires_expired_claim_and_never_returns_sending_unknown(tmp_
     sending_data = make_job(job_id="sending-api").model_dump()
     sending_data.update({
         "status": PrintJobStatus.SENDING,
-        "claim": Claim(agent_id="agent-old", claimed_at=NOW - timedelta(seconds=3), lease_expires_at=NOW - timedelta(seconds=2)),
+        "claim": Claim(
+            agent_id="agent-old",
+            claimed_at=NOW - timedelta(seconds=3),
+            lease_expires_at=NOW - timedelta(seconds=2),
+            fencing_token=1,
+        ),
     })
     sending = PrintJob.model_validate(sending_data)
     seed(repository, storage, sending)
@@ -236,7 +248,12 @@ def test_late_result_after_reconciliation_is_conflict_and_not_requeued(tmp_path:
     sending_data = make_job(job_id="late-api").model_dump()
     sending_data.update({
         "status": PrintJobStatus.SENDING,
-        "claim": Claim(agent_id="agent-001", claimed_at=NOW, lease_expires_at=NOW + timedelta(seconds=1)),
+        "claim": Claim(
+            agent_id="agent-001",
+            claimed_at=NOW,
+            lease_expires_at=NOW + timedelta(seconds=1),
+            fencing_token=1,
+        ),
     })
     job = PrintJob.model_validate(sending_data)
     seed(repository, storage, job)
@@ -277,7 +294,19 @@ def test_artifact_requires_active_claim_owner_and_returns_integrity_headers(tmp_
     seed(repository, storage, make_job())
     with TestClient(application) as client:
         claimed = client.post("/api/v1/print-agent/jobs/claim-next", headers=headers())
-        artifact = client.get(f"/api/v1/print-agent/jobs/{claimed.json()['job_id']}/artifact", headers=headers())
+        missing_fence = client.get(
+            f"/api/v1/print-agent/jobs/{claimed.json()['job_id']}/artifact",
+            headers=headers(),
+        )
+        stale_fence = client.get(
+            f"/api/v1/print-agent/jobs/{claimed.json()['job_id']}/artifact",
+            headers=headers() | {"X-Print-Claim-Token": "999999"},
+        )
+        artifact = client.get(
+            f"/api/v1/print-agent/jobs/{claimed.json()['job_id']}/artifact",
+            headers=fenced_headers(claimed.json()),
+        )
+    assert missing_fence.status_code == stale_fence.status_code == 409
     assert artifact.status_code == 200
     assert artifact.headers["content-type"] == "application/octet-stream"
     assert artifact.headers["x-artifact-byte-length"] == "3"
@@ -313,22 +342,23 @@ def test_happy_path_and_result_callbacks_are_idempotent(tmp_path: Path) -> None:
     seed(repository, storage, make_job())
     with TestClient(application) as client:
         claimed = client.post("/api/v1/print-agent/jobs/claim-next", headers=headers()).json()
-        downloaded = client.get(f"/api/v1/print-agent/jobs/{claimed['job_id']}/artifact", headers=headers())
+        claimed_headers = fenced_headers(claimed)
+        downloaded = client.get(f"/api/v1/print-agent/jobs/{claimed['job_id']}/artifact", headers=claimed_headers)
         assert sha256(downloaded.content).hexdigest() == downloaded.headers["x-artifact-sha256"]
-        begun = client.post(f"/api/v1/print-agent/jobs/{claimed['job_id']}/begin-delivery", headers=headers())
+        begun = client.post(f"/api/v1/print-agent/jobs/{claimed['job_id']}/begin-delivery", headers=claimed_headers)
         result = client.post(
             f"/api/v1/print-agent/jobs/{claimed['job_id']}/result",
-            headers=headers(),
+            headers=claimed_headers,
             json={"outcome": "success", "bytes_sent": 3},
         )
         repeated = client.post(
             f"/api/v1/print-agent/jobs/{claimed['job_id']}/result",
-            headers=headers(),
+            headers=claimed_headers,
             json={"outcome": "success", "bytes_sent": 3},
         )
         conflict = client.post(
             f"/api/v1/print-agent/jobs/{claimed['job_id']}/result",
-            headers=headers(),
+            headers=claimed_headers,
             json={"outcome": "delivery_unknown", "bytes_sent": 3},
         )
     assert begun.status_code == 200
@@ -345,7 +375,10 @@ def test_concurrent_begin_delivery_has_one_winner(tmp_path: Path) -> None:
         claimed = client.post("/api/v1/print-agent/jobs/claim-next", headers=headers()).json()
     def begin() -> int:
         with TestClient(application) as client:
-            return client.post(f"/api/v1/print-agent/jobs/{claimed['job_id']}/begin-delivery", headers=headers()).status_code
+            return client.post(
+                f"/api/v1/print-agent/jobs/{claimed['job_id']}/begin-delivery",
+                headers=fenced_headers(claimed),
+            ).status_code
     with ThreadPoolExecutor(max_workers=2) as pool:
         statuses = list(pool.map(lambda _: begin(), range(2)))
     assert sorted(statuses) == [200, 409]
@@ -357,18 +390,19 @@ def test_result_validation_unknown_delivery_and_rate_limit(tmp_path: Path) -> No
     seed(repository, storage, make_job())
     with TestClient(application) as client:
         claimed = client.post("/api/v1/print-agent/jobs/claim-next", headers=headers()).json()
-        begun = client.post(f"/api/v1/print-agent/jobs/{claimed['job_id']}/begin-delivery", headers=headers())
+        claimed_headers = fenced_headers(claimed)
+        begun = client.post(f"/api/v1/print-agent/jobs/{claimed['job_id']}/begin-delivery", headers=claimed_headers)
         invalid = client.post(
             f"/api/v1/print-agent/jobs/{claimed['job_id']}/result",
-            headers=headers(),
+            headers=claimed_headers,
             json={"outcome": "success", "bytes_sent": 2},
         )
         unknown = client.post(
             f"/api/v1/print-agent/jobs/{claimed['job_id']}/result",
-            headers=headers(),
+            headers=claimed_headers,
             json={"outcome": "delivery_unknown", "bytes_sent": 2},
         )
-        retry = client.post(f"/api/v1/print-agent/jobs/{claimed['job_id']}/begin-delivery", headers=headers())
+        retry = client.post(f"/api/v1/print-agent/jobs/{claimed['job_id']}/begin-delivery", headers=claimed_headers)
     assert begun.status_code == 200
     assert invalid.status_code == 422
     assert unknown.status_code == 200
@@ -413,7 +447,14 @@ def test_result_callback_checks_agent_ownership_before_idempotency(tmp_path: Pat
     seed(repository, storage, make_job())
     with TestClient(application) as client:
         claimed = client.post("/api/v1/print-agent/jobs/claim-next", headers=headers()).json()
-        client.post(f"/api/v1/print-agent/jobs/{claimed['job_id']}/begin-delivery", headers=headers())
+        claimed_headers = fenced_headers(claimed)
+        client.post(f"/api/v1/print-agent/jobs/{claimed['job_id']}/begin-delivery", headers=claimed_headers)
+        stored = client.post(
+            f"/api/v1/print-agent/jobs/{claimed['job_id']}/result",
+            headers=claimed_headers,
+            json={"outcome": "success", "bytes_sent": 3},
+        )
+        assert stored.status_code == 200
 
     other, _, _ = make_context(tmp_path, agent_id="agent-other")
     other.state.print_agent_dependencies.repository = repository
@@ -435,6 +476,32 @@ def test_settings_and_dependencies_repr_and_logs_do_not_contain_token(
     with TestClient(application) as client:
         client.post("/api/v1/print-agent/jobs/claim-next", headers={"Authorization": "Bearer wrong"})
     assert TOKEN not in caplog.text
+
+
+def test_postgresql_configuration_fails_closed_and_hides_database_url(tmp_path: Path) -> None:
+    database_url = "postgresql://user:do-not-log@example.invalid/database"
+    settings = PrintAgentSettings(
+        enabled=True,
+        bearer_token=TOKEN,
+        agent_id="agent-001",
+        site_id="site-001",
+        repository_backend="postgresql",
+        database_url=database_url,
+    )
+    assert database_url not in repr(settings)
+    with pytest.raises(RuntimeError, match="PRINT_AGENT_ARTIFACT_ROOT"):
+        build_print_agent_dependencies(settings=settings, profiles=())
+
+    settings_with_root = PrintAgentSettings(
+        enabled=True,
+        bearer_token=TOKEN,
+        agent_id="agent-001",
+        site_id="site-001",
+        repository_backend="postgresql",
+        artifact_root=str(tmp_path / "durable"),
+    )
+    with pytest.raises(RuntimeError, match="PRINT_AGENT_DATABASE_URL"):
+        build_print_agent_dependencies(settings=settings_with_root, profiles=())
 
 
 def test_unexpected_repository_failure_returns_generic_500(

@@ -1,0 +1,17 @@
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 3
+default_subagent_model = "gpt-5.6-terra"
+default_subagent_reasoning_effort = "medium"
+
+[agents.explorer]
+description = "Eksplorasi cepat dan read-only untuk memetakan kode sebelum perubahan."
+config_file = "./agents/explorer.toml"
+
+[agents.reviewer]
+description = "Review independen untuk correctness, security, concurrency, dan test."
+config_file = "./agents/reviewer.toml"
+
+[agents.senior_reviewer]
+description = "Review risiko tinggi untuk database, security, kontrak publik, dan keputusan arsitektur."
+config_file = "./agents/senior-reviewer.toml"

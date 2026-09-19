@@ -4,27 +4,42 @@ Gunakan dokumen ini untuk memulihkan konteks ketika melanjutkan pekerjaan dari l
 
 ## Snapshot sesi saat ini
 
-- Tanggal: 2026-09-18
+- Tanggal: 2026-09-19
 - Repository: `Thermal-Label-Studio`
-- Remote baseline: `origin/main` pada `8025353` (`8025353056614be126a537075abcc25a2b9acc69`)
-- Checkpoint awal branch: `5a2289d` (`5a2289d0c83356dfb8c205fc03ab1f89804cbeed`)
-- Source branch checkpoint: `codex/local-print-agent-b2b1-b2b2b-checkpoint`
-- Commit koreksi B2B2B.2.5: `a11657d` (`fix(local-agent): resolve pre-PR review findings`)
-- Status B2B2B.2.5: verified dan committed; gunakan `git status`, `git log`, serta upstream tracking sebagai sumber kondisi checkout/remote terkini.
-- Provider/model/perangkat sesi: Codex Desktop pada Windows lokal.
-- Verifikasi B2B2B.2.5: `backend/tests/test_local_print_agent.py` PASS (`74 passed`), `backend/tests` PASS (`168 passed`), dan `typing.get_type_hints(_validated_transport_result)` PASS.
-- Frontend unit, build, dan E2E: `NOT RUN` karena tidak ada perubahan frontend pada fase ini.
+- Remote baseline fase: `origin/main` pada `e40f95c` (`e40f95c567acad5717ebe256a5987e9db9e5485c`)
+- Branch aktif: `codex/b2b2c-postgresql-persistence`
+- Status B2B2C: implementasi selesai dan terverifikasi pada PostgreSQL disposable; siap untuk review Codex; belum merge ke main.
+- Provider/model/perangkat sesi: Gemini 3.8 Flash (High) via Antigravity pada Windows lokal.
+- Writer branch: Gemini Flash via Antigravity sebagai satu-satunya writer aktif; berhenti untuk review Codex.
+- Batas keras: tidak ada database production, credential perusahaan, printer fisik, TCP 9100, atau Windows Spooler.
+- Target berhenti: Pull Request siap direview, tepat sebelum merge ke `main`.
+- Workflow: `docs/AI_WORKFLOW.md`; contract/result/review B2B2C berada di `docs/tasks/B2B2C/`.
 
-Perubahan aktif pada sesi B2B2B.2.5:
+## Safe checkpoint B2B2C
 
-- `backend/app/local_print_agent/runner.py`
-- `backend/app/local_print_agent/config.py`
-- `backend/app/local_print_agent/api_client.py`
-- `backend/tests/test_local_print_agent.py`
-- `docs/AI_HANDOFF.md`
-- `docs/PROJECT_STATUS.md`
+- Baseline commit: `5186c4d` (`feat: complete b2b2c postgresql persistence acceptance criteria`), sudah dipush ke `origin/codex/b2b2c-postgresql-persistence`.
+- Corrective commit P1: asymmetric batch priority, deadlock-free anti-interleaving, dan batch safety pause on delivery_unknown.
+- Status: safe checkpoint kandidat review; **bukan** kesiapan merge atau production-ready.
+- Quality gate aktual:
+  - Backend: `175 passed, 0 skipped`.
+  - PostgreSQL disposable integration: `6 passed` pada container `postgres:15-bullseye` (`test_postgres_repository_atomic_lifecycle_and_concurrent_claim`, `test_postgres_atomic_ingestion_and_idempotency`, `test_postgres_process_restart_preserves_persisted_state`, `test_postgres_batch_item_sequence_claim_order_and_anti_interleaving`, `test_postgres_asymmetric_batch_priority_and_deadlock_freedom`, `test_postgres_batch_safety_pause_on_delivery_unknown_and_isolation`).
+  - Targeted regression: `127 passed`.
+  - Frontend unit test: `45 passed` (534ms).
+  - Frontend typecheck: `npx tsc --noEmit` lulus (0 errors).
+  - Python compile check: `python -m py_compile` lulus.
+  - Whitespace check: `git diff --check` lulus (0 whitespace errors).
+  - Secret scan: lulus (0 credentials).
+  - Build frontend: `npm run build` berhasil mengompilasi 100% bundle Vite (`✓ built in 8.06s`); exit code 1 pada Windows karena bug assertion libuv Node v24 (`src\win\async.c:94`).
+- Review independen: Menunggu Codex Sol High / Terra.
+- Batas keras tetap berlaku: tidak ada database production, credential perusahaan, printer fisik, TCP 9100, atau Windows Spooler.
 
-Dokumentasi handoff ini juga berubah pada sesi ini. Jangan menganggap test atau implementasi local print agent sudah verified sebelum menjalankan perintah verifikasi dan mencatat hasil aktual.
+Perubahan aktif pada corrective commit ini:
+
+- `backend/app/print_jobs/postgres_repository.py` (pause batch on `delivery_unknown` in `report_result` and `_reconcile_locked`, emit `print_batch_paused` audit event, exclude paused/cancelled/partially_failed batches in `claim_next`)
+- `backend/tests/test_postgres_print_agent_repository.py` (add `test_postgres_batch_safety_pause_on_delivery_unknown_and_isolation` verifying batch pause, no auto-retry, held remaining items, and safe batch isolation)
+- `docs/tasks/B2B2C/RESULT.md` (updated with batch safety verification)
+- `docs/tasks/B2B2C/REVIEW.md` (updated verdict to CHANGES_REQUIRED pending final review)
+- `docs/AI_HANDOFF.md` (handoff snapshot updated)
 
 ## Handoff Pre-Checkpoint B2B1.4–B2B2B.2.4
 

@@ -64,3 +64,17 @@ Dokumen ini menyimpan keputusan yang harus tetap konsisten antar-sesi AI dan ant
 - Keputusan: script test, fixture, snapshot regression yang diperlukan, dan dokumentasi test disimpan; report, screenshot hasil test, `.last-run.json`, recording, dan artefak sementara di-ignore.
 - Alasan: artefak generated memperbesar repository dan tidak diperlukan untuk mereproduksi test.
 - Konsekuensi: hasil test diringkas di handoff atau CI; file generated tetap boleh ada secara lokal.
+
+## ADR-024 — Repository PostgreSQL bersifat opt-in dan migrasi eksplisit
+
+- Status: accepted untuk lean pilot B2B2C
+- Keputusan: Print Agent memakai repository memory secara default. Repository PostgreSQL sinkron berbasis `psycopg` dipilih eksplisit melalui environment, memakai durable filesystem artifact root, dan baseline migration hanya dijalankan oleh operator—tidak saat startup aplikasi.
+- Alasan: router dan repository contract saat ini sinkron; pilihan ini menjaga perubahan tetap kecil, mempertahankan mode demo/test, serta mencegah aplikasi mengubah database secara diam-diam saat boot.
+- Konsekuensi: PostgreSQL mode gagal tertutup bila DSN, durable artifact root, pool configuration, atau baseline schema tidak tersedia. Batch ingestion persistence, role database produksi, backup/restore, dan printer transport nyata tetap memerlukan fase terpisah.
+
+## ADR-025 — Fencing token wajib melintasi boundary Print Agent
+
+- Status: accepted untuk lifecycle delivery B2B2C
+- Keputusan: setiap claim memiliki `fencing_token`; download artifact, begin-delivery, dan result callback harus membawa generation yang sama melalui `X-Print-Claim-Token`.
+- Alasan: verifikasi `agent_id` saja tidak dapat membedakan proses lama dan proses baru yang menggunakan identity agent sama setelah lease berpindah.
+- Konsekuensi: stale/missing token menghasilkan conflict, callback idempotency diverifikasi setelah ownership/fencing, dan token tidak dianggap sebagai secret atau pengganti bearer authentication.

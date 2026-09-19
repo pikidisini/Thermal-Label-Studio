@@ -15,7 +15,7 @@ from pathlib import Path
 from threading import RLock
 from typing import Literal
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from fastapi.responses import JSONResponse
@@ -29,7 +29,7 @@ from ..print_jobs.repository import (
     InMemoryPrintJobRepository,
     JobExpiredError,
     PrintJobNotFoundError,
-    PrintJobRepository,
+    PrintAgentRepository,
 )
 from ..print_jobs.service import (
     DpiMismatchError,
@@ -61,6 +61,11 @@ class PrintAgentSettings:
     rate_limit_requests: int = 30
     rate_limit_window_seconds: int = 60
     bearer_token: str | None = field(default=None, repr=False)
+    repository_backend: Literal["memory", "postgresql"] = "memory"
+    database_url: str | None = field(default=None, repr=False)
+    artifact_root: str | None = None
+    database_pool_min_size: int = 1
+    database_pool_max_size: int = 4
 
     @classmethod
     def from_environment(cls) -> "PrintAgentSettings":
@@ -82,13 +87,18 @@ class PrintAgentSettings:
             lease_seconds=read_int("PRINT_AGENT_LEASE_SECONDS", 60),
             rate_limit_requests=read_int("PRINT_AGENT_RATE_LIMIT_REQUESTS", 30),
             rate_limit_window_seconds=read_int("PRINT_AGENT_RATE_LIMIT_WINDOW_SECONDS", 60),
+            repository_backend=os.getenv("PRINT_AGENT_REPOSITORY_BACKEND", "memory").strip().lower(),
+            database_url=os.getenv("PRINT_AGENT_DATABASE_URL"),
+            artifact_root=os.getenv("PRINT_AGENT_ARTIFACT_ROOT"),
+            database_pool_min_size=read_int("PRINT_AGENT_DATABASE_POOL_MIN_SIZE", 1),
+            database_pool_max_size=read_int("PRINT_AGENT_DATABASE_POOL_MAX_SIZE", 4),
         )
 
 
 @dataclass
 class PrintAgentDependencies:
     settings: PrintAgentSettings
-    repository: PrintJobRepository
+    repository: PrintAgentRepository
     artifact_storage: TemporaryArtifactStorage
     profiles: tuple[PrinterProfile, ...]
     rate_limiter: "InMemoryAgentRateLimiter"
@@ -151,6 +161,8 @@ def require_dependencies(request: Request) -> PrintAgentDependencies:
         raise _disabled("print-agent profile registry is not configured")
     if settings.lease_seconds < 1 or settings.rate_limit_requests < 1 or settings.rate_limit_window_seconds < 1:
         raise _disabled("print-agent configuration is invalid")
+    if settings.repository_backend not in {"memory", "postgresql"}:
+        raise _disabled("print-agent repository backend is invalid")
     return dependencies
 
 
@@ -187,6 +199,12 @@ def _get_owned_job(dependencies: PrintAgentDependencies, principal: AgentPrincip
     if job.site_id != principal.site_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job not found")
     return job
+
+
+def _verify_fencing_token(job: PrintJob, fencing_token: int | None) -> int:
+    if job.claim is None or fencing_token is None or job.claim.fencing_token != fencing_token:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="claim fencing token is missing or stale")
+    return fencing_token
 
 
 def _map_repository_error(
@@ -234,7 +252,7 @@ def _profile_eligible(dependencies: PrintAgentDependencies, job: PrintJob) -> bo
 def build_print_agent_dependencies(
     *,
     settings: PrintAgentSettings | None = None,
-    repository: PrintJobRepository | None = None,
+    repository: PrintAgentRepository | None = None,
     artifact_storage: TemporaryArtifactStorage | None = None,
     profiles: tuple[PrinterProfile, ...] | None = None,
 ) -> PrintAgentDependencies:
@@ -243,8 +261,38 @@ def build_print_agent_dependencies(
     temporary_directory: tempfile.TemporaryDirectory[str] | None = None
     resolved_storage = artifact_storage
     if resolved_storage is None:
-        temporary_directory = tempfile.TemporaryDirectory(prefix="thermal-label-agent-")
-        resolved_storage = TemporaryArtifactStorage(Path(temporary_directory.name))
+        if resolved_settings.enabled and resolved_settings.repository_backend == "postgresql":
+            if not resolved_settings.artifact_root:
+                raise RuntimeError("PRINT_AGENT_ARTIFACT_ROOT is required for PostgreSQL mode")
+            resolved_storage = TemporaryArtifactStorage(Path(resolved_settings.artifact_root))
+        else:
+            temporary_directory = tempfile.TemporaryDirectory(prefix="thermal-label-agent-")
+            resolved_storage = TemporaryArtifactStorage(Path(temporary_directory.name))
+
+    resolved_repository = repository
+    if resolved_repository is None:
+        if resolved_settings.enabled and resolved_settings.repository_backend == "postgresql":
+            if not resolved_settings.database_url:
+                raise RuntimeError("PRINT_AGENT_DATABASE_URL is required for PostgreSQL mode")
+            if (
+                resolved_settings.database_pool_min_size < 1
+                or resolved_settings.database_pool_max_size < resolved_settings.database_pool_min_size
+            ):
+                raise RuntimeError("PostgreSQL pool settings are invalid")
+            from ..print_jobs.postgres_repository import PostgresPrintAgentRepository
+
+            resolved_repository = PostgresPrintAgentRepository(
+                resolved_settings.database_url,
+                min_pool_size=resolved_settings.database_pool_min_size,
+                max_pool_size=resolved_settings.database_pool_max_size,
+            )
+            try:
+                resolved_repository.verify_schema()
+            except Exception:
+                resolved_repository.close()
+                raise
+        else:
+            resolved_repository = InMemoryPrintJobRepository()
 
     profile_registry_ready = profiles is not None
     resolved_profiles = profiles or ()
@@ -265,7 +313,7 @@ def build_print_agent_dependencies(
 
     return PrintAgentDependencies(
         settings=resolved_settings,
-        repository=repository or InMemoryPrintJobRepository(),
+        repository=resolved_repository,
         artifact_storage=resolved_storage,
         profiles=resolved_profiles,
         rate_limiter=InMemoryAgentRateLimiter(
@@ -288,6 +336,10 @@ def cleanup_print_agent_state(application: FastAPI) -> None:
     if isinstance(dependencies, PrintAgentDependencies) and dependencies.temporary_directory is not None:
         dependencies.temporary_directory.cleanup()
         dependencies.temporary_directory = None
+    if isinstance(dependencies, PrintAgentDependencies):
+        close_repository = getattr(dependencies.repository, "close", None)
+        if callable(close_repository):
+            close_repository()
     if hasattr(application.state, "print_agent_dependencies"):
         del application.state.print_agent_dependencies
 
@@ -361,6 +413,7 @@ def get_job(
 @router.get("/jobs/{job_id}/artifact")
 def download_artifact(
     job_id: str,
+    fencing_token: int | None = Header(default=None, alias="X-Print-Claim-Token"),
     dependencies: PrintAgentDependencies = Depends(require_dependencies),
     principal: AgentPrincipal = Depends(authenticate),
 ) -> Response:
@@ -370,6 +423,7 @@ def download_artifact(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="artifact is not available")
     if job.claim is None or job.claim.agent_id != principal.agent_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="artifact not found")
+    _verify_fencing_token(job, fencing_token)
     now = _utc_now()
     if now >= job.expires_at:
         raise HTTPException(status_code=status.HTTP_410_GONE, detail="job expired")
@@ -397,14 +451,21 @@ def download_artifact(
 @router.post("/jobs/{job_id}/begin-delivery", response_model=PrintJob)
 def begin_delivery(
     job_id: str,
+    fencing_token: int | None = Header(default=None, alias="X-Print-Claim-Token"),
     dependencies: PrintAgentDependencies = Depends(require_dependencies),
     principal: AgentPrincipal = Depends(authenticate),
 ) -> PrintJob:
     _rate_limit(dependencies, principal)
     job = _get_owned_job(dependencies, principal, job_id)
+    verified_token = _verify_fencing_token(job, fencing_token)
     _validate_profile(dependencies, job)
     try:
-        return dependencies.repository.begin_delivery(job_id, principal.agent_id, _utc_now())
+        return dependencies.repository.begin_delivery(
+            job_id,
+            principal.agent_id,
+            _utc_now(),
+            fencing_token=verified_token,
+        )
     except (PrintJobNotFoundError, JobExpiredError, ClaimConflictError, DeliveryConflictError) as exc:
         raise _map_repository_error(exc) from exc
 
@@ -413,6 +474,7 @@ def begin_delivery(
 def report_result(
     job_id: str,
     request: AgentResultRequest,
+    fencing_token: int | None = Header(default=None, alias="X-Print-Claim-Token"),
     dependencies: PrintAgentDependencies = Depends(require_dependencies),
     principal: AgentPrincipal = Depends(authenticate),
 ) -> AgentResultResponse:
@@ -420,6 +482,7 @@ def report_result(
     job = _get_owned_job(dependencies, principal, job_id)
     if job.claim is None or job.claim.agent_id != principal.agent_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job not found")
+    verified_token = _verify_fencing_token(job, fencing_token)
     if job.artifact is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="job artifact unavailable")
     if request.outcome == "success" and request.bytes_sent != job.artifact.byte_length:
@@ -430,7 +493,13 @@ def report_result(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="bytes_sent exceeds artifact length")
     outcome = MockTransportOutcome(request.outcome)
     try:
-        updated = dependencies.repository.report_result(job_id, principal.agent_id, outcome, request.bytes_sent)
+        updated = dependencies.repository.report_result(
+            job_id,
+            principal.agent_id,
+            outcome,
+            request.bytes_sent,
+            fencing_token=verified_token,
+        )
     except (PrintJobNotFoundError, JobExpiredError, ClaimConflictError, DeliveryConflictError) as exc:
         raise _map_repository_error(exc) from exc
     return AgentResultResponse(job=updated, outcome=request.outcome, bytes_sent=request.bytes_sent)

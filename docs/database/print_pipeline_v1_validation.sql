@@ -112,6 +112,33 @@ VALUES ('00000000-0000-0000-0000-000000000403', 'job', '00000000-0000-0000-0000-
 INSERT INTO print_audit_events (audit_event_id, actor_type, actor_id, action, aggregate_type, aggregate_id)
 VALUES ('00000000-0000-0000-0000-000000000501', 'system', 'validation', 'fixture', 'job', '00000000-0000-0000-0000-000000000301');
 
+-- Negative: result outcome must agree with the persisted final status.
+-- Expected SQLSTATE 23514 / chk_print_jobs_result_consistency.
+DO $$
+DECLARE
+    actual_constraint TEXT;
+BEGIN
+    BEGIN
+        UPDATE print_jobs
+        SET result_outcome = 'success'
+        WHERE job_id = '00000000-0000-0000-0000-000000000301';
+
+        RAISE EXCEPTION
+            USING ERRCODE = 'P0001',
+                  MESSAGE = 'expected violation was not raised: result outcome mismatches status';
+    EXCEPTION
+        WHEN check_violation THEN
+            GET STACKED DIAGNOSTICS
+                actual_constraint = CONSTRAINT_NAME;
+
+            IF SQLSTATE <> '23514'
+               OR actual_constraint IS DISTINCT FROM 'chk_print_jobs_result_consistency'
+            THEN
+                RAISE;
+            END IF;
+    END;
+END $$;
+
 -- Negative: valid printer fixture, only emulation is invalid.
 -- Expected SQLSTATE 23514 / chk_printer_registry_language_emulation.
 DO $$

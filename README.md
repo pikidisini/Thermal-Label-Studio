@@ -19,6 +19,12 @@ Sebelum berpindah perangkat/provider, jalankan test yang relevan, perbarui `docs
 
 Repository root `JSON_LABEL_THERMAL_PRINTER_PARSER` adalah POC desktop/reference terpisah. Jangan mengubahnya ketika mengerjakan fitur web kecuali diminta secara eksplisit.
 
+Dokumentasi arsitektur print pipeline terbaru tersedia di
+`docs/architecture/print_job_and_local_agent.md` dan
+`docs/architecture/application_persistence_layer.md`. Repository PostgreSQL
+B2B2C bersifat opt-in dan hanya mencakup lifecycle delivery; mode memory tetap
+menjadi default dan printer transport fisik tidak diaktifkan oleh fase tersebut.
+
 ---
 
 ## 🏗️ Struktur Direktori `web_app/`

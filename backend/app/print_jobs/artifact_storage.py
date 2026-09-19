@@ -1,8 +1,10 @@
-"""Temporary, path-safe artifact storage for pilot tests and local services."""
+"""Path-safe artifact storage for temporary tests or a configured durable root."""
 
 from __future__ import annotations
 
 import hashlib
+import json
+import os
 import re
 from pathlib import Path
 from threading import RLock
@@ -19,7 +21,7 @@ class ArtifactConflictError(ArtifactIntegrityError):
 
 
 class TemporaryArtifactStorage:
-    """Stores artifacts below an injected temporary root, never from a payload path."""
+    """Stores artifacts below an injected trusted root, never from a payload path."""
 
     def __init__(self, root: Path) -> None:
         self.root = root.resolve()
@@ -39,6 +41,9 @@ class TemporaryArtifactStorage:
             raise ArtifactIntegrityError("artifact path escapes temporary storage")
         return path
 
+    def _metadata_path_for(self, payload_ref: str) -> Path:
+        return self._path_for(payload_ref).with_suffix(".metadata.json")
+
     def put(self, payload_ref: str, filename: str, payload: bytes) -> ArtifactReference:
         artifact = ArtifactReference(
             payload_ref=payload_ref,
@@ -47,17 +52,38 @@ class TemporaryArtifactStorage:
             byte_length=len(payload),
         )
         path = self._path_for(payload_ref)
+        metadata_path = self._metadata_path_for(payload_ref)
         checksum = self.checksum(payload)
         with self._lock:
             existing_metadata = self._metadata.get(payload_ref)
             if path.exists():
+                if existing_metadata is None and metadata_path.exists():
+                    try:
+                        persisted = json.loads(metadata_path.read_text(encoding="utf-8"))
+                        existing_metadata = (persisted["filename"], persisted["sha256"])
+                    except (OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
+                        raise ArtifactIntegrityError("existing artifact metadata is invalid") from exc
                 if existing_metadata is None:
                     raise ArtifactIntegrityError("existing artifact metadata is unavailable")
                 existing_filename, existing_checksum = existing_metadata
-                if existing_filename != filename or existing_checksum != checksum:
+                actual_checksum = self.checksum(path.read_bytes())
+                if (
+                    existing_filename != filename
+                    or existing_checksum != checksum
+                    or actual_checksum != checksum
+                ):
                     raise ArtifactConflictError("payload_ref already contains different content or filename")
+                self._metadata[payload_ref] = existing_metadata
                 return artifact
-            path.write_bytes(payload)
+            payload_temp = path.with_suffix(".payload.tmp")
+            metadata_temp = metadata_path.with_suffix(".json.tmp")
+            payload_temp.write_bytes(payload)
+            metadata_temp.write_text(
+                json.dumps({"filename": filename, "sha256": checksum}, sort_keys=True),
+                encoding="utf-8",
+            )
+            os.replace(payload_temp, path)
+            os.replace(metadata_temp, metadata_path)
             self._metadata[payload_ref] = (filename, checksum)
             return artifact
 

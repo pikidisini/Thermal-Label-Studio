@@ -28,6 +28,7 @@ class HttpPrintAgentApiClient:
 
     def __init__(self, config: PrintAgentConfig, client: httpx.Client | None = None) -> None:
         self.config = config
+        self._claim_tokens: dict[str, int] = {}
         self._client = client or httpx.Client(
             base_url=config.base_url,
             headers={"Authorization": f"Bearer {config.bearer_token}"},
@@ -45,11 +46,20 @@ class HttpPrintAgentApiClient:
         response = self._request("POST", "/api/v1/print-agent/jobs/claim-next")
         if response.status_code == 204:
             return None
-        return self._parse_job(response)
+        job = self._parse_job(response)
+        if job.claim is None:
+            raise TypedAgentApiError(response.status_code, "invalid_job_response")
+        self._claim_tokens[job.job_id] = job.claim.fencing_token
+        return job
 
     def download_artifact(self, job_id: str) -> ArtifactPayload:
         try:
-            with self._client.stream("GET", f"/api/v1/print-agent/jobs/{job_id}/artifact", headers=self._auth_headers(), follow_redirects=False) as response:
+            with self._client.stream(
+                "GET",
+                f"/api/v1/print-agent/jobs/{job_id}/artifact",
+                headers=self._claim_headers(job_id),
+                follow_redirects=False,
+            ) as response:
                 self._check_response(response)
                 if response.headers.get("content-type", "").split(";", 1)[0].lower() != "application/octet-stream":
                     raise TypedAgentApiError(response.status_code, "invalid_artifact_media_type")
@@ -87,13 +97,20 @@ class HttpPrintAgentApiClient:
             raise TypedAgentApiError(0, "transport_error") from exc
 
     def begin_delivery(self, job_id: str) -> PrintJob:
-        return self._parse_job(self._request("POST", f"/api/v1/print-agent/jobs/{job_id}/begin-delivery"))
+        return self._parse_job(
+            self._request(
+                "POST",
+                f"/api/v1/print-agent/jobs/{job_id}/begin-delivery",
+                headers=self._claim_headers(job_id),
+            )
+        )
 
     def report_result(self, job_id: str, outcome: str, bytes_sent: int) -> AgentResultResponse:
         response = self._request(
             "POST",
             f"/api/v1/print-agent/jobs/{job_id}/result",
             json={"outcome": outcome, "bytes_sent": bytes_sent},
+            headers=self._claim_headers(job_id),
         )
         try:
             return AgentResultResponse.model_validate(response.json())
@@ -105,7 +122,8 @@ class HttpPrintAgentApiClient:
 
     def _request(self, method: str, path: str, **kwargs: object) -> httpx.Response:
         try:
-            response = self._client.request(method, path, headers=self._auth_headers(), follow_redirects=False, **kwargs)
+            headers = kwargs.pop("headers", self._auth_headers())
+            response = self._client.request(method, path, headers=headers, follow_redirects=False, **kwargs)
         except httpx.HTTPError as exc:
             raise TypedAgentApiError(0, "transport_error") from exc
         except Exception as exc:
@@ -122,6 +140,12 @@ class HttpPrintAgentApiClient:
 
     def _auth_headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.config.bearer_token}"}
+
+    def _claim_headers(self, job_id: str) -> dict[str, str]:
+        token = self._claim_tokens.get(job_id)
+        if token is None:
+            return self._auth_headers()
+        return self._auth_headers() | {"X-Print-Claim-Token": str(token)}
 
     @staticmethod
     def _parse_job(response: httpx.Response) -> PrintJob:

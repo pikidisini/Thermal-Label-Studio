@@ -8,12 +8,12 @@ Dokumen ini adalah ringkasan kondisi proyek aktif untuk manusia dan AI.
 - Lokasi kerja lokal: `web_app/`
 - Repository referensi: `JSON_LABEL_THERMAL_PRINTER_PARSER`
 - Status: aktif dikembangkan; belum boleh dianggap production-ready tanpa verifikasi test, security, observability, backup, dan rollback.
-- Tanggal snapshot dokumen: 2026-09-18
-- Remote baseline terakhir: `origin/main` pada commit `8025353`
-- Source branch checkpoint: `codex/local-print-agent-b2b1-b2b2b-checkpoint`
-- Upstream checkpoint: `origin/codex/local-print-agent-b2b1-b2b2b-checkpoint`
-- Checkpoint awal branch: `5a2289d`; commit koreksi B2B2B.2.5: `a11657d`.
-- Status B2B2B.2.5: verified dan committed; kondisi checkout/remote terkini harus diverifikasi langsung melalui Git.
+- Tanggal snapshot dokumen: 2026-09-19
+- Remote baseline fase ini: `origin/main` pada commit `e40f95c`
+- Branch aktif: `codex/b2b2c-postgresql-persistence`
+- Status B2B2C: implementasi selesai dan terverifikasi pada PostgreSQL disposable; safe checkpoint siap direview Codex, belum merge ke main.
+- Target berhenti: Pull Request siap direview, sebelum merge ke `main`.
+- Workflow AI: `docs/AI_WORKFLOW.md`; kontrak aktif: `docs/tasks/B2B2C/TASK_CONTRACT.md`.
 
 ## Tujuan produk
 
@@ -35,10 +35,10 @@ Kode atau konsep dari POC boleh digunakan sebagai referensi, tetapi harus diband
 
 ## Pekerjaan aktif
 
-- `backend/app/local_print_agent/`: implementasi local print agent masih dalam pengembangan.
-- `backend/tests/test_local_print_agent.py`: test untuk local print agent masih dalam pengembangan.
-- `docs/architecture/print_job_and_local_agent.md`: dokumentasi arsitektur terkait print job/local agent memiliki perubahan lokal yang harus direview.
-- Status fitur, test, dan security review: belum boleh dianggap verified hanya berdasarkan keberadaan file.
+- B2B2C mengimplementasikan repository PostgreSQL opt-in untuk lifecycle delivery Print Agent, migration runner eksplisit, fencing token HTTP, dan durable artifact root.
+- Repository memory tetap menjadi default. Batch ingestion, render worker persistence, printer transport fisik, deployment production, dan Safe Demo Mode belum termasuk fase ini.
+- PostgreSQL yang digunakan untuk integration test adalah disposable lokal; tidak ada database perusahaan/production yang disentuh.
+- Status final test, review subagent, commit, push, dan PR harus diperbarui setelah quality gate selesai.
 
 ## Workflow lintas perangkat dan provider AI
 

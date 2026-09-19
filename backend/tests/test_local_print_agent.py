@@ -62,6 +62,7 @@ def job(*, status: PrintJobStatus = PrintJobStatus.CLAIMED, claim_agent: str = "
             agent_id=claim_agent,
             claimed_at=NOW if lease_expires_at > NOW else lease_expires_at - timedelta(seconds=1),
             lease_expires_at=lease_expires_at,
+            fencing_token=1,
         )
         if status in {PrintJobStatus.CLAIMED, PrintJobStatus.SENDING} else None,
         source=SourceMetadata(producer_type="sap", program="test"),
@@ -157,7 +158,7 @@ def test_final_response_outcome_and_bytes_must_match_request(response_mutation: 
     {"copies": 2},
     {"source": {"producer_type": "sap", "program": "other"}},
     {"artifact_sha256": "b" * 64},
-    {"claim": {"agent_id": "other-agent", "claimed_at": NOW.isoformat(), "lease_expires_at": (NOW + timedelta(minutes=1)).isoformat()}},
+    {"claim": {"agent_id": "other-agent", "claimed_at": NOW.isoformat(), "lease_expires_at": (NOW + timedelta(minutes=1)).isoformat(), "fencing_token": 1}},
     {"attempt_count": 2},
 ])
 def test_final_response_immutable_fields_are_verified(job_mutation: dict[str, object]) -> None:
@@ -680,6 +681,8 @@ class _TestClientAgentSession:
                 headers["Authorization"] = request.headers["authorization"]
             if request.headers.get("content-type"):
                 headers["Content-Type"] = request.headers["content-type"]
+            if request.headers.get("x-print-claim-token"):
+                headers["X-Print-Claim-Token"] = request.headers["x-print-claim-token"]
             server_response = self.server.request(request.method, request.url.path, headers=headers, content=request.content)
             return httpx.Response(server_response.status_code, headers=dict(server_response.headers), content=server_response.content, request=request)
         self.client = HttpPrintAgentApiClient(self.config_value, httpx.Client(transport=httpx.MockTransport(bridge), base_url=self.config_value.base_url, follow_redirects=False))
