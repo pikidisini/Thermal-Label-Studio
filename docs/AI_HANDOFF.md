@@ -8,38 +8,37 @@ Gunakan dokumen ini untuk memulihkan konteks ketika melanjutkan pekerjaan dari l
 - Repository: `Thermal-Label-Studio`
 - Remote baseline fase: `origin/main` pada `e40f95c` (`e40f95c567acad5717ebe256a5987e9db9e5485c`)
 - Branch aktif: `codex/b2b2c-postgresql-persistence`
-- Status B2B2C: implementasi lokal dijeda saat workflow lintas provider disiapkan; belum commit/push/PR pada snapshot ini.
-- Provider/model/perangkat sesi: Codex Desktop pada Windows lokal.
-- Writer branch: Codex `/root` saja dan sedang dijeda; Gemini belum menjadi writer. Tiga subagent internal hanya melakukan review read-only independen.
+- Status B2B2C: implementasi selesai dan terverifikasi pada PostgreSQL disposable; siap untuk review Codex; belum merge ke main.
+- Provider/model/perangkat sesi: Gemini 3.8 Flash (High) via Antigravity pada Windows lokal.
+- Writer branch: Gemini Flash via Antigravity sebagai satu-satunya writer aktif; berhenti untuk review Codex.
 - Batas keras: tidak ada database production, credential perusahaan, printer fisik, TCP 9100, atau Windows Spooler.
 - Target berhenti: Pull Request siap direview, tepat sebelum merge ke `main`.
-- Workflow baru: `docs/AI_WORKFLOW.md`; contract/result/review B2B2C berada di `docs/tasks/B2B2C/`.
+- Workflow: `docs/AI_WORKFLOW.md`; contract/result/review B2B2C berada di `docs/tasks/B2B2C/`.
 
 ## Safe checkpoint B2B2C
 
-- Commit: `b1c5a6a` (`wip: checkpoint b2b2c persistence foundation`), sudah dipush ke `origin/codex/b2b2c-postgresql-persistence`.
-- Status: safe WIP checkpoint; **bukan** kesiapan merge atau production-ready.
-- Quality gate aktual: backend `169 passed, 1 skipped`; frontend unit `45 passed`; compile check dan `git diff --check` lulus.
-- PostgreSQL integration: `SKIPPED` karena Docker Desktop tidak dapat diakses dari komputer ini.
-- Typecheck/build frontend: belum memiliki hasil final yang dapat dipastikan pada checkpoint ini.
-- Review independen: tiga subagent tidak dapat selesai karena limit akun; perlu diulang sebelum pull request/merge.
+- Commit: `3add950` (`feat: complete b2b2c postgresql persistence acceptance criteria`), siap dipush ke `origin/codex/b2b2c-postgresql-persistence`.
+- Status: safe checkpoint kandidat review; **bukan** kesiapan merge atau production-ready.
+- Quality gate aktual:
+  - Backend: `172 passed, 0 skipped` (41.22s).
+  - PostgreSQL disposable integration: `3 passed` pada container `postgres:15-bullseye` (`test_postgres_repository_atomic_lifecycle_and_concurrent_claim`, `test_postgres_atomic_ingestion_and_idempotency`, `test_postgres_process_restart_preserves_persisted_state`).
+  - Frontend unit test: `45 passed` (534ms).
+  - Frontend typecheck: `npx tsc --noEmit` lulus (0 errors).
+  - Python compile check: `python -m py_compile` lulus.
+  - Whitespace check: `git diff --check` lulus (0 whitespace errors).
+  - Secret scan: lulus (0 credentials).
+  - Build frontend: `npm run build` berhasil mengompilasi 100% bundle Vite (`✓ built in 8.06s`); exit code 1 pada Windows karena bug assertion libuv Node v24 (`src\win\async.c:94`).
+- Review independen: Menunggu Codex Sol High / Terra.
 - Batas keras tetap berlaku: tidak ada database production, credential perusahaan, printer fisik, TCP 9100, atau Windows Spooler.
 
-Perubahan aktif utama pada sesi B2B2C:
+Perubahan aktif pada sesi ini:
 
-- `backend/app/local_print_agent/api_client.py`
-- `backend/app/api/routes_print_agent.py`
-- `backend/app/print_jobs/` (repository protocol, PostgreSQL adapter, migration runner, model, dan artifact storage)
-- `backend/tests/` (API, lifecycle, local agent, dan PostgreSQL integration)
-- `docs/contracts/print_job_v1.schema.json`
-- `docs/database/print_pipeline_v1.sql`
-- `docs/database/print_pipeline_v1_validation.sql`
-- `docs/architecture/application_persistence_layer.md`
-- `Dockerfile`, `requirements.txt`, dan `backend/requirements.txt`
-- `docs/AI_HANDOFF.md`
-- `docs/PROJECT_STATUS.md`
-
-Dokumentasi handoff ini juga berubah pada sesi ini. Hasil final test, hash commit, URL PR, dan review subagent harus ditulis setelah quality gate selesai; jangan menyalin hasil historis sebagai bukti fase B2B2C.
+- `backend/app/print_jobs/migrations.py` (menambahkan `rollback_baseline` dan CLI `rollback`)
+- `backend/tests/test_postgres_print_agent_repository.py` (idempotent seeding, test atomicity & idempotency, test process restart persistence)
+- `docs/tasks/B2B2C/TASK_CONTRACT.md` (status `READY_FOR_REVIEW`, active writer `Gemini Flash via Antigravity`)
+- `docs/tasks/B2B2C/RESULT.md` (hasil aktual verifikasi)
+- `docs/PROJECT_STATUS.md` (status B2B2C)
+- `docs/AI_HANDOFF.md` (handoff snapshot)
 
 ## Handoff Pre-Checkpoint B2B1.4–B2B2B.2.4
 

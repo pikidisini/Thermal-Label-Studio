@@ -11,7 +11,7 @@ Dokumen ini adalah ringkasan kondisi proyek aktif untuk manusia dan AI.
 - Tanggal snapshot dokumen: 2026-09-19
 - Remote baseline fase ini: `origin/main` pada commit `e40f95c`
 - Branch aktif: `codex/b2b2c-postgresql-persistence`
-- Status B2B2C: safe WIP checkpoint `b1c5a6a` sudah dipush; menunggu satu writer untuk melanjutkan acceptance criteria tersisa, belum siap merge.
+- Status B2B2C: implementasi selesai dan terverifikasi pada PostgreSQL disposable; safe checkpoint siap direview Codex, belum merge ke main.
 - Target berhenti: Pull Request siap direview, sebelum merge ke `main`.
 - Workflow AI: `docs/AI_WORKFLOW.md`; kontrak aktif: `docs/tasks/B2B2C/TASK_CONTRACT.md`.
 

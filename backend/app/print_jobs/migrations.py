@@ -18,6 +18,7 @@ BASELINE_VERSION = "print_pipeline_v1"
 MIGRATION_LOCK_ID = 824_221_731
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 BASELINE_SQL_PATH = REPOSITORY_ROOT / "docs" / "database" / "print_pipeline_v1.sql"
+ROLLBACK_SQL_PATH = REPOSITORY_ROOT / "docs" / "database" / "print_pipeline_v1_rollback.sql"
 
 
 class MigrationConflictError(RuntimeError):
@@ -72,6 +73,44 @@ def apply_baseline(database_url: str, sql_path: Path = BASELINE_SQL_PATH) -> boo
     return True
 
 
+def rollback_baseline(database_url: str, sql_path: Path = ROLLBACK_SQL_PATH) -> bool:
+    """Roll back the fail-fast v1 baseline and remove its migration record.
+
+    Returns ``True`` when the schema was rolled back and ``False`` when
+    the baseline migration was not installed.
+    """
+    sql_bytes = sql_path.read_bytes()
+    sql = sql_bytes.decode("utf-8")
+    with psycopg.connect(database_url) as connection:
+        with connection.transaction():
+            connection.execute("SELECT pg_advisory_xact_lock(%s)", (MIGRATION_LOCK_ID,))
+            installed = connection.execute(
+                """
+                SELECT 1 FROM information_schema.tables
+                WHERE table_name = 'thermal_label_schema_migrations'
+                """
+            ).fetchone()
+            if installed is None:
+                return False
+            recorded = connection.execute(
+                "SELECT sha256 FROM thermal_label_schema_migrations WHERE version = %s",
+                (BASELINE_VERSION,),
+            ).fetchone()
+            if recorded is None:
+                return False
+            connection.execute(sql)
+            connection.execute(
+                "DELETE FROM thermal_label_schema_migrations WHERE version = %s",
+                (BASELINE_VERSION,),
+            )
+            count = connection.execute(
+                "SELECT count(*) FROM thermal_label_schema_migrations"
+            ).fetchone()[0]
+            if count == 0:
+                connection.execute("DROP TABLE thermal_label_schema_migrations")
+    return True
+
+
 def verify_baseline(database_url: str, sql_path: Path = BASELINE_SQL_PATH) -> None:
     checksum = baseline_checksum(sql_path)
     with psycopg.connect(database_url) as connection:
@@ -85,7 +124,7 @@ def verify_baseline(database_url: str, sql_path: Path = BASELINE_SQL_PATH) -> No
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Manage the Thermal Label Studio PostgreSQL baseline")
-    parser.add_argument("command", choices=("apply", "verify"))
+    parser.add_argument("command", choices=("apply", "verify", "rollback"))
     args = parser.parse_args()
     database_url = os.environ.get("PRINT_AGENT_DATABASE_URL")
     if not database_url:
@@ -93,9 +132,12 @@ def main() -> int:
     if args.command == "apply":
         created = apply_baseline(database_url)
         print("baseline applied" if created else "baseline already installed")
-    else:
+    elif args.command == "verify":
         verify_baseline(database_url)
         print("baseline verified")
+    else:
+        rolled_back = rollback_baseline(database_url)
+        print("baseline rolled back" if rolled_back else "baseline was not installed")
     return 0
 
 

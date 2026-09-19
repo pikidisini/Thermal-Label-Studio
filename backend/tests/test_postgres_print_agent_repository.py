@@ -22,7 +22,7 @@ from app.local_print_agent.models import AgentRunStatus
 from app.local_print_agent.runner import LocalPrintAgentRunner
 from app.local_print_agent.transport import MemoryPrinterTransport
 from app.print_jobs.artifact_storage import TemporaryArtifactStorage
-from app.print_jobs.migrations import apply_baseline, verify_baseline
+from app.print_jobs.migrations import apply_baseline, rollback_baseline, verify_baseline
 from app.print_jobs.models import Emulation, PrinterLanguage, PrinterProfile
 from app.print_jobs.postgres_repository import PostgresPrintAgentRepository
 from app.print_jobs.repository import DeliveryConflictError, JobExpiredError
@@ -36,10 +36,65 @@ pytestmark = pytest.mark.skipif(not TEST_DSN, reason="TEST_POSTGRES_DSN is not c
 @pytest.fixture(scope="module")
 def database_url() -> str:
     assert TEST_DSN is not None
+    rollback_baseline(TEST_DSN)
     assert apply_baseline(TEST_DSN) is True
     assert apply_baseline(TEST_DSN) is False
     verify_baseline(TEST_DSN)
-    return TEST_DSN
+    yield TEST_DSN
+    rollback_baseline(TEST_DSN)
+
+
+def _ensure_base_fixtures(connection: psycopg.Connection) -> tuple[str, str]:
+    connection.execute(
+        """
+        INSERT INTO media_profiles (media_profile_id, name)
+        VALUES ('TEST-MEDIA', 'B2B2C media')
+        ON CONFLICT (media_profile_id) DO NOTHING
+        """
+    )
+    media_version_id = connection.execute(
+        """
+        INSERT INTO media_profile_versions (
+            media_profile_id, version, width_mm, height_mm,
+            material_type, sensor_mode, orientation
+        ) VALUES ('TEST-MEDIA', 1, 80, 200, 'paper', 'gap', 'portrait')
+        ON CONFLICT (media_profile_id, version) DO UPDATE SET width_mm = EXCLUDED.width_mm
+        RETURNING media_profile_version_id
+        """
+    ).fetchone()[0]
+    template_version_id = connection.execute(
+        """
+        INSERT INTO template_versions (
+            template_id, version, svg_payload_ref, svg_content_sha256,
+            width_mm, height_mm, orientation
+        ) VALUES ('test-template', 1, 'test-template-v1', %s, 80, 200, 'portrait')
+        ON CONFLICT (template_id, version) DO UPDATE SET width_mm = EXCLUDED.width_mm
+        RETURNING template_version_id
+        """,
+        ("a" * 64,),
+    ).fetchone()[0]
+    for printer_id in ("printer-pg-1", "printer-pg-2"):
+        connection.execute(
+            """
+            INSERT INTO printer_registry (
+                printer_id, site_id, area_id, brand, model, delivery_mode,
+                configured_media_profile_version_id, gateway_executor_id,
+                printer_language, emulation, confirmed_dpi
+            ) VALUES (%s, 'site-pg', 'line-test', 'HONEYWELL', 'PM45',
+                      'gateway_agent', %s, 'agent-pg', 'ipl', 'native', 203)
+            ON CONFLICT (printer_id) DO NOTHING
+            """,
+            (printer_id, media_version_id),
+        )
+        connection.execute(
+            """
+            INSERT INTO printer_dispatch_state (printer_id)
+            VALUES (%s)
+            ON CONFLICT (printer_id) DO NOTHING
+            """,
+            (printer_id,),
+        )
+    return str(media_version_id), str(template_version_id)
 
 
 def _seed(database_url: str) -> tuple[str, str, str, str]:
@@ -49,49 +104,7 @@ def _seed(database_url: str) -> tuple[str, str, str, str]:
     job_four = "00000000-0000-0000-0000-000000001004"
     source = json.dumps({"producer_type": "sap", "program": "pytest-b2b2c"})
     with psycopg.connect(database_url) as connection, connection.transaction():
-        media_version = connection.execute(
-            """
-            INSERT INTO media_profiles (media_profile_id, name)
-            VALUES ('TEST-MEDIA', 'B2B2C media')
-            RETURNING media_profile_id
-            """
-        ).fetchone()[0]
-        media_version_id = connection.execute(
-            """
-            INSERT INTO media_profile_versions (
-                media_profile_id, version, width_mm, height_mm,
-                material_type, sensor_mode, orientation
-            ) VALUES (%s, 1, 80, 200, 'paper', 'gap', 'portrait')
-            RETURNING media_profile_version_id
-            """,
-            (media_version,),
-        ).fetchone()[0]
-        template_version_id = connection.execute(
-            """
-            INSERT INTO template_versions (
-                template_id, version, svg_payload_ref, svg_content_sha256,
-                width_mm, height_mm, orientation
-            ) VALUES ('test-template', 1, 'test-template-v1', %s, 80, 200, 'portrait')
-            RETURNING template_version_id
-            """,
-            ("a" * 64,),
-        ).fetchone()[0]
-        for printer_id in ("printer-pg-1", "printer-pg-2"):
-            connection.execute(
-                """
-                INSERT INTO printer_registry (
-                    printer_id, site_id, area_id, brand, model, delivery_mode,
-                    configured_media_profile_version_id, gateway_executor_id,
-                    printer_language, emulation, confirmed_dpi
-                ) VALUES (%s, 'site-pg', 'line-test', 'HONEYWELL', 'PM45',
-                          'gateway_agent', %s, 'agent-pg', 'ipl', 'native', 203)
-                """,
-                (printer_id, media_version_id),
-            )
-            connection.execute(
-                "INSERT INTO printer_dispatch_state (printer_id) VALUES (%s)",
-                (printer_id,),
-            )
+        media_version_id, template_version_id = _ensure_base_fixtures(connection)
         fixture_rows = (
             ("00000000-0000-0000-0000-000000002001", "request-pg-1", "printer-pg-1", job_one, "00000000-0000-0000-0000-000000003001", "payload-pg-1"),
             ("00000000-0000-0000-0000-000000002002", "request-pg-2", "printer-pg-2", job_two, "00000000-0000-0000-0000-000000003002", "payload-pg-2"),
@@ -108,6 +121,7 @@ def _seed(database_url: str) -> tuple[str, str, str, str]:
                     status, total_items, expires_at
                 ) VALUES (%s, 'pytest', %s, %s::jsonb, %s, '{}'::jsonb, %s, %s,
                           '{}'::jsonb, 'accepted', 1, CURRENT_TIMESTAMP + INTERVAL '1 hour')
+                ON CONFLICT (batch_id) DO NOTHING
                 """,
                 (batch_id, request_id, source, "b" * 64, printer_id, media_version_id),
             )
@@ -117,6 +131,7 @@ def _seed(database_url: str) -> tuple[str, str, str, str]:
                     item_id, batch_id, item_sequence, template_version_id,
                     canonical_item_data, item_data_sha256, copies, status
                 ) VALUES (%s, %s, 1, %s, '{}'::jsonb, %s, 1, 'rendered')
+                ON CONFLICT (item_id) DO NOTHING
                 """,
                 (item_id, batch_id, template_version_id, "c" * 64),
             )
@@ -125,6 +140,7 @@ def _seed(database_url: str) -> tuple[str, str, str, str]:
                 INSERT INTO print_jobs (
                     job_id, batch_id, item_id, printer_id, job_kind, status, expires_at
                 ) VALUES (%s, %s, %s, %s, 'original', 'queued', CURRENT_TIMESTAMP + INTERVAL '30 minutes')
+                ON CONFLICT (job_id) DO NOTHING
                 """,
                 (job_id, batch_id, item_id, printer_id),
             )
@@ -137,6 +153,7 @@ def _seed(database_url: str) -> tuple[str, str, str, str]:
                 ) VALUES (%s, %s, 'label.ipl', 'application/octet-stream', 3, %s,
                           'ipl', 'pytest-renderer', %s, '{}'::jsonb,
                           CURRENT_TIMESTAMP + INTERVAL '1 day')
+                ON CONFLICT (job_id) DO NOTHING
                 """,
                 (job_id, payload_ref, sha256(b"IPL").hexdigest(), template_version_id),
             )
@@ -384,3 +401,236 @@ def test_postgres_repository_atomic_lifecycle_and_concurrent_claim(
         assert repository.get(job_four).status.value == "sent_to_printer"
     finally:
         repository.close()
+
+
+def test_postgres_atomic_ingestion_and_idempotency(database_url: str) -> None:
+    _seed(database_url)
+    batch_id_1 = "00000000-0000-0000-0000-000000005001"
+    batch_id_2 = "00000000-0000-0000-0000-000000005002"
+    item_id_1 = "00000000-0000-0000-0000-000000006001"
+    job_id_1 = "00000000-0000-0000-0000-000000007001"
+    job_id_2 = "00000000-0000-0000-0000-000000007002"
+    source = json.dumps({"producer_type": "sap", "program": "pytest-atomic"})
+
+    with psycopg.connect(database_url) as connection:
+        media_id = connection.execute(
+            "SELECT media_profile_version_id FROM media_profile_versions LIMIT 1"
+        ).fetchone()[0]
+        template_id = connection.execute(
+            "SELECT template_version_id FROM template_versions LIMIT 1"
+        ).fetchone()[0]
+        printer_id = "printer-pg-1"
+
+        # 1. Atomic rollback on failure: intentional violation (invalid foreign key)
+        with pytest.raises(psycopg.Error):
+            with connection.transaction():
+                connection.execute(
+                    """
+                    INSERT INTO print_batches (
+                        batch_id, producer_namespace, request_id, source_metadata,
+                        raw_contract_sha256, canonical_payload_snapshot, printer_id,
+                        configured_media_profile_version_id, printer_capability_snapshot,
+                        status, total_items, expires_at
+                    ) VALUES (%s, 'pytest_atomic', 'req-fail', %s::jsonb, %s, '{}'::jsonb, %s, %s,
+                              '{}'::jsonb, 'accepted', 1, CURRENT_TIMESTAMP + INTERVAL '1 hour')
+                    """,
+                    (batch_id_1, source, "f" * 64, printer_id, media_id),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO print_batch_items (
+                        item_id, batch_id, item_sequence, template_version_id,
+                        canonical_item_data, item_data_sha256, copies, status
+                    ) VALUES (%s, %s, 1, '00000000-0000-0000-0000-000000009999', '{}'::jsonb, %s, 1, 'rendered')
+                    """,
+                    (item_id_1, batch_id_1, "f" * 64),
+                )
+
+        # Verify nothing was committed
+        batch_row = connection.execute(
+            "SELECT count(*) FROM print_batches WHERE batch_id = %s::uuid", (batch_id_1,)
+        ).fetchone()[0]
+        assert batch_row == 0
+
+        # 2. Successful atomic commit
+        with connection.transaction():
+            connection.execute(
+                """
+                INSERT INTO print_batches (
+                    batch_id, producer_namespace, request_id, source_metadata,
+                    raw_contract_sha256, canonical_payload_snapshot, printer_id,
+                    configured_media_profile_version_id, printer_capability_snapshot,
+                    status, total_items, expires_at
+                ) VALUES (%s, 'pytest_atomic', 'req-success', %s::jsonb, %s, '{}'::jsonb, %s, %s,
+                          '{}'::jsonb, 'accepted', 1, CURRENT_TIMESTAMP + INTERVAL '1 hour')
+                """,
+                (batch_id_1, source, "f" * 64, printer_id, media_id),
+            )
+            connection.execute(
+                """
+                INSERT INTO print_batch_items (
+                    item_id, batch_id, item_sequence, template_version_id,
+                    canonical_item_data, item_data_sha256, copies, status
+                ) VALUES (%s, %s, 1, %s, '{}'::jsonb, %s, 1, 'rendered')
+                """,
+                (item_id_1, batch_id_1, template_id, "f" * 64),
+            )
+            connection.execute(
+                """
+                INSERT INTO print_jobs (
+                    job_id, batch_id, item_id, printer_id, job_kind, status, expires_at
+                ) VALUES (%s, %s, %s, %s, 'original', 'queued', CURRENT_TIMESTAMP + INTERVAL '30 minutes')
+                """,
+                (job_id_1, batch_id_1, item_id_1, printer_id),
+            )
+
+        # 3. Idempotency: duplicate (producer_namespace, request_id) must fail
+        with pytest.raises(psycopg.errors.UniqueViolation) as exc_info:
+            with connection.transaction():
+                connection.execute(
+                    """
+                    INSERT INTO print_batches (
+                        batch_id, producer_namespace, request_id, source_metadata,
+                        raw_contract_sha256, canonical_payload_snapshot, printer_id,
+                        configured_media_profile_version_id, printer_capability_snapshot,
+                        status, total_items, expires_at
+                    ) VALUES (%s, 'pytest_atomic', 'req-success', %s::jsonb, %s, '{}'::jsonb, %s, %s,
+                              '{}'::jsonb, 'accepted', 1, CURRENT_TIMESTAMP + INTERVAL '1 hour')
+                    """,
+                    (batch_id_2, source, "e" * 64, printer_id, media_id),
+                )
+        assert "uq_print_batches_producer_request" in str(exc_info.value)
+
+        # 4. Single original job invariant: second original job for same item must fail
+        with pytest.raises(psycopg.errors.UniqueViolation) as exc_info_job:
+            with connection.transaction():
+                connection.execute(
+                    """
+                    INSERT INTO print_jobs (
+                        job_id, batch_id, item_id, printer_id, job_kind, status, expires_at
+                    ) VALUES (%s, %s, %s, %s, 'original', 'queued', CURRENT_TIMESTAMP + INTERVAL '30 minutes')
+                    """,
+                    (job_id_2, batch_id_1, item_id_1, printer_id),
+                )
+        assert "uq_print_jobs_single_original_per_item" in str(exc_info_job.value)
+
+
+def test_postgres_process_restart_preserves_persisted_state(
+    database_url: str,
+    tmp_path: Path,
+) -> None:
+    _seed(database_url)
+    job_id = "00000000-0000-0000-0000-000000008001"
+    batch_id = "00000000-0000-0000-0000-000000008002"
+    item_id = "00000000-0000-0000-0000-000000008003"
+    payload_ref = "payload-restart-8001"
+    source = json.dumps({"producer_type": "sap", "program": "pytest-restart"})
+    payload_bytes = b"IPL RESTART TEST"
+    payload_sha = sha256(payload_bytes).hexdigest()
+
+    storage_root = tmp_path / "restart-artifacts"
+
+    with psycopg.connect(database_url) as connection, connection.transaction():
+        media_id = connection.execute(
+            "SELECT media_profile_version_id FROM media_profile_versions LIMIT 1"
+        ).fetchone()[0]
+        template_id = connection.execute(
+            "SELECT template_version_id FROM template_versions LIMIT 1"
+        ).fetchone()[0]
+        connection.execute(
+            """
+            INSERT INTO print_batches (
+                batch_id, producer_namespace, request_id, source_metadata,
+                raw_contract_sha256, canonical_payload_snapshot, printer_id,
+                configured_media_profile_version_id, printer_capability_snapshot,
+                status, total_items, expires_at
+            ) VALUES (%s, 'pytest_restart', 'req-restart-1', %s::jsonb, %s, '{}'::jsonb, 'printer-pg-1', %s,
+                      '{}'::jsonb, 'accepted', 1, CURRENT_TIMESTAMP + INTERVAL '1 hour')
+            """,
+            (batch_id, source, "a" * 64, media_id),
+        )
+        connection.execute(
+            """
+            INSERT INTO print_batch_items (
+                item_id, batch_id, item_sequence, template_version_id,
+                canonical_item_data, item_data_sha256, copies, status
+            ) VALUES (%s, %s, 1, %s, '{}'::jsonb, %s, 1, 'rendered')
+            """,
+            (item_id, batch_id, template_id, "b" * 64),
+        )
+        connection.execute(
+            """
+            INSERT INTO print_jobs (
+                job_id, batch_id, item_id, printer_id, job_kind, status, expires_at
+            ) VALUES (%s, %s, %s, 'printer-pg-1', 'original', 'queued', CURRENT_TIMESTAMP + INTERVAL '30 minutes')
+            """,
+            (job_id, batch_id, item_id),
+        )
+        connection.execute(
+            """
+            INSERT INTO print_artifacts (
+                job_id, payload_ref, filename, media_type, byte_length,
+                artifact_sha256, printer_language_snapshot, renderer_version,
+                template_version_id, printer_capability_snapshot, retention_expires_at
+            ) VALUES (%s, %s, 'label.ipl', 'application/octet-stream', %s, %s,
+                      'ipl', 'pytest-renderer', %s, '{}'::jsonb,
+                      CURRENT_TIMESTAMP + INTERVAL '1 day')
+            """,
+            (job_id, payload_ref, len(payload_bytes), payload_sha, template_id),
+        )
+
+    # Process 1: store artifact, claim job, begin delivery, report success
+    storage_1 = TemporaryArtifactStorage(storage_root)
+    storage_1.put(payload_ref, "label.ipl", payload_bytes)
+
+    repo_1 = PostgresPrintAgentRepository(database_url, min_pool_size=1, max_pool_size=2)
+    now = datetime.now(timezone.utc)
+    claimed = repo_1.claim_next(
+        "site-pg", "agent-restart", now, timedelta(seconds=60), eligible_job_ids={job_id}
+    )
+    assert claimed is not None and claimed.job_id == job_id
+    fencing = claimed.claim.fencing_token
+
+    repo_1.begin_delivery(job_id, "agent-restart", now, fencing_token=fencing)
+    final = repo_1.report_result(
+        job_id,
+        "agent-restart",
+        MockTransportOutcome.SUCCESS,
+        len(payload_bytes),
+        fencing_token=fencing,
+    )
+    assert final.status.value == "sent_to_printer"
+    # Simulate process shutdown
+    repo_1.close()
+
+    # Process 2 (Restart): brand new repository and storage instances connecting to same DB & filesystem
+    repo_2 = PostgresPrintAgentRepository(database_url, min_pool_size=1, max_pool_size=2)
+    storage_2 = TemporaryArtifactStorage(storage_root)
+    try:
+        persisted_job = repo_2.get(job_id)
+        assert persisted_job.status.value == "sent_to_printer"
+        assert persisted_job.attempt_count == 1
+        assert persisted_job.claim is not None
+        assert persisted_job.claim.agent_id == "agent-restart"
+        assert persisted_job.claim.fencing_token == fencing
+        assert persisted_job.artifact is not None
+        assert persisted_job.artifact.payload_ref == payload_ref
+        assert persisted_job.artifact.byte_length == len(payload_bytes)
+        assert persisted_job.artifact_sha256 == payload_sha
+
+        # Verify durable artifact content is readable and verified
+        read_payload = storage_2.read_verified(persisted_job.artifact, payload_sha)
+        assert read_payload == payload_bytes
+
+        # Verify outbox & audit events survived process restart
+        with psycopg.connect(database_url) as connection:
+            outbox = connection.execute(
+                "SELECT count(*) FROM print_job_outbox WHERE aggregate_id = %s::uuid", (job_id,)
+            ).fetchone()[0]
+            audit = connection.execute(
+                "SELECT count(*) FROM print_audit_events WHERE aggregate_id = %s::uuid", (job_id,)
+            ).fetchone()[0]
+        assert outbox == 1
+        assert audit >= 3
+    finally:
+        repo_2.close()

@@ -2,13 +2,13 @@
 
 ## Identitas
 
-- Status: `PAUSED_AFTER_SAFE_CHECKPOINT`
+- Status: `READY_FOR_REVIEW`
 - Risk level: `3`
 - Branch: `codex/b2b2c-postgresql-persistence`
 - Planner/final reviewer: Codex Sol High
 - Pre-reviewer: Codex Terra
 - Intended executor: Gemini Flash via Antigravity
-- Active writer: `NONE — safe checkpoint pushed; assign one writer before edits`
+- Active writer: `Gemini Flash via Antigravity`
 
 ## Tujuan
 
