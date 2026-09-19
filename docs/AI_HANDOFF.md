@@ -18,11 +18,11 @@ Gunakan dokumen ini untuk memulihkan konteks ketika melanjutkan pekerjaan dari l
 ## Safe checkpoint B2B2C
 
 - Baseline commit: `5186c4d` (`feat: complete b2b2c postgresql persistence acceptance criteria`), sudah dipush ke `origin/codex/b2b2c-postgresql-persistence`.
-- Corrective commit review: asymmetric batch priority & deadlock-free anti-interleaving pada `claim_next()`.
+- Corrective commit P1: asymmetric batch priority, deadlock-free anti-interleaving, dan batch safety pause on delivery_unknown.
 - Status: safe checkpoint kandidat review; **bukan** kesiapan merge atau production-ready.
 - Quality gate aktual:
-  - Backend: `174 passed, 0 skipped`.
-  - PostgreSQL disposable integration: `5 passed` pada container `postgres:15-bullseye` (`test_postgres_repository_atomic_lifecycle_and_concurrent_claim`, `test_postgres_atomic_ingestion_and_idempotency`, `test_postgres_process_restart_preserves_persisted_state`, `test_postgres_batch_item_sequence_claim_order_and_anti_interleaving`, `test_postgres_asymmetric_batch_priority_and_deadlock_freedom`).
+  - Backend: `175 passed, 0 skipped`.
+  - PostgreSQL disposable integration: `6 passed` pada container `postgres:15-bullseye` (`test_postgres_repository_atomic_lifecycle_and_concurrent_claim`, `test_postgres_atomic_ingestion_and_idempotency`, `test_postgres_process_restart_preserves_persisted_state`, `test_postgres_batch_item_sequence_claim_order_and_anti_interleaving`, `test_postgres_asymmetric_batch_priority_and_deadlock_freedom`, `test_postgres_batch_safety_pause_on_delivery_unknown_and_isolation`).
   - Targeted regression: `127 passed`.
   - Frontend unit test: `45 passed` (534ms).
   - Frontend typecheck: `npx tsc --noEmit` lulus (0 errors).
@@ -35,9 +35,10 @@ Gunakan dokumen ini untuk memulihkan konteks ketika melanjutkan pekerjaan dari l
 
 Perubahan aktif pada corrective commit ini:
 
-- `backend/app/print_jobs/postgres_repository.py` (enforce asymmetric total order `(other_b.created_at, other_b.batch_id) < (b.created_at, b.batch_id)` in `claim_next()` preventing deadlock while preserving anti-interleaving)
-- `backend/tests/test_postgres_print_agent_repository.py` (add `test_postgres_asymmetric_batch_priority_and_deadlock_freedom` proving active batch finishes before reprint without mutual blocking)
-- `docs/tasks/B2B2C/RESULT.md` (updated with asymmetric priority and deadlock-free verification)
+- `backend/app/print_jobs/postgres_repository.py` (pause batch on `delivery_unknown` in `report_result` and `_reconcile_locked`, emit `print_batch_paused` audit event, exclude paused/cancelled/partially_failed batches in `claim_next`)
+- `backend/tests/test_postgres_print_agent_repository.py` (add `test_postgres_batch_safety_pause_on_delivery_unknown_and_isolation` verifying batch pause, no auto-retry, held remaining items, and safe batch isolation)
+- `docs/tasks/B2B2C/RESULT.md` (updated with batch safety verification)
+- `docs/tasks/B2B2C/REVIEW.md` (updated verdict to CHANGES_REQUIRED pending final review)
 - `docs/AI_HANDOFF.md` (handoff snapshot updated)
 
 ## Handoff Pre-Checkpoint B2B1.4–B2B2B.2.4

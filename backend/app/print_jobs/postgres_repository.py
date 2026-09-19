@@ -145,6 +145,7 @@ class PostgresPrintAgentRepository:
                       AND pr.is_enabled
                       AND j.status = 'queued'
                       AND j.expires_at > %s
+                      AND b.status NOT IN ('paused', 'cancelled', 'partially_failed')
                       AND ds.active_batch_id IS NULL
                       AND NOT EXISTS (
                           SELECT 1
@@ -154,6 +155,7 @@ class PostgresPrintAgentRepository:
                             AND other_j.batch_id != j.batch_id
                             AND other_j.status = 'queued'
                             AND other_j.expires_at > %s
+                            AND other_b.status NOT IN ('paused', 'cancelled', 'partially_failed')
                             AND (other_b.created_at, other_b.batch_id) < (b.created_at, b.batch_id)
                       )
                     """
@@ -319,7 +321,7 @@ class PostgresPrintAgentRepository:
             row = connection.execute(
                 """
                 SELECT j.status, j.executor_id, j.fencing_token, j.result_outcome,
-                       j.bytes_sent, j.attempt_count, j.printer_id
+                       j.bytes_sent, j.attempt_count, j.printer_id, j.batch_id
                 FROM printer_dispatch_state AS ds
                 JOIN print_jobs AS j ON j.printer_id = ds.printer_id
                 WHERE j.job_id = %s::uuid
@@ -368,6 +370,29 @@ class PostgresPrintAgentRepository:
                 job_id=job_id,
                 metadata={"outcome": outcome.value, "bytes_sent": bytes_sent},
             )
+            if final_status == "delivery_unknown":
+                connection.execute(
+                    """
+                    UPDATE print_batches
+                    SET status = 'paused', updated_at = %s
+                    WHERE batch_id = %s::uuid
+                    """,
+                    (db_now, row["batch_id"]),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO print_audit_events (
+                        actor_type, actor_id, action, aggregate_type, aggregate_id, reason_code, metadata
+                    ) VALUES ('agent', %s, 'print_batch_paused', 'print_batch', %s::uuid, 'delivery_unknown', %s::jsonb)
+                    """,
+                    (
+                        agent_id,
+                        row["batch_id"],
+                        self._json_payload(
+                            {"job_id": job_id, "reason": "delivery_unknown"}
+                        ),
+                    ),
+                )
             self._release_dispatch_if_idle(connection, row["printer_id"], db_now)
             return self._fetch_job(connection, job_id)
 
@@ -398,10 +423,32 @@ class PostgresPrintAgentRepository:
             WHERE pr.printer_id = j.printer_id
               AND j.status = 'sending'
               AND (j.expires_at <= %s OR j.lease_expires_at <= %s)
-            """ + suffix + " RETURNING j.job_id::text, j.printer_id",
+            """ + suffix + " RETURNING j.job_id::text, j.printer_id, j.batch_id::text",
             [db_now, db_now, db_now, *parameters[1:]],
         ).fetchall()
         changed.update(row["job_id"] for row in sending)
+        for item in sending:
+            connection.execute(
+                """
+                UPDATE print_batches
+                SET status = 'paused', updated_at = %s
+                WHERE batch_id = %s::uuid
+                """,
+                (db_now, item["batch_id"]),
+            )
+            connection.execute(
+                """
+                INSERT INTO print_audit_events (
+                    actor_type, actor_id, action, aggregate_type, aggregate_id, reason_code, metadata
+                ) VALUES ('system', 'system', 'print_batch_paused', 'print_batch', %s::uuid, 'delivery_unknown', %s::jsonb)
+                """,
+                (
+                    item["batch_id"],
+                    self._json_payload(
+                        {"job_id": item["job_id"], "reason": "delivery_unknown"}
+                    ),
+                ),
+            )
         expired_claims = connection.execute(
             """
             UPDATE print_jobs AS j

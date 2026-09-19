@@ -3,7 +3,7 @@
 - Status: `READY_FOR_REVIEW`
 - Active writer: `Gemini Flash via Antigravity`
 - Branch: `codex/b2b2c-postgresql-persistence`
-- Safe checkpoint baseline: `5186c4d` (sudah dipush ke origin) + corrective commit P1 + corrective commit review (asymmetric priority & deadlock-free anti-interleaving)
+- Safe checkpoint baseline: `5186c4d` (sudah dipush ke origin) + corrective commit P1 + corrective commit review (asymmetric priority & deadlock-free anti-interleaving) + corrective commit P1 batch safety (pause on delivery_unknown)
 
 ## Hasil implementasi
 
@@ -22,25 +22,29 @@
           AND other_j.batch_id != j.batch_id
           AND other_j.status = 'queued'
           AND other_j.expires_at > %s
+          AND other_b.status NOT IN ('paused', 'cancelled', 'partially_failed')
           AND (other_b.created_at, other_b.batch_id) < (b.created_at, b.batch_id)
     )
     ```
-    Kandidat job `j` hanya diblokir oleh `other_j` jika `other_j` berstatus `queued` dan berasal dari batch yang lebih awal `(other_b.created_at, other_b.batch_id) < (b.created_at, b.batch_id)`. Batch yang lebih tua tidak pernah diblokir oleh batch yang lebih baru, sehingga deadlock antar-batch dicegah secara mutlak.
-  - Terverifikasi melalui integration test:
-    - `test_postgres_batch_item_sequence_claim_order_and_anti_interleaving`: batch 3 item dengan UUID sengaja diinversi (`ffff...`, `8888...`, `0000...`) yang diklaim terbukti berurutan 1, 2, 3 tanpa disela batch kedua.
-    - `test_postgres_asymmetric_batch_priority_and_deadlock_freedom`: skenario riil di mana Batch B (aktif) dan Batch A (reprint) sama-sama memiliki riwayat `sent_to_printer`, membuktikan `claim_next()` tidak mengalami deadlock (mengembalikan Batch B item 2 terlebih dahulu hingga tuntas, baru kemudian Batch A reprint).
-- Acceptance Criteria 1 (Atomic ingestion & idempotency): Terverifikasi melalui `test_postgres_atomic_ingestion_and_idempotency` (rollback atomik saat kegagalan, idempotency `(producer_namespace, request_id)` via unique constraint, single original job constraint).
-- Acceptance Criteria 2 (Concurrent claim & fencing token): Terverifikasi melalui `test_postgres_repository_atomic_lifecycle_and_concurrent_claim` (2 worker concurrent, 1 pemenang, stale fencing token ditolak).
+- P1 Batch Safety & Isolation on Ambiguous Delivery (`report_result`, `_reconcile_locked`, `claim_next`):
+  - Saat `report_result` atau rekonsiliasi lease mengubah job `sending` menjadi `delivery_unknown`:
+    - Dalam transaksi PostgreSQL yang sama, parent `print_batches.status` diubah menjadi `'paused'`.
+    - Menyimpan audit event `print_batch_paused` pada `print_audit_events` dengan `reason_code = 'delivery_unknown'` dan metadata menyertakan `job_id` serta alasan kegagalan.
+  - `claim_next()` mengecualikan job queued dari batch berstatus `'paused'`, `'cancelled'`, atau `'partially_failed'` (`b.status NOT IN ('paused', 'cancelled', 'partially_failed')`).
+  - Batch yang di-pause tidak memblokir batch aman lainnya pada printer yang sama (`other_b.status NOT IN ('paused', 'cancelled', 'partially_failed')`).
+  - Job `queued` sisa pada batch yang di-pause tidak diubah dan tidak dihapus; dipertahankan sebagai item tertahan (held items) agar nantinya hanya dapat dilanjutkan melalui aksi operator resume yang terotorisasi.
+- Acceptance Criteria 1 (Atomic ingestion & idempotency): Terverifikasi melalui `test_postgres_atomic_ingestion_and_idempotency`.
+- Acceptance Criteria 2 (Concurrent claim & fencing token): Terverifikasi melalui `test_postgres_repository_atomic_lifecycle_and_concurrent_claim`.
 - Acceptance Criteria 3 (Lifecycle, lease expiry, callback, outbox): Terverifikasi melalui state machine transition, lease expiration reconciliation, transactional outbox deduplication, dan immutable audit trail.
 - Acceptance Criteria 4 (Durable artifact verification): Terverifikasi melalui SHA-256 checksum, byte length, immutability, dan sidecar metadata persistence.
-- Acceptance Criteria 5 (Restart proses tidak menghilangkan state): Terverifikasi melalui `test_postgres_process_restart_preserves_persisted_state` (menutup connection pool dan membuka instance baru pada DB & filesystem yang sama mempertahankan job, claim, artifact payload, outbox, dan audit events).
+- Acceptance Criteria 5 (Restart proses tidak menghilangkan state): Terverifikasi melalui `test_postgres_process_restart_preserves_persisted_state`.
 - Acceptance Criteria 6 (Test suite & quality gate): Seluruh backend unit test, targeted regression, dan PostgreSQL integration test lulus 100%.
 
 ## Verifikasi aktual
 
-- `PASS`: test repository PostgreSQL disposable `5 passed` (`test_postgres_repository_atomic_lifecycle_and_concurrent_claim`, `test_postgres_atomic_ingestion_and_idempotency`, `test_postgres_process_restart_preserves_persisted_state`, `test_postgres_batch_item_sequence_claim_order_and_anti_interleaving`, `test_postgres_asymmetric_batch_priority_and_deadlock_freedom`) pada container `postgres:15-bullseye` (`127.0.0.1:55432/thermal_label_test`).
+- `PASS`: test repository PostgreSQL disposable `6 passed` (`test_postgres_repository_atomic_lifecycle_and_concurrent_claim`, `test_postgres_atomic_ingestion_and_idempotency`, `test_postgres_process_restart_preserves_persisted_state`, `test_postgres_batch_item_sequence_claim_order_and_anti_interleaving`, `test_postgres_asymmetric_batch_priority_and_deadlock_freedom`, `test_postgres_batch_safety_pause_on_delivery_unknown_and_isolation`) pada container `postgres:15-bullseye` (`127.0.0.1:55432/thermal_label_test`).
 - `PASS`: targeted backend regression `127 passed` (`test_print_agent_api.py`, `test_local_print_agent.py`, `test_print_job_v1.py`).
-- `PASS`: full backend suite `174 passed, 0 skipped`.
+- `PASS`: full backend suite `175 passed, 0 skipped`.
 - `PASS`: frontend unit test `45 passed` (534ms).
 - `PASS`: frontend typecheck `npx tsc --noEmit` (0 errors).
 - `PASS`: Python compile check `python -m py_compile` pada seluruh file backend yang diubah.

@@ -11,6 +11,7 @@ from pathlib import Path
 
 import httpx
 import psycopg
+from psycopg.rows import dict_row
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -990,5 +991,328 @@ def test_postgres_asymmetric_batch_priority_and_deadlock_freedom(
         assert repository.claim_next(
             "site-pg", "agent-asym", now, timedelta(seconds=60), eligible_job_ids=target_job_ids
         ) is None
+    finally:
+        repository.close()
+
+
+def test_postgres_batch_safety_pause_on_delivery_unknown_and_isolation(
+    database_url: str,
+) -> None:
+    # Batch 1 (Unsafe/Ambiguous Batch): 2 items on printer-pg-1
+    batch_1_id = "00000000-0000-0000-0000-00000000c001"
+    item_1_1_id = "00000000-0000-0000-0000-00000000c101"
+    item_1_2_id = "00000000-0000-0000-0000-00000000c102"
+    job_1_1_uuid = "00000000-0000-0000-0000-00000000c201"
+    job_1_2_uuid = "00000000-0000-0000-0000-00000000c202"
+
+    # Batch 2 (Safe Batch): 1 item on the SAME printer (printer-pg-1), created later
+    batch_safe_1_id = "00000000-0000-0000-0000-00000000c002"
+    item_safe_1_id = "00000000-0000-0000-0000-00000000c103"
+    job_safe_1_uuid = "00000000-0000-0000-0000-00000000c203"
+
+    # Batch 3 (Lease-Expiry Batch): 2 items on printer-pg-2
+    batch_3_id = "00000000-0000-0000-0000-00000000c003"
+    item_3_1_id = "00000000-0000-0000-0000-00000000c104"
+    item_3_2_id = "00000000-0000-0000-0000-00000000c105"
+    job_3_1_uuid = "00000000-0000-0000-0000-00000000c204"
+    job_3_2_uuid = "00000000-0000-0000-0000-00000000c205"
+
+    # Batch 4 (Safe Batch): 1 item on printer-pg-2, created later
+    batch_safe_2_id = "00000000-0000-0000-0000-00000000c004"
+    item_safe_2_id = "00000000-0000-0000-0000-00000000c106"
+    job_safe_2_uuid = "00000000-0000-0000-0000-00000000c206"
+
+    source = json.dumps({"producer_type": "sap", "program": "pytest-safety"})
+
+    with psycopg.connect(database_url) as connection, connection.transaction():
+        media_version_id, template_version_id = _ensure_base_fixtures(connection)
+
+        # 1. Seed Batch 1 (created 20 mins ago) and Batch Safe 1 (created 10 mins ago) on printer-pg-1
+        connection.execute(
+            """
+            INSERT INTO print_batches (
+                batch_id, producer_namespace, request_id, source_metadata,
+                raw_contract_sha256, canonical_payload_snapshot, printer_id,
+                configured_media_profile_version_id, printer_capability_snapshot,
+                status, total_items, created_at, expires_at
+            ) VALUES
+                (%s, 'pytest_safety', 'req-safety-1', %s::jsonb, %s, '{}'::jsonb, 'printer-pg-1', %s,
+                 '{}'::jsonb, 'accepted', 2, CURRENT_TIMESTAMP - INTERVAL '20 minutes',
+                 CURRENT_TIMESTAMP + INTERVAL '1 hour'),
+                (%s, 'pytest_safety', 'req-safety-safe1', %s::jsonb, %s, '{}'::jsonb, 'printer-pg-1', %s,
+                 '{}'::jsonb, 'accepted', 1, CURRENT_TIMESTAMP - INTERVAL '10 minutes',
+                 CURRENT_TIMESTAMP + INTERVAL '1 hour')
+            """,
+            (
+                batch_1_id, source, "1" * 64, media_version_id,
+                batch_safe_1_id, source, "2" * 64, media_version_id,
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO print_batch_items (
+                item_id, batch_id, item_sequence, template_version_id,
+                canonical_item_data, item_data_sha256, copies, status
+            ) VALUES
+                (%s, %s, 1, %s, '{}'::jsonb, %s, 1, 'rendered'),
+                (%s, %s, 2, %s, '{}'::jsonb, %s, 1, 'rendered'),
+                (%s, %s, 1, %s, '{}'::jsonb, %s, 1, 'rendered')
+            """,
+            (
+                item_1_1_id, batch_1_id, template_version_id, "1" * 64,
+                item_1_2_id, batch_1_id, template_version_id, "2" * 64,
+                item_safe_1_id, batch_safe_1_id, template_version_id, "3" * 64,
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO print_jobs (
+                job_id, batch_id, item_id, printer_id, job_kind, status, created_at, expires_at
+            ) VALUES
+                (%s, %s, %s, 'printer-pg-1', 'original', 'queued', CURRENT_TIMESTAMP - INTERVAL '20 minutes', CURRENT_TIMESTAMP + INTERVAL '30 minutes'),
+                (%s, %s, %s, 'printer-pg-1', 'original', 'queued', CURRENT_TIMESTAMP - INTERVAL '20 minutes', CURRENT_TIMESTAMP + INTERVAL '30 minutes'),
+                (%s, %s, %s, 'printer-pg-1', 'original', 'queued', CURRENT_TIMESTAMP - INTERVAL '10 minutes', CURRENT_TIMESTAMP + INTERVAL '30 minutes')
+            """,
+            (
+                job_1_1_uuid, batch_1_id, item_1_1_id,
+                job_1_2_uuid, batch_1_id, item_1_2_id,
+                job_safe_1_uuid, batch_safe_1_id, item_safe_1_id,
+            ),
+        )
+
+        # 2. Seed Batch 3 (created 20 mins ago) and Batch Safe 2 (created 10 mins ago) on printer-pg-2
+        connection.execute(
+            """
+            INSERT INTO print_batches (
+                batch_id, producer_namespace, request_id, source_metadata,
+                raw_contract_sha256, canonical_payload_snapshot, printer_id,
+                configured_media_profile_version_id, printer_capability_snapshot,
+                status, total_items, created_at, expires_at
+            ) VALUES
+                (%s, 'pytest_safety', 'req-safety-3', %s::jsonb, %s, '{}'::jsonb, 'printer-pg-2', %s,
+                 '{}'::jsonb, 'accepted', 2, CURRENT_TIMESTAMP - INTERVAL '20 minutes',
+                 CURRENT_TIMESTAMP + INTERVAL '1 hour'),
+                (%s, 'pytest_safety', 'req-safety-safe2', %s::jsonb, %s, '{}'::jsonb, 'printer-pg-2', %s,
+                 '{}'::jsonb, 'accepted', 1, CURRENT_TIMESTAMP - INTERVAL '10 minutes',
+                 CURRENT_TIMESTAMP + INTERVAL '1 hour')
+            """,
+            (
+                batch_3_id, source, "4" * 64, media_version_id,
+                batch_safe_2_id, source, "5" * 64, media_version_id,
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO print_batch_items (
+                item_id, batch_id, item_sequence, template_version_id,
+                canonical_item_data, item_data_sha256, copies, status
+            ) VALUES
+                (%s, %s, 1, %s, '{}'::jsonb, %s, 1, 'rendered'),
+                (%s, %s, 2, %s, '{}'::jsonb, %s, 1, 'rendered'),
+                (%s, %s, 1, %s, '{}'::jsonb, %s, 1, 'rendered')
+            """,
+            (
+                item_3_1_id, batch_3_id, template_version_id, "4" * 64,
+                item_3_2_id, batch_3_id, template_version_id, "5" * 64,
+                item_safe_2_id, batch_safe_2_id, template_version_id, "6" * 64,
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO print_jobs (
+                job_id, batch_id, item_id, printer_id, job_kind, status, created_at, expires_at
+            ) VALUES
+                (%s, %s, %s, 'printer-pg-2', 'original', 'queued', CURRENT_TIMESTAMP - INTERVAL '20 minutes', CURRENT_TIMESTAMP + INTERVAL '30 minutes'),
+                (%s, %s, %s, 'printer-pg-2', 'original', 'queued', CURRENT_TIMESTAMP - INTERVAL '20 minutes', CURRENT_TIMESTAMP + INTERVAL '30 minutes'),
+                (%s, %s, %s, 'printer-pg-2', 'original', 'queued', CURRENT_TIMESTAMP - INTERVAL '10 minutes', CURRENT_TIMESTAMP + INTERVAL '30 minutes')
+            """,
+            (
+                job_3_1_uuid, batch_3_id, item_3_1_id,
+                job_3_2_uuid, batch_3_id, item_3_2_id,
+                job_safe_2_uuid, batch_safe_2_id, item_safe_2_id,
+            ),
+        )
+
+        all_safety_jobs = (
+            job_1_1_uuid, job_1_2_uuid, job_safe_1_uuid,
+            job_3_1_uuid, job_3_2_uuid, job_safe_2_uuid,
+        )
+        for j_id in all_safety_jobs:
+            connection.execute(
+                """
+                INSERT INTO print_artifacts (
+                    job_id, payload_ref, filename, media_type, byte_length,
+                    artifact_sha256, printer_language_snapshot, renderer_version,
+                    template_version_id, printer_capability_snapshot, retention_expires_at
+                ) VALUES (%s, %s, 'label.ipl', 'application/octet-stream', 3, %s,
+                          'ipl', 'pytest-renderer', %s, '{}'::jsonb,
+                          CURRENT_TIMESTAMP + INTERVAL '1 day')
+                ON CONFLICT (job_id) DO NOTHING
+                """,
+                (j_id, f"payload-{j_id}", sha256(b"IPL").hexdigest(), template_version_id),
+            )
+
+    repository = PostgresPrintAgentRepository(database_url, min_pool_size=1, max_pool_size=2)
+    now = datetime.now(timezone.utc)
+
+    try:
+        # =====================================================================
+        # SCENARIO A: report_result with DELIVERY_UNKNOWN pauses parent batch
+        # =====================================================================
+        printer_1_jobs = {job_1_1_uuid, job_1_2_uuid, job_safe_1_uuid}
+
+        # 1. Claim item sequence 1 (Batch 1, job_1_1_uuid)
+        claimed_1 = repository.claim_next(
+            "site-pg", "agent-pg", now, timedelta(seconds=60), eligible_job_ids=printer_1_jobs
+        )
+        assert claimed_1 is not None and claimed_1.job_id == job_1_1_uuid
+        fencing_1 = claimed_1.claim.fencing_token
+
+        # 2. Begin delivery -> status is sending
+        repository.begin_delivery(claimed_1.job_id, "agent-pg", now, fencing_token=fencing_1)
+
+        # 3. Finalize as delivery_unknown
+        unknown_job = repository.report_result(
+            claimed_1.job_id,
+            "agent-pg",
+            MockTransportOutcome.DELIVERY_UNKNOWN,
+            3,
+            fencing_token=fencing_1,
+        )
+        assert unknown_job.status.value == "delivery_unknown"
+
+        # 4. Prove batch becomes paused and audit event recorded
+        with psycopg.connect(database_url, row_factory=dict_row) as connection:
+            b1_status = connection.execute(
+                "SELECT status FROM print_batches WHERE batch_id = %s::uuid", (batch_1_id,)
+            ).fetchone()["status"]
+            assert b1_status == "paused"
+
+            audit_row = connection.execute(
+                """
+                SELECT actor_type, actor_id, action, aggregate_type, aggregate_id, reason_code, metadata
+                FROM print_audit_events
+                WHERE aggregate_id = %s::uuid AND action = 'print_batch_paused'
+                """,
+                (batch_1_id,),
+            ).fetchone()
+            assert audit_row is not None
+            assert audit_row["reason_code"] == "delivery_unknown"
+            assert audit_row["actor_type"] == "agent"
+            assert audit_row["actor_id"] == "agent-pg"
+            assert audit_row["metadata"]["job_id"] == job_1_1_uuid
+            assert audit_row["metadata"]["reason"] == "delivery_unknown"
+
+        # 5. Prove item sequence 2 CANNOT be claimed automatically
+        # 6. Prove ambiguous job (job_1_1_uuid) is NEVER retried automatically
+        # 7. Prove safe batch on the SAME printer IS claimed without interference
+        claimed_next_1 = repository.claim_next(
+            "site-pg", "agent-pg", now, timedelta(seconds=60), eligible_job_ids=printer_1_jobs
+        )
+        assert claimed_next_1 is not None
+        assert claimed_next_1.job_id == job_safe_1_uuid, (
+            f"Expected safe job {job_safe_1_uuid} to be claimed, but got {claimed_next_1.job_id}!"
+        )
+
+        # Finalize the safe job successfully
+        repository.begin_delivery(
+            claimed_next_1.job_id, "agent-pg", now, fencing_token=claimed_next_1.claim.fencing_token
+        )
+        safe_done = repository.report_result(
+            claimed_next_1.job_id,
+            "agent-pg",
+            MockTransportOutcome.SUCCESS,
+            3,
+            fencing_token=claimed_next_1.claim.fencing_token,
+        )
+        assert safe_done.status.value == "sent_to_printer"
+
+        # 8. Prove Batch 1 item 2 remains safely held in 'queued' status
+        assert repository.get(job_1_2_uuid).status.value == "queued"
+        # And no more jobs can be claimed on printer-pg-1
+        assert repository.claim_next(
+            "site-pg", "agent-pg", now, timedelta(seconds=60), eligible_job_ids=printer_1_jobs
+        ) is None
+
+        # =====================================================================
+        # SCENARIO B: Lease expiry while sending pauses parent batch
+        # =====================================================================
+        printer_2_jobs = {job_3_1_uuid, job_3_2_uuid, job_safe_2_uuid}
+
+        # 1. Claim item sequence 1 (Batch 3, job_3_1_uuid)
+        claimed_3 = repository.claim_next(
+            "site-pg", "agent-pg", now, timedelta(seconds=60), eligible_job_ids=printer_2_jobs
+        )
+        assert claimed_3 is not None and claimed_3.job_id == job_3_1_uuid
+        fencing_3 = claimed_3.claim.fencing_token
+
+        # 2. Begin delivery -> status is sending
+        repository.begin_delivery(claimed_3.job_id, "agent-pg", now, fencing_token=fencing_3)
+
+        # 3. Simulate lease expiry while in sending
+        with psycopg.connect(database_url) as connection, connection.transaction():
+            connection.execute(
+                """
+                UPDATE print_jobs
+                SET claimed_at = CURRENT_TIMESTAMP - INTERVAL '3 minutes',
+                    lease_expires_at = CURRENT_TIMESTAMP - INTERVAL '1 minute'
+                WHERE job_id = %s::uuid
+                """,
+                (job_3_1_uuid,),
+            )
+
+        # 4. Reconcile lease -> job becomes delivery_unknown, batch becomes paused
+        reconciled = repository.reconcile_job(job_3_1_uuid, datetime.now(timezone.utc))
+        assert reconciled.status.value == "delivery_unknown"
+
+        with psycopg.connect(database_url, row_factory=dict_row) as connection:
+            b3_status = connection.execute(
+                "SELECT status FROM print_batches WHERE batch_id = %s::uuid", (batch_3_id,)
+            ).fetchone()["status"]
+            assert b3_status == "paused"
+
+            audit_row_3 = connection.execute(
+                """
+                SELECT actor_type, actor_id, action, aggregate_type, aggregate_id, reason_code, metadata
+                FROM print_audit_events
+                WHERE aggregate_id = %s::uuid AND action = 'print_batch_paused'
+                """,
+                (batch_3_id,),
+            ).fetchone()
+            assert audit_row_3 is not None
+            assert audit_row_3["reason_code"] == "delivery_unknown"
+            assert audit_row_3["actor_type"] == "system"
+            assert audit_row_3["metadata"]["job_id"] == job_3_1_uuid
+
+        # 5. Prove Batch 3 item 2 is NOT claimed, job_3_1 is NOT retried,
+        # and safe batch on printer-pg-2 IS claimed
+        claimed_next_2 = repository.claim_next(
+            "site-pg", "agent-pg", now, timedelta(seconds=60), eligible_job_ids=printer_2_jobs
+        )
+        assert claimed_next_2 is not None
+        assert claimed_next_2.job_id == job_safe_2_uuid, (
+            f"Expected safe job {job_safe_2_uuid} on printer-pg-2, but got {claimed_next_2.job_id}!"
+        )
+
+        # Finalize safe job on printer 2
+        repository.begin_delivery(
+            claimed_next_2.job_id, "agent-pg", now, fencing_token=claimed_next_2.claim.fencing_token
+        )
+        safe_2_done = repository.report_result(
+            claimed_next_2.job_id,
+            "agent-pg",
+            MockTransportOutcome.SUCCESS,
+            3,
+            fencing_token=claimed_next_2.claim.fencing_token,
+        )
+        assert safe_2_done.status.value == "sent_to_printer"
+
+        # 6. Prove Batch 3 item 2 remains held in 'queued' status
+        assert repository.get(job_3_2_uuid).status.value == "queued"
+        # No more jobs can be claimed on printer-pg-2
+        assert repository.claim_next(
+            "site-pg", "agent-pg", now, timedelta(seconds=60), eligible_job_ids=printer_2_jobs
+        ) is None
+
     finally:
         repository.close()

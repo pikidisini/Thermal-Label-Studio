@@ -1,7 +1,7 @@
 # Review — B2B2C
 
 - Reviewer: `Antigravity (pengambilalihan peran GPT Sol/Terra High)`
-- Verdict: `APPROVED`
+- Verdict: `CHANGES_REQUIRED`
 - Commit baseline yang ditinjau: `39ab51f` (`fix(b2b2c): asymmetric batch priority and deadlock-free anti-interleaving in claim_next`)
 
 ## Temuan & Evaluasi
