@@ -21,7 +21,14 @@ from fastapi.routing import APIRoute
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..print_jobs.artifact_storage import ArtifactConflictError, ArtifactIntegrityError, TemporaryArtifactStorage
+from ..print_jobs.artifact_storage import (
+    DEFAULT_RETENTION,
+    ArtifactConflictError,
+    ArtifactIntegrityError,
+    ArtifactStorage,
+    DurableFilesystemArtifactStorage,
+    TemporaryArtifactStorage,
+)
 from ..print_jobs.models import Emulation, PrintJob, PrintJobStatus, PrinterLanguage, PrinterProfile
 from ..print_jobs.repository import (
     ClaimConflictError,
@@ -99,7 +106,7 @@ class PrintAgentSettings:
 class PrintAgentDependencies:
     settings: PrintAgentSettings
     repository: PrintAgentRepository
-    artifact_storage: TemporaryArtifactStorage
+    artifact_storage: ArtifactStorage
     profiles: tuple[PrinterProfile, ...]
     rate_limiter: "InMemoryAgentRateLimiter"
     profile_registry_ready: bool = True
@@ -253,7 +260,7 @@ def build_print_agent_dependencies(
     *,
     settings: PrintAgentSettings | None = None,
     repository: PrintAgentRepository | None = None,
-    artifact_storage: TemporaryArtifactStorage | None = None,
+    artifact_storage: ArtifactStorage | None = None,
     profiles: tuple[PrinterProfile, ...] | None = None,
 ) -> PrintAgentDependencies:
     """Build isolated pilot dependencies; local profile config is optional but fail-closed."""
@@ -264,7 +271,10 @@ def build_print_agent_dependencies(
         if resolved_settings.enabled and resolved_settings.repository_backend == "postgresql":
             if not resolved_settings.artifact_root:
                 raise RuntimeError("PRINT_AGENT_ARTIFACT_ROOT is required for PostgreSQL mode")
-            resolved_storage = TemporaryArtifactStorage(Path(resolved_settings.artifact_root))
+            resolved_storage = DurableFilesystemArtifactStorage(
+                Path(resolved_settings.artifact_root),
+                retention=DEFAULT_RETENTION,
+            )
         else:
             temporary_directory = tempfile.TemporaryDirectory(prefix="thermal-label-agent-")
             resolved_storage = TemporaryArtifactStorage(Path(temporary_directory.name))

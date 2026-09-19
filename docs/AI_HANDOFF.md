@@ -1,5 +1,17 @@
 # AI Handoff — Thermal Label Studio
 
+## Active snapshot — B2B2D implemented & verified
+
+- Date: `2026-09-20`
+- Repository: `Thermal-Label-Studio` (`web_app/`)
+- Baseline: `main` at `a50a142` after squash merge of PR #17 (B2B2C)
+- Active branch: `codex/b2b2d-durable-storage-planning`
+- Status: `IMPLEMENTED_AND_VERIFIED`; ready for Codex review.
+- Writer: `Gemini Flash via Antigravity`; final Level 3 review: `Codex`.
+- Scope: durable filesystem artifact-storage adapter for lean pilot (`DurableFilesystemArtifactStorage`) with 7-day retention (`DEFAULT_RETENTION = timedelta(days=7)`), atomic staging via `.staging/`, manifest integrity v1.0, and fail-closed path traversal rejection.
+- Verification: 13 unit tests passed, 7 PostgreSQL integration tests passed, 140 targeted tests passed, 189 full backend suite tests passed, `git diff --check` passed (0 whitespace errors).
+- Task files: `docs/tasks/B2B2D/TASK_CONTRACT.md`, `RESULT.md`, `REVIEW.md`.
+
 Gunakan dokumen ini untuk memulihkan konteks ketika melanjutkan pekerjaan dari laptop, task, atau sesi AI lain.
 
 ## Snapshot sesi saat ini
