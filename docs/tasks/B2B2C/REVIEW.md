@@ -1,33 +1,35 @@
 # Review — B2B2C
 
 - Reviewer: `Antigravity (pengambilalihan peran GPT Sol/Terra High)`
-- Verdict: `CHANGES_REQUESTED`
+- Verdict: `APPROVED`
+- Commit baseline yang ditinjau: `39ab51f` (`fix(b2b2c): asymmetric batch priority and deadlock-free anti-interleaving in claim_next`)
 
-## Temuan
+## Temuan & Evaluasi
 
-1. **Urutan Item & Batch FIFO**:
-   - `ORDER BY b.created_at, b.batch_id, bi.item_sequence, j.created_at, j.job_id` berhasil memecahkan masalah pengacakan urutan item berbasis UUID acak. Item dalam batch yang sama terbukti diproses sesuai urutan `item_sequence ASC` (1, 2, 3).
-2. **Kritis: Mutual Exclusion Deadlock pada Anti-Interleaving (`claim_next`)**:
-   - Klausul `NOT EXISTS` pada query `claim_next` mengecualikan kandidat batch jika terdapat batch lain pada printer yang sama yang sudah pernah dimulai (`started_j` dengan status `claimed`, `sending`, `sent_to_printer`, `failed`, `delivery_unknown`) dan masih memiliki item `queued`.
-   - Karena predikat ini bersifat **simetris** (`other_j.batch_id != j.batch_id`), jika terdapat lebih dari satu batch yang keduanya memiliki riwayat `started_j` sekaligus memiliki item `queued` (misalnya skenario *reprint* untuk batch sebelumnya saat batch aktif sedang berjalan, atau requeue item pada batch gagal), kedua batch tersebut akan saling mendiskualifikasi satu sama lain.
-   - **Dampak aktual**: `claim_next()` mengembalikan `None`. Printer mengalami stall/deadlock total dan tidak dapat memproses antrean cetak yang valid sampai salah satu batch kedaluwarsa (`expires_at`).
-   - Telah dibuktikan dan diverifikasi secara empiris melalui skrip pengujian replikasi deadlock.
+1. **Deadlock Bebas (Deadlock-Free Anti-Interleaving)**:
+   - Klausul simetris yang memicu mutual-exclusion deadlock telah diganti dengan predikat prioritas asimetris (*strict total order*):
+     `AND (other_b.created_at, other_b.batch_id) < (b.created_at, b.batch_id)`
+   - Predikat ini menjamin tidak ada dua batch yang dapat saling mengunci pada printer yang sama. Satu batch selalu memiliki prioritas definitif, sehingga pemrosesan antrean tidak akan pernah berhenti (`None`) selama masih ada antrean `queued` yang valid.
+2. **Urutan Item & FIFO**:
+   - `ORDER BY b.created_at, b.batch_id, bi.item_sequence, j.created_at, j.job_id` mempertahankan pemrosesan item dalam satu batch secara sekuensial (`item_sequence ASC`) dan deterministik.
+3. **Acceptance Criteria**:
+   - AC 1 (Atomic ingestion & idempotency): Terverifikasi.
+   - AC 2 (Concurrent claim & fencing token): Terverifikasi.
+   - AC 3 (Lifecycle, lease expiry, callback, outbox): Terverifikasi.
+   - AC 4 (Durable artifact verification & checksum): Terverifikasi.
+   - AC 5 (Restart proses mempertahankan state): Terverifikasi.
+   - AC 6 (Test suite & quality gate): 100% lulus.
 
-## Verifikasi reviewer
+## Verifikasi Reviewer Aktual
 
-- `PASS`: 4 integration test PostgreSQL disposable (`test_postgres_repository_atomic_lifecycle_and_concurrent_claim`, `test_postgres_atomic_ingestion_and_idempotency`, `test_postgres_process_restart_preserves_persisted_state`, `test_postgres_batch_item_sequence_claim_order_and_anti_interleaving`) pada `postgres:15-bullseye` (port 55432).
+- `PASS`: 5 integration test PostgreSQL disposable (`test_postgres_repository_atomic_lifecycle_and_concurrent_claim`, `test_postgres_atomic_ingestion_and_idempotency`, `test_postgres_process_restart_preserves_persisted_state`, `test_postgres_batch_item_sequence_claim_order_and_anti_interleaving`, `test_postgres_asymmetric_batch_priority_and_deadlock_freedom`) pada container `postgres:15-bullseye` (port 55432).
 - `PASS`: 127 targeted backend regression test (`test_print_agent_api.py`, `test_local_print_agent.py`, `test_print_job_v1.py`).
-- `VERIFIED FLAW`: Pengujian skenario concurrent reprint/started batches menghasilkan `CLAIMED RESULT: None` (deadlock antrean).
+- `PASS`: Full backend test suite `174 passed, 0 skipped`.
 
-## Risiko tersisa
+## Catatan Arsitektur (Post-v1 / Operasional)
 
-- Tanpa perbaikan predikat anti-interleaving menjadi *asymmetric precedence / strict total order*, operasi produksi yang melibatkan fitur *reprint* atau requeue akan memicu penghentian pemrosesan antrean printer.
-- Belum ada index komposit pada `print_jobs (printer_id, batch_id, status)` untuk mengoptimasi correlated subquery `started_j` pada volume data historis besar.
+- Pada implementasi v1 ini, prioritas antrean antar-batch ditentukan oleh waktu pembuatan batch (`print_batches.created_at`). Jika di kemudian hari tim operasional menginginkan agar batch yang *sedang aktif di tengah roll* tidak boleh disela sama sekali oleh request reprint dari batch lama, `printer_dispatch_state` dapat diperluas untuk mengunci `active_batch_id` selama keseluruhan siklus hidup batch (bukan hanya per-job claim). Untuk saat ini, perilaku v1 sudah aman, deterministik, dan bebas deadlock.
 
-## Langkah berikutnya
+## Langkah Berikutnya
 
-- Jangan merge ke `main`.
-- Revisi logika anti-interleaving pada `PostgresPrintAgentRepository.claim_next`:
-  - Ubah predikat diskualifikasi menjadi asimetris (misalnya hanya batch dengan prioritas lebih rendah yang didiskualifikasi oleh batch dengan prioritas lebih tinggi), atau
-  - Andalkan ranking order deterministik `ORDER BY` dengan predikat filter satu arah agar antrean tertua yang telah dimulai dapat dituntaskan tanpa memicu saling kunci (*mutual lock*).
-- Tambahkan regression test khusus skenario concurrent reprint/multi-started batches ke dalam test suite integration.
+- Branch `codex/b2b2c-postgresql-persistence` telah memenuhi seluruh kriteria kualitas dan siap untuk di-merge ke `main` jika pengguna menghendaki (sesuai aturan, jangan merge tanpa persetujuan eksplisit pengguna).
