@@ -514,6 +514,11 @@ def test_postgres_atomic_ingestion_and_idempotency(database_url: str) -> None:
                 )
         assert "uq_print_jobs_single_original_per_item" in str(exc_info_job.value)
 
+        with connection.transaction():
+            connection.execute("DELETE FROM print_jobs WHERE batch_id = %s::uuid", (batch_id_1,))
+            connection.execute("DELETE FROM print_batch_items WHERE batch_id = %s::uuid", (batch_id_1,))
+            connection.execute("DELETE FROM print_batches WHERE batch_id = %s::uuid", (batch_id_1,))
+
 
 def test_postgres_process_restart_preserves_persisted_state(
     database_url: str,
@@ -812,6 +817,178 @@ def test_postgres_batch_item_sequence_claim_order_and_anti_interleaving(
         # 5. No more jobs left
         assert repository.claim_next(
             "site-pg", "agent-seq", now, timedelta(seconds=60), eligible_job_ids=all_job_ids
+        ) is None
+    finally:
+        repository.close()
+
+
+def test_postgres_asymmetric_batch_priority_and_deadlock_freedom(
+    database_url: str,
+) -> None:
+    batch_b_id = "00000000-0000-0000-0000-00000000a001"
+    batch_a_id = "00000000-0000-0000-0000-00000000a002"
+    item_b1_id = "00000000-0000-0000-0000-00000000b101"
+    item_b2_id = "00000000-0000-0000-0000-00000000b102"
+    item_a1_id = "00000000-0000-0000-0000-00000000a101"
+
+    job_b1_uuid = "00000000-0000-0000-0000-00000000b001"
+    job_b2_uuid = "00000000-0000-0000-0000-00000000b002"
+    job_a1_uuid = "00000000-0000-0000-0000-00000000a011"
+    job_a2_uuid = "00000000-0000-0000-0000-00000000a012"
+
+    source = json.dumps({"producer_type": "sap", "program": "pytest-asymmetric"})
+
+    with psycopg.connect(database_url) as connection, connection.transaction():
+        media_version_id, template_version_id = _ensure_base_fixtures(connection)
+        printer_id = "printer-pg-1"
+
+        # Batch B: Created earlier (15 mins ago). Item 1 is already sent_to_printer; Item 2 is queued.
+        connection.execute(
+            """
+            INSERT INTO print_batches (
+                batch_id, producer_namespace, request_id, source_metadata,
+                raw_contract_sha256, canonical_payload_snapshot, printer_id,
+                configured_media_profile_version_id, printer_capability_snapshot,
+                status, total_items, created_at, expires_at
+            ) VALUES (%s, 'pytest_asym', 'req-b', %s::jsonb, %s, '{}'::jsonb, %s, %s,
+                      '{}'::jsonb, 'processing', 2, CURRENT_TIMESTAMP - INTERVAL '15 minutes',
+                      CURRENT_TIMESTAMP + INTERVAL '1 hour')
+            """,
+            (batch_b_id, source, "b" * 64, printer_id, media_version_id),
+        )
+        connection.execute(
+            """
+            INSERT INTO print_batch_items (
+                item_id, batch_id, item_sequence, template_version_id,
+                canonical_item_data, item_data_sha256, copies, status
+            ) VALUES
+                (%s, %s, 1, %s, '{}'::jsonb, %s, 1, 'completed'),
+                (%s, %s, 2, %s, '{}'::jsonb, %s, 1, 'rendered')
+            """,
+            (item_b1_id, batch_b_id, template_version_id, "b" * 64,
+             item_b2_id, batch_b_id, template_version_id, "b" * 64),
+        )
+        connection.execute(
+            """
+            INSERT INTO print_jobs (
+                job_id, batch_id, item_id, printer_id, job_kind, reprint_of_job_id, status,
+                created_at, expires_at, attempt_count, executor_type, executor_id,
+                claimed_at, lease_expires_at, fencing_token, bytes_sent, result_outcome
+            ) VALUES
+                (%s, %s, %s, %s, 'original', NULL, 'sent_to_printer',
+                 CURRENT_TIMESTAMP - INTERVAL '14 minutes', CURRENT_TIMESTAMP + INTERVAL '30 minutes',
+                 1, 'local_agent', 'agent-asym',
+                 CURRENT_TIMESTAMP - INTERVAL '14 minutes', CURRENT_TIMESTAMP - INTERVAL '13 minutes',
+                 1, 3, 'success'),
+                (%s, %s, %s, %s, 'original', NULL, 'queued',
+                 CURRENT_TIMESTAMP - INTERVAL '14 minutes', CURRENT_TIMESTAMP + INTERVAL '30 minutes',
+                 0, NULL, NULL,
+                 NULL, NULL,
+                 NULL, 0, NULL)
+            """,
+            (job_b1_uuid, batch_b_id, item_b1_id, printer_id,
+             job_b2_uuid, batch_b_id, item_b2_id, printer_id),
+        )
+
+        # Batch A: Created later (5 mins ago). Item 1 is already sent_to_printer; Item 1 reprint is queued.
+        connection.execute(
+            """
+            INSERT INTO print_batches (
+                batch_id, producer_namespace, request_id, source_metadata,
+                raw_contract_sha256, canonical_payload_snapshot, printer_id,
+                configured_media_profile_version_id, printer_capability_snapshot,
+                status, total_items, created_at, expires_at
+            ) VALUES (%s, 'pytest_asym', 'req-a', %s::jsonb, %s, '{}'::jsonb, %s, %s,
+                      '{}'::jsonb, 'processing', 1, CURRENT_TIMESTAMP - INTERVAL '5 minutes',
+                      CURRENT_TIMESTAMP + INTERVAL '1 hour')
+            """,
+            (batch_a_id, source, "a" * 64, printer_id, media_version_id),
+        )
+        connection.execute(
+            """
+            INSERT INTO print_batch_items (
+                item_id, batch_id, item_sequence, template_version_id,
+                canonical_item_data, item_data_sha256, copies, status
+            ) VALUES
+                (%s, %s, 1, %s, '{}'::jsonb, %s, 1, 'completed')
+            """,
+            (item_a1_id, batch_a_id, template_version_id, "a" * 64),
+        )
+        connection.execute(
+            """
+            INSERT INTO print_jobs (
+                job_id, batch_id, item_id, printer_id, job_kind, reprint_of_job_id, status,
+                created_at, expires_at, attempt_count, executor_type, executor_id,
+                claimed_at, lease_expires_at, fencing_token, bytes_sent, result_outcome
+            ) VALUES
+                (%s, %s, %s, %s, 'original', NULL, 'sent_to_printer',
+                 CURRENT_TIMESTAMP - INTERVAL '4 minutes', CURRENT_TIMESTAMP + INTERVAL '30 minutes',
+                 1, 'local_agent', 'agent-asym',
+                 CURRENT_TIMESTAMP - INTERVAL '4 minutes', CURRENT_TIMESTAMP - INTERVAL '3 minutes',
+                 2, 3, 'success'),
+                (%s, %s, %s, %s, 'reprint', %s, 'queued',
+                 CURRENT_TIMESTAMP - INTERVAL '4 minutes', CURRENT_TIMESTAMP + INTERVAL '30 minutes',
+                 0, NULL, NULL,
+                 NULL, NULL,
+                 NULL, 0, NULL)
+            """,
+            (job_a1_uuid, batch_a_id, item_a1_id, printer_id,
+             job_a2_uuid, batch_a_id, item_a1_id, printer_id, job_a1_uuid),
+        )
+
+        for job_id in (job_b1_uuid, job_b2_uuid, job_a1_uuid, job_a2_uuid):
+            connection.execute(
+                """
+                INSERT INTO print_artifacts (
+                    job_id, payload_ref, filename, media_type, byte_length,
+                    artifact_sha256, printer_language_snapshot, renderer_version,
+                    template_version_id, printer_capability_snapshot, retention_expires_at
+                ) VALUES (%s, %s, 'label.ipl', 'application/octet-stream', 3, %s,
+                          'ipl', 'pytest-renderer', %s, '{}'::jsonb,
+                          CURRENT_TIMESTAMP + INTERVAL '1 day')
+                ON CONFLICT (job_id) DO NOTHING
+                """,
+                (job_id, f"payload-{job_id}", sha256(b"IPL").hexdigest(), template_version_id),
+            )
+
+    repository = PostgresPrintAgentRepository(database_url, min_pool_size=1, max_pool_size=2)
+    now = datetime.now(timezone.utc)
+    target_job_ids = {job_b2_uuid, job_a2_uuid}
+
+    try:
+        # 1. First claim must yield Batch B remaining item (job_b2_uuid) - NOT None (deadlock-free) and NOT Batch A
+        claimed_b = repository.claim_next(
+            "site-pg", "agent-asym", now, timedelta(seconds=60), eligible_job_ids=target_job_ids
+        )
+        assert claimed_b is not None, "claim_next returned None causing deadlock when valid queued jobs exist!"
+        assert claimed_b.job_id == job_b2_uuid
+        repository.begin_delivery(claimed_b.job_id, "agent-asym", now, fencing_token=claimed_b.claim.fencing_token)
+        repository.report_result(
+            claimed_b.job_id,
+            "agent-asym",
+            MockTransportOutcome.SUCCESS,
+            3,
+            fencing_token=claimed_b.claim.fencing_token,
+        )
+
+        # 2. Second claim must now yield Batch A reprint item (job_a2_uuid) - NOT None
+        claimed_a = repository.claim_next(
+            "site-pg", "agent-asym", now, timedelta(seconds=60), eligible_job_ids=target_job_ids
+        )
+        assert claimed_a is not None, "claim_next returned None when Batch A reprint was ready!"
+        assert claimed_a.job_id == job_a2_uuid
+        repository.begin_delivery(claimed_a.job_id, "agent-asym", now, fencing_token=claimed_a.claim.fencing_token)
+        repository.report_result(
+            claimed_a.job_id,
+            "agent-asym",
+            MockTransportOutcome.SUCCESS,
+            3,
+            fencing_token=claimed_a.claim.fencing_token,
+        )
+
+        # 3. No more jobs left
+        assert repository.claim_next(
+            "site-pg", "agent-asym", now, timedelta(seconds=60), eligible_job_ids=target_job_ids
         ) is None
     finally:
         repository.close()

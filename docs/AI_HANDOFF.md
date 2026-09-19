@@ -18,11 +18,11 @@ Gunakan dokumen ini untuk memulihkan konteks ketika melanjutkan pekerjaan dari l
 ## Safe checkpoint B2B2C
 
 - Baseline commit: `5186c4d` (`feat: complete b2b2c postgresql persistence acceptance criteria`), sudah dipush ke `origin/codex/b2b2c-postgresql-persistence`.
-- Corrective commit P1: ordering batch/item_sequence dan anti-interleaving pada `claim_next()`.
+- Corrective commit review: asymmetric batch priority & deadlock-free anti-interleaving pada `claim_next()`.
 - Status: safe checkpoint kandidat review; **bukan** kesiapan merge atau production-ready.
 - Quality gate aktual:
-  - Backend: `173 passed, 0 skipped` (28.90s).
-  - PostgreSQL disposable integration: `4 passed` pada container `postgres:15-bullseye` (`test_postgres_repository_atomic_lifecycle_and_concurrent_claim`, `test_postgres_atomic_ingestion_and_idempotency`, `test_postgres_process_restart_preserves_persisted_state`, `test_postgres_batch_item_sequence_claim_order_and_anti_interleaving`).
+  - Backend: `174 passed, 0 skipped`.
+  - PostgreSQL disposable integration: `5 passed` pada container `postgres:15-bullseye` (`test_postgres_repository_atomic_lifecycle_and_concurrent_claim`, `test_postgres_atomic_ingestion_and_idempotency`, `test_postgres_process_restart_preserves_persisted_state`, `test_postgres_batch_item_sequence_claim_order_and_anti_interleaving`, `test_postgres_asymmetric_batch_priority_and_deadlock_freedom`).
   - Targeted regression: `127 passed`.
   - Frontend unit test: `45 passed` (534ms).
   - Frontend typecheck: `npx tsc --noEmit` lulus (0 errors).
@@ -33,11 +33,11 @@ Gunakan dokumen ini untuk memulihkan konteks ketika melanjutkan pekerjaan dari l
 - Review independen: Menunggu Codex Sol High / Terra.
 - Batas keras tetap berlaku: tidak ada database production, credential perusahaan, printer fisik, TCP 9100, atau Windows Spooler.
 
-Perubahan aktif pada corrective commit P1 ini:
+Perubahan aktif pada corrective commit ini:
 
-- `backend/app/print_jobs/postgres_repository.py` (enforce batch created_at order, item_sequence ASC, and anti-interleaving in `claim_next()`)
-- `backend/tests/test_postgres_print_agent_repository.py` (add `test_postgres_batch_item_sequence_claim_order_and_anti_interleaving` with 3 items, inverted UUIDs, and sequential claim verification)
-- `docs/tasks/B2B2C/RESULT.md` (updated with P1 results and verification)
+- `backend/app/print_jobs/postgres_repository.py` (enforce asymmetric total order `(other_b.created_at, other_b.batch_id) < (b.created_at, b.batch_id)` in `claim_next()` preventing deadlock while preserving anti-interleaving)
+- `backend/tests/test_postgres_print_agent_repository.py` (add `test_postgres_asymmetric_batch_priority_and_deadlock_freedom` proving active batch finishes before reprint without mutual blocking)
+- `docs/tasks/B2B2C/RESULT.md` (updated with asymmetric priority and deadlock-free verification)
 - `docs/AI_HANDOFF.md` (handoff snapshot updated)
 
 ## Handoff Pre-Checkpoint B2B1.4–B2B2B.2.4

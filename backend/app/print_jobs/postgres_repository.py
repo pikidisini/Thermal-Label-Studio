@@ -149,35 +149,17 @@ class PostgresPrintAgentRepository:
                       AND NOT EXISTS (
                           SELECT 1
                           FROM print_jobs AS other_j
+                          JOIN print_batches AS other_b ON other_b.batch_id = other_j.batch_id
                           WHERE other_j.printer_id = j.printer_id
                             AND other_j.batch_id != j.batch_id
                             AND other_j.status = 'queued'
                             AND other_j.expires_at > %s
-                            AND EXISTS (
-                                SELECT 1
-                                FROM print_jobs AS started_j
-                                WHERE started_j.printer_id = other_j.printer_id
-                                  AND started_j.batch_id = other_j.batch_id
-                                  AND started_j.status IN (
-                                      'claimed', 'sending', 'sent_to_printer',
-                                      'failed', 'delivery_unknown'
-                                  )
-                            )
+                            AND (other_b.created_at, other_b.batch_id) < (b.created_at, b.batch_id)
                       )
                     """
                     + eligibility_sql
                     + """
                     ORDER BY
-                        (CASE WHEN EXISTS (
-                            SELECT 1
-                            FROM print_jobs AS started_batch_j
-                            WHERE started_batch_j.printer_id = j.printer_id
-                              AND started_batch_j.batch_id = j.batch_id
-                              AND started_batch_j.status IN (
-                                  'claimed', 'sending', 'sent_to_printer',
-                                  'failed', 'delivery_unknown'
-                              )
-                        ) THEN 0 ELSE 1 END),
                         b.created_at,
                         b.batch_id,
                         bi.item_sequence,
