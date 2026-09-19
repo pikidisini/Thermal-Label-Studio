@@ -130,13 +130,15 @@ class PostgresPrintAgentRepository:
                 db_now = self._database_now(connection)
                 self._reconcile_locked(connection, db_now, site_id=site_id)
                 eligibility_sql = "" if allowed_ids is None else " AND j.job_id::text = ANY(%s)"
-                parameters: list[object] = [site_id, db_now]
+                parameters: list[object] = [site_id, db_now, db_now]
                 if allowed_ids is not None:
                     parameters.append(list(allowed_ids))
                 candidate = connection.execute(
                     """
                     SELECT j.job_id::text AS job_id, j.batch_id, j.printer_id
                     FROM print_jobs AS j
+                    JOIN print_batches AS b ON b.batch_id = j.batch_id
+                    JOIN print_batch_items AS bi ON bi.item_id = j.item_id AND bi.batch_id = j.batch_id
                     JOIN printer_registry AS pr ON pr.printer_id = j.printer_id
                     JOIN printer_dispatch_state AS ds ON ds.printer_id = j.printer_id
                     WHERE pr.site_id = %s
@@ -144,10 +146,43 @@ class PostgresPrintAgentRepository:
                       AND j.status = 'queued'
                       AND j.expires_at > %s
                       AND ds.active_batch_id IS NULL
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM print_jobs AS other_j
+                          WHERE other_j.printer_id = j.printer_id
+                            AND other_j.batch_id != j.batch_id
+                            AND other_j.status = 'queued'
+                            AND other_j.expires_at > %s
+                            AND EXISTS (
+                                SELECT 1
+                                FROM print_jobs AS started_j
+                                WHERE started_j.printer_id = other_j.printer_id
+                                  AND started_j.batch_id = other_j.batch_id
+                                  AND started_j.status IN (
+                                      'claimed', 'sending', 'sent_to_printer',
+                                      'failed', 'delivery_unknown'
+                                  )
+                            )
+                      )
                     """
                     + eligibility_sql
                     + """
-                    ORDER BY j.created_at, j.job_id
+                    ORDER BY
+                        (CASE WHEN EXISTS (
+                            SELECT 1
+                            FROM print_jobs AS started_batch_j
+                            WHERE started_batch_j.printer_id = j.printer_id
+                              AND started_batch_j.batch_id = j.batch_id
+                              AND started_batch_j.status IN (
+                                  'claimed', 'sending', 'sent_to_printer',
+                                  'failed', 'delivery_unknown'
+                              )
+                        ) THEN 0 ELSE 1 END),
+                        b.created_at,
+                        b.batch_id,
+                        bi.item_sequence,
+                        j.created_at,
+                        j.job_id
                     FOR UPDATE OF ds, j SKIP LOCKED
                     LIMIT 1
                     """,

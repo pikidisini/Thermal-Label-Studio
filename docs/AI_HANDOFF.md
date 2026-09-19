@@ -17,11 +17,13 @@ Gunakan dokumen ini untuk memulihkan konteks ketika melanjutkan pekerjaan dari l
 
 ## Safe checkpoint B2B2C
 
-- Commit: `3add950` (`feat: complete b2b2c postgresql persistence acceptance criteria`), siap dipush ke `origin/codex/b2b2c-postgresql-persistence`.
+- Baseline commit: `5186c4d` (`feat: complete b2b2c postgresql persistence acceptance criteria`), sudah dipush ke `origin/codex/b2b2c-postgresql-persistence`.
+- Corrective commit P1: ordering batch/item_sequence dan anti-interleaving pada `claim_next()`.
 - Status: safe checkpoint kandidat review; **bukan** kesiapan merge atau production-ready.
 - Quality gate aktual:
-  - Backend: `172 passed, 0 skipped` (41.22s).
-  - PostgreSQL disposable integration: `3 passed` pada container `postgres:15-bullseye` (`test_postgres_repository_atomic_lifecycle_and_concurrent_claim`, `test_postgres_atomic_ingestion_and_idempotency`, `test_postgres_process_restart_preserves_persisted_state`).
+  - Backend: `173 passed, 0 skipped` (28.90s).
+  - PostgreSQL disposable integration: `4 passed` pada container `postgres:15-bullseye` (`test_postgres_repository_atomic_lifecycle_and_concurrent_claim`, `test_postgres_atomic_ingestion_and_idempotency`, `test_postgres_process_restart_preserves_persisted_state`, `test_postgres_batch_item_sequence_claim_order_and_anti_interleaving`).
+  - Targeted regression: `127 passed`.
   - Frontend unit test: `45 passed` (534ms).
   - Frontend typecheck: `npx tsc --noEmit` lulus (0 errors).
   - Python compile check: `python -m py_compile` lulus.
@@ -31,14 +33,12 @@ Gunakan dokumen ini untuk memulihkan konteks ketika melanjutkan pekerjaan dari l
 - Review independen: Menunggu Codex Sol High / Terra.
 - Batas keras tetap berlaku: tidak ada database production, credential perusahaan, printer fisik, TCP 9100, atau Windows Spooler.
 
-Perubahan aktif pada sesi ini:
+Perubahan aktif pada corrective commit P1 ini:
 
-- `backend/app/print_jobs/migrations.py` (menambahkan `rollback_baseline` dan CLI `rollback`)
-- `backend/tests/test_postgres_print_agent_repository.py` (idempotent seeding, test atomicity & idempotency, test process restart persistence)
-- `docs/tasks/B2B2C/TASK_CONTRACT.md` (status `READY_FOR_REVIEW`, active writer `Gemini Flash via Antigravity`)
-- `docs/tasks/B2B2C/RESULT.md` (hasil aktual verifikasi)
-- `docs/PROJECT_STATUS.md` (status B2B2C)
-- `docs/AI_HANDOFF.md` (handoff snapshot)
+- `backend/app/print_jobs/postgres_repository.py` (enforce batch created_at order, item_sequence ASC, and anti-interleaving in `claim_next()`)
+- `backend/tests/test_postgres_print_agent_repository.py` (add `test_postgres_batch_item_sequence_claim_order_and_anti_interleaving` with 3 items, inverted UUIDs, and sequential claim verification)
+- `docs/tasks/B2B2C/RESULT.md` (updated with P1 results and verification)
+- `docs/AI_HANDOFF.md` (handoff snapshot updated)
 
 ## Handoff Pre-Checkpoint B2B1.4–B2B2B.2.4
 

@@ -634,3 +634,184 @@ def test_postgres_process_restart_preserves_persisted_state(
         assert audit >= 3
     finally:
         repo_2.close()
+
+
+def test_postgres_batch_item_sequence_claim_order_and_anti_interleaving(
+    database_url: str,
+) -> None:
+    batch_seq_id = "00000000-0000-0000-0000-000000009001"
+    batch_other_id = "00000000-0000-0000-0000-000000009002"
+    item_1_id = "00000000-0000-0000-0000-000000009101"
+    item_2_id = "00000000-0000-0000-0000-000000009102"
+    item_3_id = "00000000-0000-0000-0000-000000009103"
+    item_other_id = "00000000-0000-0000-0000-000000009104"
+
+    # UUIDs intentionally INVERTED relative to item_sequence
+    job_1_uuid = "ffffffff-ffff-ffff-ffff-ffffffffffff"  # item_sequence 1 -> highest UUID
+    job_2_uuid = "88888888-8888-8888-8888-888888888888"  # item_sequence 2 -> middle UUID
+    job_3_uuid = "00000000-0000-0000-0000-000000000001"  # item_sequence 3 -> lowest UUID
+    job_other_uuid = "11111111-1111-1111-1111-111111111111"
+
+    source = json.dumps({"producer_type": "sap", "program": "pytest-sequence"})
+
+    with psycopg.connect(database_url) as connection, connection.transaction():
+        media_version_id, template_version_id = _ensure_base_fixtures(connection)
+        printer_id = "printer-pg-1"
+
+        # Batch 1: 3 items with sequences 1, 2, 3
+        connection.execute(
+            """
+            INSERT INTO print_batches (
+                batch_id, producer_namespace, request_id, source_metadata,
+                raw_contract_sha256, canonical_payload_snapshot, printer_id,
+                configured_media_profile_version_id, printer_capability_snapshot,
+                status, total_items, created_at, expires_at
+            ) VALUES (%s, 'pytest_seq', 'req-seq-1', %s::jsonb, %s, '{}'::jsonb, %s, %s,
+                      '{}'::jsonb, 'accepted', 3, CURRENT_TIMESTAMP - INTERVAL '10 minutes',
+                      CURRENT_TIMESTAMP + INTERVAL '1 hour')
+            """,
+            (batch_seq_id, source, "1" * 64, printer_id, media_version_id),
+        )
+        for item_id, seq in ((item_1_id, 1), (item_2_id, 2), (item_3_id, 3)):
+            connection.execute(
+                """
+                INSERT INTO print_batch_items (
+                    item_id, batch_id, item_sequence, template_version_id,
+                    canonical_item_data, item_data_sha256, copies, status
+                ) VALUES (%s, %s, %s, %s, '{}'::jsonb, %s, 1, 'rendered')
+                """,
+                (item_id, batch_seq_id, seq, template_version_id, f"{seq}" * 64),
+            )
+        # Insert 3 jobs with inverted UUIDs and identical created_at
+        for job_id, item_id in ((job_1_uuid, item_1_id), (job_2_uuid, item_2_id), (job_3_uuid, item_3_id)):
+            connection.execute(
+                """
+                INSERT INTO print_jobs (
+                    job_id, batch_id, item_id, printer_id, job_kind, status, created_at, expires_at
+                ) VALUES (%s, %s, %s, %s, 'original', 'queued', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 minutes')
+                """,
+                (job_id, batch_seq_id, item_id, printer_id),
+            )
+
+        # Batch 2: Another batch on the same printer (created slightly later, but queued)
+        connection.execute(
+            """
+            INSERT INTO print_batches (
+                batch_id, producer_namespace, request_id, source_metadata,
+                raw_contract_sha256, canonical_payload_snapshot, printer_id,
+                configured_media_profile_version_id, printer_capability_snapshot,
+                status, total_items, created_at, expires_at
+            ) VALUES (%s, 'pytest_seq', 'req-seq-2', %s::jsonb, %s, '{}'::jsonb, %s, %s,
+                      '{}'::jsonb, 'accepted', 1, CURRENT_TIMESTAMP - INTERVAL '5 minutes',
+                      CURRENT_TIMESTAMP + INTERVAL '1 hour')
+            """,
+            (batch_other_id, source, "2" * 64, printer_id, media_version_id),
+        )
+        connection.execute(
+            """
+            INSERT INTO print_batch_items (
+                item_id, batch_id, item_sequence, template_version_id,
+                canonical_item_data, item_data_sha256, copies, status
+            ) VALUES (%s, %s, 1, %s, '{}'::jsonb, %s, 1, 'rendered')
+            """,
+            (item_other_id, batch_other_id, template_version_id, "4" * 64),
+        )
+        connection.execute(
+            """
+            INSERT INTO print_jobs (
+                job_id, batch_id, item_id, printer_id, job_kind, status, created_at, expires_at
+            ) VALUES (%s, %s, %s, %s, 'original', 'queued', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 minutes')
+            """,
+            (job_other_uuid, batch_other_id, item_other_id, printer_id),
+        )
+
+        for job_id in (job_1_uuid, job_2_uuid, job_3_uuid, job_other_uuid):
+            connection.execute(
+                """
+                INSERT INTO print_artifacts (
+                    job_id, payload_ref, filename, media_type, byte_length,
+                    artifact_sha256, printer_language_snapshot, renderer_version,
+                    template_version_id, printer_capability_snapshot, retention_expires_at
+                ) VALUES (%s, %s, 'label.ipl', 'application/octet-stream', 3, %s,
+                          'ipl', 'pytest-renderer', %s, '{}'::jsonb,
+                          CURRENT_TIMESTAMP + INTERVAL '1 day')
+                """,
+                (job_id, f"payload-{job_id[:8]}", sha256(b"IPL").hexdigest(), template_version_id),
+            )
+
+    repository = PostgresPrintAgentRepository(database_url, min_pool_size=1, max_pool_size=2)
+    now = datetime.now(timezone.utc)
+    all_job_ids = {job_1_uuid, job_2_uuid, job_3_uuid, job_other_uuid}
+
+    try:
+        # 1. First claim must yield Job 1 (item_sequence 1), despite having the highest UUID
+        claimed_1 = repository.claim_next(
+            "site-pg", "agent-seq", now, timedelta(seconds=60), eligible_job_ids=all_job_ids
+        )
+        assert claimed_1 is not None
+        assert claimed_1.job_id == job_1_uuid
+        repository.begin_delivery(claimed_1.job_id, "agent-seq", now, fencing_token=claimed_1.claim.fencing_token)
+        repository.report_result(
+            claimed_1.job_id,
+            "agent-seq",
+            MockTransportOutcome.SUCCESS,
+            10,
+            fencing_token=claimed_1.claim.fencing_token,
+        )
+
+        # 2. Second claim must yield Job 2 (item_sequence 2) - NOT batch 2 and NOT job 3
+        claimed_2 = repository.claim_next(
+            "site-pg", "agent-seq", now, timedelta(seconds=60), eligible_job_ids=all_job_ids
+        )
+        assert claimed_2 is not None
+        assert claimed_2.job_id == job_2_uuid
+        repository.begin_delivery(claimed_2.job_id, "agent-seq", now, fencing_token=claimed_2.claim.fencing_token)
+        repository.report_result(
+            claimed_2.job_id,
+            "agent-seq",
+            MockTransportOutcome.SUCCESS,
+            10,
+            fencing_token=claimed_2.claim.fencing_token,
+        )
+
+        # 3. Third claim must yield Job 3 (item_sequence 3) - NOT batch 2
+        claimed_3 = repository.claim_next(
+            "site-pg", "agent-seq", now, timedelta(seconds=60), eligible_job_ids=all_job_ids
+        )
+        assert claimed_3 is not None
+        assert claimed_3.job_id == job_3_uuid
+        repository.begin_delivery(claimed_3.job_id, "agent-seq", now, fencing_token=claimed_3.claim.fencing_token)
+        repository.report_result(
+            claimed_3.job_id,
+            "agent-seq",
+            MockTransportOutcome.SUCCESS,
+            10,
+            fencing_token=claimed_3.claim.fencing_token,
+        )
+
+        # 4. Only after all items of batch 1 are completed, batch 2 may be claimed
+        claimed_other = repository.claim_next(
+            "site-pg", "agent-seq", now, timedelta(seconds=60), eligible_job_ids=all_job_ids
+        )
+        assert claimed_other is not None
+        assert claimed_other.job_id == job_other_uuid
+        repository.begin_delivery(
+            claimed_other.job_id,
+            "agent-seq",
+            now,
+            fencing_token=claimed_other.claim.fencing_token,
+        )
+        repository.report_result(
+            claimed_other.job_id,
+            "agent-seq",
+            MockTransportOutcome.SUCCESS,
+            10,
+            fencing_token=claimed_other.claim.fencing_token,
+        )
+
+        # 5. No more jobs left
+        assert repository.claim_next(
+            "site-pg", "agent-seq", now, timedelta(seconds=60), eligible_job_ids=all_job_ids
+        ) is None
+    finally:
+        repository.close()
