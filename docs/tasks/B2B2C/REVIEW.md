@@ -1,8 +1,8 @@
 # Review — B2B2C
 
 - Reviewer: `Antigravity (pengambilalihan peran GPT Sol/Terra High)`
-- Verdict: `CHANGES_REQUIRED`
-- Commit baseline yang ditinjau: `39ab51f` (`fix(b2b2c): asymmetric batch priority and deadlock-free anti-interleaving in claim_next`)
+- Verdict: `APPROVED`
+- Commit baseline yang ditinjau: `0699c78` (`fix(b2b2c): pause parent batch and emit audit event on delivery_unknown with safe isolation`)
 
 ## Temuan & Evaluasi
 
@@ -12,7 +12,13 @@
    - Predikat ini menjamin tidak ada dua batch yang dapat saling mengunci pada printer yang sama. Satu batch selalu memiliki prioritas definitif, sehingga pemrosesan antrean tidak akan pernah berhenti (`None`) selama masih ada antrean `queued` yang valid.
 2. **Urutan Item & FIFO**:
    - `ORDER BY b.created_at, b.batch_id, bi.item_sequence, j.created_at, j.job_id` mempertahankan pemrosesan item dalam satu batch secara sekuensial (`item_sequence ASC`) dan deterministik.
-3. **Acceptance Criteria**:
+3. **P1 Batch Safety & Isolation on Ambiguous Delivery**:
+   - Saat `report_result` atau rekonsiliasi lease (`_reconcile_locked`) mengubah status job `sending` menjadi `delivery_unknown`, status parent `print_batches` diubah menjadi `'paused'` dalam transaksi PostgreSQL yang sama.
+   - Audit event `print_batch_paused` disimpan di `print_audit_events` dengan `reason_code = 'delivery_unknown'` dan menyertakan `job_id` serta alasan kegagalan pada metadata.
+   - `claim_next()` mengecualikan job dari batch berstatus `'paused'`, `'cancelled'`, atau `'partially_failed'` (`b.status NOT IN ('paused', 'cancelled', 'partially_failed')`).
+   - Batch yang di-pause tidak memblokir batch aman lainnya pada printer yang sama (`other_b.status NOT IN ('paused', 'cancelled', 'partially_failed')`).
+   - Sisa job `queued` pada batch yang di-pause dipertahankan utuh sebagai held items (tidak diubah/dihapus), agar hanya dapat dilanjutkan lewat aksi operator resume yang terotorisasi.
+4. **Acceptance Criteria**:
    - AC 1 (Atomic ingestion & idempotency): Terverifikasi.
    - AC 2 (Concurrent claim & fencing token): Terverifikasi.
    - AC 3 (Lifecycle, lease expiry, callback, outbox): Terverifikasi.
@@ -22,14 +28,17 @@
 
 ## Verifikasi Reviewer Aktual
 
-- `PASS`: 5 integration test PostgreSQL disposable (`test_postgres_repository_atomic_lifecycle_and_concurrent_claim`, `test_postgres_atomic_ingestion_and_idempotency`, `test_postgres_process_restart_preserves_persisted_state`, `test_postgres_batch_item_sequence_claim_order_and_anti_interleaving`, `test_postgres_asymmetric_batch_priority_and_deadlock_freedom`) pada container `postgres:15-bullseye` (port 55432).
+- `PASS`: 6 integration test PostgreSQL disposable (`test_postgres_repository_atomic_lifecycle_and_concurrent_claim`, `test_postgres_atomic_ingestion_and_idempotency`, `test_postgres_process_restart_preserves_persisted_state`, `test_postgres_batch_item_sequence_claim_order_and_anti_interleaving`, `test_postgres_asymmetric_batch_priority_and_deadlock_freedom`, `test_postgres_batch_safety_pause_on_delivery_unknown_and_isolation`) pada container `postgres:15-bullseye` (port 55432).
 - `PASS`: 127 targeted backend regression test (`test_print_agent_api.py`, `test_local_print_agent.py`, `test_print_job_v1.py`).
-- `PASS`: Full backend test suite `174 passed, 0 skipped`.
+- `PASS`: Full backend test suite `175 passed, 0 skipped`.
+- `PASS`: `git diff --check` (0 whitespace errors).
 
 ## Catatan Arsitektur (Post-v1 / Operasional)
 
-- Pada implementasi v1 ini, prioritas antrean antar-batch ditentukan oleh waktu pembuatan batch (`print_batches.created_at`). Jika di kemudian hari tim operasional menginginkan agar batch yang *sedang aktif di tengah roll* tidak boleh disela sama sekali oleh request reprint dari batch lama, `printer_dispatch_state` dapat diperluas untuk mengunci `active_batch_id` selama keseluruhan siklus hidup batch (bukan hanya per-job claim). Untuk saat ini, perilaku v1 sudah aman, deterministik, dan bebas deadlock.
+- Pada implementasi v1 ini, batch yang mengalami `delivery_unknown` di-pause secara atomik untuk mencegah interleaving atau auto-retry liar, sementara sisa item dalam batch dipertahankan berstatus `queued` untuk resume manual oleh operator.
+- Per-printer scheduling tetap aman dan batch aman lainnya pada printer yang sama dapat terus mencetak tanpa terhambat.
 
 ## Langkah Berikutnya
 
-- Branch `codex/b2b2c-postgresql-persistence` telah memenuhi seluruh kriteria kualitas dan siap untuk di-merge ke `main` jika pengguna menghendaki (sesuai aturan, jangan merge tanpa persetujuan eksplisit pengguna).
+- Seluruh temuan perbaikan telah diselesaikan pada commit `0699c78`.
+- Pengguna dapat meminta Codex untuk melakukan review akhir independen terhadap branch `codex/b2b2c-postgresql-persistence` sebelum merge ke `main`. Jangan merge tanpa persetujuan eksplisit pengguna.
