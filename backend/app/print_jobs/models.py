@@ -55,6 +55,7 @@ class Claim(StrictModel):
     )
     claimed_at: datetime
     lease_expires_at: datetime
+    fencing_token: int = Field(ge=1)
 
     @field_validator("claimed_at", "lease_expires_at")
     @classmethod

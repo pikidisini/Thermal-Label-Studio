@@ -16,6 +16,7 @@ from .repository import (
     DeliveryConflictError,
     InMemoryPrintJobRepository,
     JobExpiredError,
+    PrintAgentRepository,
     PrintJobRepository,
 )
 from .service import (
@@ -54,6 +55,7 @@ __all__ = [
     "MockPrinterTransport",
     "MockTransportOutcome",
     "PrintJob",
+    "PrintAgentRepository",
     "PrintJobService",
     "PrintJobRepository",
     "PrintJobStateMachine",

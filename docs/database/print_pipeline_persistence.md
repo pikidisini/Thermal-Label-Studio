@@ -25,7 +25,7 @@ Rancangan database **PostgreSQL v1** ini dibuat untuk menyelesaikan masalah ters
 4. **Pencegahan Kertas Tertukar (*No Interleaving*)**: Di setiap printer fisik, sistem menjamin pesanan cetak berjalan terurut nomor 1 sampai 30. Pesanan orang lain dilarang menyela di tengah-tengah gulungan stiker yang sedang dicetak.
 5. **Keamanan Ekstra Saat Gangguan**: Jika printer kehabisan kertas di tengah jalan (misalnya pada label nomor 14), sistem otomatis menghentikan sementara sisa label (nomor 15 sampai 30) agar urutan nomor seri tidak rusak. Operator memeriksa fisik kertas sebelum memutuskan untuk melanjutkan atau mencetak ulang (*reprint*).
 
-> **Pemberitahuan Batasan Fase**: *Dokumen ini adalah spesifikasi rancangan arsitektur data berstatus PROPOSED di mana seluruh kasus pada validation harness saat ini lulus pada container disposable PostgreSQL 15.13 (`postgres:15-bullseye`). Concurrency repository, privilege role, migration upgrade, backup/restore, dan production deployment belum diuji. DECISIONS.md saat ini hanya memuat ADR-001 sampai ADR-009. ADR-010 sampai ADR-023 masih merupakan kandidat PROPOSED yang didokumentasikan di production_architecture_options.md dan belum dipromosikan ke DECISIONS.md.*
+> **Pemberitahuan Batasan Fase**: *DDL tetap merupakan rancangan data PROPOSED. Adapter lifecycle delivery B2B2C, migration runner eksplisit, dan focused concurrent claim sudah diuji pada PostgreSQL 15 disposable, tetapi high-contention/load test, privilege role, upgrade migration produksi, backup/restore, failover, dan production deployment belum diuji. ADR-010 sampai ADR-023 tetap kandidat PROPOSED; ADR-024 dan ADR-025 adalah keputusan implementasi B2B2C yang telah diterima.*
 
 ---
 
@@ -403,8 +403,8 @@ Skema database PostgreSQL v1 adalah **PROPOSED** dan tidak diklaim selaras 100% 
 
 Untuk menjaga transparansi radikal sesuai aturan quality gate:
 1. **Tidak Ada Database Production/Staging Permanen**: DDL ini belum di-deploy ke database production/staging permanen (baru diverifikasi pada disposable container PostgreSQL 15.13).
-2. **Tidak Ada ORM / Migration Tool**: Belum ada library SQLAlchemy, Alembic, psycopg, atau Prisma yang dipasang ke `requirements.txt`.
-3. **Tidak Ada Runtime Code yang Berubah**: Source code backend FastAPI, unit test, dan adapter runner belum dihubungkan ke database.
+2. **Migration Runner Minimal Sudah Ada**: `psycopg` dan migration runner eksplisit berbasis checksum/advisory lock sudah diimplementasikan. SQLAlchemy/Alembic sengaja belum ditambahkan; baseline SQL yang direview tetap menjadi source of truth pada pilot.
+3. **Delivery Lifecycle Sudah Terhubung**: Print Agent HTTP API dapat memakai `PostgresPrintAgentRepository` secara opt-in untuk claim, reconciliation, begin-delivery, result callback, audit, dan outbox. Batch ingestion dan render worker persistence masih belum diimplementasikan.
 4. **Transport RAW TCP Masih Mock**: Pengiriman biner nyata ke Port 9100 printer fisik belum diimplementasikan.
 5. **RabbitMQ dan MinIO Ditangguhkan**: Sistem pilot menggunakan PostgreSQL Outbox dan Durable Linux Volume lokal.
 
@@ -415,11 +415,11 @@ case. Fixture reprint memiliki original root valid dan setiap case mengubah satu
 invariant target saja. Script tidak menyediakan koneksi printer.
 
 **Status Eksekusi**: Seluruh kasus pada validation harness saat ini lulus pada instance PostgreSQL 15.13 disposable container (`postgres:15-bullseye`).
-Forward DDL, validasi 33 negative test cases dengan expected-failure sentinels, rollback penuh tanpa CASCADE, dan clean re-apply dieksekusi dengan hasil `VALIDATION_PASS_IF_NO_ERROR`.
+Forward DDL, validasi 34 negative test cases dengan expected-failure sentinels, rollback penuh tanpa CASCADE, clean re-apply, migration checksum, lifecycle repository, dan focused concurrent claim dieksekusi dengan hasil lulus pada PostgreSQL 15 disposable.
 
 ## 13. Status Contract, Batas Enforcement, dan Runtime Verification (Fase B2B2B.2)
 
-Dokumen, DDL, dan rollback pada fase ini berstatus **PROPOSED**. Seluruh kasus pada validation harness saat ini lulus pada engine PostgreSQL 15.13 (`postgres:15-bullseye`) via Docker Desktop disposable container. Namun, status *runtime-verified* ini secara tegas **bukan** berarti *production-deployed* atau *production-ready*. Concurrency repository, privilege role, migration upgrade, backup/restore, dan production deployment belum diuji. DECISIONS.md saat ini hanya memuat ADR-001 sampai ADR-009. ADR-010 sampai ADR-023 masih merupakan kandidat PROPOSED yang didokumentasikan di production_architecture_options.md dan belum dipromosikan ke DECISIONS.md.
+DDL dan rollback tetap berstatus **PROPOSED**. Seluruh kasus pada validation harness saat ini lulus pada engine PostgreSQL 15 disposable, dan adapter lifecycle B2B2C telah lolos focused concurrency serta integration test. Namun, status *disposable-runtime-verified* ini secara tegas **bukan** berarti *production-deployed* atau *production-ready*. High-contention/load test, privilege role, upgrade migration produksi, backup/restore, failover, dan production deployment belum diuji. ADR-010 sampai ADR-023 tetap kandidat PROPOSED; ADR-024 dan ADR-025 mencatat keputusan implementasi B2B2C yang sudah diterima.
 
 ### Invariant relasional dan lifecycle
 
@@ -483,6 +483,19 @@ belum memiliki representasi langsung pada claim v1 sehingga memerlukan adapter
 atau kontrak v2 yang masih **PROPOSED**. `source_metadata` JSONB juga harus
 divalidasi oleh service/Pydantic sebelum insert; JSONB sendiri tidak menegakkan
 shape strict.
+
+## 13.1 Implementasi B2B2C
+
+Rancangan dan bukti implementasi application layer dijelaskan di
+`docs/architecture/application_persistence_layer.md`. Boundary yang sudah
+diimplementasikan hanya lifecycle delivery Print Agent; batch ingestion dan
+render persistence tidak boleh dianggap sudah berpindah ke PostgreSQL.
+
+Fencing generation disimpan pada `printer_dispatch_state`, disalin ke claim job,
+dan wajib diteruskan sebagai `X-Print-Claim-Token`. Token melindungi keputusan
+database sebelum I/O baru, tetapi tidak dapat membatalkan byte yang sudah dikirim
+ke printer RAW TCP. Karena itu status `sending` yang ambigu tetap berakhir pada
+`delivery_unknown`, bukan auto-requeue.
 
 ## 14. Koreksi B2B2B.2.2 — Expected-Failure Sentinel pada Harness Validation
 

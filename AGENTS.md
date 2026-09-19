@@ -28,6 +28,24 @@ Dokumen konteks:
 
 ## 3. Workflow wajib
 
+### Routing model dan biaya
+
+Klasifikasikan task sebelum bekerja:
+
+- **Level 0 — sangat ringan:** typo, format, atau dokumentasi kecil. Gunakan Gemini Flash, Luna, atau kerjakan langsung tanpa review terpisah.
+- **Level 1 — rutin:** perubahan lokal dengan risiko rendah. Utamakan Gemini Flash sebagai executor; Luna dapat dipakai sebagai alternatif.
+- **Level 2 — integrasi:** menyentuh beberapa modul atau membutuhkan test lintas komponen. Gunakan Terra untuk perencanaan/review dan Gemini Flash sebagai executor utama.
+- **Level 3 — risiko tinggi:** database, concurrency, security, kontrak publik, migration, atau lifecycle cetak. Gunakan Sol High hanya untuk rancangan atau review akhir; implementasi panjang tetap dapat dikerjakan Gemini Flash setelah task contract disetujui.
+- **Level 4 — membutuhkan otorisasi:** credential, production database, tindakan destruktif, keputusan bisnis, atau printer fisik. Berhenti dan minta keputusan pengguna.
+
+Aturan efisiensi:
+
+- Jangan memakai Sol High untuk pencarian, edit mekanis, test berulang, atau dokumentasi rutin.
+- Subagent Codex default bersifat read-only untuk eksplorasi/review. Hanya root agent atau executor yang ditetapkan boleh menulis.
+- Codex tidak dapat memindahkan pekerjaan ke Antigravity secara otomatis. Perpindahan provider dilakukan melalui task contract, result, review, safe checkpoint, dan push Git; jangan meminta pengguna menyalin seluruh percakapan.
+- Buat folder `docs/tasks/<TASK_ID>/` hanya untuk Level 2/3, handoff lintas provider/perangkat, atau pekerjaan multi-sesi. Perbaikan ringan tidak memerlukan folder task.
+- Status dan pilihan model adalah panduan biaya, bukan bukti kualitas. Acceptance criteria dan hasil test tetap menjadi penentu selesai.
+
 ### Sebelum mengubah file
 
 1. Baca file konteks di atas.
@@ -35,6 +53,7 @@ Dokumen konteks:
 3. Baca diff yang sudah ada; jangan menimpa perubahan lokal.
 4. Tentukan scope, file kandidat, risiko, acceptance criteria, dan test plan.
 5. Gunakan satu branch untuk satu task. Hanya satu AI/perangkat menjadi penulis aktif pada satu branch.
+6. Untuk task Level 2/3, baca atau buat `docs/tasks/<TASK_ID>/TASK_CONTRACT.md` sebelum implementasi.
 
 ### Saat mengimplementasikan
 
@@ -51,6 +70,7 @@ Dokumen konteks:
 2. Perbarui `docs/AI_HANDOFF.md` dengan provider, perangkat, branch, commit baseline, file, test, dan blocker.
 3. Review `git diff` dan pastikan secret, `.env`, report generated, screenshot hasil test, `.last-run.json`, dan artefak sementara tidak masuk commit.
 4. Jelaskan perubahan, risiko tersisa, dan langkah berikutnya. Commit/push hanya setelah scope dapat dijelaskan kepada pengguna.
+5. Untuk handoff lintas provider, penulis lama harus berhenti setelah safe checkpoint dipush. Penulis baru mengisi `RESULT.md`; reviewer mengisi `REVIEW.md`.
 
 ## 4. Aturan keamanan dan quality gate
 
@@ -62,13 +82,11 @@ Dokumen konteks:
 
 ## 5. Format respons
 
-Untuk respons substantif gunakan urutan ringkas:
+Gunakan Bahasa Indonesia sederhana untuk pembaca awam. Default respons harus pendek dan langsung:
 
-1. Kesimpulan dan rekomendasi.
-2. Asumsi, scope, dan pertanyaan kritis.
-3. Risiko teknis/keamanan/UX.
-4. Rancangan dan perubahan file.
-5. Test plan dan hasil aktual.
-6. `🚀 LAKUKAN INI SELANJUTNYA`.
+1. **Hasil:** apa yang selesai, gagal, atau masih menunggu.
+2. **Yang perlu Anda lakukan:** tepat satu tindakan berikutnya. Jika tidak ada, tulis “Anda tidak perlu melakukan apa pun.”
 
-Gunakan code block dengan bahasa yang tepat dan sebutkan path file. Bedakan fakta terverifikasi, asumsi, kandidat, dan pekerjaan yang belum dijalankan.
+Tambahkan bagian **Perubahan**, **Verifikasi**, atau **Risiko** hanya jika benar-benar membantu keputusan pengguna. Jangan menampilkan log panjang, daftar file lengkap, atau boilerplate berulang; simpan detail teknis di task folder, handoff, atau Pull Request.
+
+Format enam bagian lengkap hanya digunakan untuk milestone formal, review arsitektur/security, kesiapan Pull Request, atau jika pengguna memintanya. Tetap bedakan fakta terverifikasi, asumsi, kandidat, dan pekerjaan yang belum dijalankan.

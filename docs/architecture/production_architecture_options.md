@@ -1,15 +1,13 @@
 # Proposal Arsitektur Production: Opsi Sistem, Komponen, dan Roadmap Bertahap
 
-> **Status B2B2B.2:** DDL dan opsi persistence di dokumen ini berstatus
-> **PROPOSED**. Seluruh kasus pada validation harness saat ini lulus pada
-> PostgreSQL 15.13 disposable (forward DDL PASS, 33 negative test cases
-> PASS, rollback PASS, dan clean re-apply PASS). Status terverifikasi runtime ini
-> tidak sama dengan production-deployed atau production-ready. Concurrency
-> repository, privilege role, migration upgrade, backup/restore, dan production
-> deployment belum diuji. DECISIONS.md saat ini hanya memuat ADR-001 sampai
-> ADR-009. ADR-010 sampai ADR-023 masih merupakan kandidat PROPOSED yang
-> didokumentasikan di production_architecture_options.md dan belum dipromosikan
-> ke DECISIONS.md.
+> **Status B2B2C:** DDL tetap merupakan baseline **PROPOSED**, sedangkan adapter
+> lifecycle delivery PostgreSQL, migration runner eksplisit, fencing token HTTP,
+> dan durable artifact root telah **IMPLEMENTED** serta diuji pada PostgreSQL
+> 15 disposable. Harness saat ini mencakup 34 negative test cases. Status ini
+> bukan production-deployed atau production-ready; load test, role isolation,
+> backup/restore, upgrade migration produksi, dan printer fisik belum diuji.
+> ADR-010 sampai ADR-023 tetap kandidat PROPOSED; ADR-024 dan ADR-025 telah
+> dicatat sebagai keputusan implementasi B2B2C di `DECISIONS.md`.
 
 > - **Status Dokumen**: `PROPOSED` (Proposal Arsitektur Fase 2.3B2B2B — *PostgreSQL Persistence Schema & DDL Design*)
 > - **Tanggal Pembaruan**: 2026-09-18
@@ -532,7 +530,7 @@ Sebelum memulai penulisan DDL fisik pada Fase 2.3B2B2B, rancangan arsitektur mem
 12. **Standar Format Checksum**: Kolom checksum SHA-256 untuk berkas biner artefak dan konten template SVG menggunakan format *lowercase hexadecimal* 64 karakter (regex `^[a-f0-9]{64}$`).
 13. **Validasi Atomik Sebelum Antrean**: Seluruh item dalam satu batch harus lolos validasi kompatibilitas media fisik dan kelengkapan token template sebelum transaksi batch di-commit ke database (*All-or-Nothing*).
 
-> **Batasan Fase:** Pada fase 2.3B2B DDL skema v1 masih berstatus **PROPOSED** dan belum production-deployed atau production-ready. Seluruh kasus pada validation harness saat ini lulus pada container disposable PostgreSQL 15.13 (`postgres:15-bullseye`) (forward DDL PASS, 33 negative test cases ber-sentinel PASS, rollback tanpa `CASCADE` PASS, dan clean re-apply PASS). Concurrency repository, privilege role, migration upgrade, backup/restore, dan production deployment belum diuji. DECISIONS.md saat ini hanya memuat ADR-001 sampai ADR-009. ADR-010 sampai ADR-023 masih merupakan kandidat PROPOSED yang didokumentasikan di production_architecture_options.md dan belum dipromosikan ke DECISIONS.md.
+> **Batasan Fase:** DDL skema v1 masih berstatus **PROPOSED** dan belum production-deployed atau production-ready. Forward DDL, 34 negative test cases ber-sentinel, rollback tanpa `CASCADE`, clean re-apply, migration checksum, lifecycle repository, stale fencing rejection, serta focused concurrent claim telah lulus pada PostgreSQL 15 disposable. High-contention/load test, privilege role, upgrade migration produksi, backup/restore, failover, dan production deployment belum diuji.
 
 ---
 
@@ -540,7 +538,7 @@ Sebelum memulai penulisan DDL fisik pada Fase 2.3B2B2B, rancangan arsitektur mem
 
 ```mermaid
 flowchart LR
-    A["Fase B2B2B\nDesain DDL PostgreSQL v1\n(PROPOSED; runtime-verified)"] --> B["Fase B2B2C\nPostgreSQL Repository\n(Implementasi Repository ACID)"]
+    A["Fase B2B2B\nDesain DDL PostgreSQL v1\n(PROPOSED; runtime-verified)"] --> B["Fase B2B2C\nPostgreSQL Delivery Repository\n(IMPLEMENTED; disposable-verified)"]
     B --> C["Fase B2B2D\nDurable Storage Adapter\n(Filesystem Volume / MinIO SDK)"]
     C --> D["Fase B2B2E\nWorker & Central Dispatcher\n(Pipeline Render & Socket Dispatcher)"]
     D --> E["Fase B2B2F\nDocker Compose Pilot Linux\n(Uji Terintegrasi 1 Lini, 1 PC, 1 Printer)"]
@@ -548,7 +546,7 @@ flowchart LR
 ```
 
 1. **Fase 2.3B2B (PROPOSED)**: Desain persistensi formal DDL v1: composite printer/batch/job binding, lifecycle row-state, artifact/template references, outbox consistency, immutability boundary, forward DDL fail-fast, dan rollback tanpa `CASCADE`. Sintaks dan validation harness telah diverifikasi runtime pada container disposable PostgreSQL 15.13 (belum production-deployed).
-2. **Fase 2.3B2B2C**: Implementasi repository PostgreSQL teruji menggantikan mock in-memory dengan penanganan transaksi atomik.
+2. **Fase 2.3B2B2C (IMPLEMENTED, disposable-verified)**: Repository PostgreSQL opt-in untuk lifecycle delivery, migration runner eksplisit, fencing token end-to-end, persistent result idempotency/outbox/audit, dan durable artifact root. Repository memory tetap default untuk test/pilot offline; batch ingestion dan render persistence belum dipindahkan ke PostgreSQL.
 3. **Fase 2.3B2B2D**: Implementasi adapter penyimpanan berkas biner sementara (Durable Linux Volume / S3 MinIO).
 4. **Fase 2.3B2B2E**: Implementasi pipeline render asinkron dan Central Print Dispatcher Port 9100 dengan timeout terkontrol di luar DB lock.
 5. **Fase 2.3B2B2F**: Penyusunan berkas Docker Compose pilot terintegrasi untuk server intranet Linux (1 lini, 1 PC, 1 printer IP).
@@ -558,7 +556,7 @@ flowchart LR
 
 ## M. Daftar Pertanyaan Terbuka untuk Konfirmasi Lapangan (*Open Questions*)
 
-Sebelum memulai Fase B2B2C, konfirmasi berikut sangat dibutuhkan dari tim operasional dan IT infrastruktur perusahaan:
+Sebelum deployment pilot dan implementasi transport fisik, konfirmasi berikut masih dibutuhkan dari tim operasional dan IT infrastruktur perusahaan:
 
 1. **Verifikasi Konektivitas Port 9100 dari Linux Server**: Menguji koneksi jaringan aktual dari server Linux intranet ke IP printer di lantai pabrik pada Port 9100 RAW TCP untuk memastikan tidak ada firewall antar-VLAN yang memblokir.
 2. **Proporsi Printer Jaringan vs USB/Serial**: Menghitung inventaris aktual berapa banyak printer yang terhubung via kabel LAN/IP dibanding printer yang dicolok kabel USB ke komputer lokal.
@@ -587,10 +585,12 @@ Sebelum memulai Fase B2B2C, konfirmasi berikut sangat dibutuhkan dari tim operas
 | **ADR-021: Keterbatasan Fencing Token pada RAW TCP dan Invarian State Sending** | `PROPOSED` | Mengakui printer RAW TCP tidak paham fencing token; status `sending` dilarang auto-requeue; durasi lease memperhitungkan connect/write timeout. |
 | **ADR-022: Invarian Persistensi Relasional Menuju DDL B2B2B** | `PROPOSED` | Menetapkan 13 aturan integritas persistensi database sebagai kontrak pembekuan sebelum perancangan DDL formal. |
 | **ADR-023: Desain Skema Relasional PostgreSQL v1 untuk Pipeline Batch** | `PROPOSED` | DDL v1 memisahkan media version, template version, printer registry, dispatch lease, batches, items, jobs, artifacts, outbox, dan audit append-only. |
+| **ADR-024: PostgreSQL Opt-In dan Migrasi Eksplisit untuk Delivery Lifecycle** | `ACCEPTED` | Mode default tetap memory; PostgreSQL diaktifkan eksplisit dan migrasi tidak pernah berjalan otomatis saat startup. |
+| **ADR-025: Fencing Token Wajib pada Boundary HTTP Print Agent** | `ACCEPTED` | Claim token diteruskan pada download, begin-delivery, dan result untuk menolak stale worker sebelum I/O baru. |
 
 ## O. Status Validasi Runtime DDL dan Batas Enforcement (Fase B2B2B.2)
 
-DDL pada fase ini adalah proposal fail-fast di mana seluruh kasus pada validation harness saat ini lulus pada container disposable PostgreSQL 15.13 (`postgres:15-bullseye`). Verifikasi runtime mencakup forward DDL (11 tabel, trigger, dan function), harness validasi 33 negative test cases ber-sentinel (`VALIDATION_PASS_IF_NO_ERROR`), rollback bersih tanpa `CASCADE` (menghasilkan "Did not find any relations"), serta clean re-apply yang membuktikan *repeatability* pada database bersih dan kelengkapan skrip rollback. Forward DDL bersifat *fail-fast* (bukan `IF NOT EXISTS`), sehingga pengujian ini bukan pembuktian idempotensi terhadap skema yang sudah terpasang. Status terverifikasi runtime ini tidak sama dengan production-deployed atau production-ready. Concurrency repository, privilege role, migration upgrade, backup/restore, dan production deployment belum diuji. DECISIONS.md saat ini hanya memuat ADR-001 sampai ADR-009. ADR-010 sampai ADR-023 masih merupakan kandidat PROPOSED yang didokumentasikan di production_architecture_options.md dan belum dipromosikan ke DECISIONS.md.
+DDL pada fase ini adalah proposal fail-fast di mana seluruh kasus pada validation harness saat ini lulus pada container disposable PostgreSQL 15 (`postgres:15-bullseye`). Verifikasi runtime mencakup forward DDL (11 tabel, trigger, dan function), harness validasi 34 negative test cases ber-sentinel (`VALIDATION_PASS_IF_NO_ERROR`), rollback bersih tanpa `CASCADE`, serta clean re-apply yang membuktikan *repeatability* pada database bersih dan kelengkapan skrip rollback. Forward DDL bersifat *fail-fast* (bukan `IF NOT EXISTS`), sehingga pengujian ini bukan pembuktian idempotensi terhadap skema yang sudah terpasang. B2B2C juga memverifikasi migration checksum, satu pemenang pada focused concurrent claim per printer, lifecycle `queued -> claimed -> sending -> final`, lease reconciliation, stale fencing rejection, callback idempotency, audit/outbox, dan alur HTTP sampai mock transport. Status ini tidak sama dengan production-deployed atau production-ready; high-contention/load test, privilege role, upgrade migration produksi, backup/restore, failover, dan production deployment belum diuji.
 
 CHECK constraint menegakkan bentuk baris saat ini, bukan riwayat transisi; state machine, `queued -> claimed -> sending`, lease recovery, monotonic fencing generation, aturan minimum-one original per item, dan reprint ke original root tetap merupakan aturan repository/service dalam transaksi ACID.
 
@@ -618,6 +618,6 @@ luar row lock. Kontrak JSON v1 tidak diubah: adapter memetakan
 `executor_id` ke `claim.agent_id` untuk gateway/local agent, sementara central
 dispatcher membutuhkan adapter/kontrak v2 yang masih **PROPOSED**.
 
-Harness validasi disposable pada `docs/database/print_pipeline_v1_validation.sql` telah dieksekusi di mana seluruh kasus pada validation harness saat ini lulus pada container disposable PostgreSQL 15.13 (`postgres:15-bullseye`) via Docker Desktop. Setelah pengujian forward DDL, 33 negative test cases, rollback, dan clean re-apply selesai, container disposable `pg-disposable-b2b2b` telah dihentikan dan dihapus bersih (tidak ada container disposable yang tersisa), sementara image `postgres:15-bullseye` tetap tersimpan di Docker cache lokal. Status validasi adalah **PASS pada disposable PostgreSQL 15.13 harness**.
+Harness validasi disposable pada `docs/database/print_pipeline_v1_validation.sql` telah dieksekusi pada PostgreSQL 15 via Docker Desktop. Setelah forward DDL, 34 negative test cases, rollback, clean re-apply, serta integration test B2B2C selesai, container disposable task wajib dihapus; image `postgres:15-bullseye` boleh tetap berada di cache lokal. Status validasi adalah **PASS pada disposable PostgreSQL 15 harness**.
 
-*(DECISIONS.md saat ini hanya memuat ADR-001 sampai ADR-009. ADR-010 sampai ADR-023 masih merupakan kandidat PROPOSED yang didokumentasikan di production_architecture_options.md dan belum dipromosikan ke DECISIONS.md).*
+*(ADR-010 sampai ADR-023 tetap kandidat PROPOSED di dokumen ini. ADR-024 dan ADR-025 tercatat sebagai ACCEPTED di `DECISIONS.md` untuk implementasi B2B2C.)*

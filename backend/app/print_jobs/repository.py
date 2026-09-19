@@ -68,7 +68,13 @@ class PrintJobRepository(Protocol):
 
     def expire_lease(self, job_id: str, now: datetime) -> PrintJob: ...
 
-    def begin_delivery(self, job_id: str, agent_id: str, now: datetime) -> PrintJob: ...
+    def begin_delivery(
+        self,
+        job_id: str,
+        agent_id: str,
+        now: datetime,
+        fencing_token: int | None = None,
+    ) -> PrintJob: ...
 
     def finalize_delivery(
         self,
@@ -84,6 +90,45 @@ class PrintJobRepository(Protocol):
         agent_id: str,
         outcome: MockTransportOutcome,
         bytes_sent: int,
+        fencing_token: int | None = None,
+    ) -> PrintJob: ...
+
+
+class PrintAgentRepository(Protocol):
+    """Narrow persistence boundary used by the Print Agent HTTP API."""
+
+    def get(self, job_id: str) -> PrintJob: ...
+
+    def list_site_jobs(self, site_id: str) -> tuple[PrintJob, ...]: ...
+
+    def claim_next(
+        self,
+        site_id: str,
+        agent_id: str,
+        now: datetime,
+        lease: timedelta,
+        eligible_job_ids: Collection[str] | None = None,
+    ) -> PrintJob | None: ...
+
+    def reconcile_expired_jobs(self, now: datetime) -> tuple[PrintJob, ...]: ...
+
+    def reconcile_job(self, job_id: str, now: datetime) -> PrintJob: ...
+
+    def begin_delivery(
+        self,
+        job_id: str,
+        agent_id: str,
+        now: datetime,
+        fencing_token: int | None = None,
+    ) -> PrintJob: ...
+
+    def report_result(
+        self,
+        job_id: str,
+        agent_id: str,
+        outcome: MockTransportOutcome,
+        bytes_sent: int,
+        fencing_token: int | None = None,
     ) -> PrintJob: ...
 
 
@@ -100,6 +145,7 @@ class InMemoryPrintJobRepository:
         self._jobs: dict[str, PrintJob] = {}
         self._request_records: dict[str, IdempotencyRecord] = {}
         self._result_records: dict[str, tuple[MockTransportOutcome, int]] = {}
+        self._fencing_generation: dict[str, int] = {}
         self._lock = RLock()
 
     def create_idempotent(self, job: PrintJob, semantic_input: Mapping[str, object]) -> PrintJob:
@@ -142,10 +188,12 @@ class InMemoryPrintJobRepository:
             if lease <= timedelta(0):
                 raise ValueError("lease must be positive")
             lease_expires_at = min(now + lease, job.expires_at)
+            fencing_token = self._next_fencing_token_locked(job.printer_id)
             claim = Claim(
                 agent_id=agent_id,
                 claimed_at=now,
                 lease_expires_at=lease_expires_at,
+                fencing_token=fencing_token,
             )
             updated = PrintJobStateMachine.claim(job, claim)
             self._jobs[job_id] = updated.model_copy(deep=True)
@@ -182,7 +230,12 @@ class InMemoryPrintJobRepository:
                 if allowed_ids is not None and job.job_id not in allowed_ids:
                     continue
                 lease_expires_at = min(now + lease, job.expires_at)
-                claim = Claim(agent_id=agent_id, claimed_at=now, lease_expires_at=lease_expires_at)
+                claim = Claim(
+                    agent_id=agent_id,
+                    claimed_at=now,
+                    lease_expires_at=lease_expires_at,
+                    fencing_token=self._next_fencing_token_locked(job.printer_id),
+                )
                 updated = PrintJobStateMachine.claim(job, claim)
                 self._jobs[job.job_id] = updated.model_copy(deep=True)
                 return updated.model_copy(deep=True)
@@ -205,7 +258,13 @@ class InMemoryPrintJobRepository:
                 self._jobs[job_id] = updated.model_copy(deep=True)
             return updated.model_copy(deep=True)
 
-    def begin_delivery(self, job_id: str, agent_id: str, now: datetime) -> PrintJob:
+    def begin_delivery(
+        self,
+        job_id: str,
+        agent_id: str,
+        now: datetime,
+        fencing_token: int | None = None,
+    ) -> PrintJob:
         """Atomically verify claim/expiry/attempts and enter sending once."""
         with self._lock:
             self._require_aware(now)
@@ -214,6 +273,8 @@ class InMemoryPrintJobRepository:
                 raise DeliveryConflictError(f"job is not claimed: {job_id}")
             if job.claim is None or job.claim.agent_id != agent_id:
                 raise DeliveryConflictError(f"claim is owned by another agent: {job_id}")
+            if fencing_token is not None and job.claim.fencing_token != fencing_token:
+                raise DeliveryConflictError(f"claim fencing token is stale: {job_id}")
             if now >= job.expires_at:
                 self._mark_expired_locked(job)
                 raise JobExpiredError(f"job has expired: {job_id}")
@@ -259,6 +320,7 @@ class InMemoryPrintJobRepository:
         agent_id: str,
         outcome: MockTransportOutcome,
         bytes_sent: int,
+        fencing_token: int | None = None,
     ) -> PrintJob:
         """Finalize a delivery once and make an identical callback idempotent."""
         if bytes_sent < 0:
@@ -272,6 +334,8 @@ class InMemoryPrintJobRepository:
             current = self.get(job_id)
             if current.claim is None or current.claim.agent_id != agent_id:
                 raise DeliveryConflictError(f"claim is owned by another agent: {job_id}")
+            if fencing_token is not None and current.claim.fencing_token != fencing_token:
+                raise DeliveryConflictError(f"claim fencing token is stale: {job_id}")
             previous = self._result_records.get(job_id)
             if previous is not None:
                 if previous != (outcome, bytes_sent):
@@ -304,6 +368,11 @@ class InMemoryPrintJobRepository:
     def _mark_expired_locked(self, job: PrintJob) -> None:
         expired = PrintJobStateMachine.transition(job, PrintJobStatus.EXPIRED)
         self._jobs[job.job_id] = expired.model_copy(deep=True)
+
+    def _next_fencing_token_locked(self, printer_id: str) -> int:
+        next_token = self._fencing_generation.get(printer_id, 0) + 1
+        self._fencing_generation[printer_id] = next_token
+        return next_token
 
     @staticmethod
     def _require_aware(value: datetime) -> None:

@@ -72,7 +72,12 @@ def _job(
         PrintJobStatus.CANCELLED,
     }
     delivery_claim = claim or (
-        Claim(agent_id="agent-001", claimed_at=NOW, lease_expires_at=NOW + timedelta(minutes=1))
+        Claim(
+            agent_id="agent-001",
+            claimed_at=NOW,
+            lease_expires_at=NOW + timedelta(minutes=1),
+            fencing_token=1,
+        )
         if status
         in {
             PrintJobStatus.CLAIMED,
@@ -129,14 +134,22 @@ def test_timestamps_and_lease_order_are_validated() -> None:
     with pytest.raises(ValidationError):
         _job().__class__(**{**_job().model_dump(), "expires_at": NOW})
     with pytest.raises(ValidationError):
-        Claim(agent_id="agent-001", claimed_at=NOW, lease_expires_at=NOW)
+        Claim(agent_id="agent-001", claimed_at=NOW, lease_expires_at=NOW, fencing_token=1)
 
 
 def test_state_machine_normal_and_invalid_transitions() -> None:
     accepted = _job(PrintJobStatus.ACCEPTED)
     rendered = PrintJobStateMachine.render(accepted, _artifact(), CHECKSUM)
     queued = PrintJobStateMachine.transition(rendered, PrintJobStatus.QUEUED)
-    claimed = PrintJobStateMachine.claim(queued, Claim(agent_id="agent-001", claimed_at=NOW, lease_expires_at=NOW + timedelta(minutes=1)))
+    claimed = PrintJobStateMachine.claim(
+        queued,
+        Claim(
+            agent_id="agent-001",
+            claimed_at=NOW,
+            lease_expires_at=NOW + timedelta(minutes=1),
+            fencing_token=1,
+        ),
+    )
     sending = PrintJobStateMachine.transition(claimed, PrintJobStatus.SENDING)
     sent = PrintJobStateMachine.transition(sending, PrintJobStatus.SENT_TO_PRINTER)
     assert rendered.status is PrintJobStatus.RENDERED
@@ -224,7 +237,12 @@ def test_lease_expiry_requeues_before_sending_and_marks_sending_unknown() -> Non
 
     sending = _job(
         PrintJobStatus.SENDING,
-        claim=Claim(agent_id="agent-a", claimed_at=NOW, lease_expires_at=NOW + timedelta(seconds=1)),
+        claim=Claim(
+            agent_id="agent-a",
+            claimed_at=NOW,
+            lease_expires_at=NOW + timedelta(seconds=1),
+            fencing_token=1,
+        ),
     )
     repo.create_idempotent(sending, {"request": "sending"})
     unknown = repo.expire_lease(sending.job_id, NOW + timedelta(seconds=2))
@@ -275,7 +293,12 @@ def test_reconcile_expiry_rules_are_atomic_idempotent_and_terminal_safe() -> Non
         PrintJobStatus.SENDING,
         job_id="sending-expired",
         request_id="sending-expired-request",
-        claim=Claim(agent_id="agent-old", claimed_at=NOW, lease_expires_at=NOW + timedelta(seconds=1)),
+        claim=Claim(
+            agent_id="agent-old",
+            claimed_at=NOW,
+            lease_expires_at=NOW + timedelta(seconds=1),
+            fencing_token=1,
+        ),
     )
     repo.create_idempotent(sending, {"request": "sending-expires"})
     unknown = repo.reconcile_job(sending.job_id, NOW + timedelta(seconds=2))
@@ -338,6 +361,9 @@ def test_temporary_storage_checksum_length_and_traversal(tmp_path: Path) -> None
     checksum = storage.checksum(payload)
     assert artifact.byte_length == len(payload)
     assert storage.read_verified(artifact, checksum) == payload
+    restarted_storage = TemporaryArtifactStorage(tmp_path)
+    assert restarted_storage.put("payload_safe", "label.ipl", payload) == artifact
+    assert restarted_storage.read_verified(artifact, checksum) == payload
     with pytest.raises(ValueError):
         storage.put("../escape", "label.ipl", payload)
     with pytest.raises(ArtifactConflictError):

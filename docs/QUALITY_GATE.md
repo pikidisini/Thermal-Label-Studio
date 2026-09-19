@@ -31,6 +31,20 @@ Perintah dari folder `web_app/`:
 pytest backend/tests -v
 ```
 
+Untuk perubahan repository PostgreSQL, gunakan database **disposable** dan
+berikan DSN hanya melalui environment lokal:
+
+```powershell
+$env:TEST_POSTGRES_DSN='postgresql://<disposable-local-dsn>'
+python -m pytest backend/tests/test_postgres_print_agent_repository.py -q -p no:cacheprovider
+python -m pytest backend/tests -q -p no:cacheprovider
+```
+
+Migration baseline harus dijalankan eksplisit melalui
+`python -m backend.app.print_jobs.migrations apply`; aplikasi dilarang melakukan
+migration otomatis saat startup. Jangan arahkan test atau migration verification
+ke database staging/production.
+
 ### Frontend
 
 - render/loading/empty/error/success state;

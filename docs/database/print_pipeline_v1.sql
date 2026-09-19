@@ -46,8 +46,8 @@ CREATE TABLE template_versions (
 
 -- 3. Trusted printer registry. Endpoint values are never accepted from SAP.
 CREATE TABLE printer_registry (
-    printer_id VARCHAR(64) PRIMARY KEY,
-    site_id VARCHAR(64) NOT NULL,
+    printer_id VARCHAR(128) PRIMARY KEY,
+    site_id VARCHAR(128) NOT NULL,
     area_id VARCHAR(64) NOT NULL,
     brand TEXT NOT NULL CHECK (brand IN ('HONEYWELL', 'INTERMEC', 'ZEBRA')),
     model VARCHAR(64) NOT NULL,
@@ -55,11 +55,11 @@ CREATE TABLE printer_registry (
     configured_media_profile_version_id UUID NOT NULL REFERENCES media_profile_versions(media_profile_version_id) ON DELETE RESTRICT,
     network_host INET NULL,
     network_port INTEGER NULL CHECK (network_port BETWEEN 1 AND 65535),
-    gateway_executor_id VARCHAR(64) NULL,
-    trusted_bridge_id VARCHAR(64) NULL,
+    gateway_executor_id VARCHAR(128) NULL,
+    trusted_bridge_id VARCHAR(128) NULL,
     printer_language TEXT NOT NULL CHECK (printer_language IN ('ipl', 'zpl')),
     emulation TEXT NOT NULL CHECK (emulation IN ('native', 'zsim2')),
-    confirmed_dpi INTEGER NOT NULL CHECK (confirmed_dpi > 0),
+    confirmed_dpi NUMERIC(7, 3) NOT NULL CHECK (confirmed_dpi > 0),
     firmware_version VARCHAR(64) NULL,
     is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -81,10 +81,10 @@ CREATE TABLE printer_registry (
 -- 4. One active batch owner per printer. fencing_generation monotonicity is a
 -- repository/transaction rule; a CHECK can only enforce positivity.
 CREATE TABLE printer_dispatch_state (
-    printer_id VARCHAR(64) PRIMARY KEY REFERENCES printer_registry(printer_id) ON DELETE RESTRICT,
+    printer_id VARCHAR(128) PRIMARY KEY REFERENCES printer_registry(printer_id) ON DELETE RESTRICT,
     active_batch_id UUID NULL,
     executor_type TEXT NULL CHECK (executor_type IN ('central_dispatcher', 'gateway_agent', 'local_agent')),
-    executor_id VARCHAR(64) NULL,
+    executor_id VARCHAR(128) NULL,
     fencing_generation BIGINT NOT NULL DEFAULT 1 CHECK (fencing_generation > 0),
     acquired_at TIMESTAMPTZ NULL,
     lease_expires_at TIMESTAMPTZ NULL,
@@ -106,7 +106,7 @@ CREATE TABLE print_batches (
     source_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
     raw_contract_sha256 CHAR(64) NOT NULL CHECK (raw_contract_sha256 ~ '^[a-f0-9]{64}$'),
     canonical_payload_snapshot JSONB NOT NULL,
-    printer_id VARCHAR(64) NOT NULL REFERENCES printer_registry(printer_id) ON DELETE RESTRICT,
+    printer_id VARCHAR(128) NOT NULL REFERENCES printer_registry(printer_id) ON DELETE RESTRICT,
     configured_media_profile_version_id UUID NOT NULL REFERENCES media_profile_versions(media_profile_version_id) ON DELETE RESTRICT,
     printer_capability_snapshot JSONB NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('accepted', 'processing', 'completed', 'partially_failed', 'paused', 'cancelled')),
@@ -145,17 +145,18 @@ CREATE TABLE print_jobs (
     job_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     batch_id UUID NOT NULL,
     item_id UUID NOT NULL,
-    printer_id VARCHAR(64) NOT NULL,
+    printer_id VARCHAR(128) NOT NULL,
     job_kind TEXT NOT NULL CHECK (job_kind IN ('original', 'reprint')),
     reprint_of_job_id UUID NULL,
     status TEXT NOT NULL CHECK (status IN ('accepted', 'rendered', 'queued', 'claimed', 'sending', 'sent_to_printer', 'delivery_unknown', 'failed', 'expired', 'cancelled')),
     attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
     executor_type TEXT NULL CHECK (executor_type IN ('central_dispatcher', 'gateway_agent', 'local_agent')),
-    executor_id VARCHAR(64) NULL,
+    executor_id VARCHAR(128) NULL,
     claimed_at TIMESTAMPTZ NULL,
     lease_expires_at TIMESTAMPTZ NULL,
     fencing_token BIGINT NULL CHECK (fencing_token > 0),
     bytes_sent INTEGER NOT NULL DEFAULT 0 CHECK (bytes_sent >= 0),
+    result_outcome TEXT NULL CHECK (result_outcome IN ('success', 'failure_before_send', 'delivery_unknown')),
     last_error_code VARCHAR(64) NULL,
     last_error_category VARCHAR(64) NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -191,6 +192,12 @@ CREATE TABLE print_jobs (
     ),
     CONSTRAINT chk_print_jobs_delivery_attempt CHECK (
         status NOT IN ('sending', 'sent_to_printer', 'delivery_unknown') OR attempt_count >= 1
+    ),
+    CONSTRAINT chk_print_jobs_result_consistency CHECK (
+        result_outcome IS NULL OR
+        (result_outcome = 'success' AND status = 'sent_to_printer') OR
+        (result_outcome = 'failure_before_send' AND status = 'failed') OR
+        (result_outcome = 'delivery_unknown' AND status = 'delivery_unknown')
     )
 );
 
@@ -198,6 +205,11 @@ CREATE TABLE print_jobs (
 -- transaction/repository rule and is not guaranteed by this partial index.
 CREATE UNIQUE INDEX uq_print_jobs_single_original_per_item
     ON print_jobs (item_id) WHERE job_kind = 'original';
+
+-- Defense in depth for per-printer serialization. Repository transactions also
+-- lock printer_dispatch_state before claiming or mutating an active delivery.
+CREATE UNIQUE INDEX uq_print_jobs_single_active_delivery_per_printer
+    ON print_jobs (printer_id) WHERE status IN ('claimed', 'sending');
 
 -- Reprint policy: a reprint is a new row. The service must require its parent
 -- to be an original root and store that root job_id; FK alone cannot prevent
@@ -254,7 +266,7 @@ CREATE TABLE print_job_outbox (
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'publishing', 'published', 'failed')),
     attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
     available_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    claimed_by VARCHAR(64) NULL,
+    claimed_by VARCHAR(128) NULL,
     claimed_at TIMESTAMPTZ NULL,
     claim_expires_at TIMESTAMPTZ NULL,
     published_at TIMESTAMPTZ NULL,
@@ -279,7 +291,7 @@ CREATE TABLE print_audit_events (
     audit_event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     occurred_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actor_type TEXT NOT NULL CHECK (actor_type IN ('system', 'sap_producer', 'operator', 'admin', 'dispatcher', 'agent')),
-    actor_id VARCHAR(64) NOT NULL,
+    actor_id VARCHAR(128) NOT NULL,
     action VARCHAR(64) NOT NULL,
     aggregate_type VARCHAR(64) NOT NULL,
     aggregate_id UUID NOT NULL,

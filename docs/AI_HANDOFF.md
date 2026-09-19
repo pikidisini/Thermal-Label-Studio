@@ -4,27 +4,41 @@ Gunakan dokumen ini untuk memulihkan konteks ketika melanjutkan pekerjaan dari l
 
 ## Snapshot sesi saat ini
 
-- Tanggal: 2026-09-18
+- Tanggal: 2026-09-19
 - Repository: `Thermal-Label-Studio`
-- Remote baseline: `origin/main` pada `8025353` (`8025353056614be126a537075abcc25a2b9acc69`)
-- Checkpoint awal branch: `5a2289d` (`5a2289d0c83356dfb8c205fc03ab1f89804cbeed`)
-- Source branch checkpoint: `codex/local-print-agent-b2b1-b2b2b-checkpoint`
-- Commit koreksi B2B2B.2.5: `a11657d` (`fix(local-agent): resolve pre-PR review findings`)
-- Status B2B2B.2.5: verified dan committed; gunakan `git status`, `git log`, serta upstream tracking sebagai sumber kondisi checkout/remote terkini.
+- Remote baseline fase: `origin/main` pada `e40f95c` (`e40f95c567acad5717ebe256a5987e9db9e5485c`)
+- Branch aktif: `codex/b2b2c-postgresql-persistence`
+- Status B2B2C: implementasi lokal dijeda saat workflow lintas provider disiapkan; belum commit/push/PR pada snapshot ini.
 - Provider/model/perangkat sesi: Codex Desktop pada Windows lokal.
-- Verifikasi B2B2B.2.5: `backend/tests/test_local_print_agent.py` PASS (`74 passed`), `backend/tests` PASS (`168 passed`), dan `typing.get_type_hints(_validated_transport_result)` PASS.
-- Frontend unit, build, dan E2E: `NOT RUN` karena tidak ada perubahan frontend pada fase ini.
+- Writer branch: Codex `/root` saja dan sedang dijeda; Gemini belum menjadi writer. Tiga subagent internal hanya melakukan review read-only independen.
+- Batas keras: tidak ada database production, credential perusahaan, printer fisik, TCP 9100, atau Windows Spooler.
+- Target berhenti: Pull Request siap direview, tepat sebelum merge ke `main`.
+- Workflow baru: `docs/AI_WORKFLOW.md`; contract/result/review B2B2C berada di `docs/tasks/B2B2C/`.
 
-Perubahan aktif pada sesi B2B2B.2.5:
+## Safe checkpoint B2B2C — kandidat
 
-- `backend/app/local_print_agent/runner.py`
-- `backend/app/local_print_agent/config.py`
+- Status: kandidat safe WIP checkpoint; **bukan** kesiapan merge atau production-ready.
+- Quality gate aktual: backend `169 passed, 1 skipped`; frontend unit `45 passed`; compile check dan `git diff --check` lulus.
+- PostgreSQL integration: `SKIPPED` karena Docker Desktop tidak dapat diakses dari komputer ini.
+- Typecheck/build frontend: belum memiliki hasil final yang dapat dipastikan pada checkpoint ini.
+- Review independen: tiga subagent tidak dapat selesai karena limit akun; perlu diulang sebelum pull request/merge.
+- Batas keras tetap berlaku: tidak ada database production, credential perusahaan, printer fisik, TCP 9100, atau Windows Spooler.
+
+Perubahan aktif utama pada sesi B2B2C:
+
 - `backend/app/local_print_agent/api_client.py`
-- `backend/tests/test_local_print_agent.py`
+- `backend/app/api/routes_print_agent.py`
+- `backend/app/print_jobs/` (repository protocol, PostgreSQL adapter, migration runner, model, dan artifact storage)
+- `backend/tests/` (API, lifecycle, local agent, dan PostgreSQL integration)
+- `docs/contracts/print_job_v1.schema.json`
+- `docs/database/print_pipeline_v1.sql`
+- `docs/database/print_pipeline_v1_validation.sql`
+- `docs/architecture/application_persistence_layer.md`
+- `Dockerfile`, `requirements.txt`, dan `backend/requirements.txt`
 - `docs/AI_HANDOFF.md`
 - `docs/PROJECT_STATUS.md`
 
-Dokumentasi handoff ini juga berubah pada sesi ini. Jangan menganggap test atau implementasi local print agent sudah verified sebelum menjalankan perintah verifikasi dan mencatat hasil aktual.
+Dokumentasi handoff ini juga berubah pada sesi ini. Hasil final test, hash commit, URL PR, dan review subagent harus ditulis setelah quality gate selesai; jangan menyalin hasil historis sebagai bukti fase B2B2C.
 
 ## Handoff Pre-Checkpoint B2B1.4–B2B2B.2.4
 

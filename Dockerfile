@@ -35,6 +35,9 @@ COPY engine/ /app/engine/
 COPY assets/ /app/assets/
 COPY data_samples/ /app/data_samples/
 COPY backend/ /app/backend/
+# Runtime migration command reads the reviewed SQL baseline explicitly; it is
+# never executed automatically during container startup.
+COPY docs/database/ /app/docs/database/
 
 # Copy built frontend assets from stage 1
 COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
