@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import hashlib
 import json
 import os
@@ -23,6 +24,18 @@ from app.print_jobs.models import ArtifactReference
 
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def _worker_put_artifact(
+    root_str: str, payload_ref: str, filename: str, payload: bytes
+) -> tuple[bool, str]:
+    """Top-level worker function for multiprocessing tests."""
+    try:
+        storage = DurableFilesystemArtifactStorage(Path(root_str))
+        ref = storage.put(payload_ref, filename, payload)
+        return True, ref.payload_ref
+    except Exception as exc:
+        return False, f"{type(exc).__name__}: {exc}"
 
 
 def test_put_creates_atomic_payload_and_manifest(tmp_path: Path) -> None:
@@ -237,3 +250,116 @@ def test_staging_directory_cleanup(tmp_path: Path) -> None:
 
     # After atomic put, staging temp files must be cleanly moved or removed
     assert list(staging_dir.iterdir()) == []
+
+
+def test_root_relative_path_rejected() -> None:
+    with pytest.raises(ArtifactIntegrityError, match="artifact root must be an absolute path"):
+        DurableFilesystemArtifactStorage(Path("relative/storage/path"))
+
+
+def test_symlink_payload_rejected(tmp_path: Path) -> None:
+    storage = DurableFilesystemArtifactStorage(tmp_path)
+    target_outside = tmp_path.parent / "outside_payload_target.txt"
+    target_outside.write_bytes(b"OUTSIDE_PAYLOAD")
+    symlink_path = tmp_path / "job-symlink-payload.payload"
+
+    try:
+        symlink_path.symlink_to(target_outside)
+    except (OSError, NotImplementedError):
+        pytest.skip("Symlink creation is not permitted or supported in this environment")
+
+    # Trying to put to a ref where payload is already a symlink must fail
+    with pytest.raises(ArtifactIntegrityError, match="symlinks are not permitted"):
+        storage.put("job-symlink-payload", "label.zpl", b"TEST")
+
+    # Trying to read_verified from a symlink must fail
+    ref = ArtifactReference.model_construct(
+        payload_ref="job-symlink-payload",
+        filename="label.zpl",
+        media_type="application/octet-stream",
+        byte_length=len(b"OUTSIDE_PAYLOAD"),
+    )
+    with pytest.raises(ArtifactIntegrityError, match="symlinks are not permitted"):
+        storage.read_verified(ref, _sha256(b"OUTSIDE_PAYLOAD"))
+
+
+def test_symlink_manifest_rejected(tmp_path: Path) -> None:
+    storage = DurableFilesystemArtifactStorage(tmp_path)
+    target_outside = tmp_path.parent / "outside_manifest.json"
+    target_outside.write_text("{}", encoding="utf-8")
+    symlink_path = tmp_path / "job-symlink-manifest.manifest.json"
+
+    try:
+        symlink_path.symlink_to(target_outside)
+    except (OSError, NotImplementedError):
+        pytest.skip("Symlink creation is not permitted or supported in this environment")
+
+    ref = ArtifactReference.model_construct(
+        payload_ref="job-symlink-manifest",
+        filename="label.zpl",
+        media_type="application/octet-stream",
+        byte_length=4,
+    )
+    with pytest.raises(ArtifactIntegrityError, match="symlinks are not permitted"):
+        storage.read_verified(ref, "dummy")
+
+
+def test_symlink_mocked_rejection(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    storage = DurableFilesystemArtifactStorage(tmp_path)
+    monkeypatch.setattr(Path, "is_symlink", lambda self: True)
+
+    with pytest.raises(ArtifactIntegrityError, match="symlinks are not permitted"):
+        storage.put("job-mock-symlink", "label.zpl", b"TEST")
+
+    ref = ArtifactReference.model_construct(
+        payload_ref="job-mock-symlink",
+        filename="label.zpl",
+        media_type="application/octet-stream",
+        byte_length=4,
+    )
+    with pytest.raises(ArtifactIntegrityError, match="symlinks are not permitted"):
+        storage.read_verified(ref, "dummy")
+
+
+def test_multiprocess_concurrent_put_same_content_idempotent(tmp_path: Path) -> None:
+    payload_ref = "job-multiprocess-idempotent"
+    payload = b"^XA^FDMULTIPROCESS-IDEMPOTENT^FS^XZ"
+
+    with concurrent.futures.ProcessPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(_worker_put_artifact, str(tmp_path), payload_ref, "label.zpl", payload),
+            executor.submit(_worker_put_artifact, str(tmp_path), payload_ref, "label.zpl", payload),
+        ]
+        results = [f.result(timeout=15) for f in futures]
+
+    for success, message in results:
+        assert success is True, f"Process failed: {message}"
+        assert message == payload_ref
+
+    storage = DurableFilesystemArtifactStorage(tmp_path)
+    ref = ArtifactReference(
+        payload_ref=payload_ref,
+        filename="label.zpl",
+        media_type="application/octet-stream",
+        byte_length=len(payload),
+    )
+    assert storage.read_verified(ref, _sha256(payload)) == payload
+
+
+def test_multiprocess_concurrent_put_different_content_conflict(tmp_path: Path) -> None:
+    payload_ref = "job-multiprocess-conflict"
+    payload_a = b"^XA^FDPAYLOAD-A^FS^XZ"
+    payload_b = b"^XA^FDPAYLOAD-B^FS^XZ"
+
+    with concurrent.futures.ProcessPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(_worker_put_artifact, str(tmp_path), payload_ref, "label.zpl", payload_a),
+            executor.submit(_worker_put_artifact, str(tmp_path), payload_ref, "label.zpl", payload_b),
+        ]
+        results = [f.result(timeout=15) for f in futures]
+
+    successes = [r for r in results if r[0] is True]
+    conflicts = [r for r in results if r[0] is False and "ArtifactConflictError" in r[1]]
+
+    assert len(successes) == 1, f"Expected exactly 1 success, got results: {results}"
+    assert len(conflicts) == 1, f"Expected exactly 1 conflict, got results: {results}"

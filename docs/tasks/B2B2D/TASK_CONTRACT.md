@@ -2,13 +2,13 @@
 
 ## Identitas
 
-- Status: `PLANNED`
+- Status: `IMPLEMENTED_AND_VERIFIED`
 - Risk level: `3`
 - Branch: `codex/b2b2d-durable-storage-planning`
 - Baseline: `origin/main` pada `a50a142` (B2B2C merged)
 - Planner dan final reviewer: `Codex`
-- Intended executor: `Gemini Flash via Antigravity`
-- Active writer saat ini: `Codex` — hanya perencanaan dan checkpoint dokumen
+- Executor: `Gemini Flash via Antigravity`
+- Active writer saat ini: `Gemini Flash via Antigravity`
 
 ## Tujuan
 
@@ -80,17 +80,25 @@ delivery B2B2C tidak bergantung pada temporary directory proses.
 7. Test relevan, security review, `git diff --check`, secret scan, dan
    dokumentasi/handoff mencatat bukti aktual serta keterbatasan.
 
-## Pertanyaan bisnis yang wajib dijawab sebelum implementasi
+## Keputusan bisnis yang telah dijawab pengguna
 
-1. Berapa lama artifact biner hasil render boleh disimpan pada pilot?
-   Pilihan rekomendasi awal: **7 hari**; alternatif bila kebutuhan reprint dan
-   audit lebih panjang: **30 hari**. Ini bukan logo atau template SVG; artifact
-   adalah instruksi cetak spesifik untuk satu label/data dan dapat mengandung
-   barcode, nomor batch, atau data operasional.
-2. Siapa yang memiliki volume Linux dan backup-nya: IT Infrastruktur, atau
-   aplikasi hanya menyimpan data sementara yang boleh hilang setelah retensi?
-   Rekomendasi: IT Infrastruktur memiliki volume dan backup server; aplikasi
-   hanya mengelola manifest serta expiry metadata.
+1. **Retensi artifact**: Pengguna telah menyetujui kebijakan retensi pilot **7 hari**
+   (`DEFAULT_RETENTION = timedelta(days=7)`). Waktu kedaluwarsa dicatat di setiap
+   `.manifest.json` (`retention_expires_at = created_at + 7 days`).
+2. **Kepemilikan volume**: IT Infrastruktur memiliki volume dan backup server;
+   aplikasi hanya mengelola payload, manifest, serta expiry metadata.
+
+## Resolusi Temuan P1/P2
+
+- **P1: Root path validation**: Parameter `root` divalidasi secara eksplisit
+  `if not root.is_absolute(): raise ArtifactIntegrityError` sebelum `root.resolve()`.
+  Path relatif ditolak fail-closed agar tidak mengevaluasi ke direktori kerja saat ini.
+- **P1: Symlink rejection**: Symlink payload dan manifest di dalam root ditolak
+  secara fail-closed (`path.is_symlink()`, `resolved.is_symlink()`, dan
+  `resolved.relative_to(self.root)`), mencegah symlink traversal dan symlink injection.
+- **P2: Multiprocess concurrency safety**: Penulisan di-lock antar-proses melalui
+  `_ProcessLock` berbasis direktori atomik di `.staging/` per `payload_ref`.
+  Menjamin idempotency multi-proses tanpa overwrite atau pasangan file yang rusak.
 
 ## Test plan
 

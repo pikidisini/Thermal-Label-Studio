@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import re
+import time
 import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
@@ -72,6 +73,51 @@ class ArtifactStorage(Protocol):
     def checksum(payload: bytes) -> str: ...
 
 
+class _ProcessLock:
+    """Inter-process lock using atomic directory creation in the filesystem."""
+
+    def __init__(self, lock_dir: Path, timeout: float = 10.0, poll_interval: float = 0.02) -> None:
+        self.lock_dir = lock_dir
+        self.timeout = timeout
+        self.poll_interval = poll_interval
+        self._acquired = False
+
+    def acquire(self) -> None:
+        deadline = time.monotonic() + self.timeout
+        while True:
+            try:
+                os.mkdir(self.lock_dir)
+                self._acquired = True
+                return
+            except FileExistsError:
+                # Check for stale lock (older than 30s) in case of previous hard crash
+                try:
+                    mtime = self.lock_dir.stat().st_mtime
+                    if time.time() - mtime > 30.0:
+                        os.rmdir(self.lock_dir)
+                        continue
+                except OSError:
+                    pass
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(f"timed out waiting for process lock on {self.lock_dir.name}")
+                time.sleep(self.poll_interval)
+
+    def release(self) -> None:
+        if self._acquired:
+            try:
+                os.rmdir(self.lock_dir)
+            except OSError:
+                pass
+            self._acquired = False
+
+    def __enter__(self) -> "_ProcessLock":
+        self.acquire()
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.release()
+
+
 class DurableFilesystemArtifactStorage:
     """Durable filesystem volume adapter with atomic staging, fsync, and integrity manifests."""
 
@@ -83,9 +129,9 @@ class DurableFilesystemArtifactStorage:
     ) -> None:
         if retention <= timedelta(0):
             raise ValueError("retention must be positive")
-        self.root = root.resolve()
-        if not self.root.is_absolute():
+        if not root.is_absolute():
             raise ArtifactIntegrityError("artifact root must be an absolute path")
+        self.root = root.resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self.staging_dir = self.root / ".staging"
         self.staging_dir.mkdir(parents=True, exist_ok=True)
@@ -108,15 +154,33 @@ class DurableFilesystemArtifactStorage:
 
     def _path_for(self, payload_ref: str) -> Path:
         self._validate_ref(payload_ref)
-        path = (self.root / f"{payload_ref}.payload").resolve()
-        if path.parent != self.root:
+        path = self.root / f"{payload_ref}.payload"
+        if path.is_symlink():
+            raise ArtifactIntegrityError("symlinks are not permitted in artifact storage")
+        resolved = path.resolve()
+        if resolved.is_symlink():
+            raise ArtifactIntegrityError("symlinks are not permitted in artifact storage")
+        try:
+            resolved.relative_to(self.root)
+        except ValueError:
+            raise ArtifactIntegrityError("artifact path escapes storage root")
+        if resolved.parent != self.root:
             raise ArtifactIntegrityError("artifact path escapes storage root")
         return path
 
     def _manifest_path_for(self, payload_ref: str) -> Path:
         self._validate_ref(payload_ref)
-        path = (self.root / f"{payload_ref}.manifest.json").resolve()
-        if path.parent != self.root:
+        path = self.root / f"{payload_ref}.manifest.json"
+        if path.is_symlink():
+            raise ArtifactIntegrityError("symlinks are not permitted in artifact storage")
+        resolved = path.resolve()
+        if resolved.is_symlink():
+            raise ArtifactIntegrityError("symlinks are not permitted in artifact storage")
+        try:
+            resolved.relative_to(self.root)
+        except ValueError:
+            raise ArtifactIntegrityError("artifact manifest path escapes storage root")
+        if resolved.parent != self.root:
             raise ArtifactIntegrityError("artifact manifest path escapes storage root")
         return path
 
@@ -145,8 +209,9 @@ class DurableFilesystemArtifactStorage:
 
         final_payload_path = self._path_for(payload_ref)
         final_manifest_path = self._manifest_path_for(payload_ref)
+        lock_dir = self.staging_dir / f"{payload_ref}.lock"
 
-        with self._lock:
+        with self._lock, _ProcessLock(lock_dir):
             # Check for existing artifact
             if final_payload_path.exists() and final_manifest_path.exists():
                 manifest = self._load_manifest(payload_ref)
@@ -266,6 +331,8 @@ class TemporaryArtifactStorage:
     """Stores artifacts below an injected trusted root, never from a payload path."""
 
     def __init__(self, root: Path) -> None:
+        if not root.is_absolute():
+            raise ArtifactIntegrityError("temporary artifact root must be an absolute path")
         self.root = root.resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self._lock = RLock()
