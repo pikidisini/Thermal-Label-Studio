@@ -15,9 +15,10 @@ Gunakan dokumen ini untuk memulihkan konteks ketika melanjutkan pekerjaan dari l
 - Target berhenti: Pull Request siap direview, tepat sebelum merge ke `main`.
 - Workflow baru: `docs/AI_WORKFLOW.md`; contract/result/review B2B2C berada di `docs/tasks/B2B2C/`.
 
-## Safe checkpoint B2B2C — kandidat
+## Safe checkpoint B2B2C
 
-- Status: kandidat safe WIP checkpoint; **bukan** kesiapan merge atau production-ready.
+- Commit: `b1c5a6a` (`wip: checkpoint b2b2c persistence foundation`), sudah dipush ke `origin/codex/b2b2c-postgresql-persistence`.
+- Status: safe WIP checkpoint; **bukan** kesiapan merge atau production-ready.
 - Quality gate aktual: backend `169 passed, 1 skipped`; frontend unit `45 passed`; compile check dan `git diff --check` lulus.
 - PostgreSQL integration: `SKIPPED` karena Docker Desktop tidak dapat diakses dari komputer ini.
 - Typecheck/build frontend: belum memiliki hasil final yang dapat dipastikan pada checkpoint ini.

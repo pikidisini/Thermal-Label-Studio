@@ -2,13 +2,13 @@
 
 ## Identitas
 
-- Status: `PAUSED`
+- Status: `PAUSED_AFTER_SAFE_CHECKPOINT`
 - Risk level: `3`
 - Branch: `codex/b2b2c-postgresql-persistence`
 - Planner/final reviewer: Codex Sol High
 - Pre-reviewer: Codex Terra
-- Intended executor after safe checkpoint: Gemini Flash via Antigravity
-- Active writer: `Codex — paused while workflow is prepared`
+- Intended executor: Gemini Flash via Antigravity
+- Active writer: `NONE — safe checkpoint pushed; assign one writer before edits`
 
 ## Tujuan
 
@@ -53,4 +53,4 @@ Mengimplementasikan persistence layer PostgreSQL B2B2C secara transaksional untu
 
 ## Handoff
 
-Jangan memindahkan writer ke Gemini sebelum perubahan Codex saat ini direview, dijadikan safe checkpoint, dan dipush. Setelah itu, Gemini membaca contract ini, mengerjakan acceptance criteria yang tersisa, mengisi `RESULT.md`, lalu berhenti sebelum merge.
+Safe checkpoint `b1c5a6a` sudah dipush ke branch ini. Setelah Gemini ditetapkan sebagai writer, Gemini membaca contract ini, mengerjakan acceptance criteria yang tersisa, mengisi `RESULT.md`, lalu berhenti sebelum merge.

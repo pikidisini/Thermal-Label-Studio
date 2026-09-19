@@ -1,9 +1,9 @@
 # Result — B2B2C
 
-- Status: `READY_FOR_WIP_CHECKPOINT`
-- Active writer: `Codex — paused`
+- Status: `PAUSED_AFTER_SAFE_CHECKPOINT`
+- Active writer: `NONE — menunggu Gemini Flash atau writer berikutnya`
 - Branch: `codex/b2b2c-postgresql-persistence`
-- Commit: belum dibuat untuk working tree B2B2C saat ini
+- Safe checkpoint: `b1c5a6a` (`wip: checkpoint b2b2c persistence foundation`)
 
 ## Hasil sementara
 
@@ -29,10 +29,9 @@
 
 ## Risiko atau keputusan yang dibutuhkan
 
-- Working tree berisi implementasi B2B2C yang belum menjadi safe checkpoint.
-- Status container PostgreSQL disposable harus diperiksa kembali sebelum cleanup atau penggunaan berikutnya.
+- Status container PostgreSQL disposable harus diperiksa kembali sebelum penggunaan berikutnya.
 - Review independen subagent belum tersedia karena limit akun menghentikan tiga reviewer. Checkpoint ini adalah checkpoint kerja aman, bukan verdict siap merge.
 
 ## Langkah berikutnya
 
-- Buat safe checkpoint, push branch, lalu lakukan review independen dan PostgreSQL integration saat Docker tersedia sebelum melanjutkan implementasi atau mengajukan merge.
+- Tetapkan satu writer (Gemini Flash direkomendasikan), selesaikan acceptance criteria tersisa, lalu lakukan review independen dan PostgreSQL integration saat Docker tersedia.
