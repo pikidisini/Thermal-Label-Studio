@@ -1,4 +1,4 @@
-﻿# Node / Frontend
+# Node / Frontend
 node_modules/
 dist/
 dist-ssr/
@@ -33,6 +33,7 @@ Thumbs.db
 *.log
 .env
 .env.*
+!.env*.example
 
 # Generated test reports and results
 playwright-report/
