@@ -6,7 +6,7 @@ from decimal import Decimal
 from dataclasses import dataclass
 from datetime import datetime
 
-from .artifact_storage import ArtifactIntegrityError, TemporaryArtifactStorage
+from .artifact_storage import ArtifactIntegrityError, ArtifactStorage
 from .models import PrintJob, PrintJobStatus, PrinterProfile
 from .repository import DeliveryConflictError, InMemoryPrintJobRepository, PrintJobRepository
 from .transport import MockPrinterTransport, MockSendResult, MockTransportOutcome
@@ -62,7 +62,7 @@ class PrintJobService:
         self,
         profiles: list[PrinterProfile],
         repository: PrintJobRepository | None = None,
-        artifact_storage: TemporaryArtifactStorage | None = None,
+        artifact_storage: ArtifactStorage | None = None,
     ) -> None:
         self._profiles = {profile.printer_id: profile for profile in profiles}
         self.repository = repository or InMemoryPrintJobRepository()

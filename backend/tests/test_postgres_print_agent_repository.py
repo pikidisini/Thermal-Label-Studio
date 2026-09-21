@@ -22,7 +22,11 @@ from app.local_print_agent.config import LocalPrinterProfile, PrintAgentConfig
 from app.local_print_agent.models import AgentRunStatus
 from app.local_print_agent.runner import LocalPrintAgentRunner
 from app.local_print_agent.transport import MemoryPrinterTransport
-from app.print_jobs.artifact_storage import TemporaryArtifactStorage
+from app.print_jobs.artifact_storage import (
+    DEFAULT_RETENTION,
+    DurableFilesystemArtifactStorage,
+    TemporaryArtifactStorage,
+)
 from app.print_jobs.migrations import apply_baseline, rollback_baseline, verify_baseline
 from app.print_jobs.models import Emulation, PrinterLanguage, PrinterProfile
 from app.print_jobs.postgres_repository import PostgresPrintAgentRepository
@@ -1314,5 +1318,104 @@ def test_postgres_batch_safety_pause_on_delivery_unknown_and_isolation(
             "site-pg", "agent-pg", now, timedelta(seconds=60), eligible_job_ids=printer_2_jobs
         ) is None
 
+    finally:
+        repository.close()
+
+
+def test_postgres_with_durable_artifact_storage_and_manifest_retention(
+    database_url: str, tmp_path: Path
+) -> None:
+    """Proves DurableFilesystemArtifactStorage integrates with PostgresPrintAgentRepository."""
+    storage_root = tmp_path / "durable_artifacts"
+    storage = DurableFilesystemArtifactStorage(storage_root, retention=DEFAULT_RETENTION)
+
+    repository = PostgresPrintAgentRepository(database_url, min_pool_size=1, max_pool_size=2)
+    job_uuid = "e1000000-0000-0000-0000-000000000001"
+    batch_id = "e1000000-0000-0000-0000-000000000002"
+    item_id = "e1000000-0000-0000-0000-000000000003"
+    payload_ref = "job-durable-pg-1"
+    payload_bytes = b"^XA^FDPOSTGRES-DURABLE-STORAGE^FS^XZ"
+    payload_sha = sha256(payload_bytes).hexdigest()
+
+    # 1. Put into durable storage -> verifies manifest and payload written atomically
+    ref = storage.put(payload_ref, "label.ipl", payload_bytes)
+    assert ref.payload_ref == payload_ref
+    assert ref.byte_length == len(payload_bytes)
+
+    # 2. Insert into PostgreSQL with matching payload_ref and sha256
+    with psycopg.connect(database_url) as connection, connection.transaction():
+        media_id, template_id = _ensure_base_fixtures(connection)
+        source = json.dumps({"producer_type": "sap", "program": "pytest-durable"})
+        connection.execute(
+            """
+            INSERT INTO print_batches (
+                batch_id, producer_namespace, request_id, source_metadata,
+                raw_contract_sha256, canonical_payload_snapshot, printer_id,
+                configured_media_profile_version_id, printer_capability_snapshot,
+                status, total_items, expires_at
+            ) VALUES (%s, 'pytest_durable', 'req-durable-1', %s::jsonb, %s, '{}'::jsonb, 'printer-pg-1', %s,
+                      '{}'::jsonb, 'accepted', 1, CURRENT_TIMESTAMP + INTERVAL '1 hour')
+            """,
+            (batch_id, source, "a" * 64, media_id),
+        )
+        connection.execute(
+            """
+            INSERT INTO print_batch_items (
+                item_id, batch_id, item_sequence, template_version_id,
+                canonical_item_data, item_data_sha256, copies, status
+            ) VALUES (%s, %s, 1, %s, '{}'::jsonb, %s, 1, 'rendered')
+            """,
+            (item_id, batch_id, template_id, "b" * 64),
+        )
+        connection.execute(
+            """
+            INSERT INTO print_jobs (
+                job_id, batch_id, item_id, printer_id, job_kind, status, expires_at
+            ) VALUES (%s, %s, %s, 'printer-pg-1', 'original', 'queued', CURRENT_TIMESTAMP + INTERVAL '30 minutes')
+            """,
+            (job_uuid, batch_id, item_id),
+        )
+        connection.execute(
+            """
+            INSERT INTO print_artifacts (
+                job_id, payload_ref, filename, media_type, byte_length,
+                artifact_sha256, printer_language_snapshot, renderer_version,
+                template_version_id, printer_capability_snapshot, retention_expires_at
+            ) VALUES (%s, %s, 'label.ipl', 'application/octet-stream', %s, %s,
+                      'ipl', 'pytest-renderer', %s, '{}'::jsonb,
+                      CURRENT_TIMESTAMP + INTERVAL '7 days')
+            """,
+            (job_uuid, payload_ref, len(payload_bytes), payload_sha, template_id),
+        )
+
+    try:
+        now = datetime.now(timezone.utc)
+        claimed = repository.claim_next(
+            "site-pg", "agent-pg", now, timedelta(seconds=60), eligible_job_ids={job_uuid}
+        )
+        assert claimed is not None
+        assert claimed.job_id == job_uuid
+        fencing = claimed.claim.fencing_token
+
+        # Verify reading from durable storage with integrity check
+        verified_bytes = storage.read_verified(claimed.artifact, claimed.artifact_sha256)
+        assert verified_bytes == payload_bytes
+
+        # Verify manifest
+        manifest = storage.get_manifest(payload_ref)
+        assert manifest.filename == "label.ipl"
+        assert manifest.sha256 == payload_sha
+        assert manifest.byte_length == len(payload_bytes)
+
+        # Begin delivery and report success
+        repository.begin_delivery(job_uuid, "agent-pg", now, fencing_token=fencing)
+        finished = repository.report_result(
+            job_uuid,
+            "agent-pg",
+            MockTransportOutcome.SUCCESS,
+            len(payload_bytes),
+            fencing_token=fencing,
+        )
+        assert finished.status.value == "sent_to_printer"
     finally:
         repository.close()

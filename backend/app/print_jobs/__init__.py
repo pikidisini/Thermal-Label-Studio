@@ -1,6 +1,14 @@
 """Typed, transport-independent print-job v1 foundation."""
 
-from .artifact_storage import ArtifactConflictError, ArtifactIntegrityError, TemporaryArtifactStorage
+from .artifact_storage import (
+    DEFAULT_RETENTION,
+    ArtifactConflictError,
+    ArtifactIntegrityError,
+    ArtifactManifest,
+    ArtifactStorage,
+    DurableFilesystemArtifactStorage,
+    TemporaryArtifactStorage,
+)
 from .models import (
     ArtifactReference,
     Claim,
@@ -35,15 +43,19 @@ from .state_machine import InvalidTransitionError, LeaseExpiredDuringSendingErro
 from .transport import MockPrinterTransport, MockTransportOutcome
 
 __all__ = [
-    "ArtifactReference",
     "ArtifactConflictError",
     "ArtifactIntegrityError",
+    "ArtifactManifest",
+    "ArtifactReference",
+    "ArtifactStorage",
     "Claim",
+    "DEFAULT_RETENTION",
     "DeliveryNotAllowedError",
     "DeliveryConflictError",
     "DeliveryResult",
     "DpiMismatchError",
     "DpiNotConfirmedError",
+    "DurableFilesystemArtifactStorage",
     "Emulation",
     "EmulationMismatchError",
     "InMemoryPrintJobRepository",
