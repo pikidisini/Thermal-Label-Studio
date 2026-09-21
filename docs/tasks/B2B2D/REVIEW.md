@@ -1,66 +1,139 @@
-# Review — B2B2D
+# Review — B2B2D (Re-review)
 
-- Reviewer: `Gemini Flash via Antigravity (Principal Security Reviewer & Staff Systems Architect, dialihkan dari Codex)`
-- Status: `APPROVED`
+- Reviewer: `Claude Opus 4.6 via Antigravity (Independent re-review, supersedes Gemini Flash review)`
+- Status: `APPROVED_WITH_NOTES`
 - Verdict: `READY_FOR_MERGE`
 - Branch: `codex/b2b2d-durable-storage-planning`
 - Baseline: `origin/main` pada commit `a50a142` (B2B2C merged)
+- Head commit: `f8f8541`
 
-## 1. Audit Mendalam Temuan P1 & Resolusi
+## 1. Audit Mendalam Kode Keamanan & Konkurensi
 
-1. **P1 — Validasi Containment `.staging` dan Reparse/Junction/Symlink Rejection**:
-   - *Analisis Keamanan*: Pada OS Windows, NTFS Directory Junction (`IO_REPARSE_TAG_MOUNT_POINT`) tidak terdeteksi oleh `pathlib.Path.is_symlink()`. Jika folder `.staging` atau storage root dialihkan via junction ke lokasi eksternal (symlink injection/directory traversal), file staging dapat keluar dari boundary storage tepercaya.
-   - *Evaluasi Implementasi*:
-     - Helper `_is_reparse_or_link(path)` menggunakan kombinasi `path.is_symlink()` dan `os.readlink(path)` (yang pada Python 3.8+ Windows mendukung junction point), mengembalikan `True` jika path berupa symlink maupun junction.
-     - Konstruktor `DurableFilesystemArtifactStorage` memeriksa `_is_reparse_or_link` pada `self.root` serta `self.staging_dir` baik sebelum maupun setelah pembuatan direktori.
-     - Pengecekan sekunder *defense-in-depth* `self.staging_dir.resolve() != self.root / ".staging"` memastikan bahwa resolusi path kanonikal tidak pernah keluar dari direktori root.
-     - Penolakan symlink pada `_path_for()` dan `_manifest_path_for()` memastikan payload dan manifest final tidak dapat dieksploitasi via symlink.
-   - *Hasil Pengujian*:
-     - `test_staging_directory_windows_junction_rejected`: Terverifikasi menolak junction NTFS nyata yang dibuat via Windows `mklink /J`.
-     - `test_staging_directory_containment_fallback_rejected`: Terverifikasi menolak path yang resolusinya keluar dari storage root.
+### 1.1 `_is_reparse_or_link()` (L76–86)
 
-2. **P1 — OS-Level Inter-Process Lock `_ProcessLock` tanpa Mtime Takeover**:
-   - *Analisis Sistem & Konkurensi*: Pendekatan penguncian file berbasis umur file (`mtime > 30s`) memiliki cacat fatal (*TOCTOU / stale lock race*): jika sebuah proses writer mengalami latensi I/O tinggi, memory paging, atau GC pause, proses lain dapat secara keliru menganggap lock mati, menghapus direktori lock, dan menimpa artefak yang sedang ditulis secara konkuren.
-   - *Evaluasi Implementasi*:
-     - Mekanisme lock dirombak total menjadi OS-level file descriptor lock:
-       - Windows: `msvcrt.locking(fd, msvcrt.LK_NBRLCK, 1)` (non-blocking exclusive byte lock pada offset 0).
-       - POSIX / Linux: `fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)` (non-blocking exclusive advisory lock).
-     - File lock dibuka dengan mode `"a+b"` sehingga tidak memotong (*truncate*) file yang sedang di-lock proses lain.
-     - Kepemilikan lock dijamin langsung oleh kernel sistem operasi. Jika proses terminasi normal ataupun crash/SIGKILL, kernel OS secara otomatis melepaskan file descriptor lock tersebut seketika.
-     - Mekanisme *mtime takeover* dihapus sepenuhnya.
-     - Saat batas `timeout` tercapai (default 10s), proses yang gagal mendapatkan lock langsung *fail-closed* (`raise TimeoutError`) dan menutup handle filenya tanpa memodifikasi, memotong, atau menghapus (*unlink*) file lock milik proses aktif.
-   - *Hasil Pengujian*:
-     - `test_multiprocess_live_owner_with_aged_timestamp_cannot_be_taken_over`: Terverifikasi bahwa owner lock aktif yang timestamp-nya sengaja diubah ke epoch 0 (1970) tidak dapat direbut oleh writer kedua, dan writer kedua mengalami timeout fail-closed tanpa menghapus lock file aktif.
-     - `test_multiprocess_concurrent_put_same_content_idempotent`: Terverifikasi 2 proses konkuren menulis ref identik secara atomik dan idempotent.
-     - `test_multiprocess_concurrent_put_different_content_conflict`: Terverifikasi 2 proses konkuren menulis ref yang sama dengan konten berbeda menghasilkan tepat 1 sukses dan 1 `ArtifactConflictError`.
+**Pendekatan**: Kombinasi `path.is_symlink()` + `os.readlink(path)` untuk menangkap symlink standar dan NTFS Directory Junction.
 
-## 2. Pemenuhan Acceptance Criteria (TASK_CONTRACT.md)
+**Evaluasi**:
+- ✅ `os.readlink()` pada Windows Python 3.8+ mendukung deteksi reparse point termasuk junction (`IO_REPARSE_TAG_MOUNT_POINT`).
+- ✅ Error handling mencakup `OSError` (path tidak ada, bukan reparse) dan `ValueError`.
+- ✅ Untuk path yang tidak ada, `is_symlink()` return `False` dan `readlink` raise `FileNotFoundError` → fungsi return `False` (benar).
+- ⚠️ **TOCTOU (INFO-level)**: Antara panggilan `_is_reparse_or_link(self.root)` (L189) dan `self.root.mkdir()` (L191), secara teori penyerang lokal bisa membuat junction. Namun ini memerlukan akses filesystem setara — severity INFO, bukan P1.
 
-- **AC 1 (Storage boundary)**: `ArtifactStorage` didefinisikan sebagai protocol independen (`put`, `read_verified`, `checksum`), memisahkan `DurableFilesystemArtifactStorage` dari storage in-memory/test tanpa mengubah kontrak publik `PrintJob v1`. (STATUS: `VERIFIED`)
-- **AC 2 (Path traversal & boundary validation)**: Root divalidasi absolut, penolakan karakter URL/traversal (`/`, `\`, `:`, `?`, `#`), penolakan symlink dan directory junction pada root, staging, payload, dan manifest. (STATUS: `VERIFIED`)
-- **AC 3 (Atomic publish & fail-closed)**: Payload dan manifest ditulis ke `.staging/` dengan UUID acak unik, di-flush dan di-`fsync` ke disk, lalu di-publish atomik menggunakan `os.replace()`. Pembaca tidak pernah menerima state parsial. (STATUS: `VERIFIED`)
-- **AC 4 (Immutability & idempotency)**: Penulisan ulang dengan konten dan metadata identik mengembalikan `ArtifactReference` yang sama (idempotent); penulisan ulang dengan filename, ukuran, atau bytes berbeda menghasilkan `ArtifactConflictError`. (STATUS: `VERIFIED`)
-- **AC 5 (read_verified integrity check)**: Validasi manifest schema, payload_ref, filename, media type, byte length, dan SHA-256 dilakukan secara ketat sebelum bytes dikembalikan ke caller. (STATUS: `VERIFIED`)
-- **AC 6 (Integrasi opt-in PostgreSQL)**: Mode PostgreSQL persistence menggunakan durable storage adapter yang terkonfigurasi; startup fail-closed jika konfigurasi root tidak valid; backward compatibility dengan memory/test suite tetap terjaga. (STATUS: `VERIFIED`)
-- **AC 7 (Quality gate & dokumentasi)**: Seluruh test unit, konkurensi multiproses, integrasi PostgreSQL disposable, dan targeted regression lulus; `git diff --check` bersih (0 whitespace errors); 0 secrets. (STATUS: `VERIFIED`)
+### 1.2 `_ProcessLock` (L122–172)
 
-## 3. Verifikasi Reviewer Aktual
+**Pendekatan**: OS-level file descriptor lock via `msvcrt.locking` (Windows) atau `fcntl.flock` (POSIX).
 
-- `PASS`: 20 unit/concurrency test passed, 2 skipped (symlink OS non-admin) pada `backend/tests/test_durable_artifact_storage.py`.
-- `PASS`: 7 PostgreSQL integration test passed pada disposable container `postgres:15-bullseye` (`backend/tests/test_postgres_print_agent_repository.py`).
-- `PASS`: 147 targeted backend regression test passed, 2 skipped.
-- `PASS`: 196 full backend suite passed, 2 skipped (31.34s) pada container database disposable aktif.
-- `PASS`: `git diff --check` lulus (0 whitespace errors).
-- `PASS`: Secret scan lulus (0 secrets / credentials).
+**Evaluasi**:
+- ✅ Lock lifetime terikat ke kernel OS — otomatis dilepas saat proses crash/terminasi.
+- ✅ Tidak ada mekanisme mtime takeover yang sebelumnya rentan.
+- ✅ Timeout fail-closed tanpa menghapus/memodifikasi lock file milik owner aktif.
+- ✅ `"a+b"` mode tidak melakukan truncation pada file yang mungkin masih di-lock proses lain.
+- ✅ Test `test_multiprocess_live_owner_with_aged_timestamp_cannot_be_taken_over` membuktikan bahwa owner aktif dengan mtime epoch 0 tidak bisa direbut.
 
-## 4. Catatan Arsitektur & Operasional (Lean Pilot)
+**Temuan Baru P2 — `msvcrt.locking` byte-offset sensitivity (Windows-only)**:
 
-1. **Kebijakan Retensi**: Retensi artefak 7 hari (`DEFAULT_RETENTION = timedelta(days=7)`) telah tertanam pada metadata manifest (`retention_expires_at`). Sesuai scope kontrak, daemon penghapusan otomatis (*retention cleanup daemon*) berada di luar scope B2B2D dan akan diimplementasikan pada fase lifecycle tersendiri.
-2. **Permission Filesystem**: Pada deployment server Linux intranet nantinya, direktori root durable storage harus diatur dengan permission ketat (`chmod 700 / chown app:app`) agar hanya user proses aplikasi yang memiliki akses read/write.
+`msvcrt.locking()` mengunci byte range mulai dari **posisi `tell()` saat ini**. Kode saat ini tidak melakukan `f.seek(0)` sebelum memanggil `_try_lock_fd`. Dalam mode `"a+b"`:
+- Jika file berukuran 0 byte → `tell()` = 0 → lock pada range [0, 1) ✅
+- Jika file berukuran N byte → `tell()` = N → lock pada range [N, N+1) ❌
 
-## 5. Kesimpulan & Langkah Berikutnya
+Saya membuktikan ini secara empiris: ketika satu proses membuka lock file kosong (offset 0) lalu menulis konten, proses kedua yang membuka file yang sama mendapat offset 7 dan berhasil mengakuisisi lock **secara bersamaan** pada byte range yang berbeda.
 
-Implementasi B2B2D beserta dua resolusi P1 telah diaudit secara formal dan memenuhi standar keandalan, keamanan, dan konkurensi enterprise.
+**Mitigasi (tidak ada eksploitasi aktual)**: Dalam implementasi saat ini, kode **tidak pernah menulis** ke lock file setelah membukanya. Jadi `tell()` selalu 0 untuk semua proses, dan mutual exclusion berfungsi dengan benar. Temuan ini hanya menjadi risiko jika ada perubahan kode di masa depan yang menulis ke lock file.
 
-- **Verdict**: **`APPROVED`** / **`READY_FOR_MERGE`**
-- **Langkah berikutnya**: Menunggu persetujuan pengguna untuk melakukan squash merge branch `codex/b2b2d-durable-storage-planning` ke `main`.
+**Rekomendasi**: Tambahkan `f.seek(0)` sebelum `_try_lock_fd(f.fileno())` pada L145 sebagai defense-in-depth. Ini hanya 1 baris:
+
+```python
+f = open(self.lock_file_path, "a+b")
+while True:
+    f.seek(0)  # <-- defense-in-depth: ensure consistent byte range
+    if _try_lock_fd(f.fileno()):
+```
+
+### 1.3 `_ProcessLock.release()` TOCTOU pada `unlink` (L154–165)
+
+**Alur release**: `_unlock_fd(fd)` → `close(fd)` → `unlink(path)`
+
+Antara `close` dan `unlink`, proses lain bisa `open`+`lock` path tersebut. Kemudian `unlink` menghapus file yang sudah di-lock oleh proses baru. Proses ketiga bisa membuat file baru di path yang sama dan lock-nya juga.
+
+**Mitigasi**: Efek praktis nihil karena:
+1. `put()` melakukan pengecekan ulang keberadaan file final di dalam lock — dua writer tidak bisa menghasilkan payload parsial.
+2. Worst case: satu writer mendapat "spurious lock", tapi tetap menyelesaikan operasi idempotent atau mendapatkan `ArtifactConflictError`.
+3. Lock file `unlink` yang gagal hanya meninggalkan file 0-byte yang tidak berbahaya.
+
+**Severity**: INFO — tidak memerlukan perubahan.
+
+### 1.4 `DurableFilesystemArtifactStorage.__init__()` (L175–207)
+
+**Evaluasi**:
+- ✅ Root wajib absolut sebelum `resolve()` — mencegah resolusi ke CWD tak terduga.
+- ✅ Staging dir diperiksa baik sebelum maupun setelah pembuatan.
+- ✅ Defense-in-depth containment: `staging_dir.resolve() != self.root / ".staging"` menangkap escaping yang lolos dari `_is_reparse_or_link`.
+- ✅ Test coverage memadai untuk junction, symlink mock, dan containment fallback.
+
+### 1.5 `_validate_ref()` (L209–216)
+
+**Catatan minor**: Line 215 (`if any(char in payload_ref for char in ("/\\:?#"))`) adalah **dead code** karena regex pada L213 sudah membatasi karakter ke `[A-Za-z0-9_-]`. Tidak berbahaya, dan berfungsi sebagai defense-in-depth terhadap perubahan regex di masa depan.
+
+### 1.6 Atomic Staging & Publish (L260–341)
+
+**Evaluasi**:
+- ✅ Staging file menggunakan UUID unik per operasi — menghindari collision.
+- ✅ `flush()` + `os.fsync()` sebelum `os.replace()` — menjamin durability.
+- ✅ `os.replace()` bersifat atomik pada level OS (rename syscall).
+- ✅ Error path membersihkan staging files (`unlink(missing_ok=True)`).
+- ✅ Idempotency check membandingkan filename, sha256, byte_length, dan actual checksum.
+- ✅ Deteksi state parsial (payload ada tapi manifest tidak, atau sebaliknya) → fail-closed.
+
+### 1.7 Integrasi Service & API
+
+**Evaluasi diff** (`routes_print_agent.py`, `service.py`, `__init__.py`):
+- ✅ Tipe parameter diubah dari `TemporaryArtifactStorage` ke `ArtifactStorage` (protocol) — backward compatible.
+- ✅ Mode PostgreSQL otomatis menggunakan `DurableFilesystemArtifactStorage` dengan retention 7 hari.
+- ✅ Startup fail-closed: `RuntimeError` jika `PRINT_AGENT_ARTIFACT_ROOT` tidak dikonfigurasi dalam mode PostgreSQL.
+- ✅ Mode non-PostgreSQL tetap menggunakan `TemporaryArtifactStorage` — tidak ada perubahan behavior.
+
+## 2. Pemenuhan Acceptance Criteria
+
+| AC | Deskripsi | Status | Bukti |
+|----|-----------|--------|-------|
+| 1 | Storage boundary memisahkan durable dari test | `VERIFIED` | `ArtifactStorage` protocol + dua adapter independen |
+| 2 | Path traversal, symlink, junction ditolak | `VERIFIED` | Regex ref, `_is_reparse_or_link`, containment check, 6 test |
+| 3 | Atomic publish, fail-closed | `VERIFIED` | UUID staging, fsync, os.replace, parsial detection |
+| 4 | Immutability / idempotency | `VERIFIED` | Same-content idempotent, conflict error pada perbedaan |
+| 5 | `read_verified()` integrity | `VERIFIED` | 6 field manifest validation + sha256 + byte_length |
+| 6 | Integrasi opt-in PostgreSQL | `VERIFIED` | DurableFS pada mode PG, fail-closed startup |
+| 7 | Quality gate & dokumentasi | `VERIFIED` | Test results di bawah, diff check, secret scan |
+
+## 3. Hasil Verifikasi Aktual (Dijalankan Ulang Reviewer)
+
+| Suite | Hasil | Catatan |
+|-------|-------|---------|
+| Durable artifact tests | **20 passed, 2 skipped** (3.75s) | 2 skip = symlink on Windows non-admin |
+| PostgreSQL integration | **7 passed** (3.34s) | Container disposable `127.0.0.1:55432` |
+| Full backend | **189 passed, 9 skipped** (28.17s) | 7 skip = PG (no DSN), 2 skip = symlink |
+| `git diff --check` | **0 whitespace errors** | |
+| Secret scan | **0 secrets** | |
+
+## 4. Temuan Keseluruhan
+
+| ID | Severity | Deskripsi | Status |
+|----|----------|-----------|--------|
+| F1 | P2 (defense-in-depth) | `_ProcessLock.acquire()` tidak melakukan `f.seek(0)` sebelum `_try_lock_fd()`. Pada Windows `msvcrt.locking`, byte range tergantung posisi `tell()`. Saat ini aman karena kode tidak menulis ke lock file, tapi rentan jika ada perubahan di masa depan. | **NON-BLOCKING** — rekomendasi 1-line fix |
+| F2 | INFO | `_ProcessLock.release()` TOCTOU: unlock → close → unlink memiliki window di mana proses lain bisa lock path, lalu path di-unlink. Efek praktis nihil karena `put()` re-check di dalam lock. | **NO ACTION** |
+| F3 | INFO | `_validate_ref()` L215 dead code (redundant char check setelah regex). Berfungsi sebagai defense-in-depth. | **NO ACTION** |
+| F4 | INFO | `__init__` TOCTOU antara `_is_reparse_or_link(root)` dan `root.mkdir()`. Memerlukan akses filesystem lokal setara. | **NO ACTION** |
+| F5 | INFO | `re.fullmatch()` dengan anchors `^$` redundan. Harmless, idiomatic Python. | **NO ACTION** |
+
+## 5. Kesimpulan
+
+Implementasi B2B2D solid dan memenuhi seluruh 7 acceptance criteria. Kode menunjukkan pendekatan keamanan yang berlapis:
+- Validasi input (regex, allowlist filename)
+- Boundary enforcement (path traversal, symlink/junction rejection, containment)
+- Atomic durability (staging + fsync + os.replace)
+- Concurrent safety (OS-level lock + in-process RLock)
+- Fail-closed pada semua error path
+
+Satu temuan P2 (F1) bersifat non-blocking dan bisa diperbaiki dengan 1 baris `f.seek(0)` kapan saja. Temuan lainnya bersifat informasional.
+
+- **Verdict**: **`APPROVED_WITH_NOTES`**
+- **Langkah berikutnya**: Perbaiki F1 (`f.seek(0)`) sebelum atau sesudah merge (non-blocking). Menunggu persetujuan pengguna untuk squash merge ke `main`.
