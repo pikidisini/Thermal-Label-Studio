@@ -1,15 +1,17 @@
 # AI Handoff — Thermal Label Studio
 
-## Active snapshot — B2B2E planning in progress
+## Active snapshot — B2B2E implemented & verified
 
 - Date: `2026-09-21`
 - Repository: `Thermal-Label-Studio` (`web_app/`)
 - Baseline: `main` at `40e67cd` after merge of B2B2D (`codex/b2b2d-durable-storage-planning`)
 - Active branch: `codex/b2b2e-worker-central-dispatcher`
-- Status: `PLANNED`; task contract disusun untuk review/konfirmasi scope B2B2E.
-- Planner / Writer: `Gemini Flash via Antigravity`.
-- Scope: Central Print Dispatcher (RAW TCP socket port 9100 dengan timeout terkontrol di luar DB lock), RawTcpSocketTransport, dan Render Ingestion Pipeline ke DurableFilesystemArtifactStorage & PostgreSQL.
-- Task files: `docs/tasks/B2B2E/TASK_CONTRACT.md`.
+- Status: `IMPLEMENTED_AND_VERIFIED`; safe checkpoint ready for independent review.
+- Writer: `Gemini Flash via Antigravity`.
+- Scope: Central Print Dispatcher (RAW TCP socket port 9100 dengan timeout terkontrol di luar DB lock, single owner serial scheduling, anti-interleaving batch), RawTcpSocketTransport, dan Render Ingestion Pipeline ke DurableFilesystemArtifactStorage & PostgreSQL.
+- Verification: 8 socket transport unit tests passed, 4 central dispatcher integration tests passed (termasuk verifikasi empiris zero long-held lock & delivery_unknown pause batch), 3 batch ingestion integration tests passed (atomic all-or-nothing compatibility), 43 targeted tests passed, 212 full backend tests passed, `git diff --check` passed (0 whitespace errors), 0 secrets.
+- Task files: `docs/tasks/B2B2E/TASK_CONTRACT.md`, `RESULT.md`.
+
 
 Gunakan dokumen ini untuk memulihkan konteks ketika melanjutkan pekerjaan dari laptop, task, atau sesi AI lain.
 

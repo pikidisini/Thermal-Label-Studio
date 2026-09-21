@@ -2,7 +2,7 @@
 
 ## Identitas
 
-- Status: `PLANNED`
+- Status: `IMPLEMENTED_AND_VERIFIED`
 - Risk level: `3`
 - Branch: `codex/b2b2e-worker-central-dispatcher`
 - Baseline: `main` pada `40e67cd` (B2B2D merged)
