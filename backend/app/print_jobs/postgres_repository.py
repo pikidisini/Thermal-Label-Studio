@@ -108,6 +108,29 @@ class PostgresPrintAgentRepository:
             ).fetchall()
         return tuple(self._row_to_job(row) for row in rows)
 
+    def get_printer_endpoint(self, printer_id: str) -> dict[str, Any] | None:
+        """Resolves printer endpoint details exclusively from printer_registry."""
+        with self._pool.connection() as connection:
+            row = connection.execute(
+                """
+                SELECT
+                    printer_id,
+                    site_id,
+                    delivery_mode,
+                    COALESCE(host(network_host), network_host::text) AS network_host,
+                    network_port,
+                    is_enabled,
+                    printer_language,
+                    emulation,
+                    confirmed_dpi
+                FROM printer_registry
+                WHERE printer_id = %s
+                """,
+                (printer_id,),
+            ).fetchone()
+            return dict(row) if row is not None else None
+
+
     def claim_next(
         self,
         site_id: str,
@@ -115,6 +138,7 @@ class PostgresPrintAgentRepository:
         now: datetime,
         lease: timedelta,
         eligible_job_ids: Collection[str] | None = None,
+        executor_type: str = "local_agent",
     ) -> PrintJob | None:
         self._require_aware(now)
         if lease <= timedelta(0):
@@ -178,7 +202,7 @@ class PostgresPrintAgentRepository:
                     """
                     UPDATE printer_dispatch_state
                     SET active_batch_id = %s,
-                        executor_type = 'local_agent',
+                        executor_type = %s,
                         executor_id = %s,
                         fencing_generation = fencing_generation + 1,
                         acquired_at = %s,
@@ -190,20 +214,20 @@ class PostgresPrintAgentRepository:
                     RETURNING fencing_generation, lease_expires_at
                     """,
                     (
-                        candidate["batch_id"], agent_id, db_now, db_now, lease,
+                        candidate["batch_id"], executor_type, agent_id, db_now, db_now, lease,
                         candidate["job_id"], db_now, candidate["printer_id"],
                     ),
                 ).fetchone()
                 connection.execute(
                     """
                     UPDATE print_jobs
-                    SET status = 'claimed', executor_type = 'local_agent', executor_id = %s,
+                    SET status = 'claimed', executor_type = %s, executor_id = %s,
                         claimed_at = %s, lease_expires_at = %s, fencing_token = %s,
                         updated_at = %s
                     WHERE job_id = %s::uuid
                     """,
                     (
-                        agent_id, db_now, dispatch["lease_expires_at"],
+                        executor_type, agent_id, db_now, dispatch["lease_expires_at"],
                         dispatch["fencing_generation"], db_now, candidate["job_id"],
                     ),
                 )

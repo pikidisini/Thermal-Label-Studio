@@ -9,6 +9,20 @@ from .artifact_storage import (
     DurableFilesystemArtifactStorage,
     TemporaryArtifactStorage,
 )
+from .batch_ingestion import (
+    BatchCompatibilityError,
+    BatchIngestionError,
+    BatchIngestionRequest,
+    BatchIngestionResult,
+    BatchIngestionService,
+    BatchItemInput,
+    BatchValidationError,
+)
+from .central_dispatcher import (
+    CentralPrintDispatcher,
+    DispatchResult,
+    DispatchStatus,
+)
 from .models import (
     ArtifactReference,
     Claim,
@@ -20,6 +34,7 @@ from .models import (
     SourceContractMetadata,
     SourceMetadata,
 )
+from .postgres_repository import PostgresPrintAgentRepository
 from .repository import (
     DeliveryConflictError,
     InMemoryPrintJobRepository,
@@ -39,8 +54,16 @@ from .service import (
     PrinterProfileNotFoundError,
     SiteMismatchError,
 )
+from .socket_transport import (
+    MockSocketTransport,
+    RawTcpSocketTransport,
+    SocketTransport,
+    SocketTransportResult,
+    TransportOutcome,
+)
 from .state_machine import InvalidTransitionError, LeaseExpiredDuringSendingError, PrintJobStateMachine
 from .transport import MockPrinterTransport, MockTransportOutcome
+
 
 __all__ = [
     "ArtifactConflictError",
@@ -48,11 +71,21 @@ __all__ = [
     "ArtifactManifest",
     "ArtifactReference",
     "ArtifactStorage",
+    "BatchCompatibilityError",
+    "BatchIngestionError",
+    "BatchIngestionRequest",
+    "BatchIngestionResult",
+    "BatchIngestionService",
+    "BatchItemInput",
+    "BatchValidationError",
+    "CentralPrintDispatcher",
     "Claim",
     "DEFAULT_RETENTION",
     "DeliveryNotAllowedError",
     "DeliveryConflictError",
     "DeliveryResult",
+    "DispatchResult",
+    "DispatchStatus",
     "DpiMismatchError",
     "DpiNotConfirmedError",
     "DurableFilesystemArtifactStorage",
@@ -65,7 +98,9 @@ __all__ = [
     "LeaseExpiredDuringSendingError",
     "LeaseOwnershipError",
     "MockPrinterTransport",
+    "MockSocketTransport",
     "MockTransportOutcome",
+    "PostgresPrintAgentRepository",
     "PrintJob",
     "PrintAgentRepository",
     "PrintJobService",
@@ -75,8 +110,12 @@ __all__ = [
     "PrinterLanguage",
     "PrinterProfile",
     "PrinterProfileNotFoundError",
+    "RawTcpSocketTransport",
     "SiteMismatchError",
+    "SocketTransport",
+    "SocketTransportResult",
     "SourceContractMetadata",
     "SourceMetadata",
     "TemporaryArtifactStorage",
+    "TransportOutcome",
 ]
