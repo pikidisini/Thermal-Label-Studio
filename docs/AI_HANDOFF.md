@@ -1,29 +1,24 @@
 # AI Handoff — Thermal Label Studio
 
-## Active snapshot — B2B2F review completed (APPROVED)
+## Active snapshot — B2B2G Pilot Safety & Network Hardening (IMPLEMENTED)
 
 - Date: `2026-09-21`
 - Repository: `Thermal-Label-Studio` (`web_app/`)
-- Baseline: `main` at `cabd0f0` after merge of B2B2E (`codex/b2b2e-worker-central-dispatcher`)
-- Active branch: `codex/b2b2f-docker-compose-pilot`
-- Status: `APPROVED`; review formal Level 3 selesai dengan verdict `READY_FOR_MERGE`.
-- Reviewer: `Gemini Flash via Antigravity (Principal AI Engineer & Staff Systems Architect)`.
-- Scope: Docker Compose Pilot Linux (Control Plane FastAPI + React bundle, PostgreSQL 15, Durable Storage volume, Central Print Dispatcher worker, explicit migration command, `.env.pilot.example`, dan pilot simulation test).
-- Test status: **228 passed, 2 skipped** (100% backend passing).
-- Task files: `docs/tasks/B2B2F/TASK_CONTRACT.md`, `RESULT.md`, `REVIEW.md`.
-- Key files created/modified:
-  - `docker-compose.pilot.yml`
-  - `.env.pilot.example`
-  - `.gitignore` (allows `.env*.example`)
-  - `backend/app/print_jobs/central_dispatcher_runner.py`
-  - `backend/app/print_jobs/seed_pilot.py`
-  - `backend/app/print_jobs/__init__.py`
-  - `scripts/pilot_init.sh`
-  - `backend/tests/test_central_dispatcher_runner.py`
-  - `backend/tests/test_pilot_e2e_simulation.py`
-  - `docs/deployment/pilot_runbook.md`
-  - `docs/tasks/B2B2F/TASK_CONTRACT.md`, `RESULT.md`
-- Next action: Berhenti sebelum merge ke `main`, push safe checkpoint.
+- Baseline: `main` at `e5aeec7` after merge of B2B2F (`codex/b2b2f-docker-compose-pilot`)
+- Active branch: `codex/b2b2g-pilot-safety-network-hardening`
+- Status: `IMPLEMENTED` (P1 Corrections Applied, Ready for Re-Review); seluruh kriteria AC 1 s/d AC 7 dan perbaikan P1-1 & P1-2 terpenuhi.
+- Planner / Author: `Gemini Flash via Antigravity`.
+- Scope: Pilot Safety & Network Hardening (PostgreSQL loopback isolation, placeholder password fail-closed rejection across FastAPI & migrations, physical dispatch safety gate `RawTcpSocketTransport(dispatch_enabled=False)`, simulator transport default, safe `.env.pilot.example` dummy IP, registry overwrite protection & audit trail in `seed_pilot`, dan transparent test evidence).
+- Physical printer status: `BLOCKED` (dilarang menyentuh jaringan kantor / printer fisik; verifikasi menggunakan simulator dan mock).
+- Quality Gate:
+  - Safety hardening tests: `19 passed, 0 failed` in 3.41s (`backend/tests/test_pilot_safety_hardening.py`).
+  - Socket transport tests: `9 passed, 0 failed` in 0.81s (`backend/tests/test_socket_transport.py`).
+  - Central dispatcher runner tests: `13 passed, 0 failed` in 2.24s (`backend/tests/test_central_dispatcher_runner.py`).
+  - Full backend test suite: `250 passed, 2 skipped, 0 failed` in 57.02s.
+  - Whitespace diff check: `git diff --check` passed cleanly (exit code 0).
+  - Docker Compose config check: OK (`127.0.0.1` loopback bound).
+- Task files: `docs/tasks/B2B2G/TASK_CONTRACT.md`, `docs/tasks/B2B2G/RESULT.md`, `docs/tasks/B2B2G/REVIEW.md`.
+- Next action: Berhenti sebelum commit/push/merge; menunggu review akhir Codex.
 
 
 Gunakan dokumen ini untuk memulihkan konteks ketika melanjutkan pekerjaan dari laptop, task, atau sesi AI lain.

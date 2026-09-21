@@ -47,6 +47,7 @@ from ..print_jobs.service import (
     PrinterProfileNotFoundError,
     SiteMismatchError,
 )
+from ..print_jobs.security_validation import validate_database_credentials
 from ..print_jobs.transport import MockTransportOutcome
 
 logger = logging.getLogger(__name__)
@@ -75,7 +76,12 @@ class PrintAgentSettings:
     database_pool_max_size: int = 4
 
     @classmethod
-    def from_environment(cls) -> "PrintAgentSettings":
+    def from_environment(
+        cls,
+        *,
+        allow_test_credentials: bool = False,
+        allow_insecure: bool = False,
+    ) -> "PrintAgentSettings":
         def read_int(name: str, default: int) -> int:
             raw_value = os.getenv(name)
             if raw_value is None:
@@ -86,6 +92,14 @@ class PrintAgentSettings:
                 return 0
 
         enabled = os.getenv("PRINT_AGENT_API_ENABLED", "false").strip().lower() == "true"
+        repository_backend = os.getenv("PRINT_AGENT_REPOSITORY_BACKEND", "memory").strip().lower()
+        database_url = os.getenv("PRINT_AGENT_DATABASE_URL")
+        if repository_backend == "postgresql":
+            validate_database_credentials(
+                database_url,
+                allow_test_credentials=allow_test_credentials,
+                allow_insecure=allow_insecure,
+            )
         return cls(
             enabled=enabled,
             agent_id=os.getenv("PRINT_AGENT_AGENT_ID"),
@@ -94,8 +108,8 @@ class PrintAgentSettings:
             lease_seconds=read_int("PRINT_AGENT_LEASE_SECONDS", 60),
             rate_limit_requests=read_int("PRINT_AGENT_RATE_LIMIT_REQUESTS", 30),
             rate_limit_window_seconds=read_int("PRINT_AGENT_RATE_LIMIT_WINDOW_SECONDS", 60),
-            repository_backend=os.getenv("PRINT_AGENT_REPOSITORY_BACKEND", "memory").strip().lower(),
-            database_url=os.getenv("PRINT_AGENT_DATABASE_URL"),
+            repository_backend=repository_backend,
+            database_url=database_url,
             artifact_root=os.getenv("PRINT_AGENT_ARTIFACT_ROOT"),
             database_pool_min_size=read_int("PRINT_AGENT_DATABASE_POOL_MIN_SIZE", 1),
             database_pool_max_size=read_int("PRINT_AGENT_DATABASE_POOL_MAX_SIZE", 4),

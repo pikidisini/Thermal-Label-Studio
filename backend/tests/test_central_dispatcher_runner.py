@@ -25,7 +25,7 @@ from backend.app.print_jobs.models import PrintJob, PrintJobStatus
 def test_config_from_valid_environment(tmp_path: Path):
     artifact_dir = (tmp_path / "artifacts").resolve()
     env = {
-        "PRINT_AGENT_DATABASE_URL": "postgresql://user:pass@localhost:5432/testdb",
+        "PRINT_AGENT_DATABASE_URL": "postgresql://user:aB9_xK2_mQ7_vP4_zL1@localhost:5432/testdb",
         "PRINT_AGENT_ARTIFACT_ROOT": str(artifact_dir),
         "PRINT_AGENT_SITE_ID": "plant-alpha",
         "PRINT_AGENT_DISPATCHER_ID": "worker-01",
@@ -35,7 +35,7 @@ def test_config_from_valid_environment(tmp_path: Path):
         "DISPATCHER_MAX_CYCLES": "10",
     }
     config = DispatcherRunnerConfig.from_environment(env)
-    assert config.database_url == "postgresql://user:pass@localhost:5432/testdb"
+    assert config.database_url == "postgresql://user:aB9_xK2_mQ7_vP4_zL1@localhost:5432/testdb"
     assert config.artifact_root == artifact_dir
     assert config.site_id == "plant-alpha"
     assert config.dispatcher_id == "worker-01"
@@ -64,19 +64,20 @@ def test_config_missing_artifact_root():
 def test_config_relative_artifact_root():
     with pytest.raises(ValueError, match="must be an absolute path"):
         DispatcherRunnerConfig(
-            database_url="postgresql://localhost/db",
+            database_url="postgresql://user:aB9_xK2_mQ7_vP4_zL1@localhost/db",
             artifact_root=Path("relative/path"),
         )
 
 
 def test_config_invalid_timing_values(tmp_path: Path):
     root = tmp_path.resolve()
+    valid_url = "postgresql://user:aB9_xK2_mQ7_vP4_zL1@localhost/db"
     with pytest.raises(ValueError, match="poll_interval_seconds must be positive"):
-        DispatcherRunnerConfig("postgresql://localhost/db", root, poll_interval_seconds=0)
+        DispatcherRunnerConfig(valid_url, root, poll_interval_seconds=0)
     with pytest.raises(ValueError, match="lease_seconds must be positive"):
-        DispatcherRunnerConfig("postgresql://localhost/db", root, lease_seconds=-1)
+        DispatcherRunnerConfig(valid_url, root, lease_seconds=-1)
     with pytest.raises(ValueError, match="socket_timeout_seconds must be positive"):
-        DispatcherRunnerConfig("postgresql://localhost/db", root, socket_timeout_seconds=0)
+        DispatcherRunnerConfig(valid_url, root, socket_timeout_seconds=0)
 
 
 def test_run_dispatcher_loop_stops_on_max_cycles():
@@ -159,7 +160,7 @@ def test_main_cli_missing_config_returns_error():
 def test_main_cli_unmigrated_database_fails_closed(tmp_path: Path):
     artifact_root = str(tmp_path.resolve())
     env = {
-        "PRINT_AGENT_DATABASE_URL": "postgresql://fake:fake@127.0.0.1:5432/fake",
+        "PRINT_AGENT_DATABASE_URL": "postgresql://fake:aB9_xK2_mQ7_vP4_zL1@127.0.0.1:5432/fake",
         "PRINT_AGENT_ARTIFACT_ROOT": artifact_root,
         "DISPATCHER_MAX_CYCLES": "1",
     }
@@ -178,7 +179,7 @@ def test_main_cli_unmigrated_database_fails_closed(tmp_path: Path):
 def test_main_cli_successful_cycle(tmp_path: Path):
     artifact_root = str(tmp_path.resolve())
     env = {
-        "PRINT_AGENT_DATABASE_URL": "postgresql://fake:fake@127.0.0.1:5432/fake",
+        "PRINT_AGENT_DATABASE_URL": "postgresql://fake:aB9_xK2_mQ7_vP4_zL1@127.0.0.1:5432/fake",
         "PRINT_AGENT_ARTIFACT_ROOT": artifact_root,
         "DISPATCHER_MAX_CYCLES": "1",
         "DISPATCHER_POLL_INTERVAL_SECONDS": "0.01",
@@ -196,4 +197,55 @@ def test_main_cli_successful_cycle(tmp_path: Path):
             assert exit_code == 0
             mock_repo.verify_schema.assert_called_once()
             mock_disp.run_once.assert_called_once()
+            mock_repo.close.assert_called_once()
+
+
+def test_main_cli_tcp_mode_forwards_dispatch_enabled(tmp_path: Path):
+    """P1 Re-review: RawTcpSocketTransport receives dispatch_enabled=True when PRINT_DISPATCH_ENABLED=true."""
+    artifact_root = str(tmp_path.resolve())
+    env = {
+        "PRINT_AGENT_DATABASE_URL": "postgresql://fake:aB9_xK2_mQ7_vP4_zL1@127.0.0.1:5432/fake",
+        "PRINT_AGENT_ARTIFACT_ROOT": artifact_root,
+        "DISPATCHER_TRANSPORT_MODE": "tcp",
+        "PRINT_DISPATCH_ENABLED": "true",
+        "DISPATCHER_MAX_CYCLES": "1",
+    }
+    with patch.dict(os.environ, env, clear=True):
+        with patch("backend.app.print_jobs.central_dispatcher_runner.PostgresPrintAgentRepository") as mock_repo_cls, \
+             patch("backend.app.print_jobs.central_dispatcher_runner.RawTcpSocketTransport") as mock_transport_cls, \
+             patch("backend.app.print_jobs.central_dispatcher_runner.CentralPrintDispatcher") as mock_disp_cls:
+            mock_repo = MagicMock()
+            mock_repo_cls.return_value = mock_repo
+            mock_transport = MagicMock()
+            mock_transport_cls.return_value = mock_transport
+            mock_disp = MagicMock()
+            mock_disp.run_once.return_value = DispatchResult(status=DispatchStatus.IDLE)
+            mock_disp_cls.return_value = mock_disp
+
+            exit_code = main([])
+            assert exit_code == 0
+            mock_transport_cls.assert_called_once()
+            _, kwargs = mock_transport_cls.call_args
+            assert kwargs.get("dispatch_enabled") is True
+            mock_repo.close.assert_called_once()
+
+
+def test_main_cli_tcp_mode_fails_closed_when_flag_false(tmp_path: Path):
+    """AC 3 / P1: TCP mode without PRINT_DISPATCH_ENABLED=true fails closed."""
+    artifact_root = str(tmp_path.resolve())
+    env = {
+        "PRINT_AGENT_DATABASE_URL": "postgresql://fake:aB9_xK2_mQ7_vP4_zL1@127.0.0.1:5432/fake",
+        "PRINT_AGENT_ARTIFACT_ROOT": artifact_root,
+        "DISPATCHER_TRANSPORT_MODE": "tcp",
+        "PRINT_DISPATCH_ENABLED": "false",
+    }
+    with patch.dict(os.environ, env, clear=True):
+        with patch("backend.app.print_jobs.central_dispatcher_runner.PostgresPrintAgentRepository") as mock_repo_cls, \
+             patch("backend.app.print_jobs.central_dispatcher_runner.RawTcpSocketTransport") as mock_transport_cls:
+            mock_repo = MagicMock()
+            mock_repo_cls.return_value = mock_repo
+
+            exit_code = main([])
+            assert exit_code == 1
+            mock_transport_cls.assert_not_called()
             mock_repo.close.assert_called_once()

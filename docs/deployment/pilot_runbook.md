@@ -57,8 +57,8 @@ Dokumen ini adalah panduan operasional resmi untuk menyebarkan (*deploy*), mengo
 - **Runtime**: Docker Engine versi 24.0+ dan Docker Compose v2/v5 (`docker compose`).
 - **Akses Jaringan**:
   - Inbound Port `8000`: Dapat diakses dari subnet workstation operator pabrik.
-  - Outbound Port `9100`: Server Linux **wajib** memiliki rute jaringan dan izin firewall (iptables/ufw) untuk menghubungi IP printer (misal `192.168.1.50:9100`).
-  - Port Database `5432`: Hanya diekspos ke localhost server untuk keperluan maintenance, tidak dibuka ke LAN publik.
+  - Outbound Port `9100`: Server Linux memerlukan izin rute hanya jika pengiriman fisik (`PRINT_DISPATCH_ENABLED=true`) telah diotorisasi. Secara default, sistem menggunakan mode `simulator`.
+  - Port Database `5432`: **Terikat eksklusif ke loopback interface host `127.0.0.1`** (`127.0.0.1:${POSTGRES_PORT:-5432}:5432`), sepenuhnya tertutup dari akses jaringan LAN intranet pabrik.
 
 ---
 
@@ -79,12 +79,18 @@ chmod 600 .env
 ```
 
 Buka berkas `.env` menggunakan editor teks (misal `nano .env`), lalu sesuaikan nilai-nilai berikut:
-- `POSTGRES_PASSWORD`: Ganti placeholder dengan password acak yang kuat.
-- `PRINT_AGENT_DATABASE_URL`: Sesuaikan password pada connection string agar cocok dengan `POSTGRES_PASSWORD`.
-- `PILOT_PRINTER_HOST`: Masukkan alamat IP riil printer di lini 1 (misal `192.168.1.50`).
+- `POSTGRES_PASSWORD`: **Wajib** ganti placeholder dengan password acak yang kuat (minimal 12 karakter). Sistem menolak startup jika masih menggunakan placeholder default.
+- `PRINT_AGENT_DATABASE_URL`: Sesuaikan password pada connection string agar cocok persis dengan `POSTGRES_PASSWORD`.
+- `PRINT_DISPATCH_ENABLED`: Tetap `false` untuk mode demo/evaluasi. Ubah ke `true` hanya jika izin pengiriman fisik telah disetujui.
+- `DISPATCHER_TRANSPORT_MODE`: Gunakan `simulator` untuk pengujian aman tanpa perangkat fisik, atau `tcp` untuk pengiriman riil.
+- `PILOT_PRINTER_HOST`: Gunakan loopback dummy `127.0.0.1` untuk simulasi, atau masukkan IP printer jika pengiriman fisik diaktifkan.
 - `PILOT_PRINTER_PORT`: Port printer jaringan (default `9100`).
 - `PILOT_PRINTER_BRAND`: `HONEYWELL`, `INTERMEC`, atau `ZEBRA`.
 - `PILOT_PRINTER_LANGUAGE`: `ipl` atau `zpl`.
+
+> [!CAUTION]
+> **Larangan Penggunaan `ALLOW_INSECURE_TEST_CREDENTIALS` pada Pilot**:
+> Variabel lingkungan `ALLOW_INSECURE_TEST_CREDENTIALS` adalah sakelar internal khusus pengujian otomatis pada kontainer disposable terisolasi (CI / automated tests). Sakelar ini **DILARANG KERAS** disetel pada berkas `.env` atau lingkungan deployment pilot. Setiap deployment pilot wajib menggunakan password database yang kuat dan unik (minimal 12 karakter).
 
 ### Langkah 2: Build Image Kontainer
 
@@ -130,9 +136,17 @@ Jalankan skrip inisialisasi printer pilot untuk mendaftarkan printer IP lini 1 k
 docker compose -f docker-compose.pilot.yml run --rm app python -m backend.app.print_jobs.seed_pilot
 ```
 
-*Catatan: Skrip ini bersifat idempoten (`ON CONFLICT DO UPDATE`), aman dijalankan berulang kali.*
+*Catatan Keamanan (B2B2G Overwrite Protection):*
+- Skrip ini bersifat idempoten: jika printer sudah terdaftar dengan konfigurasi yang sama persis, operasi akan sukses tanpa perubahan (*no-op*).
+- Jika printer sudah terdaftar namun nilai konfigurasinya berbeda (misal perubahan IP, port, DPI, atau bahasa), skrip akan **menolak menimpa** (*fail-closed*) untuk mencegah rusaknya konfigurasi lini aktif.
+- Untuk memperbarui konfigurasi printer yang sudah ada, operator wajib menyertakan flag `--force-update` dan `--reason "<alasan perubahan>"`:
+  ```bash
+  docker compose -f docker-compose.pilot.yml run --rm app python -m backend.app.print_jobs.seed_pilot \
+    --force-update --reason "Penyesuaian IP printer lini 1 pasca migrasi switch"
+  ```
+  Setiap pembaruan paksa dicatat dalam tabel audit `print_audit_events` beserta snapshot konfigurasi lama dan baru.
 
-Sebagai alternatif ringkas untuk Langkah 3 & 4, Anda dapat menggunakan skrip otomatis:
+Sebagai alternatif ringkas untuk Langkah 3 & 4 (hanya untuk inisialisasi awal), Anda dapat menggunakan skrip otomatis:
 ```bash
 chmod +x scripts/pilot_init.sh
 ./scripts/pilot_init.sh docker-compose.pilot.yml

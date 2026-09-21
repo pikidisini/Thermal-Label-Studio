@@ -148,17 +148,19 @@ def test_seed_pilot_parameter_validation():
     with pytest.raises(ValueError, match="database_url is required"):
         seed_pilot_data("")
 
+    valid_url = "postgresql://user:aB9_xK2_mQ7_vP4_zL1@localhost/db"
+
     with pytest.raises(ValueError, match="printer_id is required"):
-        seed_pilot_data("postgresql://localhost/db", printer_id="")
+        seed_pilot_data(valid_url, printer_id="")
 
     with pytest.raises(ValueError, match="brand must be one of"):
-        seed_pilot_data("postgresql://localhost/db", brand="EPSON")
+        seed_pilot_data(valid_url, brand="EPSON")
 
     with pytest.raises(ValueError, match="printer_language must be ipl or zpl"):
-        seed_pilot_data("postgresql://localhost/db", printer_language="epl")
+        seed_pilot_data(valid_url, printer_language="epl")
 
     with pytest.raises(ValueError, match="IPL printer language only supports native emulation"):
-        seed_pilot_data("postgresql://localhost/db", printer_language="ipl", emulation="zsim2")
+        seed_pilot_data(valid_url, printer_language="ipl", emulation="zsim2")
 
 
 # ------------------------------------------------------------------------------

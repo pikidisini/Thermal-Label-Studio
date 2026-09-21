@@ -11,6 +11,7 @@ import pytest
 
 from app.print_jobs.socket_transport import (
     MockSocketTransport,
+    PhysicalPrintDisabledError,
     RawTcpSocketTransport,
     SocketTransportResult,
     TransportOutcome,
@@ -24,8 +25,34 @@ def test_invalid_timeouts_raise_error() -> None:
         RawTcpSocketTransport(connect_timeout=1.0, write_timeout=-1.0)
 
 
+def test_raw_tcp_transport_fails_closed_by_default_without_socket_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Proves RawTcpSocketTransport fails closed before calling socket.socket()."""
+    socket_called = False
+
+    def guarded_socket(*args: object, **kwargs: object) -> socket.socket:
+        nonlocal socket_called
+        socket_called = True
+        raise AssertionError("socket.socket() must never be called when dispatch_enabled is false!")
+
+    monkeypatch.setattr(socket, "socket", guarded_socket)
+
+    # 1. Default creation (no dispatch_enabled passed)
+    transport_default = RawTcpSocketTransport()
+    with pytest.raises(PhysicalPrintDisabledError, match="Physical printer dispatch is disabled"):
+        transport_default.send("127.0.0.1", 9100, b"data")
+    assert not socket_called
+
+    # 2. Explicit dispatch_enabled=False
+    transport_explicit_false = RawTcpSocketTransport(dispatch_enabled=False)
+    with pytest.raises(PhysicalPrintDisabledError, match="Physical printer dispatch is disabled"):
+        transport_explicit_false.send("127.0.0.1", 9100, b"data")
+    assert not socket_called
+
+
 def test_invalid_port_or_host_fails_before_send() -> None:
-    transport = RawTcpSocketTransport(connect_timeout=1.0, write_timeout=1.0)
+    transport = RawTcpSocketTransport(connect_timeout=1.0, write_timeout=1.0, dispatch_enabled=True)
     result_host = transport.send("", 9100, b"data")
     assert result_host.outcome == TransportOutcome.FAILURE_BEFORE_SEND
     assert result_host.bytes_sent == 0
@@ -38,7 +65,7 @@ def test_invalid_port_or_host_fails_before_send() -> None:
 
 
 def test_empty_payload_succeeds_immediately() -> None:
-    transport = RawTcpSocketTransport(connect_timeout=1.0, write_timeout=1.0)
+    transport = RawTcpSocketTransport(connect_timeout=1.0, write_timeout=1.0, dispatch_enabled=True)
     result = transport.send("127.0.0.1", 9100, b"")
     assert result.outcome == TransportOutcome.SUCCESS
     assert result.bytes_sent == 0
@@ -51,7 +78,7 @@ def test_connection_refused_returns_failure_before_send() -> None:
     unused_port = temp_sock.getsockname()[1]
     temp_sock.close()
 
-    transport = RawTcpSocketTransport(connect_timeout=0.5, write_timeout=1.0)
+    transport = RawTcpSocketTransport(connect_timeout=0.5, write_timeout=1.0, dispatch_enabled=True)
     result = transport.send("127.0.0.1", unused_port, b"test_payload")
     assert result.outcome == TransportOutcome.FAILURE_BEFORE_SEND
     assert result.bytes_sent == 0
@@ -85,7 +112,7 @@ def test_successful_send_on_loopback_server() -> None:
     server_ready.wait(timeout=2.0)
 
     payload = b"^XA^FO50,50^FDTEST_LABEL^FS^XZ" * 20
-    transport = RawTcpSocketTransport(connect_timeout=2.0, write_timeout=2.0)
+    transport = RawTcpSocketTransport(connect_timeout=2.0, write_timeout=2.0, dispatch_enabled=True)
     result = transport.send("127.0.0.1", port, payload)
 
     t.join(timeout=2.0)
@@ -124,7 +151,9 @@ def test_mid_stream_sever_returns_delivery_unknown(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(socket.socket, "send", mock_send)
 
     payload = b"X" * 1000
-    transport = RawTcpSocketTransport(connect_timeout=2.0, write_timeout=2.0, chunk_size=100)
+    transport = RawTcpSocketTransport(
+        connect_timeout=2.0, write_timeout=2.0, chunk_size=100, dispatch_enabled=True
+    )
     result = transport.send("127.0.0.1", port, payload)
 
     t.join(timeout=2.0)
@@ -156,7 +185,9 @@ def test_initial_write_failure_returns_failure_before_send(monkeypatch: pytest.M
     monkeypatch.setattr(socket.socket, "send", mock_send)
 
     payload = b"X" * 1000
-    transport = RawTcpSocketTransport(connect_timeout=2.0, write_timeout=2.0, chunk_size=100)
+    transport = RawTcpSocketTransport(
+        connect_timeout=2.0, write_timeout=2.0, chunk_size=100, dispatch_enabled=True
+    )
     result = transport.send("127.0.0.1", port, payload)
 
     t.join(timeout=2.0)

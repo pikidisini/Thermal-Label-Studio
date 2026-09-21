@@ -3,10 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import StrEnum
+import hashlib
+import json
+from pathlib import Path
 import socket
 import time
-from typing import Protocol
+from typing import Any, Protocol
+
+
+class PhysicalPrintDisabledError(RuntimeError):
+    """Raised when physical printer dispatch is attempted while disabled."""
 
 
 class TransportOutcome(StrEnum):
@@ -44,6 +52,7 @@ class RawTcpSocketTransport:
         connect_timeout: float = 3.0,
         write_timeout: float = 10.0,
         chunk_size: int = 16384,
+        dispatch_enabled: bool = False,
     ) -> None:
         if connect_timeout <= 0:
             raise ValueError("connect_timeout must be positive")
@@ -54,8 +63,14 @@ class RawTcpSocketTransport:
         self.connect_timeout = float(connect_timeout)
         self.write_timeout = float(write_timeout)
         self.chunk_size = int(chunk_size)
+        self.dispatch_enabled = bool(dispatch_enabled)
 
     def send(self, host: str, port: int, payload: bytes) -> SocketTransportResult:
+        if not self.dispatch_enabled:
+            raise PhysicalPrintDisabledError(
+                f"Physical printer dispatch is disabled (dispatch_enabled=False). "
+                f"Direct TCP socket connection to {host}:{port} is blocked."
+            )
         if not host or not isinstance(host, str):
             return SocketTransportResult(TransportOutcome.FAILURE_BEFORE_SEND, 0, "invalid host")
         if not (1 <= port <= 65535):
@@ -148,3 +163,38 @@ class MockSocketTransport:
                 bytes_sent,
                 self.error_message or "mock connection severed mid-stream",
             )
+
+
+class SimulatorSocketTransport:
+    """Safe simulator transport for demonstration, CI, and local evaluation.
+
+    Satisfies the SocketTransport protocol. Never opens real network sockets.
+    Records transmitted payloads in-memory and optionally appends JSON lines
+    to a simulator output file.
+    """
+
+    def __init__(self, log_path: Path | None = None) -> None:
+        self.log_path = log_path
+        self.calls: list[tuple[str, int, bytes]] = []
+        self.dispatches: list[dict[str, Any]] = []
+
+    def send(self, host: str, port: int, payload: bytes) -> SocketTransportResult:
+        self.calls.append((host, port, payload))
+        dispatch_record = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "host": host,
+            "port": port,
+            "byte_count": len(payload),
+            "payload_sha256": hashlib.sha256(payload).hexdigest(),
+        }
+        self.dispatches.append(dispatch_record)
+
+        if self.log_path:
+            try:
+                self.log_path.parent.mkdir(parents=True, exist_ok=True)
+                with self.log_path.open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(dispatch_record) + "\n")
+            except OSError:
+                pass
+
+        return SocketTransportResult(TransportOutcome.SUCCESS, len(payload))

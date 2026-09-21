@@ -13,6 +13,8 @@ from pathlib import Path
 
 import psycopg
 
+from .security_validation import validate_database_credentials
+
 
 BASELINE_VERSION = "print_pipeline_v1"
 MIGRATION_LOCK_ID = 824_221_731
@@ -29,12 +31,23 @@ def baseline_checksum(sql_path: Path = BASELINE_SQL_PATH) -> str:
     return hashlib.sha256(sql_path.read_bytes()).hexdigest()
 
 
-def apply_baseline(database_url: str, sql_path: Path = BASELINE_SQL_PATH) -> bool:
+def apply_baseline(
+    database_url: str,
+    sql_path: Path = BASELINE_SQL_PATH,
+    *,
+    allow_test_credentials: bool = False,
+    allow_insecure: bool = False,
+) -> bool:
     """Apply the fail-fast v1 baseline once and record its exact checksum.
 
     Returns ``True`` when the schema was created and ``False`` when the exact
     migration was already installed.
     """
+    validate_database_credentials(
+        database_url,
+        allow_test_credentials=allow_test_credentials,
+        allow_insecure=allow_insecure,
+    )
     sql_bytes = sql_path.read_bytes()
     sql = sql_bytes.decode("utf-8")
     checksum = hashlib.sha256(sql_bytes).hexdigest()
@@ -73,12 +86,23 @@ def apply_baseline(database_url: str, sql_path: Path = BASELINE_SQL_PATH) -> boo
     return True
 
 
-def rollback_baseline(database_url: str, sql_path: Path = ROLLBACK_SQL_PATH) -> bool:
+def rollback_baseline(
+    database_url: str,
+    sql_path: Path = ROLLBACK_SQL_PATH,
+    *,
+    allow_test_credentials: bool = False,
+    allow_insecure: bool = False,
+) -> bool:
     """Roll back the fail-fast v1 baseline and remove its migration record.
 
     Returns ``True`` when the schema was rolled back and ``False`` when
     the baseline migration was not installed.
     """
+    validate_database_credentials(
+        database_url,
+        allow_test_credentials=allow_test_credentials,
+        allow_insecure=allow_insecure,
+    )
     sql_bytes = sql_path.read_bytes()
     sql = sql_bytes.decode("utf-8")
     with psycopg.connect(database_url) as connection:
@@ -111,7 +135,18 @@ def rollback_baseline(database_url: str, sql_path: Path = ROLLBACK_SQL_PATH) -> 
     return True
 
 
-def verify_baseline(database_url: str, sql_path: Path = BASELINE_SQL_PATH) -> None:
+def verify_baseline(
+    database_url: str,
+    sql_path: Path = BASELINE_SQL_PATH,
+    *,
+    allow_test_credentials: bool = False,
+    allow_insecure: bool = False,
+) -> None:
+    validate_database_credentials(
+        database_url,
+        allow_test_credentials=allow_test_credentials,
+        allow_insecure=allow_insecure,
+    )
     checksum = baseline_checksum(sql_path)
     with psycopg.connect(database_url) as connection:
         row = connection.execute(
@@ -129,6 +164,7 @@ def main() -> int:
     database_url = os.environ.get("PRINT_AGENT_DATABASE_URL")
     if not database_url:
         parser.error("PRINT_AGENT_DATABASE_URL is required")
+    validate_database_credentials(database_url)
     if args.command == "apply":
         created = apply_baseline(database_url)
         print("baseline applied" if created else "baseline already installed")

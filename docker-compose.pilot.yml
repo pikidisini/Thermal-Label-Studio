@@ -11,7 +11,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-pilot_user} -d $${POSTGRES_DB:-thermal_label_pilot}"]
       interval: 5s
@@ -71,6 +71,8 @@ services:
       DISPATCHER_POLL_INTERVAL_SECONDS: ${DISPATCHER_POLL_INTERVAL_SECONDS:-2.0}
       DISPATCHER_LEASE_SECONDS: ${DISPATCHER_LEASE_SECONDS:-30}
       DISPATCHER_SOCKET_TIMEOUT: ${DISPATCHER_SOCKET_TIMEOUT:-10.0}
+      PRINT_DISPATCH_ENABLED: ${PRINT_DISPATCH_ENABLED:-false}
+      DISPATCHER_TRANSPORT_MODE: ${DISPATCHER_TRANSPORT_MODE:-simulator}
     volumes:
       - artifact_data:/app/artifacts
     depends_on:
