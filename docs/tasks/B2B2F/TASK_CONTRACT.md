@@ -2,7 +2,7 @@
 
 ## Identitas
 
-- Status: `PLANNED`
+- Status: `IMPLEMENTED`
 - Risk level: `3`
 - Branch: `codex/b2b2f-docker-compose-pilot`
 - Baseline: `main` pada `cabd0f0` (B2B2E merged)

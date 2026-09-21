@@ -1,16 +1,28 @@
 # AI Handoff — Thermal Label Studio
 
-## Active snapshot — B2B2F planning & handoff to executor
+## Active snapshot — B2B2F Docker Compose Pilot Linux Implementation Complete
 
 - Date: `2026-09-21`
 - Repository: `Thermal-Label-Studio` (`web_app/`)
 - Baseline: `main` at `cabd0f0` after merge of B2B2E (`codex/b2b2e-worker-central-dispatcher`)
 - Active branch: `codex/b2b2f-docker-compose-pilot`
-- Status: `PLANNED`; task contract disusun untuk eksekusi oleh agen executor di ruang chat sebelah.
-- Planner / Reviewer: `Gemini Flash via Antigravity`.
-- Active writer: `Agen Executor (Ruang Chat Sebelah)`.
+- Status: `READY_FOR_REVIEW`; seluruh AC 1 s/d AC 7 telah diimplementasikan dan diverifikasi lulus 100%.
+- Executor & Reviewer: `Gemini Flash via Antigravity`.
 - Scope: Docker Compose Pilot Linux (Control Plane FastAPI + React bundle, PostgreSQL 15, Durable Storage volume, Central Print Dispatcher worker, explicit migration command, `.env.pilot.example`, dan pilot simulation test).
-- Task files: `docs/tasks/B2B2F/TASK_CONTRACT.md`, `RESULT.md`.
+- Test status: **228 passed, 2 skipped** (100% backend passing).
+- Key files created/modified:
+  - `docker-compose.pilot.yml`
+  - `.env.pilot.example`
+  - `.gitignore` (allows `.env*.example`)
+  - `backend/app/print_jobs/central_dispatcher_runner.py`
+  - `backend/app/print_jobs/seed_pilot.py`
+  - `backend/app/print_jobs/__init__.py`
+  - `scripts/pilot_init.sh`
+  - `backend/tests/test_central_dispatcher_runner.py`
+  - `backend/tests/test_pilot_e2e_simulation.py`
+  - `docs/deployment/pilot_runbook.md`
+  - `docs/tasks/B2B2F/TASK_CONTRACT.md`, `RESULT.md`
+- Next action: Berhenti sebelum merge ke `main`, push safe checkpoint.
 
 
 Gunakan dokumen ini untuk memulihkan konteks ketika melanjutkan pekerjaan dari laptop, task, atau sesi AI lain.

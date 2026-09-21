@@ -23,6 +23,11 @@ from .central_dispatcher import (
     DispatchResult,
     DispatchStatus,
 )
+from .central_dispatcher_runner import (
+    DispatcherRunnerConfig,
+    run_dispatcher_loop,
+)
+from .seed_pilot import seed_pilot_data
 from .models import (
     ArtifactReference,
     Claim,
@@ -86,6 +91,7 @@ __all__ = [
     "DeliveryResult",
     "DispatchResult",
     "DispatchStatus",
+    "DispatcherRunnerConfig",
     "DpiMismatchError",
     "DpiNotConfirmedError",
     "DurableFilesystemArtifactStorage",
@@ -111,6 +117,8 @@ __all__ = [
     "PrinterProfile",
     "PrinterProfileNotFoundError",
     "RawTcpSocketTransport",
+    "run_dispatcher_loop",
+    "seed_pilot_data",
     "SiteMismatchError",
     "SocketTransport",
     "SocketTransportResult",
