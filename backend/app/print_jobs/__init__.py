@@ -27,7 +27,14 @@ from .central_dispatcher_runner import (
     DispatcherRunnerConfig,
     run_dispatcher_loop,
 )
-from .seed_pilot import seed_pilot_data
+from .seed_pilot import (
+    PrinterConflictError,
+    seed_pilot_data,
+)
+from .security_validation import (
+    FORBIDDEN_PASSWORD_SUBSTRINGS,
+    validate_database_credentials,
+)
 from .models import (
     ArtifactReference,
     Claim,
@@ -61,7 +68,9 @@ from .service import (
 )
 from .socket_transport import (
     MockSocketTransport,
+    PhysicalPrintDisabledError,
     RawTcpSocketTransport,
+    SimulatorSocketTransport,
     SocketTransport,
     SocketTransportResult,
     TransportOutcome,
@@ -97,6 +106,7 @@ __all__ = [
     "DurableFilesystemArtifactStorage",
     "Emulation",
     "EmulationMismatchError",
+    "FORBIDDEN_PASSWORD_SUBSTRINGS",
     "InMemoryPrintJobRepository",
     "InvalidTransitionError",
     "JobExpiredError",
@@ -106,6 +116,7 @@ __all__ = [
     "MockPrinterTransport",
     "MockSocketTransport",
     "MockTransportOutcome",
+    "PhysicalPrintDisabledError",
     "PostgresPrintAgentRepository",
     "PrintJob",
     "PrintAgentRepository",
@@ -113,12 +124,14 @@ __all__ = [
     "PrintJobRepository",
     "PrintJobStateMachine",
     "PrintJobStatus",
+    "PrinterConflictError",
     "PrinterLanguage",
     "PrinterProfile",
     "PrinterProfileNotFoundError",
     "RawTcpSocketTransport",
     "run_dispatcher_loop",
     "seed_pilot_data",
+    "SimulatorSocketTransport",
     "SiteMismatchError",
     "SocketTransport",
     "SocketTransportResult",
@@ -126,4 +139,5 @@ __all__ = [
     "SourceMetadata",
     "TemporaryArtifactStorage",
     "TransportOutcome",
+    "validate_database_credentials",
 ]

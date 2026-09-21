@@ -20,7 +20,12 @@ from typing import Callable
 from .artifact_storage import DEFAULT_RETENTION, DurableFilesystemArtifactStorage
 from .central_dispatcher import CentralPrintDispatcher, DispatchResult, DispatchStatus
 from .postgres_repository import PostgresPrintAgentRepository
-from .socket_transport import RawTcpSocketTransport
+from .security_validation import validate_database_credentials
+from .socket_transport import (
+    PhysicalPrintDisabledError,
+    RawTcpSocketTransport,
+    SimulatorSocketTransport,
+)
 
 logger = logging.getLogger("central_dispatcher_runner")
 
@@ -38,9 +43,14 @@ class DispatcherRunnerConfig:
         lease_seconds: float = 30.0,
         socket_timeout_seconds: float = 10.0,
         max_cycles: int | None = None,
+        print_dispatch_enabled: bool = False,
+        transport_mode: str = "simulator",
+        allow_insecure_credentials: bool = False,
     ) -> None:
         if not database_url or not database_url.strip():
             raise ValueError("PRINT_AGENT_DATABASE_URL is required and cannot be empty")
+        validate_database_credentials(database_url, allow_insecure=allow_insecure_credentials)
+
         resolved_root = artifact_root.resolve() if not artifact_root.is_absolute() else artifact_root
         if not artifact_root.is_absolute():
             raise ValueError(f"PRINT_AGENT_ARTIFACT_ROOT must be an absolute path: {artifact_root}")
@@ -50,6 +60,8 @@ class DispatcherRunnerConfig:
             raise ValueError("lease_seconds must be positive")
         if socket_timeout_seconds <= 0:
             raise ValueError("socket_timeout_seconds must be positive")
+        if transport_mode not in ("simulator", "mock", "tcp"):
+            raise ValueError(f"Invalid transport_mode '{transport_mode}'. Must be one of: simulator, mock, tcp")
 
         self.database_url = database_url
         self.artifact_root = artifact_root
@@ -59,6 +71,9 @@ class DispatcherRunnerConfig:
         self.lease_seconds = lease_seconds
         self.socket_timeout_seconds = socket_timeout_seconds
         self.max_cycles = max_cycles
+        self.print_dispatch_enabled = print_dispatch_enabled
+        self.transport_mode = transport_mode
+        self.allow_insecure_credentials = allow_insecure_credentials
 
     @classmethod
     def from_environment(cls, env: dict[str, str] | None = None) -> DispatcherRunnerConfig:
@@ -66,6 +81,11 @@ class DispatcherRunnerConfig:
         database_url = source.get("PRINT_AGENT_DATABASE_URL", "").strip()
         if not database_url:
             raise ValueError("Environment variable PRINT_AGENT_DATABASE_URL is required")
+
+        # Security boundary: ALLOW_INSECURE_TEST_CREDENTIALS is an explicit environment-controlled
+        # exception strictly reserved for disposable test containers (CI / local tests) and is
+        # strictly prohibited in pilot or production deployments.
+        allow_insecure = source.get("ALLOW_INSECURE_TEST_CREDENTIALS", "").strip().lower() in ("true", "1", "yes")
 
         raw_artifact_root = source.get("PRINT_AGENT_ARTIFACT_ROOT", "").strip()
         if not raw_artifact_root:
@@ -83,6 +103,9 @@ class DispatcherRunnerConfig:
         max_cycles_val = source.get("DISPATCHER_MAX_CYCLES")
         max_cycles = int(max_cycles_val) if max_cycles_val else None
 
+        print_dispatch_enabled = source.get("PRINT_DISPATCH_ENABLED", "false").strip().lower() in ("true", "1", "yes")
+        transport_mode = source.get("DISPATCHER_TRANSPORT_MODE", "simulator").strip().lower()
+
         return cls(
             database_url=database_url,
             artifact_root=artifact_root,
@@ -92,6 +115,9 @@ class DispatcherRunnerConfig:
             lease_seconds=lease_seconds,
             socket_timeout_seconds=socket_timeout,
             max_cycles=max_cycles,
+            print_dispatch_enabled=print_dispatch_enabled,
+            transport_mode=transport_mode,
+            allow_insecure_credentials=allow_insecure,
         )
 
 
@@ -155,7 +181,28 @@ def main(argv: list[str] | None = None) -> int:
             config.artifact_root,
             retention=DEFAULT_RETENTION,
         )
-        transport = RawTcpSocketTransport(write_timeout=config.socket_timeout_seconds)
+
+        if config.transport_mode == "tcp":
+            if not config.print_dispatch_enabled:
+                raise PhysicalPrintDisabledError(
+                    "Physical printer dispatch is disabled (PRINT_DISPATCH_ENABLED=false). "
+                    "Direct TCP socket connection to network printers is blocked."
+                )
+            transport = RawTcpSocketTransport(
+                write_timeout=config.socket_timeout_seconds,
+                dispatch_enabled=config.print_dispatch_enabled,
+            )
+            logger.info("Transport initialized: RawTcpSocketTransport (physical network socket).")
+        elif config.transport_mode == "simulator":
+            simulator_log = config.artifact_root / ".simulator_dispatches.jsonl"
+            transport = SimulatorSocketTransport(log_path=simulator_log)
+            logger.info("Transport initialized: SimulatorSocketTransport (safe demo/simulation mode).")
+        elif config.transport_mode == "mock":
+            from .socket_transport import MockSocketTransport
+            transport = MockSocketTransport()
+            logger.info("Transport initialized: MockSocketTransport (test mode).")
+        else:
+            raise ValueError(f"Unknown transport mode: {config.transport_mode}")
 
         dispatcher = CentralPrintDispatcher(
             site_id=config.site_id,
