@@ -1,16 +1,16 @@
 # AI Handoff — Thermal Label Studio
 
-## Active snapshot — B2B2E review completed (APPROVED)
+## Active snapshot — B2B2F planning & handoff to executor
 
 - Date: `2026-09-21`
 - Repository: `Thermal-Label-Studio` (`web_app/`)
-- Baseline: `main` at `40e67cd` after merge of B2B2D (`codex/b2b2d-durable-storage-planning`)
-- Active branch: `codex/b2b2e-worker-central-dispatcher`
-- Status: `APPROVED`; review formal Level 3 selesai dengan verdict `READY_FOR_MERGE`.
-- Reviewer: `Gemini Flash via Antigravity (Principal AI Engineer & Staff Systems Architect)`.
-- Scope: Central Print Dispatcher (RAW TCP socket port 9100 dengan timeout terkontrol di luar DB lock, single owner serial scheduling, anti-interleaving batch), RawTcpSocketTransport, dan Render Ingestion Pipeline ke DurableFilesystemArtifactStorage & PostgreSQL.
-- Verification: 8 socket transport unit tests passed, 4 central dispatcher integration tests passed (termasuk verifikasi empiris zero long-held lock & delivery_unknown pause batch), 3 batch ingestion integration tests passed (atomic all-or-nothing compatibility), 43 targeted tests passed, 212 full backend tests passed, `git diff --check` passed (0 whitespace errors), 0 secrets.
-- Task files: `docs/tasks/B2B2E/TASK_CONTRACT.md`, `RESULT.md`, `REVIEW.md`.
+- Baseline: `main` at `cabd0f0` after merge of B2B2E (`codex/b2b2e-worker-central-dispatcher`)
+- Active branch: `codex/b2b2f-docker-compose-pilot`
+- Status: `PLANNED`; task contract disusun untuk eksekusi oleh agen executor di ruang chat sebelah.
+- Planner / Reviewer: `Gemini Flash via Antigravity`.
+- Active writer: `Agen Executor (Ruang Chat Sebelah)`.
+- Scope: Docker Compose Pilot Linux (Control Plane FastAPI + React bundle, PostgreSQL 15, Durable Storage volume, Central Print Dispatcher worker, explicit migration command, `.env.pilot.example`, dan pilot simulation test).
+- Task files: `docs/tasks/B2B2F/TASK_CONTRACT.md`, `RESULT.md`.
 
 
 Gunakan dokumen ini untuk memulihkan konteks ketika melanjutkan pekerjaan dari laptop, task, atau sesi AI lain.

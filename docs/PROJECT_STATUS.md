@@ -9,12 +9,13 @@ Dokumen ini adalah ringkasan kondisi proyek aktif untuk manusia dan AI.
 - Repository referensi: `JSON_LABEL_THERMAL_PRINTER_PARSER`
 - Status: aktif dikembangkan; belum boleh dianggap production-ready tanpa verifikasi test, security, observability, backup, dan rollback.
 - Tanggal snapshot dokumen: 2026-09-21
-- Baseline: `main` pada commit `40e67cd` setelah B2B2D di-merge.
-- Branch aktif: `codex/b2b2e-worker-central-dispatcher`.
+- Baseline: `main` pada commit `cabd0f0` setelah B2B2E di-merge.
+- Branch aktif: `codex/b2b2f-docker-compose-pilot`.
 - Status B2B2C: merged ke `main`; lifecycle delivery PostgreSQL opt-in dan disposable-verified.
 - Status B2B2D: merged ke `main`; DurableFilesystemArtifactStorage terverifikasi penuh (manifest integrity v1.0, 7-day retention, P1/P2 resolved).
-- Status B2B2E: perencanaan Task Contract (`docs/tasks/B2B2E/TASK_CONTRACT.md`) untuk Central Print Dispatcher dan Render Ingestion Pipeline.
-- Workflow AI: `docs/AI_WORKFLOW.md`; kontrak aktif: `docs/tasks/B2B2E/TASK_CONTRACT.md`.
+- Status B2B2E: merged ke `main`; Central Print Dispatcher (RAW TCP socket port 9100) dan Batch Ingestion Pipeline terverifikasi penuh.
+- Status B2B2F: perencanaan Task Contract (`docs/tasks/B2B2F/TASK_CONTRACT.md`) untuk Docker Compose Pilot Linux (1 lini, 1 PC, 1 printer IP).
+- Workflow AI: `docs/AI_WORKFLOW.md`; kontrak aktif: `docs/tasks/B2B2F/TASK_CONTRACT.md`.
 
 ## Tujuan produk
 
@@ -36,8 +37,8 @@ Kode atau konsep dari POC boleh digunakan sebagai referensi, tetapi harus diband
 
 ## Pekerjaan aktif
 
-- B2B2C dan B2B2D telah selesai dan digabungkan ke `main`.
-- B2B2E berfokus pada Central Print Dispatcher (RAW TCP socket port 9100 dengan kontrol timeout di luar DB row lock) serta Pipeline Render Ingestion yang menyimpan biner label ke `DurableFilesystemArtifactStorage` dan mencatatnya ke database relasional.
+- B2B2C, B2B2D, dan B2B2E telah selesai dan digabungkan ke `main`.
+- B2B2F berfokus pada penyusunan berkas Docker Compose pilot terintegrasi (`docker-compose.pilot.yml`), isolasi volume database dan durable artifact storage, runner worker dispatcher berkelanjutan dengan graceful shutdown, konfigurasi environment bebas rahasia (`.env.pilot.example`), dan skrip simulasi/smoke test 1 lini produksi.
 - PostgreSQL yang digunakan untuk integration test adalah disposable lokal; tidak ada database perusahaan/production yang disentuh.
 - Status final test, review subagent, commit, push, dan PR harus diperbarui setelah quality gate selesai.
 
