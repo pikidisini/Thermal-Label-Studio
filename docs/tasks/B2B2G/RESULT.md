@@ -1,9 +1,12 @@
 # Result — B2B2G: Pilot Safety & Network Hardening
 
-- Status: `IMPLEMENTED` (P1 & P2 Re-review Corrections Applied, Ready for Final Review)
+- Status: `MERGED`
 - Active writer: `Gemini Flash via Antigravity`
-- Branch: `codex/b2b2g-pilot-safety-network-hardening`
+- Branch: `codex/b2b2g-pilot-safety-network-hardening` (Merged via PR #18)
 - Baseline: `main` pada `e5aeec7` (B2B2F merged)
+- Pull Request: https://github.com/pikidisini/Thermal-Label-Studio/pull/18
+- Feature Commit: `347f0f36d1b67d42486938954833d3436d044126`
+- Squash Merge Commit on `main`: `a7b4c9201cb4d142129a67febe83e387c32bfda6`
 
 ---
 
@@ -82,4 +85,4 @@
 
 ## Status Handoff
 
-Seluruh temuan P1 dan P2 dari re-review Codex telah diselesaikan, diuji secara menyeluruh, dan didokumentasikan. Sesuai batasan instruksi pengguna, tidak ada commit, push, atau merge yang dilakukan. Sistem berhenti untuk re-review akhir Codex.
+Fase B2B2G telah di-review oleh Codex (APPROVED_FOR_COMMIT_AND_PR), di-commit, di-push, dan di-merge ke `main` melalui Squash and Merge PR #18 (commit `a7b4c92`). Seluruh Acceptance Criteria (AC 1 s/d AC 7) terpenuhi dan 250 backend tests lulus tanpa regresi. Selesai dan berhenti sesuai instruksi pengguna.

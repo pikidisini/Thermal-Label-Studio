@@ -1,12 +1,15 @@
 # AI Handoff — Thermal Label Studio
 
-## Active snapshot — B2B2G Pilot Safety & Network Hardening (IMPLEMENTED)
+## Active snapshot — B2B2G Pilot Safety & Network Hardening (MERGED)
 
 - Date: `2026-09-21`
 - Repository: `Thermal-Label-Studio` (`web_app/`)
-- Baseline: `main` at `e5aeec7` after merge of B2B2F (`codex/b2b2f-docker-compose-pilot`)
-- Active branch: `codex/b2b2g-pilot-safety-network-hardening`
-- Status: `IMPLEMENTED` (P1 Corrections Applied, Ready for Re-Review); seluruh kriteria AC 1 s/d AC 7 dan perbaikan P1-1 & P1-2 terpenuhi.
+- Baseline: `main` at `a7b4c92` after squash merge of B2B2G PR #18
+- Active branch: `main`
+- Status: `MERGED`; fase B2B2G selesai, disetujui Codex, dan di-merge ke main.
+- Pull Request: https://github.com/pikidisini/Thermal-Label-Studio/pull/18
+- Feature Commit: `347f0f36d1b67d42486938954833d3436d044126`
+- Squash Merge Commit: `a7b4c9201cb4d142129a67febe83e387c32bfda6`
 - Planner / Author: `Gemini Flash via Antigravity`.
 - Scope: Pilot Safety & Network Hardening (PostgreSQL loopback isolation, placeholder password fail-closed rejection across FastAPI & migrations, physical dispatch safety gate `RawTcpSocketTransport(dispatch_enabled=False)`, simulator transport default, safe `.env.pilot.example` dummy IP, registry overwrite protection & audit trail in `seed_pilot`, dan transparent test evidence).
 - Physical printer status: `BLOCKED` (dilarang menyentuh jaringan kantor / printer fisik; verifikasi menggunakan simulator dan mock).
@@ -18,7 +21,7 @@
   - Whitespace diff check: `git diff --check` passed cleanly (exit code 0).
   - Docker Compose config check: OK (`127.0.0.1` loopback bound).
 - Task files: `docs/tasks/B2B2G/TASK_CONTRACT.md`, `docs/tasks/B2B2G/RESULT.md`, `docs/tasks/B2B2G/REVIEW.md`.
-- Next action: Berhenti sebelum commit/push/merge; menunggu review akhir Codex.
+- Next action: B2B2G selesai. Berhenti sesuai instruksi pengguna (jangan lanjut ke fase berikutnya).
 
 
 Gunakan dokumen ini untuk memulihkan konteks ketika melanjutkan pekerjaan dari laptop, task, atau sesi AI lain.
