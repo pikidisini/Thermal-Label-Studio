@@ -73,42 +73,96 @@ class ArtifactStorage(Protocol):
     def checksum(payload: bytes) -> str: ...
 
 
-class _ProcessLock:
-    """Inter-process lock using atomic directory creation in the filesystem."""
+def _is_reparse_or_link(path: Path) -> bool:
+    """Return True if path is a symbolic link or Windows reparse point (junction)."""
+    if path.is_symlink():
+        return True
+    if hasattr(os, "readlink"):
+        try:
+            os.readlink(path)
+            return True
+        except (OSError, ValueError):
+            pass
+    return False
 
-    def __init__(self, lock_dir: Path, timeout: float = 10.0, poll_interval: float = 0.02) -> None:
-        self.lock_dir = lock_dir
+
+if os.name == "nt":
+    import msvcrt
+
+    def _try_lock_fd(fd: int) -> bool:
+        try:
+            msvcrt.locking(fd, msvcrt.LK_NBRLCK, 1)
+            return True
+        except OSError:
+            return False
+
+    def _unlock_fd(fd: int) -> None:
+        try:
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        except OSError:
+            pass
+
+else:
+    import fcntl
+
+    def _try_lock_fd(fd: int) -> bool:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return True
+        except (BlockingIOError, OSError):
+            return False
+
+    def _unlock_fd(fd: int) -> None:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        except OSError:
+            pass
+
+
+class _ProcessLock:
+    """Inter-process lock bound to the operating system process lifetime.
+
+    On POSIX systems, this uses fcntl.flock(LOCK_EX | LOCK_NB).
+    On Windows systems, this uses msvcrt.locking(LK_NBRLCK, 1).
+    When the process terminates (or crashes), the OS automatically releases the lock.
+    Stale locks are never taken over based on timestamps/mtime; if a lock cannot
+    be acquired within the timeout, the operation fails closed without modifying
+    or unlinking the active owner's lock.
+    """
+
+    def __init__(self, lock_file_path: Path, timeout: float = 10.0, poll_interval: float = 0.02) -> None:
+        self.lock_file_path = lock_file_path
         self.timeout = timeout
         self.poll_interval = poll_interval
         self._acquired = False
+        self._file = None
 
     def acquire(self) -> None:
         deadline = time.monotonic() + self.timeout
+        # Open in append/read-binary mode so existing file is not truncated
+        f = open(self.lock_file_path, "a+b")
         while True:
-            try:
-                os.mkdir(self.lock_dir)
+            if _try_lock_fd(f.fileno()):
+                self._file = f
                 self._acquired = True
                 return
-            except FileExistsError:
-                # Check for stale lock (older than 30s) in case of previous hard crash
-                try:
-                    mtime = self.lock_dir.stat().st_mtime
-                    if time.time() - mtime > 30.0:
-                        os.rmdir(self.lock_dir)
-                        continue
-                except OSError:
-                    pass
-                if time.monotonic() >= deadline:
-                    raise TimeoutError(f"timed out waiting for process lock on {self.lock_dir.name}")
-                time.sleep(self.poll_interval)
+            if time.monotonic() >= deadline:
+                f.close()
+                raise TimeoutError(f"timed out waiting for process lock on {self.lock_file_path.name}")
+            time.sleep(self.poll_interval)
 
     def release(self) -> None:
-        if self._acquired:
+        if self._acquired and self._file is not None:
             try:
-                os.rmdir(self.lock_dir)
-            except OSError:
-                pass
-            self._acquired = False
+                _unlock_fd(self._file.fileno())
+            finally:
+                self._file.close()
+                self._file = None
+                self._acquired = False
+                try:
+                    self.lock_file_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
 
     def __enter__(self) -> "_ProcessLock":
         self.acquire()
@@ -132,9 +186,23 @@ class DurableFilesystemArtifactStorage:
         if not root.is_absolute():
             raise ArtifactIntegrityError("artifact root must be an absolute path")
         self.root = root.resolve()
+        if _is_reparse_or_link(self.root):
+            raise ArtifactIntegrityError("artifact root must not be a symlink or junction")
         self.root.mkdir(parents=True, exist_ok=True)
+
         self.staging_dir = self.root / ".staging"
-        self.staging_dir.mkdir(parents=True, exist_ok=True)
+        if self.staging_dir.exists():
+            if _is_reparse_or_link(self.staging_dir):
+                raise ArtifactIntegrityError("staging directory must not be a symlink or junction")
+            if self.staging_dir.resolve() != self.root / ".staging":
+                raise ArtifactIntegrityError("staging directory escapes storage root")
+        else:
+            self.staging_dir.mkdir(parents=True, exist_ok=True)
+            if _is_reparse_or_link(self.staging_dir):
+                raise ArtifactIntegrityError("staging directory must not be a symlink or junction")
+            if self.staging_dir.resolve() != self.root / ".staging":
+                raise ArtifactIntegrityError("staging directory escapes storage root")
+
         self.retention = retention
         self._lock = RLock()
 
@@ -209,9 +277,9 @@ class DurableFilesystemArtifactStorage:
 
         final_payload_path = self._path_for(payload_ref)
         final_manifest_path = self._manifest_path_for(payload_ref)
-        lock_dir = self.staging_dir / f"{payload_ref}.lock"
+        lock_file_path = self.staging_dir / f"{payload_ref}.lock"
 
-        with self._lock, _ProcessLock(lock_dir):
+        with self._lock, _ProcessLock(lock_file_path):
             # Check for existing artifact
             if final_payload_path.exists() and final_manifest_path.exists():
                 manifest = self._load_manifest(payload_ref)

@@ -18,6 +18,7 @@ from app.print_jobs.artifact_storage import (
     ArtifactIntegrityError,
     ArtifactManifest,
     DurableFilesystemArtifactStorage,
+    _ProcessLock,
 )
 from app.print_jobs.models import ArtifactReference
 
@@ -34,6 +35,29 @@ def _worker_put_artifact(
         storage = DurableFilesystemArtifactStorage(Path(root_str))
         ref = storage.put(payload_ref, filename, payload)
         return True, ref.payload_ref
+    except Exception as exc:
+        return False, f"{type(exc).__name__}: {exc}"
+
+
+def _worker_hold_lock_and_age_timestamp(
+    lock_path_str: str, ready_event: object, release_event: object
+) -> None:
+    """Acquires lock, sets mtime to epoch 1970, notifies ready, and waits for release_event."""
+    lock_path = Path(lock_path_str)
+    lock = _ProcessLock(lock_file_path=lock_path, timeout=5.0)
+    with lock:
+        # Make timestamp extremely old (epoch 1970)
+        os.utime(lock_path, (0, 0))
+        getattr(ready_event, "set")()
+        getattr(release_event, "wait")(timeout=10.0)
+
+
+def _worker_try_acquire_lock(lock_path_str: str, timeout: float) -> tuple[bool, str]:
+    """Attempts to acquire lock with specified timeout, returns (success, error_or_ok)."""
+    try:
+        lock = _ProcessLock(lock_file_path=Path(lock_path_str), timeout=timeout)
+        with lock:
+            return True, "acquired"
     except Exception as exc:
         return False, f"{type(exc).__name__}: {exc}"
 
@@ -363,3 +387,99 @@ def test_multiprocess_concurrent_put_different_content_conflict(tmp_path: Path) 
 
     assert len(successes) == 1, f"Expected exactly 1 success, got results: {results}"
     assert len(conflicts) == 1, f"Expected exactly 1 conflict, got results: {results}"
+
+
+def test_staging_directory_windows_junction_rejected(tmp_path: Path) -> None:
+    """Proves real Windows directory junction on .staging is detected and rejected."""
+    root = tmp_path / "storage_root_junction"
+    root.mkdir()
+    target_outside = tmp_path / "outside_staging_target"
+    target_outside.mkdir()
+
+    staging_path = root / ".staging"
+    junction_created = False
+    if os.name == "nt":
+        try:
+            import subprocess
+            subprocess.run(
+                ["cmd", "/c", "mklink", "/J", str(staging_path), str(target_outside)],
+                check=True,
+                capture_output=True,
+            )
+            junction_created = True
+        except (subprocess.SubprocessError, OSError):
+            pass
+
+    if junction_created:
+        with pytest.raises(ArtifactIntegrityError, match="staging directory"):
+            DurableFilesystemArtifactStorage(root)
+    else:
+        try:
+            staging_path.symlink_to(target_outside, target_is_directory=True)
+            with pytest.raises(ArtifactIntegrityError, match="staging directory"):
+                DurableFilesystemArtifactStorage(root)
+        except (OSError, NotImplementedError):
+            pytest.skip("Neither junction nor symlink creation supported in this environment")
+
+
+def test_staging_directory_containment_fallback_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Proves containment check rejects .staging when resolve() escapes root even without is_symlink."""
+    root = tmp_path / "storage_root_fallback"
+    root.mkdir()
+    outside_dir = tmp_path / "completely_outside"
+    outside_dir.mkdir()
+
+    # Monkeypatch resolve on Path to simulate an escaping reparse point that is_symlink misses
+    orig_resolve = Path.resolve
+
+    def mock_resolve(self: Path, *args: object, **kwargs: object) -> Path:
+        if self.name == ".staging" and self.parent == root:
+            return outside_dir
+        return orig_resolve(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", mock_resolve)
+    with pytest.raises(ArtifactIntegrityError, match="staging directory escapes storage root"):
+        DurableFilesystemArtifactStorage(root)
+
+
+def test_multiprocess_live_owner_with_aged_timestamp_cannot_be_taken_over(tmp_path: Path) -> None:
+    """Proves an active lock owner cannot be taken over by a second writer even if mtime is old."""
+    import multiprocessing
+    ctx = multiprocessing.get_context("spawn")
+    manager = ctx.Manager()
+    ready_event = manager.Event()
+    release_event = manager.Event()
+
+    staging_dir = tmp_path / ".staging"
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = staging_dir / "test_active.lock"
+
+    owner_process = ctx.Process(
+        target=_worker_hold_lock_and_age_timestamp,
+        args=(str(lock_path), ready_event, release_event),
+    )
+    owner_process.start()
+
+    try:
+        # Wait for owner to acquire lock and age timestamp
+        assert ready_event.wait(timeout=5.0), "Owner process failed to acquire lock"
+
+        # Verify timestamp was indeed aged to epoch 0
+        assert lock_path.stat().st_mtime == 0
+
+        # Now writer 2 attempts to acquire the lock with timeout 0.3s
+        success, message = _worker_try_acquire_lock(str(lock_path), timeout=0.3)
+        assert success is False, "Writer 2 illegally acquired lock from live owner!"
+        assert "TimeoutError" in message
+
+        # Verify lock file was not deleted or unlinked by writer 2
+        assert lock_path.is_file()
+    finally:
+        release_event.set()
+        owner_process.join(timeout=5.0)
+        if owner_process.is_alive():
+            owner_process.terminate()
+
+    # Now that owner is dead/released, writer 2 should be able to acquire
+    success_after, _ = _worker_try_acquire_lock(str(lock_path), timeout=2.0)
+    assert success_after is True
