@@ -483,3 +483,23 @@ def test_multiprocess_live_owner_with_aged_timestamp_cannot_be_taken_over(tmp_pa
     # Now that owner is dead/released, writer 2 should be able to acquire
     success_after, _ = _worker_try_acquire_lock(str(lock_path), timeout=2.0)
     assert success_after is True
+
+
+def test_process_lock_non_empty_file_mutual_exclusion(tmp_path: Path) -> None:
+    """Verifies that _ProcessLock guarantees mutual exclusion even if lock file pre-exists with content."""
+    lock_path = tmp_path / "content.lock"
+    lock_path.write_bytes(b"pre_existing_bytes_in_lock_file")
+
+    lock1 = _ProcessLock(lock_path, timeout=0.5)
+    lock2 = _ProcessLock(lock_path, timeout=0.2, poll_interval=0.02)
+
+    lock1.acquire()
+    try:
+        with pytest.raises(TimeoutError):
+            lock2.acquire()
+    finally:
+        lock1.release()
+
+    # After lock1 is released, lock2 should acquire successfully
+    lock2.acquire()
+    lock2.release()

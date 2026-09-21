@@ -142,6 +142,7 @@ class _ProcessLock:
         # Open in append/read-binary mode so existing file is not truncated
         f = open(self.lock_file_path, "a+b")
         while True:
+            f.seek(0)
             if _try_lock_fd(f.fileno()):
                 self._file = f
                 self._acquired = True
@@ -154,6 +155,7 @@ class _ProcessLock:
     def release(self) -> None:
         if self._acquired and self._file is not None:
             try:
+                self._file.seek(0)
                 _unlock_fd(self._file.fileno())
             finally:
                 self._file.close()

@@ -23,6 +23,7 @@
      - `_ProcessLock` berbasis file descriptor lock OS (`msvcrt.locking(LK_NBRLCK)` di Windows, `fcntl.flock(LOCK_EX | LOCK_NB)` di POSIX/Linux).
      - Kepemilikan lock diikat oleh OS dan otomatis dilepas oleh kernel saat proses mati atau crash.
      - Tidak ada pengambilalihan lock otomatis berdasarkan mtime/umur; jika timeout, fail closed tanpa memodifikasi atau menghapus lock owner aktif.
+     - Posisi file diatur eksplisit `seek(0)` sebelum lock dan unlock, menjamin byte range offset [0, 1) konsisten di Windows meskipun lock file memiliki konten (resolusi temuan P2/F1).
    - Backward compatibility: `TemporaryArtifactStorage` tetap dipertahankan untuk test suite in-memory.
 
 2. **Integrasi Service & API**:
@@ -35,7 +36,7 @@
 ## 2. Hasil Pengujian Aktual
 
 - **Unit & Concurrency Tests (`backend/tests/test_durable_artifact_storage.py`)**:
-  - `20 passed, 2 skipped` (2 symlink OS tests skipped di Windows non-admin, diverifikasi penuh melalui `test_symlink_mocked_rejection`).
+  - `21 passed, 2 skipped` (2 symlink OS tests skipped di Windows non-admin, diverifikasi penuh melalui `test_symlink_mocked_rejection`).
   - Menguji:
     - Atomic write & manifest 7-day retention.
     - Idempotency & conflict detection (different filename, different bytes).
@@ -50,13 +51,14 @@
     - Windows junction rejection nyata (`test_staging_directory_windows_junction_rejected`).
     - Staging containment fallback rejection (`test_staging_directory_containment_fallback_rejected`).
     - Multiprocess live owner with aged timestamp cannot be taken over (`test_multiprocess_live_owner_with_aged_timestamp_cannot_be_taken_over`).
+    - Multiprocess non-empty lock file mutual exclusion with explicit seek(0) (`test_process_lock_non_empty_file_mutual_exclusion`).
 - **PostgreSQL Integration Tests (`backend/tests/test_postgres_print_agent_repository.py`)**:
   - `7 passed` dalam 3.39 detik pada Docker container `postgres:15-bullseye` (`127.0.0.1:55432`).
   - Termasuk `test_postgres_with_durable_artifact_storage_and_manifest_retention`.
 - **Targeted Regression Suite**:
-  - `147 passed, 2 skipped` dalam 5.31 detik.
+  - `147 passed, 2 skipped` dalam 7.24 detik.
 - **Full Backend Suite**:
-  - `196 passed, 2 skipped` dalam 30.96 detik.
+  - `190 passed, 9 skipped` (7 skipped PG tanpa DSN, 2 skipped symlink Windows non-admin) / `196 passed, 2 skipped` (dengan container PG).
 - **Lint & Format**:
   - `git diff --check`: 0 whitespace errors.
 - **Secret Scan**:

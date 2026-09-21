@@ -118,7 +118,7 @@ Antara `close` dan `unlink`, proses lain bisa `open`+`lock` path tersebut. Kemud
 
 | ID | Severity | Deskripsi | Status |
 |----|----------|-----------|--------|
-| F1 | P2 (defense-in-depth) | `_ProcessLock.acquire()` tidak melakukan `f.seek(0)` sebelum `_try_lock_fd()`. Pada Windows `msvcrt.locking`, byte range tergantung posisi `tell()`. Saat ini aman karena kode tidak menulis ke lock file, tapi rentan jika ada perubahan di masa depan. | **NON-BLOCKING** — rekomendasi 1-line fix |
+| F1 | P2 (defense-in-depth) | `_ProcessLock.acquire()` tidak melakukan `f.seek(0)` sebelum `_try_lock_fd()`. Pada Windows `msvcrt.locking`, byte range tergantung posisi `tell()`. | **RESOLVED** — Ditambahkan `f.seek(0)` pada `acquire()` dan `self._file.seek(0)` pada `release()`, diverifikasi via `test_process_lock_non_empty_file_mutual_exclusion`. |
 | F2 | INFO | `_ProcessLock.release()` TOCTOU: unlock → close → unlink memiliki window di mana proses lain bisa lock path, lalu path di-unlink. Efek praktis nihil karena `put()` re-check di dalam lock. | **NO ACTION** |
 | F3 | INFO | `_validate_ref()` L215 dead code (redundant char check setelah regex). Berfungsi sebagai defense-in-depth. | **NO ACTION** |
 | F4 | INFO | `__init__` TOCTOU antara `_is_reparse_or_link(root)` dan `root.mkdir()`. Memerlukan akses filesystem lokal setara. | **NO ACTION** |
@@ -126,14 +126,12 @@ Antara `close` dan `unlink`, proses lain bisa `open`+`lock` path tersebut. Kemud
 
 ## 5. Kesimpulan
 
-Implementasi B2B2D solid dan memenuhi seluruh 7 acceptance criteria. Kode menunjukkan pendekatan keamanan yang berlapis:
+Implementasi B2B2D solid dan memenuhi seluruh 7 acceptance criteria. Seluruh temuan P1 dan temuan P2 (F1) telah diselesaikan dan diverifikasi. Kode menunjukkan pendekatan keamanan yang berlapis:
 - Validasi input (regex, allowlist filename)
 - Boundary enforcement (path traversal, symlink/junction rejection, containment)
 - Atomic durability (staging + fsync + os.replace)
-- Concurrent safety (OS-level lock + in-process RLock)
+- Concurrent safety (OS-level lock + in-process RLock, explicit `seek(0)`)
 - Fail-closed pada semua error path
 
-Satu temuan P2 (F1) bersifat non-blocking dan bisa diperbaiki dengan 1 baris `f.seek(0)` kapan saja. Temuan lainnya bersifat informasional.
-
-- **Verdict**: **`APPROVED_WITH_NOTES`**
-- **Langkah berikutnya**: Perbaiki F1 (`f.seek(0)`) sebelum atau sesudah merge (non-blocking). Menunggu persetujuan pengguna untuk squash merge ke `main`.
+- **Verdict**: **`APPROVED`** (All P1/P2 resolved, ready for merge)
+- **Langkah berikutnya**: Squash merge branch `codex/b2b2d-durable-storage-planning` ke `main`.
