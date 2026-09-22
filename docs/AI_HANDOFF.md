@@ -1,27 +1,27 @@
 # AI Handoff — Thermal Label Studio
 
-## Active snapshot — B2B2G Pilot Safety & Network Hardening (MERGED)
+## Active snapshot — B2B2H Safe Demo Mode & Batch Monitoring (APPROVED_FOR_CHECKPOINT)
 
-- Date: `2026-09-21`
+- Date: `2026-09-22`
 - Repository: `Thermal-Label-Studio` (`web_app/`)
-- Baseline: `main` at `a7b4c92` after squash merge of B2B2G PR #18
-- Active branch: `main`
-- Status: `MERGED`; fase B2B2G selesai, disetujui Codex, dan di-merge ke main.
-- Pull Request: https://github.com/pikidisini/Thermal-Label-Studio/pull/18
-- Feature Commit: `347f0f36d1b67d42486938954833d3436d044126`
-- Squash Merge Commit: `a7b4c9201cb4d142129a67febe83e387c32bfda6`
-- Planner / Author: `Gemini Flash via Antigravity`.
-- Scope: Pilot Safety & Network Hardening (PostgreSQL loopback isolation, placeholder password fail-closed rejection across FastAPI & migrations, physical dispatch safety gate `RawTcpSocketTransport(dispatch_enabled=False)`, simulator transport default, safe `.env.pilot.example` dummy IP, registry overwrite protection & audit trail in `seed_pilot`, dan transparent test evidence).
-- Physical printer status: `BLOCKED` (dilarang menyentuh jaringan kantor / printer fisik; verifikasi menggunakan simulator dan mock).
+- Baseline: `main` at `43abb3f`
+- Active branch: `codex/b2b2h-safe-demo-mode`
+- Status: `APPROVED_FOR_CHECKPOINT`; Codex Level-3 review selesai dengan status APPROVED_FOR_CHECKPOINT; checkpoint commit dan PR ke main diotorisasi oleh pengguna.
+- Executor: `Gemini Flash via Antigravity`.
+- Scope: Safe Demo Mode & Batch Monitoring (Backend fail-closed guard `SAFE_DEMO_MODE=false` default, isolated in-memory `SafeDemoService` dispatches strictly to `SimulatorSocketTransport`, synthetic multi-item sequential batch fixture with `copies=1`, 3-panel React UI `SafeDemoModal.tsx` + conditional `TopBarActions.tsx`, human-readable explicit status `"Terkirim ke simulator — tidak dicetak fisik"`, safe in-memory reset, zero socket/network usage, Playwright scoped test runner).
+- Physical printer status: `NOT RUN` (dilarang dalam scope B2B2H; verifikasi 100% menggunakan simulator).
 - Quality Gate:
-  - Safety hardening tests: `19 passed, 0 failed` in 3.41s (`backend/tests/test_pilot_safety_hardening.py`).
-  - Socket transport tests: `9 passed, 0 failed` in 0.81s (`backend/tests/test_socket_transport.py`).
-  - Central dispatcher runner tests: `13 passed, 0 failed` in 2.24s (`backend/tests/test_central_dispatcher_runner.py`).
-  - Full backend test suite: `250 passed, 2 skipped, 0 failed` in 57.02s.
-  - Whitespace diff check: `git diff --check` passed cleanly (exit code 0).
-  - Docker Compose config check: OK (`127.0.0.1` loopback bound).
-- Task files: `docs/tasks/B2B2G/TASK_CONTRACT.md`, `docs/tasks/B2B2G/RESULT.md`, `docs/tasks/B2B2G/REVIEW.md`.
-- Next action: B2B2G selesai. Berhenti sesuai instruksi pengguna (jangan lanjut ke fase berikutnya).
+  - Backend Safe Demo tests: `7 passed, 0 failed` in 1.35s (`backend/tests/test_safe_demo.py`).
+  - Full backend regression: `238 passed, 21 skipped, 0 failed` in 45.62s.
+  - Frontend unit tests: `51 passed, 0 failed` in 0.94s (`npm test`).
+  - Frontend typecheck: `npx tsc --noEmit` lulus (0 errors).
+  - Frontend production build: `npm run build` lulus (7.09s).
+  - Playwright E2E browser tests: `2 passed` in 22.9s (`safe_demo.spec.js` checked-in) + `5 passed` in 50.0s (`phase2_integration.spec.js`).
+  - Whitespace diff check: `git diff --check` lulus (0 errors).
+- Task files: `docs/tasks/B2B2H/TASK_CONTRACT.md`, `docs/tasks/B2B2H/RESULT.md`, `docs/tasks/B2B2H/REVIEW.md`.
+- Next action: Lakukan checkpoint commit dan push ke origin/codex/b2b2h-safe-demo-mode, buat PR ke main tanpa merge.
+
+
 
 
 Gunakan dokumen ini untuk memulihkan konteks ketika melanjutkan pekerjaan dari laptop, task, atau sesi AI lain.

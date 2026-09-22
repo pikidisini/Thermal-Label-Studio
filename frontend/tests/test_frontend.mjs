@@ -197,7 +197,127 @@ test('apiClient Mock Integration Tests', async (t) => {
     assert.equal(res.success, true);
     assert.equal(res.total_labels, 5);
   });
+
+  await t.test('safeDemo.getBatch calls /api/v1/safe-demo/batch', async () => {
+    let capturedUrl = null;
+    global.fetch = async (url) => {
+      capturedUrl = url;
+      return {
+        ok: true,
+        json: async () => ({
+          batch_id: 'demo-batch-001',
+          total_items: 3,
+          disclaimer: 'Demo data / not SAP production data',
+          items: [
+            { item_sequence: 1, copies: 1, canonical_item_data: { roll_number: 'R1' } },
+            { item_sequence: 2, copies: 1, canonical_item_data: { roll_number: 'R2' } },
+            { item_sequence: 3, copies: 1, canonical_item_data: { roll_number: 'R3' } },
+          ],
+        }),
+      };
+    };
+
+    const batch = await apiClient.safeDemo.getBatch();
+    assert.ok(capturedUrl.endsWith('/api/v1/safe-demo/batch'));
+    assert.equal(batch.batch_id, 'demo-batch-001');
+    assert.equal(batch.total_items, 3);
+    assert.equal(batch.items.length, 3);
+    assert.equal(batch.items[0].copies, 1);
+  });
+
+  await t.test('safeDemo.getBatch handles 404 fail-closed gracefully', async () => {
+    global.fetch = async () => ({
+      ok: false,
+      status: 404,
+      json: async () => ({ detail: 'Safe demo mode is disabled.' }),
+    });
+
+    await assert.rejects(
+      async () => await apiClient.safeDemo.getBatch(),
+      /Safe Demo Mode dinonaktifkan di backend/
+    );
+  });
+
+  await t.test('safeDemo.runDemo dispatches POST /api/v1/safe-demo/run', async () => {
+    let capturedUrl = null;
+    let capturedOpts = null;
+    global.fetch = async (url, opts) => {
+      capturedUrl = url;
+      capturedOpts = opts;
+      return {
+        ok: true,
+        json: async () => ({
+          batch_id: 'demo-batch-001',
+          status: 'completed',
+          items: [
+            { item_sequence: 1, status: 'sent_to_simulator', status_display: 'Terkirim ke simulator — tidak dicetak fisik' },
+          ],
+        }),
+      };
+    };
+
+    const res = await apiClient.safeDemo.runDemo();
+    assert.ok(capturedUrl.endsWith('/api/v1/safe-demo/run'));
+    assert.equal(capturedOpts.method, 'POST');
+    assert.equal(res.status, 'completed');
+    assert.equal(res.items[0].status_display, 'Terkirim ke simulator — tidak dicetak fisik');
+  });
+
+  await t.test('safeDemo.resetDemo dispatches POST /api/v1/safe-demo/reset', async () => {
+    let capturedUrl = null;
+    let capturedOpts = null;
+    global.fetch = async (url, opts) => {
+      capturedUrl = url;
+      capturedOpts = opts;
+      return {
+        ok: true,
+        json: async () => ({
+          status: 'reset_completed',
+          message: 'Reset success',
+          batch: { batch_id: 'demo-batch-001', status: 'ready' },
+        }),
+      };
+    };
+
+    const res = await apiClient.safeDemo.resetDemo();
+    assert.ok(capturedUrl.endsWith('/api/v1/safe-demo/reset'));
+    assert.equal(capturedOpts.method, 'POST');
+    assert.equal(res.status, 'reset_completed');
+    assert.equal(res.batch.status, 'ready');
+  });
+
+  await t.test('safeDemo.checkEnabled returns true when safe_demo_mode is true', async () => {
+    global.fetch = async (url) => {
+      assert.equal(url, '/api/status');
+      return {
+        ok: true,
+        json: async () => ({ status: 'online', safe_demo_mode: true }),
+      };
+    };
+
+    const enabled = await apiClient.safeDemo.checkEnabled();
+    assert.equal(enabled, true);
+  });
+
+  await t.test('safeDemo.checkEnabled returns false (fail-closed) when safe_demo_mode is false or error', async () => {
+    // 1. False in response
+    global.fetch = async () => ({
+      ok: true,
+      json: async () => ({ status: 'online', safe_demo_mode: false }),
+    });
+    let enabled = await apiClient.safeDemo.checkEnabled();
+    assert.equal(enabled, false);
+
+    // 2. Network error
+    global.fetch = async () => {
+      throw new Error('Network failure');
+    };
+    enabled = await apiClient.safeDemo.checkEnabled();
+    assert.equal(enabled, false);
+  });
 });
+
+
 
 test('SAP contract adapter keeps raw contract and exposes scalar UI tokens', () => {
   const { rawContract, tokenMap } = adaptSapContract({

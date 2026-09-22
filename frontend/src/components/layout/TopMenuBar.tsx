@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { ViewMode } from '../../types/label';
 import { TemplateMetadata } from '../../types/template';
 import { TemplateSelector } from './topbar/TemplateSelector';
@@ -17,7 +17,11 @@ interface TopMenuBarProps {
   onOpenPrint: () => void;
   onOpenShortcuts: () => void;
   onOpenDiagnostics: () => void;
+  onOpenSafeDemo: () => void;
+  isSafeDemoEnabled?: boolean;
 }
+
+
 
 /** Row 1 — 40px brand bar */
 function BrandRow() {
@@ -71,6 +75,8 @@ export function TopMenuBar({
   onOpenPrint,
   onOpenShortcuts,
   onOpenDiagnostics,
+  onOpenSafeDemo,
+  isSafeDemoEnabled,
 }: TopMenuBarProps) {
   return (
     <header data-testid="container-top-menubar" className="flex flex-col select-none z-20 shadow-md">
@@ -98,6 +104,8 @@ export function TopMenuBar({
           onOpenPrint={onOpenPrint}
           onOpenShortcuts={onOpenShortcuts}
           onOpenDiagnostics={onOpenDiagnostics}
+          onOpenSafeDemo={onOpenSafeDemo}
+          isSafeDemoEnabled={isSafeDemoEnabled}
         />
       </div>
     </header>
