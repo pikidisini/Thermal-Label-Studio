@@ -1,33 +1,24 @@
 # AI Handoff — Thermal Label Studio
 
-## Active snapshot — B2B2H Safe Demo Mode & Batch Monitoring (APPROVED_FOR_CHECKPOINT)
+## Active snapshot — B2B2I SAP Shadow Print Simulation & PDF Batch Evidence (Pass 4 P1 Atomicity Resolved — WAITING_FOR_CODEX_FINAL_REVIEW)
 
 - Date: `2026-09-22`
 - Repository: `Thermal-Label-Studio` (`web_app/`)
-- Baseline: `main` at `43abb3f`
-- Active branch: `codex/b2b2h-safe-demo-mode`
-- Status: `APPROVED_FOR_CHECKPOINT`; Codex Level-3 review selesai dengan status APPROVED_FOR_CHECKPOINT; checkpoint commit dan PR ke main diotorisasi oleh pengguna.
-- Pull Request: https://github.com/pikidisini/Thermal-Label-Studio/pull/19
-- Checkpoint Commit: `8750d18`
-- Executor: `Gemini Flash via Antigravity`.
-
-- Scope: Safe Demo Mode & Batch Monitoring (Backend fail-closed guard `SAFE_DEMO_MODE=false` default, isolated in-memory `SafeDemoService` dispatches strictly to `SimulatorSocketTransport`, synthetic multi-item sequential batch fixture with `copies=1`, 3-panel React UI `SafeDemoModal.tsx` + conditional `TopBarActions.tsx`, human-readable explicit status `"Terkirim ke simulator — tidak dicetak fisik"`, safe in-memory reset, zero socket/network usage, Playwright scoped test runner).
-- Physical printer status: `NOT RUN` (dilarang dalam scope B2B2H; verifikasi 100% menggunakan simulator).
+- Baseline: `main` at `fd8dd4e` after B2B2H merge.
+- Active branch: `codex/b2b2i-sap-shadow-print-simulation`
+- Status: `CORE_COMPLETED — WAITING_FOR_CODEX_FINAL_REVIEW`; Seluruh core SAP-to-PDF selesai 100% setelah perbaikan P1 Atomicity & startup recovery. AC 7 PPIC interactive monitoring ditunda secara formal ke fase Identity Provider/RBAC. Berhenti sebelum commit/push/PR/merge.
+- Executor: `Gemini Flash 3.8 via Antigravity`; Reviewer: `Codex`.
+- Scope: Inbound canonical SAP JSON via `POST /api/v1/simulation/sap-batches`, reuse real rendering pipeline (`inject_data`, `inject_barcodes_and_qr`, `svg_to_png`), virtual PDF sink, multi-page PDF batch evidence ordered/watermarked dengan ReportLab, durable filesystem persistence di `simulation_batches/`, fail-closed anonymous access rejection (P1-A), UI fail-closed "monitoring requires identity provider" (AC 7 ditunda), explicit startup recovery policy "Controlled Virtual Resume on Startup" (P1-B), atomisitas batch record vs idempotency index dengan proof of commit validation, fail-closed startup recovery error handling, dan zero orphan batch. Tidak ada live SAP/RFC/OData/credential, printer fisik/TCP 9100/Spooler, atau deployment intranet.
 - Quality Gate:
-  - Backend Safe Demo tests: `7 passed, 0 failed` in 1.35s (`backend/tests/test_safe_demo.py`).
-  - Full backend regression: `238 passed, 21 skipped, 0 failed` in 45.62s.
-  - Frontend unit tests: `51 passed, 0 failed` in 0.94s (`npm test`).
-  - Frontend typecheck: `npx tsc --noEmit` lulus (0 errors).
-  - Frontend production build: `npm run build` lulus (7.09s).
-  - Playwright E2E browser tests: `2 passed` in 22.9s (`safe_demo.spec.js` checked-in) + `5 passed` in 50.0s (`phase2_integration.spec.js`).
-  - Whitespace diff check: `git diff --check` lulus (0 errors).
-- Task files: `docs/tasks/B2B2H/TASK_CONTRACT.md`, `docs/tasks/B2B2H/RESULT.md`, `docs/tasks/B2B2H/REVIEW.md`.
-- Next action: Lakukan checkpoint commit dan push ke origin/codex/b2b2h-safe-demo-mode, buat PR ke main tanpa merge.
-
-
-
-
-Gunakan dokumen ini untuk memulihkan konteks ketika melanjutkan pekerjaan dari laptop, task, atau sesi AI lain.
+  - Targeted SAP simulation backend suite (AC 1-8, P1, P2, P1-A, P1-B, P1-Final, Regressions): `24 passed` in 38.28s (`backend/tests/test_sap_shadow_simulation.py`).
+  - Regression persistence/transport/safety: `86 passed, 6 skipped` in 10.98s (`test_durable_artifact_storage.py`, `test_socket_transport.py`, `test_pilot_safety_hardening.py`, `test_print_job_v1.py`, `test_central_dispatcher_runner.py`).
+  - Full backend test suite: `262 passed, 21 skipped` in 60.96s.
+  - Frontend unit tests: `59 passed, 0 failed` in 0.55s (`npm run test` di `frontend/`).
+  - Frontend production build: `npm run build` sukses (`built in 6.68s`).
+  - Playwright E2E tests: `2 passed` in 20.0s (`sap_shadow_simulation.spec.js` - default-off hidden & fail-closed IdP status modal).
+  - Whitespace & syntax check: `git diff --check` bersih (0 errors).
+- Task files: `docs/tasks/B2B2I/TASK_CONTRACT.md`, `docs/tasks/B2B2I/REVIEW.md`, `docs/tasks/B2B2I/RESULT.md`, `docs/architecture/sap_shadow_simulation_contract.md`.
+- Next action: Menunggu review akhir dari Codex sebelum commit/push/PR.
 
 ## Snapshot sesi saat ini
 

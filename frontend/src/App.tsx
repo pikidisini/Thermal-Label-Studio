@@ -33,10 +33,12 @@ import SaveTemplateModal from './components/modals/SaveTemplateModal';
 import ShortcutHelpModal from './components/modals/ShortcutHelpModal';
 import AiDiagnosticsModal from './components/modals/AiDiagnosticsModal';
 import SafeDemoModal from './components/modals/SafeDemoModal';
+import SapShadowSimulationModal from './components/modals/SapShadowSimulationModal';
 
 // Utilities
 import { exportFabricToSvg } from './utils/fabricSvgExporter';
 import { safeDemoApi } from './utils/api/safeDemoApi';
+import { sapShadowSimulationApi } from './utils/api/sapShadowSimulationApi';
 
 
 export default function App() {
@@ -56,12 +58,16 @@ export default function App() {
     isDiagnosticsModalOpen,
     isSafeDemoModalOpen,
     isSafeDemoEnabled,
+    isSapShadowSimulationModalOpen,
+    isSapShadowSimulationEnabled,
     setCanvasModalOpen,
     setSaveModalOpen,
     setShortcutModalOpen,
     setDiagnosticsModalOpen,
     setSafeDemoModalOpen,
     setIsSafeDemoEnabled,
+    setSapShadowSimulationModalOpen,
+    setIsSapShadowSimulationEnabled,
   } = useTemplateStore();
 
   const { sampleContracts, activeContractKey, jsonData, tokenMap, usedTokens, switchContract } = useContractStore();
@@ -84,7 +90,10 @@ export default function App() {
     safeDemoApi.checkEnabled().then((enabled) => {
       setIsSafeDemoEnabled(enabled);
     });
-  }, [setIsSafeDemoEnabled]);
+    sapShadowSimulationApi.checkEnabled().then((enabled) => {
+      setIsSapShadowSimulationEnabled(enabled);
+    });
+  }, [setIsSafeDemoEnabled, setIsSapShadowSimulationEnabled]);
 
 
   React.useEffect(() => {
@@ -155,6 +164,8 @@ export default function App() {
         onOpenDiagnostics={() => setDiagnosticsModalOpen(true)}
         onOpenSafeDemo={() => setSafeDemoModalOpen(true)}
         isSafeDemoEnabled={isSafeDemoEnabled}
+        onOpenSapSimulation={() => setSapShadowSimulationModalOpen(true)}
+        isSapShadowSimulationEnabled={isSapShadowSimulationEnabled}
       />
 
 
@@ -282,6 +293,11 @@ export default function App() {
       <SafeDemoModal
         isOpen={isSafeDemoModalOpen}
         onClose={() => setSafeDemoModalOpen(false)}
+      />
+
+      <SapShadowSimulationModal
+        isOpen={isSapShadowSimulationModalOpen}
+        onClose={() => setSapShadowSimulationModalOpen(false)}
       />
     </div>
   );

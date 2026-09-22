@@ -13,6 +13,8 @@ interface TemplateState {
   isDiagnosticsModalOpen: boolean;
   isSafeDemoModalOpen: boolean;
   isSafeDemoEnabled: boolean;
+  isSapShadowSimulationModalOpen: boolean;
+  isSapShadowSimulationEnabled: boolean;
   isDirty: boolean;
 
   // Actions
@@ -28,6 +30,8 @@ interface TemplateState {
   setDiagnosticsModalOpen: (open: boolean) => void;
   setSafeDemoModalOpen: (open: boolean) => void;
   setIsSafeDemoEnabled: (enabled: boolean) => void;
+  setSapShadowSimulationModalOpen: (open: boolean) => void;
+  setIsSapShadowSimulationEnabled: (enabled: boolean) => void;
   setIsDirty: (dirty: boolean) => void;
 }
 
@@ -43,6 +47,8 @@ export const useTemplateStore = create<TemplateState>((set) => ({
   isDiagnosticsModalOpen: false,
   isSafeDemoModalOpen: false,
   isSafeDemoEnabled: false,
+  isSapShadowSimulationModalOpen: false,
+  isSapShadowSimulationEnabled: false,
   isDirty: false,
 
   setTemplates: (templates) => set({ templates }),
@@ -58,5 +64,9 @@ export const useTemplateStore = create<TemplateState>((set) => ({
   setDiagnosticsModalOpen: (isDiagnosticsModalOpen) => set({ isDiagnosticsModalOpen }),
   setSafeDemoModalOpen: (isSafeDemoModalOpen) => set({ isSafeDemoModalOpen }),
   setIsSafeDemoEnabled: (isSafeDemoEnabled) => set({ isSafeDemoEnabled }),
+  setSapShadowSimulationModalOpen: (isSapShadowSimulationModalOpen) =>
+    set({ isSapShadowSimulationModalOpen }),
+  setIsSapShadowSimulationEnabled: (isSapShadowSimulationEnabled) =>
+    set({ isSapShadowSimulationEnabled }),
   setIsDirty: (isDirty) => set({ isDirty }),
 }));

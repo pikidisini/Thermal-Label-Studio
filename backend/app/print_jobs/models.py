@@ -42,8 +42,8 @@ class ArtifactReference(StrictModel):
         max_length=128,
         pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
     )
-    filename: Literal["label.ipl", "label.zpl"]
-    media_type: Literal["application/octet-stream"]
+    filename: Literal["label.ipl", "label.zpl", "evidence.pdf"]
+    media_type: Literal["application/octet-stream", "application/pdf"]
     byte_length: int = Field(gt=0, le=10 * 1024 * 1024)
 
 

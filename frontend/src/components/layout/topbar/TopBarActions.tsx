@@ -11,6 +11,8 @@ interface TopBarActionsProps {
   onOpenDiagnostics: () => void;
   onOpenSafeDemo: () => void;
   isSafeDemoEnabled?: boolean;
+  onOpenSapSimulation?: () => void;
+  isSapShadowSimulationEnabled?: boolean;
 }
 
 
@@ -61,6 +63,8 @@ export function TopBarActions({
   onOpenDiagnostics,
   onOpenSafeDemo,
   isSafeDemoEnabled = false,
+  onOpenSapSimulation,
+  isSapShadowSimulationEnabled = false,
 }: TopBarActionsProps) {
   return (
     <div data-testid="container-topbar-actions" className="flex items-center gap-1">
@@ -102,6 +106,19 @@ export function TopBarActions({
         >
           <span className="material-symbols-outlined" style={{ fontSize: 14 }}>smart_display</span>
           <span className="hidden sm:inline">Safe Demo</span>
+        </button>
+      )}
+
+      {/* SAP Shadow Simulation Button (Only visible when backend sap_shadow_simulation_enabled is active) */}
+      {isSapShadowSimulationEnabled && (
+        <button
+          data-testid="btn-sap-simulation"
+          onClick={onOpenSapSimulation}
+          title="SAP Shadow Simulation (Virtual PDF Evidence)"
+          className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium transition-all bg-amber-950/50 text-amber-300 border border-amber-500/40 hover:bg-amber-900/60 hover:border-amber-400 rounded-sm"
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>picture_as_pdf</span>
+          <span className="hidden sm:inline">SAP Simulation</span>
         </button>
       )}
 

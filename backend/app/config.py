@@ -65,3 +65,25 @@ def is_safe_demo_enabled() -> bool:
 
 
 SAFE_DEMO_MODE = is_safe_demo_enabled()
+
+
+def is_sap_shadow_simulation_enabled() -> bool:
+    """Check if SAP shadow print simulation mode is explicitly enabled via environment variable.
+
+    Defaults to False for fail-closed security.
+    """
+    return os.getenv("SAP_SHADOW_SIMULATION_ENABLED", "false").strip().lower() in ("true", "1", "yes")
+
+
+SAP_SHADOW_SIMULATION_ENABLED = is_sap_shadow_simulation_enabled()
+
+
+def get_sap_simulation_auth_token() -> str:
+    """Retrieve configured token for authenticating SAP shadow simulation requests.
+
+    Must be explicitly set; empty token fails closed.
+    """
+    return os.getenv("SAP_SIMULATION_AUTH_TOKEN", "").strip()
+
+
+SAP_SIMULATION_AUTH_TOKEN = get_sap_simulation_auth_token()
