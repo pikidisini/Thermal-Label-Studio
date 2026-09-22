@@ -119,4 +119,3 @@ test.describe('Safe Demo Mode (B2B2H) End-to-End Suite', () => {
     await expect(modal).not.toBeVisible();
   });
 });
-
