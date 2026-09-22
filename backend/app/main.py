@@ -6,10 +6,13 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+
+logger = logging.getLogger("main")
 
 from .api import (
     inspect_router,
@@ -18,6 +21,7 @@ from .api import (
     render_router,
     safe_demo_router,
     sap_router,
+    simulation_router,
     templates_router,
 )
 from .api.routes_print_agent import (
@@ -31,6 +35,7 @@ from .config import (
     CORS_ORIGINS,
     FRONTEND_DIR,
     is_safe_demo_enabled,
+    is_sap_shadow_simulation_enabled,
 )
 
 from .services.cleanup_service import storage_cleanup_worker
@@ -40,6 +45,18 @@ from .services.cleanup_service import storage_cleanup_worker
 async def lifespan(app: FastAPI):
     """Application lifespan context manager managing background worker tasks."""
     initialize_print_agent_state(app)
+    # P1-B: Controlled virtual simulation recovery on startup (Fail-Closed)
+    if is_sap_shadow_simulation_enabled():
+        from .services.sap_shadow_service import sap_shadow_service
+        try:
+            sap_shadow_service.recover_on_startup()
+        except Exception as exc:
+            logger.critical(
+                "SAP shadow simulation startup recovery failed: %s. Aborting startup to fail closed.",
+                exc,
+                exc_info=True,
+            )
+            raise RuntimeError(f"SAP shadow simulation startup recovery failed: {exc}") from exc
     cleanup_task = asyncio.create_task(storage_cleanup_worker(interval_seconds=1800, max_age_seconds=7200))
     try:
         yield
@@ -78,6 +95,7 @@ app.include_router(inspect_router, prefix="/api/v1")
 app.include_router(sap_router, prefix="/api/v1")
 app.include_router(print_agent_router, prefix="/api/v1")
 app.include_router(safe_demo_router, prefix="/api/v1")
+app.include_router(simulation_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["System"])
@@ -96,6 +114,7 @@ def api_status():
         "version": APP_VERSION,
         "docs_url": "/docs",
         "safe_demo_mode": is_safe_demo_enabled(),
+        "sap_shadow_simulation_enabled": is_sap_shadow_simulation_enabled(),
         "endpoints": {
             "templates": "/api/v1/templates",
             "render": "/api/v1/render",
@@ -104,6 +123,8 @@ def api_status():
             "print_spooler": "/api/v1/print/spooler",
             "print_batch": "/api/v1/print/batch",
             "safe_demo": "/api/v1/safe-demo/batch",
+            "simulation_batches": "/api/v1/simulation/sap-batches",
+            "simulation_status": "/api/v1/simulation/status",
             "inspect": "/api/v1/inspect/validate",
             "sap_ping": "/api/v1/sap/ping",
             "sap_print": "/api/v1/sap/print",

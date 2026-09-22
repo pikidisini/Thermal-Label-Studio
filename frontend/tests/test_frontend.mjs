@@ -9,6 +9,7 @@ import { renderApi } from '../src/utils/api/renderApi.ts';
 import { barcodeGenerators } from '../src/utils/barcodeGenerators.ts';
 import { INDUSTRIAL_SYMBOLS, getSymbolSvg } from '../src/utils/industrialSymbols.ts';
 import { adaptSapContract } from '../src/utils/sapContractAdapter.ts';
+import { sapShadowSimulationApi } from '../src/utils/api/sapShadowSimulationApi.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -873,5 +874,145 @@ test('Fitur 2 - Vector Toolbox Tools & Token Bindings Suite', async (t) => {
     assert.ok(usedTokens.has('material_number'));
     assert.ok(usedTokens.has('batch_number'));
     assert.ok(usedTokens.has('gross_weight_kg'));
+  });
+});
+
+test('sapShadowSimulationApi Unit & Mock Integration Tests', async (t) => {
+  const originalFetch = global.fetch;
+
+  t.afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  await t.test('checkEnabled returns true when sap_shadow_simulation_enabled is true', async () => {
+    global.fetch = async (url) => {
+      assert.equal(url, '/api/status');
+      return {
+        ok: true,
+        json: async () => ({ status: 'online', sap_shadow_simulation_enabled: true }),
+      };
+    };
+
+    const enabled = await sapShadowSimulationApi.checkEnabled();
+    assert.equal(enabled, true);
+  });
+
+  await t.test('checkEnabled returns false on error or disabled', async () => {
+    global.fetch = async () => ({
+      ok: false,
+      status: 500,
+    });
+
+    const enabled = await sapShadowSimulationApi.checkEnabled();
+    assert.equal(enabled, false);
+  });
+
+  await t.test('submitBatch sends POST to /api/v1/simulation/sap-batches with token header', async () => {
+    let capturedUrl = '';
+    let capturedMethod = '';
+    let capturedHeaders = {};
+    let capturedBody = '';
+
+    global.fetch = async (url, opts) => {
+      capturedUrl = url;
+      capturedMethod = opts.method;
+      capturedHeaders = opts.headers;
+      capturedBody = opts.body;
+      return {
+        ok: true,
+        json: async () => ({
+          batch_id: 'batch-mock-123',
+          status: 'accepted',
+          total_items: 1,
+          idempotent_replay: false,
+        }),
+      };
+    };
+
+    const requestPayload = {
+      producer_namespace: 'SAP_PPIC',
+      request_id: 'REQ-MOCK-01',
+      printer_id: 'PILOT-PRINTER-01',
+      items: [
+        {
+          item_sequence: 1,
+          template_version_id: 'label_roll_80x200',
+          canonical_item_data: { material_code: 'MAT-01' },
+        },
+      ],
+    };
+
+    const res = await sapShadowSimulationApi.submitBatch(requestPayload, 'secret-token-xyz');
+    assert.ok(capturedUrl.endsWith('/api/v1/simulation/sap-batches'));
+    assert.equal(capturedMethod, 'POST');
+    assert.equal(capturedHeaders['X-SAP-Simulation-Token'], 'secret-token-xyz');
+    assert.equal(res.batch_id, 'batch-mock-123');
+    assert.equal(res.status, 'accepted');
+  });
+
+  await t.test('submitBatch handles 401/403 authorization failures with clear message', async () => {
+    global.fetch = async () => ({
+      ok: false,
+      status: 401,
+      json: async () => ({ detail: 'Invalid or missing simulation authorization token.' }),
+    });
+
+    await assert.rejects(
+      async () => {
+        await sapShadowSimulationApi.submitBatch(
+          { producer_namespace: 'SAP', request_id: 'R1', printer_id: 'P1', items: [] },
+          'wrong-token'
+        );
+      },
+      /Otorisasi token simulasi gagal/
+    );
+  });
+
+  await t.test('getBatch calls /api/v1/simulation/sap-batches/:batchId with token header', async () => {
+    global.fetch = async (url, opts) => {
+      assert.ok(url.endsWith('/api/v1/simulation/sap-batches/b-123'));
+      assert.equal(opts.headers['X-SAP-Simulation-Token'], 'token-abc');
+      return {
+        ok: true,
+        json: async () => ({
+          batch_id: 'b-123',
+          status: 'completed',
+          total_items: 2,
+          completed_items: 2,
+          items: [],
+        }),
+      };
+    };
+
+    const record = await sapShadowSimulationApi.getBatch('b-123', 'token-abc');
+    assert.equal(record.batch_id, 'b-123');
+    assert.equal(record.status, 'completed');
+  });
+
+  await t.test('listBatches calls GET /api/v1/simulation/sap-batches', async () => {
+    global.fetch = async (url) => {
+      assert.ok(url.endsWith('/api/v1/simulation/sap-batches'));
+      return {
+        ok: true,
+        json: async () => [
+          {
+            batch_id: 'b-001',
+            status: 'completed',
+            total_items: 3,
+            created_at: '2026-09-22T08:00:00Z',
+          },
+        ],
+      };
+    };
+
+    const batches = await sapShadowSimulationApi.listBatches();
+    assert.equal(batches.length, 1);
+    assert.equal(batches[0].batch_id, 'b-001');
+    assert.equal(batches[0].status, 'completed');
+  });
+
+  await t.test('getDownloadUrl returns proper endpoint URI', () => {
+    const url = sapShadowSimulationApi.getDownloadUrl('batch-abc-123');
+    assert.ok(url.endsWith('/api/v1/simulation/sap-batches/batch-abc-123/pdf'));
   });
 });

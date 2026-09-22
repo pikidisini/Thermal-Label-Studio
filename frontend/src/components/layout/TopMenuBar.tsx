@@ -19,6 +19,8 @@ interface TopMenuBarProps {
   onOpenDiagnostics: () => void;
   onOpenSafeDemo: () => void;
   isSafeDemoEnabled?: boolean;
+  onOpenSapSimulation?: () => void;
+  isSapShadowSimulationEnabled?: boolean;
 }
 
 
@@ -77,6 +79,8 @@ export function TopMenuBar({
   onOpenDiagnostics,
   onOpenSafeDemo,
   isSafeDemoEnabled,
+  onOpenSapSimulation,
+  isSapShadowSimulationEnabled,
 }: TopMenuBarProps) {
   return (
     <header data-testid="container-top-menubar" className="flex flex-col select-none z-20 shadow-md">
@@ -106,6 +110,8 @@ export function TopMenuBar({
           onOpenDiagnostics={onOpenDiagnostics}
           onOpenSafeDemo={onOpenSafeDemo}
           isSafeDemoEnabled={isSafeDemoEnabled}
+          onOpenSapSimulation={onOpenSapSimulation}
+          isSapShadowSimulationEnabled={isSapShadowSimulationEnabled}
         />
       </div>
     </header>

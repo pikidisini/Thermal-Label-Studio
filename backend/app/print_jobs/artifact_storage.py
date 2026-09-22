@@ -18,7 +18,7 @@ from .models import ArtifactReference, PrinterLanguage
 
 DEFAULT_RETENTION = timedelta(days=7)
 MANIFEST_SCHEMA_VERSION = "1.0"
-ALLOWED_FILENAMES = frozenset({"label.ipl", "label.zpl"})
+ALLOWED_FILENAMES = frozenset({"label.ipl", "label.zpl", "evidence.pdf"})
 
 
 class ArtifactIntegrityError(ValueError):
@@ -270,10 +270,11 @@ class DurableFilesystemArtifactStorage:
             raise ArtifactIntegrityError("payload byte length must be between 1 and 10MB")
         checksum = self.checksum(payload_bytes)
 
+        media_type = "application/pdf" if filename.endswith(".pdf") else "application/octet-stream"
         artifact = ArtifactReference(
             payload_ref=payload_ref,
             filename=filename,
-            media_type="application/octet-stream",
+            media_type=media_type,
             byte_length=byte_length,
         )
 
@@ -308,7 +309,7 @@ class DurableFilesystemArtifactStorage:
                 schema_version=MANIFEST_SCHEMA_VERSION,
                 payload_ref=payload_ref,
                 filename=filename,
-                media_type="application/octet-stream",
+                media_type=media_type,
                 byte_length=byte_length,
                 sha256=checksum,
                 created_at=now.isoformat(),
@@ -424,10 +425,11 @@ class TemporaryArtifactStorage:
         return self._path_for(payload_ref).with_suffix(".metadata.json")
 
     def put(self, payload_ref: str, filename: str, payload: bytes) -> ArtifactReference:
+        media_type = "application/pdf" if filename.endswith(".pdf") else "application/octet-stream"
         artifact = ArtifactReference(
             payload_ref=payload_ref,
             filename=filename,
-            media_type="application/octet-stream",
+            media_type=media_type,
             byte_length=len(payload),
         )
         path = self._path_for(payload_ref)
