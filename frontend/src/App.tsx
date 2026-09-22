@@ -32,9 +32,12 @@ import PrintModal from './components/modals/PrintModal';
 import SaveTemplateModal from './components/modals/SaveTemplateModal';
 import ShortcutHelpModal from './components/modals/ShortcutHelpModal';
 import AiDiagnosticsModal from './components/modals/AiDiagnosticsModal';
+import SafeDemoModal from './components/modals/SafeDemoModal';
 
 // Utilities
 import { exportFabricToSvg } from './utils/fabricSvgExporter';
+import { safeDemoApi } from './utils/api/safeDemoApi';
+
 
 export default function App() {
   const canvasRef = useRef<fabric.Canvas | null>(null);
@@ -51,10 +54,14 @@ export default function App() {
     isSaveModalOpen,
     isShortcutModalOpen,
     isDiagnosticsModalOpen,
+    isSafeDemoModalOpen,
+    isSafeDemoEnabled,
     setCanvasModalOpen,
     setSaveModalOpen,
     setShortcutModalOpen,
     setDiagnosticsModalOpen,
+    setSafeDemoModalOpen,
+    setIsSafeDemoEnabled,
   } = useTemplateStore();
 
   const { sampleContracts, activeContractKey, jsonData, tokenMap, usedTokens, switchContract } = useContractStore();
@@ -74,7 +81,11 @@ export default function App() {
 
   React.useEffect(() => {
     templateMgr.initData();
-  }, []);
+    safeDemoApi.checkEnabled().then((enabled) => {
+      setIsSafeDemoEnabled(enabled);
+    });
+  }, [setIsSafeDemoEnabled]);
+
 
   React.useEffect(() => {
     const handleResize = () => {
@@ -142,7 +153,11 @@ export default function App() {
         onOpenPrint={() => setPrintModalOpen(true)}
         onOpenShortcuts={() => setShortcutModalOpen(true)}
         onOpenDiagnostics={() => setDiagnosticsModalOpen(true)}
+        onOpenSafeDemo={() => setSafeDemoModalOpen(true)}
+        isSafeDemoEnabled={isSafeDemoEnabled}
       />
+
+
 
       {viewMode === 'design' && (
         <PropertyRibbon
@@ -262,6 +277,11 @@ export default function App() {
         isOpen={isDiagnosticsModalOpen}
         onClose={() => setDiagnosticsModalOpen(false)}
         fabricCanvas={canvasRef.current}
+      />
+
+      <SafeDemoModal
+        isOpen={isSafeDemoModalOpen}
+        onClose={() => setSafeDemoModalOpen(false)}
       />
     </div>
   );

@@ -2,6 +2,7 @@ import { templatesApi } from './api/templatesApi';
 import { renderApi } from './api/renderApi';
 import { printApi } from './api/printApi';
 import { sapApi } from './api/sapApi';
+import { safeDemoApi } from './api/safeDemoApi';
 
 export const apiClient = {
   // Template Services
@@ -22,9 +23,13 @@ export const apiClient = {
   printDirect: printApi.printDirect,
   printBatch: printApi.printBatch,
 
+  // Safe Demo Mode & Batch Monitoring
+  safeDemo: safeDemoApi,
+
   // SAP Contracts & Inspection
   getSampleContracts: sapApi.getSampleContracts,
   validateSapPayload: sapApi.validateSapPayload,
 };
+
 
 export default apiClient;

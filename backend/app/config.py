@@ -54,3 +54,14 @@ CORS_ORIGINS: List[str] = [
 DEFAULT_DPI = 203.2
 DEFAULT_WIDTH_MM = 200.0
 DEFAULT_HEIGHT_MM = 80.0
+
+
+def is_safe_demo_enabled() -> bool:
+    """Check if safe demo mode is explicitly enabled via environment variable.
+
+    Defaults to False for fail-closed security.
+    """
+    return os.getenv("SAFE_DEMO_MODE", "false").strip().lower() in ("true", "1", "yes")
+
+
+SAFE_DEMO_MODE = is_safe_demo_enabled()

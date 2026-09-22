@@ -9,7 +9,10 @@ interface TopBarActionsProps {
   onOpenPrint: () => void;
   onOpenShortcuts: () => void;
   onOpenDiagnostics: () => void;
+  onOpenSafeDemo: () => void;
+  isSafeDemoEnabled?: boolean;
 }
+
 
 interface ViewBtn {
   mode: ViewMode;
@@ -56,6 +59,8 @@ export function TopBarActions({
   onOpenPrint,
   onOpenShortcuts,
   onOpenDiagnostics,
+  onOpenSafeDemo,
+  isSafeDemoEnabled = false,
 }: TopBarActionsProps) {
   return (
     <div data-testid="container-topbar-actions" className="flex items-center gap-1">
@@ -87,7 +92,21 @@ export function TopBarActions({
       <IconBtn icon="help_outline" title="Keyboard Shortcuts"   onClick={onOpenShortcuts}                   testId="btn-shortcuts-help" />
       <IconBtn icon="monitoring"   title="AI Diagnostics"       onClick={onOpenDiagnostics}                 testId="btn-ai-diagnostics" />
 
+      {/* Safe Demo Button (Only visible when backend safe_demo_mode is active) */}
+      {isSafeDemoEnabled && (
+        <button
+          data-testid="btn-safe-demo"
+          onClick={onOpenSafeDemo}
+          title="Safe Demo Mode (Simulator)"
+          className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium transition-all bg-emerald-950/50 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-900/60 hover:border-emerald-400 rounded-sm"
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>smart_display</span>
+          <span className="hidden sm:inline">Safe Demo</span>
+        </button>
+      )}
+
       <div className="w-px h-4 bg-outline-variant mx-1" />
+
 
       {/* Primary CTA */}
       <button

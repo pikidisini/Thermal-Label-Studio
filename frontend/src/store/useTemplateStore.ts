@@ -11,6 +11,8 @@ interface TemplateState {
   isSaveModalOpen: boolean;
   isShortcutModalOpen: boolean;
   isDiagnosticsModalOpen: boolean;
+  isSafeDemoModalOpen: boolean;
+  isSafeDemoEnabled: boolean;
   isDirty: boolean;
 
   // Actions
@@ -24,6 +26,8 @@ interface TemplateState {
   setSaveModalOpen: (open: boolean) => void;
   setShortcutModalOpen: (open: boolean) => void;
   setDiagnosticsModalOpen: (open: boolean) => void;
+  setSafeDemoModalOpen: (open: boolean) => void;
+  setIsSafeDemoEnabled: (enabled: boolean) => void;
   setIsDirty: (dirty: boolean) => void;
 }
 
@@ -37,6 +41,8 @@ export const useTemplateStore = create<TemplateState>((set) => ({
   isSaveModalOpen: false,
   isShortcutModalOpen: false,
   isDiagnosticsModalOpen: false,
+  isSafeDemoModalOpen: false,
+  isSafeDemoEnabled: false,
   isDirty: false,
 
   setTemplates: (templates) => set({ templates }),
@@ -50,5 +56,7 @@ export const useTemplateStore = create<TemplateState>((set) => ({
   setSaveModalOpen: (isSaveModalOpen) => set({ isSaveModalOpen }),
   setShortcutModalOpen: (isShortcutModalOpen) => set({ isShortcutModalOpen }),
   setDiagnosticsModalOpen: (isDiagnosticsModalOpen) => set({ isDiagnosticsModalOpen }),
+  setSafeDemoModalOpen: (isSafeDemoModalOpen) => set({ isSafeDemoModalOpen }),
+  setIsSafeDemoEnabled: (isSafeDemoEnabled) => set({ isSafeDemoEnabled }),
   setIsDirty: (isDirty) => set({ isDirty }),
 }));
