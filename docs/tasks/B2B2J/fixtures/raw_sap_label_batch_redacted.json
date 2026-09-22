@@ -1,0 +1,128 @@
+{
+  "_fixture_notice": "SYNTHETIC_REDACTED_DATA_ONLY: This fixture contains purely artificial synthetic values for structural schema validation. Zero real production values or live SAP references.",
+  "contract_schema_version": "1.0-raw",
+  "producer_namespace": "SAP_PPIC",
+  "request_id": "REQ-SYNTHETIC-20260922-RAW-001",
+  "source_provenance": {
+    "system_id": "SYN_DEV",
+    "mandt": "000",
+    "plant": "SYN_PLANT_1100",
+    "storage_location": "SYN_SLOC_0001",
+    "sap_user": "SYNTHETIC_TEST_USER",
+    "transaction_code": "ZMMR_LABELROL",
+    "snapshot_timestamp": "2026-09-22T00:00:00Z"
+  },
+  "items": [
+    {
+      "item_sequence": 1,
+      "label_code": "REDACTED_STANDARD_LABEL_CODE",
+      "copies": 1,
+      "raw_business_facts": {
+        "batch_number": "SYN-BATCH-2026-001",
+        "material_number": "SYN-MAT-00000001",
+        "material_description": "Synthetic Test Roll Film Grade A",
+        "roll_number": "SYN-ROLL-001",
+        "film_type_code": "PET_PLAIN",
+        "film_type_text": "PET PLAIN FILM",
+        "quality_grade": "A",
+        "dates_note": "STRUCTURAL_EXAMPLE_ONLY: Pure synthetic dates for structural schema testing. Not real SAP DEV output. In SAP, production_date is SAP_RESOLVED_TRANSITIONAL via Z_GET_PRODUCTION_DATE, and target expiry is APPLICATION_DERIVED_TARGET.",
+        "synthetic_production_date": "2026-09-22",
+        "synthetic_expiry_date": "2027-09-22",
+        "measurements": {
+          "thickness_micron": 12.0,
+          "width_mm": 80.0,
+          "length_meters": 2000.0,
+          "net_weight_kg": 12.1,
+          "core_diameter_inch": 3.0
+        },
+        "surface_treatment": {
+          "inside": "CORONA",
+          "outside": "NONE"
+        },
+        "splices": {
+          "splice_1_meters": 0.0,
+          "splice_2_meters": 0.0
+        },
+        "sales_order_ref": {
+          "sales_order": "SYN-SO-00000001",
+          "sales_order_item": "0010",
+          "customer_part_number": "SYN-CUST-PART-001"
+        }
+      }
+    },
+    {
+      "item_sequence": 2,
+      "label_code": "REDACTED_STANDARD_LABEL_CODE",
+      "copies": 1,
+      "raw_business_facts": {
+        "batch_number": "SYN-BATCH-2026-002",
+        "material_number": "SYN-MAT-00000002",
+        "material_description": "Synthetic Test Roll Film Grade B",
+        "roll_number": "SYN-ROLL-002",
+        "film_type_code": "BOPP_SEAL",
+        "film_type_text": "BOPP HEAT SEALABLE",
+        "quality_grade": "B",
+        "dates_note": "STRUCTURAL_EXAMPLE_ONLY: Pure synthetic dates for structural schema testing. Not real SAP DEV output. In SAP, production_date is SAP_RESOLVED_TRANSITIONAL via Z_GET_PRODUCTION_DATE, and target expiry is APPLICATION_DERIVED_TARGET.",
+        "synthetic_production_date": "2026-09-22",
+        "synthetic_expiry_date": "2027-09-22",
+        "measurements": {
+          "thickness_micron": 20.0,
+          "width_mm": 80.0,
+          "length_meters": 1500.0,
+          "net_weight_kg": 15.4,
+          "core_diameter_inch": 3.0
+        },
+        "surface_treatment": {
+          "inside": "FLAME",
+          "outside": "NONE"
+        },
+        "splices": {
+          "splice_1_meters": 100.0,
+          "splice_2_meters": 0.0
+        },
+        "sales_order_ref": {
+          "sales_order": "SYN-SO-00000001",
+          "sales_order_item": "0020",
+          "customer_part_number": "SYN-CUST-PART-001"
+        }
+      }
+    },
+    {
+      "item_sequence": 3,
+      "label_code": "REDACTED_STANDARD_LABEL_CODE",
+      "copies": 1,
+      "raw_business_facts": {
+        "batch_number": "SYN-BATCH-2026-003",
+        "material_number": "SYN-MAT-00000003",
+        "material_description": "Synthetic Test Roll Film Grade C",
+        "roll_number": "SYN-ROLL-003",
+        "film_type_code": "MET_PET",
+        "film_type_text": "METALLIZED BARRIER FILM",
+        "quality_grade": "C",
+        "dates_note": "STRUCTURAL_EXAMPLE_ONLY: Pure synthetic dates for structural schema testing. Not real SAP DEV output. In SAP, production_date is SAP_RESOLVED_TRANSITIONAL via Z_GET_PRODUCTION_DATE, and target expiry is APPLICATION_DERIVED_TARGET.",
+        "synthetic_production_date": "2026-09-22",
+        "synthetic_expiry_date": "2027-09-22",
+        "measurements": {
+          "thickness_micron": 15.0,
+          "width_mm": 80.0,
+          "length_meters": 1800.0,
+          "net_weight_kg": 17.75,
+          "core_diameter_inch": 6.0
+        },
+        "surface_treatment": {
+          "inside": "CORONA",
+          "outside": "CORONA"
+        },
+        "splices": {
+          "splice_1_meters": 0.0,
+          "splice_2_meters": 0.0
+        },
+        "sales_order_ref": {
+          "sales_order": "SYN-SO-00000002",
+          "sales_order_item": "0010",
+          "customer_part_number": "SYN-CUST-PART-002"
+        }
+      }
+    }
+  ]
+}
