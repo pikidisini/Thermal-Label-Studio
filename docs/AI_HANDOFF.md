@@ -7,7 +7,10 @@
 - Baseline: `main` at `43abb3f`
 - Active branch: `codex/b2b2h-safe-demo-mode`
 - Status: `APPROVED_FOR_CHECKPOINT`; Codex Level-3 review selesai dengan status APPROVED_FOR_CHECKPOINT; checkpoint commit dan PR ke main diotorisasi oleh pengguna.
+- Pull Request: https://github.com/pikidisini/Thermal-Label-Studio/pull/19
+- Checkpoint Commit: `8750d18`
 - Executor: `Gemini Flash via Antigravity`.
+
 - Scope: Safe Demo Mode & Batch Monitoring (Backend fail-closed guard `SAFE_DEMO_MODE=false` default, isolated in-memory `SafeDemoService` dispatches strictly to `SimulatorSocketTransport`, synthetic multi-item sequential batch fixture with `copies=1`, 3-panel React UI `SafeDemoModal.tsx` + conditional `TopBarActions.tsx`, human-readable explicit status `"Terkirim ke simulator — tidak dicetak fisik"`, safe in-memory reset, zero socket/network usage, Playwright scoped test runner).
 - Physical printer status: `NOT RUN` (dilarang dalam scope B2B2H; verifikasi 100% menggunakan simulator).
 - Quality Gate:

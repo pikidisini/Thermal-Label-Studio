@@ -5,6 +5,9 @@
 - Branch: `codex/b2b2h-safe-demo-mode`
 - Baseline: `main` at `43abb3f`
 - Reviewer: `Codex` (Verdict: `APPROVED_FOR_CHECKPOINT`)
+- Checkpoint Commit: `8750d18`
+- Pull Request: https://github.com/pikidisini/Thermal-Label-Studio/pull/19
+
 
 
 ---
