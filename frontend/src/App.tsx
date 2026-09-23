@@ -93,6 +93,15 @@ export default function App() {
     sapShadowSimulationApi.checkEnabled().then((enabled) => {
       setIsSapShadowSimulationEnabled(enabled);
     });
+
+    // Jalur developer / automated test regression untuk modal Safe Demo lama (tidak tampil sebagai tombol pengguna utama)
+    if (typeof window !== 'undefined') {
+      (window as any).__openSafeDemoModal = () => setSafeDemoModalOpen(true);
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('dev_safe_demo') === 'true') {
+        setSafeDemoModalOpen(true);
+      }
+    }
   }, [setIsSafeDemoEnabled, setIsSapShadowSimulationEnabled]);
 
 
@@ -166,6 +175,7 @@ export default function App() {
         isSafeDemoEnabled={isSafeDemoEnabled}
         onOpenSapSimulation={() => setSapShadowSimulationModalOpen(true)}
         isSapShadowSimulationEnabled={isSapShadowSimulationEnabled}
+        onOpenLabelSimulation={() => setSapShadowSimulationModalOpen(true)}
       />
 
 

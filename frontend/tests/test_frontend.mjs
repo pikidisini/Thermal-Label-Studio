@@ -10,6 +10,7 @@ import { barcodeGenerators } from '../src/utils/barcodeGenerators.ts';
 import { INDUSTRIAL_SYMBOLS, getSymbolSvg } from '../src/utils/industrialSymbols.ts';
 import { adaptSapContract } from '../src/utils/sapContractAdapter.ts';
 import { sapShadowSimulationApi } from '../src/utils/api/sapShadowSimulationApi.ts';
+import { shouldShowLabelSimulation } from '../src/utils/simulationCapabilities.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1229,5 +1230,41 @@ test('sapShadowSimulationApi Unit & Mock Integration Tests', async (t) => {
       async () => await sapShadowSimulationApi.importOperatorJson(mockFile, 'csrf'),
       /Terlalu banyak permintaan impor/
     );
+  });
+});
+
+test('Fase 3.1 — Unified Simulation Capabilities & Entry Evaluator', async (t) => {
+  await t.test('keduanya mati (false, false) -> false', () => {
+    assert.equal(
+      shouldShowLabelSimulation({ isSapShadowSimulationEnabled: false, isSafeDemoEnabled: false }),
+      false
+    );
+  });
+
+  await t.test('Safe Demo saja aktif (false, true) -> false (AC 1: Safe Demo saja tidak boleh menampilkan tombol operator)', () => {
+    assert.equal(
+      shouldShowLabelSimulation({ isSapShadowSimulationEnabled: false, isSafeDemoEnabled: true }),
+      false
+    );
+  });
+
+  await t.test('SAP shadow simulation saja aktif (true, false) -> true', () => {
+    assert.equal(
+      shouldShowLabelSimulation({ isSapShadowSimulationEnabled: true, isSafeDemoEnabled: false }),
+      true
+    );
+  });
+
+  await t.test('keduanya aktif (true, true) -> true (paling banyak satu tombol simulasi)', () => {
+    assert.equal(
+      shouldShowLabelSimulation({ isSapShadowSimulationEnabled: true, isSafeDemoEnabled: true }),
+      true
+    );
+  });
+
+  await t.test('input null/undefined -> false (fail-closed)', () => {
+    assert.equal(shouldShowLabelSimulation(null), false);
+    assert.equal(shouldShowLabelSimulation(undefined), false);
+    assert.equal(shouldShowLabelSimulation({}), false);
   });
 });

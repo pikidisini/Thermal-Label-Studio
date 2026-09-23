@@ -1,14 +1,36 @@
 # AI Handoff — Thermal Label Studio
 
-## Active snapshot — Fase 3.1: Simulasi Label Terpadu (PLANNED)
+## Active snapshot — Fase 3.1: Simulasi Label Terpadu (IMPLEMENTED — AWAITING_CODEX_REVIEW)
 
 - Date: `2026-09-23`; repository: `Thermal-Label-Studio` (`web_app/`).
-- Branch perencanaan: `codex/f3-1-simulasi-label-terpadu`, dibuat dari checkpoint lokal B2B2O `8d895a9`. Belum ada implementasi Fase 3.1, PR, atau merge. Status checkpoint perencanaan harus diverifikasi terhadap Git sebelum executor mulai.
-- Codex menulis aturan penamaan fase dan `docs/tasks/F3.1/TASK_CONTRACT.md`. Gemini Flash 3.8 High adalah calon executor tunggal setelah safe checkpoint/handoff; Codex berhenti menulis pada branch ini saat Gemini mulai.
-- Scope: satu entry UI "Simulasi Label" yang membuka alur operator impor JSON SAP -> urutan batch/item -> PDF simulasi. Backend/test Safe Demo lama dipertahankan sebagai fasilitas developer, bukan pintu pengguna kedua. Tidak ada printer fisik.
-- Status: `PLANNED`. Test aplikasi Fase 3.1 `NOT RUN` karena belum ada perubahan runtime. Pemeriksaan dokumentasi: `git diff --check` dan scan langsung file baru dijalankan pada perencanaan; status akhir checkpoint diverifikasi dari Git.
-- Folder `output/` sudah untracked sebelum perencanaan dan dibiarkan utuh; jangan masukkan berkas data SAP/hasil simulasi ke commit.
-- Snapshot B2B2O dan fase sebelumnya di bawah adalah arsip pada saat penulisannya, bukan status Git terkini.
+- Branch: `codex/f3-1-simulasi-label-terpadu`, baseline checkpoint B2B2O `8d895a9`.
+- Writer / Executor: Gemini Flash 3.8 High (Antigravity). Reviewer: Codex (independen).
+- Scope: satu entry UI "Simulasi Label" (`btn-label-simulation`) yang membuka alur operator impor JSON SAP -> urutan batch/item -> PDF simulasi. Backend/test Safe Demo lama dipertahankan sebagai fasilitas developer (`?dev_safe_demo=true`), bukan pintu pengguna kedua di HUD. Tidak ada printer fisik.
+- Status: `IMPLEMENTED — AWAITING_CODEX_REVIEW`.
+- Quality Gates Aktual:
+  * TypeScript strict: `npm exec tsc -- --noEmit` -> PASS (0 error)
+  * Vite production build: `npm run build` -> PASS (dist/assets terkompilasi, 29.56s)
+  * Frontend unit tests: `npm test` -> **74 passed, 0 failed** (termasuk 5 capability evaluator matrix tests)
+  * Playwright E2E Topbar & Capability Matrix: `sap_shadow_simulation.spec.js` -> **4 passed (18.0s)** (semua 4 kombinasi flag teruji)
+  * Playwright E2E Pilot Operator Self-Service: `pilot_operator_self_service.spec.js` -> **2 passed (11.5s)** (login, impor JSON, batch sequence, PDF via `btn-label-simulation`)
+  * Playwright E2E Legacy Safe Demo Regression: `safe_demo.spec.js` -> **2 passed (12.6s)** (memverifikasi tombol primer tidak muncul, hook developer berfungsi)
+  * Backend pytest regression: `test_pilot_operator_import_json.py` -> **24 passed in 27.82s**
+  * Git whitespace check: `git diff --check` -> PASS (clean)
+- Files modified/added:
+  * `frontend/src/utils/simulationCapabilities.ts` (new)
+  * `frontend/src/components/layout/topbar/TopBarActions.tsx` (modified)
+  * `frontend/src/components/layout/TopMenuBar.tsx` (modified)
+  * `frontend/src/App.tsx` (modified)
+  * `frontend/src/components/modals/SapShadowSimulationModal.tsx` (modified)
+  * `frontend/tests/test_frontend.mjs` (modified)
+  * `frontend/tests/e2e/sap_shadow_simulation.spec.js` (modified)
+  * `frontend/tests/e2e/pilot_operator_self_service.spec.js` (modified)
+  * `frontend/tests/e2e/safe_demo.spec.js` (modified)
+  * `docs/tasks/F3.1/RESULT.md` (new)
+  * `docs/tasks/F3.1/TASK_CONTRACT.md` (modified)
+  * `docs/architecture/simulation_experience_plan.md` (new/tracked)
+- Stop gate: Berhenti sebelum PR atau merge untuk review independen oleh Codex.
+- Folder `output/` sudah untracked sebelum task ini dan tidak disentuh/stage.
 
 ## Active snapshot — B2B2O: Impor JSON Lokal Raw SAP Snapshot v2 ke Safe Demo (REMEDIATION_P1_P2_ENV_IGNORE_COMPLETED — AWAITING_CODEX_LEVEL_3_REVIEW)
 

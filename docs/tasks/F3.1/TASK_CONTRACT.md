@@ -12,6 +12,8 @@ Executor setelah handoff: Gemini Flash 3.8 High (Antigravity), satu-satunya writ
 
 Reviewer: Codex, independen dari executor
 
+Rancangan produk: `docs/architecture/simulation_experience_plan.md`
+
 ## Tujuan untuk pengguna
 
 Di antarmuka studio, pengguna melihat satu tombol **Simulasi Label**, bukan dua tombol **Safe Demo** dan **SAP Simulation** yang maknanya membingungkan. Tombol ini membuka alur uji mandiri yang sudah ada: login operator pilot, impor berkas JSON hasil ekspor SAP, melihat batch dan urutan item, lalu membuka PDF simulasi. Simulasi tidak pernah mengirim data ke printer. Ini penyatuan *pintu masuk dan bahasa UI*, bukan klaim bahwa kedua backend/engine sudah sama.

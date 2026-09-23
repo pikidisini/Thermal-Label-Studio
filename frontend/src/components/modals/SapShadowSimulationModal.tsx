@@ -267,10 +267,10 @@ export default function SapShadowSimulationModal({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-bold text-white">
-                  SAP Shadow Print Simulation
+                  Simulasi Label
                 </h2>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">
-                  Safe Demo
+                  Simulasi SAP DEV
                 </span>
                 {isAuthenticated && (
                   <span
@@ -283,7 +283,7 @@ export default function SapShadowSimulationModal({
                 )}
               </div>
               <p className="text-xs text-slate-400">
-                Uji mandiri hasil simulasi SAP DEV & bukti PDF ber-watermark (Tanpa cetak fisik)
+                Uji mandiri hasil simulasi SAP DEV & bukti PDF ber-watermark (Simulasi murni, tidak mencetak fisik)
               </p>
             </div>
           </div>
@@ -390,10 +390,10 @@ export default function SapShadowSimulationModal({
                   </div>
                   <div>
                     <h3 className="font-bold text-white text-sm">
-                      Login Operator Pilot
+                      Login Operator Simulasi
                     </h3>
                     <p className="text-[11px] text-slate-400">
-                      Sesi terbatas untuk uji mandiri simulasi SAP DEV
+                      Sesi terbatas untuk uji mandiri simulasi label SAP DEV (tanpa cetak fisik)
                     </p>
                   </div>
                 </div>
@@ -458,10 +458,10 @@ export default function SapShadowSimulationModal({
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-bold text-white text-sm">
-                    Daftar Batch Simulasi SAP DEV
+                    Daftar Batch Simulasi Label
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    Memantau batch yang terkirim dari SAP DEV secara in-process & virtual sink
+                    Memantau batch simulasi dari SAP DEV secara in-process & virtual sink (tanpa printer fisik)
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -520,14 +520,14 @@ export default function SapShadowSimulationModal({
                   </div>
 
                   <p className="text-[11px] text-slate-300 leading-relaxed">
-                    Pilih berkas JSON hasil ekspor program <code>ZMMR_LABEL_JSON</code> dari SAP DEV di komputer Anda untuk menjalankan simulasi Safe Demo secara lokal tanpa routing jaringan.
+                    Pilih berkas JSON hasil ekspor program <code>ZMMR_LABEL_JSON</code> dari SAP DEV di komputer Anda untuk menjalankan simulasi label secara lokal tanpa transmisi ke printer fisik.
                   </p>
 
                   <div className="p-2.5 bg-amber-950/40 border border-amber-800/40 rounded-lg flex items-start gap-2 text-[11px] text-amber-200">
                     <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                     <div>
                       <span className="font-semibold text-amber-300">Pemberitahuan Keamanan & Privasi:</span>{' '}
-                      Berkas ini berpotensi memuat data bisnis dari SAP DEV. Data hanya diproses secara lokal untuk simulasi Safe Demo dan tidak pernah dikirim ke printer fisik atau dibagikan ke jaringan publik.
+                      Berkas ini berpotensi memuat data bisnis dari SAP DEV. Berkas diunggah dan diproses oleh server lokal untuk simulasi serta pembuatan bukti PDF. Data tidak pernah dikirim ke printer fisik atau dibagikan ke jaringan publik.
                     </div>
                   </div>
 
@@ -636,10 +636,10 @@ export default function SapShadowSimulationModal({
                 >
                   <Clock className="w-8 h-8 text-slate-600 mx-auto" />
                   <h4 className="text-sm font-semibold text-slate-300">
-                    Belum Ada Batch Simulasi dari SAP DEV
+                    Belum Ada Batch Simulasi Label
                   </h4>
                   <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                    Sistem siap menerima batch simulasi. Jalankan tcode label pada SAP DEV (misalnya <code>ZLABEL</code> atau <code>ZMMR_LABEL_JSON</code>) yang mengarah ke endpoint simulasi. Batch akan otomatis muncul di sini.
+                    Sistem siap menerima batch simulasi. Jalankan tcode label pada SAP DEV (misalnya <code>ZLABEL</code> atau <code>ZMMR_LABEL_JSON</code>) atau gunakan tombol &apos;Impor JSON dari SAP&apos; di atas. Batch simulasi akan otomatis muncul di sini.
                   </p>
                 </div>
               ) : (
@@ -883,7 +883,7 @@ export default function SapShadowSimulationModal({
         {/* Modal Footer */}
         <div className="px-6 py-4 border-t border-slate-800 bg-slate-900/90 flex items-center justify-between shrink-0">
           <span className="text-xs text-slate-500">
-            Thermal Label Studio — Pilot Operator Self-Service (B2B2N Safe Demo)
+            Thermal Label Studio — Simulasi Label Terpadu (Uji Mandiri SAP & Bukti PDF)
           </span>
           <button
             onClick={onClose}

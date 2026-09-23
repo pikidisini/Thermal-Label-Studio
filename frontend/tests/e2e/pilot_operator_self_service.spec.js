@@ -158,8 +158,12 @@ test.describe('Pilot Operator Self-Service Simulation (B2B2N) End-to-End Suite',
     // Navigate to root
     await page.goto('/');
 
-    // Open simulation modal
-    const simBtn = page.getByTestId('btn-sap-simulation');
+    // Verify legacy buttons do not exist (Fase 3.1)
+    await expect(page.getByTestId('btn-safe-demo')).not.toBeVisible();
+    await expect(page.getByTestId('btn-sap-simulation')).not.toBeVisible();
+
+    // Open unified simulation modal
+    const simBtn = page.getByTestId('btn-label-simulation');
     await expect(simBtn).toBeVisible();
     await simBtn.click();
 
@@ -347,9 +351,11 @@ test.describe('Pilot Operator Self-Service Simulation (B2B2N) End-to-End Suite',
       });
     });
 
-    // Navigate to root and open simulation modal
+    // Navigate to root and open simulation modal via unified button
     await page.goto('/');
-    await page.getByTestId('btn-sap-simulation').click();
+    await expect(page.getByTestId('btn-safe-demo')).not.toBeVisible();
+    await expect(page.getByTestId('btn-sap-simulation')).not.toBeVisible();
+    await page.getByTestId('btn-label-simulation').click();
 
     // Login as operator
     await page.getByTestId('input-pilot-password').fill('OperatorPilotSecret2026!');
