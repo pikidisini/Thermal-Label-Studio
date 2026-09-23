@@ -1,22 +1,25 @@
 # AI Handoff — Thermal Label Studio
 
-## Active snapshot — Fase 3.1: Simulasi Label Terpadu (IMPLEMENTED — AWAITING_CODEX_REVIEW)
+## Active snapshot — Fase 3.1: Simulasi Label Terpadu (REMEDIATION_P2_P3_COMPLETED — AWAITING_CODEX_REVIEW)
 
 - Date: `2026-09-23`; repository: `Thermal-Label-Studio` (`web_app/`).
-- Branch: `codex/f3-1-simulasi-label-terpadu`, baseline checkpoint B2B2O `8d895a9`.
+- Branch: `codex/f3-1-simulasi-label-terpadu`, baseline checkpoint B2B2O `8d895a9`, commit F3.1 baseline `bcf3556`.
 - Writer / Executor: Gemini Flash 3.8 High (Antigravity). Reviewer: Codex (independen).
-- Scope: satu entry UI "Simulasi Label" (`btn-label-simulation`) yang membuka alur operator impor JSON SAP -> urutan batch/item -> PDF simulasi. Backend/test Safe Demo lama dipertahankan sebagai fasilitas developer (`?dev_safe_demo=true`), bukan pintu pengguna kedua di HUD. Tidak ada printer fisik.
-- Status: `IMPLEMENTED — AWAITING_CODEX_REVIEW`.
+- Scope: satu entry UI "Simulasi Label" (`btn-label-simulation`) yang membuka alur operator impor JSON SAP -> urutan batch/item -> PDF simulasi. Backend/test Safe Demo lama dipertahankan sebagai fasilitas developer, bukan pintu pengguna kedua di HUD. Tidak ada printer fisik.
+- Status: `REMEDIATION_P2_P3_COMPLETED — AWAITING_CODEX_REVIEW`.
+  * Remediasi P2-1: Menghapus total `window.__openSafeDemoModal` dan konversi `as any` di `App.tsx`; membatasi parameter `dev_safe_demo` hanya pada mode dev (`import.meta.env.DEV && isSafeDemoEnabled`) sehingga tereliminasi total (*dead-code elimination*) pada production build.
+  * Remediasi P2-2: Memperbaiki petunjuk dan disclaimer privasi di `SapShadowSimulationModal.tsx` agar akurat untuk deployment lokal maupun intranet Linux (menyatakan berkas diunggah ke server aplikasi yang sedang digunakan, tanpa klaim perimeter jaringan sepihak).
+  * Remediasi P3: Memutakhirkan `RESULT.md` dan snapshot handoff dengan hash commit dan status pengujian aktual pasca-remediasi.
 - Quality Gates Aktual:
   * TypeScript strict: `npm exec tsc -- --noEmit` -> PASS (0 error)
-  * Vite production build: `npm run build` -> PASS (dist/assets terkompilasi, 29.56s)
+  * Vite production build: `npm run build` -> PASS (dist/assets terkompilasi, 6.80s; verifikasi `grep dev_safe_demo dist/` -> 0 hasil)
   * Frontend unit tests: `npm test` -> **74 passed, 0 failed** (termasuk 5 capability evaluator matrix tests)
-  * Playwright E2E Topbar & Capability Matrix: `sap_shadow_simulation.spec.js` -> **4 passed (18.0s)** (semua 4 kombinasi flag teruji)
-  * Playwright E2E Pilot Operator Self-Service: `pilot_operator_self_service.spec.js` -> **2 passed (11.5s)** (login, impor JSON, batch sequence, PDF via `btn-label-simulation`)
-  * Playwright E2E Legacy Safe Demo Regression: `safe_demo.spec.js` -> **2 passed (12.6s)** (memverifikasi tombol primer tidak muncul, hook developer berfungsi)
-  * Backend pytest regression: `test_pilot_operator_import_json.py` -> **24 passed in 27.82s**
+  * Playwright E2E Topbar & Capability Matrix: `sap_shadow_simulation.spec.js` -> **4 passed (15.7s)** (semua 4 kombinasi flag teruji)
+  * Playwright E2E Pilot Operator Self-Service: `pilot_operator_self_service.spec.js` -> **2 passed (11.4s)** (login, impor JSON, batch sequence, PDF via `btn-label-simulation`)
+  * Playwright E2E Legacy Safe Demo Regression: `safe_demo.spec.js` -> **2 passed (14.9s)** (memverifikasi tombol primer tidak muncul di HUD; harness dev berfungsi)
+  * Backend pytest regression: `test_pilot_operator_import_json.py` -> **24 passed in 28.42s**
   * Git whitespace check: `git diff --check` -> PASS (clean)
-- Files modified/added:
+- Files modified/added in F3.1:
   * `frontend/src/utils/simulationCapabilities.ts` (new)
   * `frontend/src/components/layout/topbar/TopBarActions.tsx` (modified)
   * `frontend/src/components/layout/TopMenuBar.tsx` (modified)
@@ -26,7 +29,7 @@
   * `frontend/tests/e2e/sap_shadow_simulation.spec.js` (modified)
   * `frontend/tests/e2e/pilot_operator_self_service.spec.js` (modified)
   * `frontend/tests/e2e/safe_demo.spec.js` (modified)
-  * `docs/tasks/F3.1/RESULT.md` (new)
+  * `docs/tasks/F3.1/RESULT.md` (modified)
   * `docs/tasks/F3.1/TASK_CONTRACT.md` (modified)
   * `docs/architecture/simulation_experience_plan.md` (new/tracked)
 - Stop gate: Berhenti sebelum PR atau merge untuk review independen oleh Codex.

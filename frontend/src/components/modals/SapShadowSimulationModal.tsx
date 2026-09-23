@@ -520,14 +520,14 @@ export default function SapShadowSimulationModal({
                   </div>
 
                   <p className="text-[11px] text-slate-300 leading-relaxed">
-                    Pilih berkas JSON hasil ekspor program <code>ZMMR_LABEL_JSON</code> dari SAP DEV di komputer Anda untuk menjalankan simulasi label secara lokal tanpa transmisi ke printer fisik.
+                    Pilih berkas JSON hasil ekspor program <code>ZMMR_LABEL_JSON</code> dari SAP DEV di komputer Anda untuk menjalankan simulasi label tanpa transmisi ke printer fisik.
                   </p>
 
                   <div className="p-2.5 bg-amber-950/40 border border-amber-800/40 rounded-lg flex items-start gap-2 text-[11px] text-amber-200">
                     <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                     <div>
                       <span className="font-semibold text-amber-300">Pemberitahuan Keamanan & Privasi:</span>{' '}
-                      Berkas ini berpotensi memuat data bisnis dari SAP DEV. Berkas diunggah dan diproses oleh server lokal untuk simulasi serta pembuatan bukti PDF. Data tidak pernah dikirim ke printer fisik atau dibagikan ke jaringan publik.
+                      Berkas ini berpotensi memuat data bisnis dari SAP DEV. Berkas diunggah ke server aplikasi yang sedang digunakan untuk simulasi serta pembuatan bukti PDF; tidak dikirim ke printer fisik.
                     </div>
                   </div>
 

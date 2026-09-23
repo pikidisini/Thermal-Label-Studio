@@ -94,15 +94,15 @@ export default function App() {
       setIsSapShadowSimulationEnabled(enabled);
     });
 
-    // Jalur developer / automated test regression untuk modal Safe Demo lama (tidak tampil sebagai tombol pengguna utama)
-    if (typeof window !== 'undefined') {
-      (window as any).__openSafeDemoModal = () => setSafeDemoModalOpen(true);
+    // Harness khusus test runner/development untuk regression modal Safe Demo legacy;
+    // Dieliminasi total oleh bundler pada production build (import.meta.env.DEV === false).
+    if (import.meta.env.DEV && isSafeDemoEnabled && typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get('dev_safe_demo') === 'true') {
         setSafeDemoModalOpen(true);
       }
     }
-  }, [setIsSafeDemoEnabled, setIsSapShadowSimulationEnabled]);
+  }, [setIsSafeDemoEnabled, setIsSapShadowSimulationEnabled, isSafeDemoEnabled]);
 
 
   React.useEffect(() => {
