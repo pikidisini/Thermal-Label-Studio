@@ -66,3 +66,66 @@ export interface SapShadowBatchRecord {
   artifact?: SapShadowArtifact | null;
   error?: string | null;
 }
+
+export interface PilotOperatorSessionStatus {
+  pilot_operator_enabled: boolean;
+  authenticated: boolean;
+  csrf_token?: string;
+  expires_at?: string;
+  operator_label?: string;
+}
+
+export interface PilotOperatorLoginResponse {
+  status: 'authenticated';
+  csrf_token: string;
+  expires_at: string;
+  operator_label: string;
+}
+
+export interface PilotOperatorBatchSummary {
+  batch_id: string;
+  producer_namespace: string;
+  request_id: string;
+  label_code: string;
+  profile_version: string;
+  status: 'accepted' | 'processing' | 'completed' | 'failed';
+  total_items: number;
+  completed_items: number;
+  created_at: string;
+  completed_at?: string | null;
+  error?: string | null;
+  has_pdf: boolean;
+}
+
+export interface PilotOperatorItemSummary {
+  item_id: string;
+  item_sequence: number;
+  template_version_id: string;
+  copies: number;
+  status: 'accepted' | 'rendering' | 'completed' | 'failed';
+  error?: string | null;
+}
+
+export interface PilotOperatorBatchDetail {
+  batch_id: string;
+  producer_namespace: string;
+  request_id: string;
+  printer_id: string;
+  label_code?: string;
+  profile_version?: string;
+  virtual_profile: {
+    dpi: number;
+    width_mm: number;
+    height_mm: number;
+    orientation: string;
+    printer_language: string;
+  };
+  status: 'accepted' | 'processing' | 'completed' | 'failed';
+  total_items: number;
+  completed_items: number;
+  items: PilotOperatorItemSummary[];
+  created_at: string;
+  completed_at?: string | null;
+  artifact?: SapShadowArtifact | null;
+  error?: string | null;
+}

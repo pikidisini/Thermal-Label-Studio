@@ -4,11 +4,28 @@ Dokumen ini adalah ringkasan kondisi proyek aktif untuk manusia dan AI.
 
 ## Status proyek
 
-Snapshot terkini (2026-09-23): B2B2K sudah merged ke `main` melalui PR #22
-(`3984469`). B2B2L sedang direncanakan pada branch
-`codex/b2b2l-profile-composition-engine`; lihat
-`docs/tasks/B2B2L/TASK_CONTRACT.md`. Rincian fase lama di bawah adalah
-snapshot historis dan bukan status Git terkini.
+Snapshot implementasi (2026-09-23): Fase `3.1 — Simulasi Label Terpadu`
+telah diimplementasikan pada branch `codex/f3-1-simulasi-label-terpadu`.
+Topbar menyatukan pintu masuk simulasi menjadi satu tombol `Simulasi Label`
+(`btn-label-simulation`), alur operator mandiri (login -> import JSON ->
+urutan item -> bukti PDF) terhubung penuh, matriks kapabilitas terverifikasi,
+dan modal Safe Demo lama dipertahankan untuk kebutuhan developer/regression.
+Dokumentasi hasil tersedia di `docs/tasks/F3.1/RESULT.md`. Menunggu review Codex.
+
+Snapshot terkini (2026-09-23): B2B2N memiliki checkpoint 35f9cb5. B2B2O
+disiapkan pada branch codex/b2b2o-local-json-export-import: task impor JSON
+lokal dan draft penulisan ulang ZMMR_LABEL_JSON tersedia di
+docs/tasks/B2B2O/. Fitur impor browser belum diimplementasikan dan ABAP belum
+diaktivasi/diuji di SAP DEV. Tujuannya membuktikan alur berkas JSON nyata dari
+SAP DEV ke Safe Demo/PDF tanpa routing jaringan SAP-ke-aplikasi.
+
+Snapshot terkini (2026-09-23): B2B2M sudah merged ke `main` melalui PR #24
+(`0f2cf82`). B2B2N sedang direncanakan pada branch
+`codex/b2b2n-self-service-safe-demo`; lihat
+`docs/tasks/B2B2N/TASK_CONTRACT.md`. Prioritasnya membuktikan alur
+SAP DEV ke PDF simulasi yang dapat dilihat sendiri oleh pengguna, dengan
+autentikasi operator terpisah dari token mesin SAP. Rincian fase lama di bawah
+adalah snapshot historis dan bukan status Git terkini.
 
 - Repository aktif: `Thermal-Label-Studio`
 - Lokasi kerja lokal: `web_app/`

@@ -10,6 +10,7 @@ test.describe('Safe Demo Mode (B2B2H) End-to-End Suite', () => {
         body: JSON.stringify({
           status: 'online',
           safe_demo_mode: false,
+          sap_shadow_simulation_enabled: false,
         }),
       });
     });
@@ -28,17 +29,32 @@ test.describe('Safe Demo Mode (B2B2H) End-to-End Suite', () => {
     // Verify entry button is NOT visible in HUD
     const demoBtn = page.getByTestId('btn-safe-demo');
     await expect(demoBtn).not.toBeVisible();
+    await expect(page.getByTestId('btn-label-simulation')).not.toBeVisible();
+    await expect(page.getByTestId('btn-sap-simulation')).not.toBeVisible();
   });
 
-  test('Saat safe demo mode aktif: tombol tampil, modal terbuka, 3 item berurutan, notices tampil, simulasi sukses, dan reset', async ({ page }) => {
-    await page.goto('/');
+  test('Saat safe demo mode aktif: tidak tampil sebagai tombol primer di HUD (AC 1), modal tetap dapat diuji via developer hook', async ({ page }) => {
+    // Intercept /api/status to simulate safe_demo_mode: true but sap_shadow_simulation_enabled: false
+    await page.route('**/api/status', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'online',
+          safe_demo_mode: true,
+          sap_shadow_simulation_enabled: false,
+        }),
+      });
+    });
 
-    // 1. Check entry point button in HUD
-    const demoBtn = page.getByTestId('btn-safe-demo');
-    await expect(demoBtn).toBeVisible();
-    await demoBtn.click();
+    await page.goto('/?dev_safe_demo=true');
 
-    // 2. Modal appears
+    // 1. Entry button in HUD is NOT visible (AC 1 & Scope 4: tidak tampil sebagai tombol pengguna utama)
+    await expect(page.getByTestId('btn-safe-demo')).not.toBeVisible();
+    await expect(page.getByTestId('btn-sap-simulation')).not.toBeVisible();
+    await expect(page.getByTestId('btn-label-simulation')).not.toBeVisible();
+
+    // 2. Modal appears via developer hook (?dev_safe_demo=true)
     const modal = page.getByTestId('safe-demo-modal');
     await expect(modal).toBeVisible();
 

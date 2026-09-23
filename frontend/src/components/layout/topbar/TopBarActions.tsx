@@ -1,5 +1,6 @@
 import React from 'react';
 import { ViewMode } from '../../../types/label';
+import { shouldShowLabelSimulation } from '../../../utils/simulationCapabilities';
 
 interface TopBarActionsProps {
   viewMode: ViewMode;
@@ -9,10 +10,11 @@ interface TopBarActionsProps {
   onOpenPrint: () => void;
   onOpenShortcuts: () => void;
   onOpenDiagnostics: () => void;
-  onOpenSafeDemo: () => void;
+  onOpenSafeDemo?: () => void;
   isSafeDemoEnabled?: boolean;
   onOpenSapSimulation?: () => void;
   isSapShadowSimulationEnabled?: boolean;
+  onOpenLabelSimulation?: () => void;
 }
 
 
@@ -65,6 +67,7 @@ export function TopBarActions({
   isSafeDemoEnabled = false,
   onOpenSapSimulation,
   isSapShadowSimulationEnabled = false,
+  onOpenLabelSimulation,
 }: TopBarActionsProps) {
   return (
     <div data-testid="container-topbar-actions" className="flex items-center gap-1">
@@ -96,29 +99,16 @@ export function TopBarActions({
       <IconBtn icon="help_outline" title="Keyboard Shortcuts"   onClick={onOpenShortcuts}                   testId="btn-shortcuts-help" />
       <IconBtn icon="monitoring"   title="AI Diagnostics"       onClick={onOpenDiagnostics}                 testId="btn-ai-diagnostics" />
 
-      {/* Safe Demo Button (Only visible when backend safe_demo_mode is active) */}
-      {isSafeDemoEnabled && (
+      {/* Unified Simulasi Label Button (Fase 3.1: Paling banyak satu tombol simulasi) */}
+      {shouldShowLabelSimulation({ isSapShadowSimulationEnabled, isSafeDemoEnabled }) && (
         <button
-          data-testid="btn-safe-demo"
-          onClick={onOpenSafeDemo}
-          title="Safe Demo Mode (Simulator)"
-          className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium transition-all bg-emerald-950/50 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-900/60 hover:border-emerald-400 rounded-sm"
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>smart_display</span>
-          <span className="hidden sm:inline">Safe Demo</span>
-        </button>
-      )}
-
-      {/* SAP Shadow Simulation Button (Only visible when backend sap_shadow_simulation_enabled is active) */}
-      {isSapShadowSimulationEnabled && (
-        <button
-          data-testid="btn-sap-simulation"
-          onClick={onOpenSapSimulation}
-          title="SAP Shadow Simulation (Virtual PDF Evidence)"
+          data-testid="btn-label-simulation"
+          onClick={onOpenLabelSimulation || onOpenSapSimulation}
+          title="Simulasi Label (Uji Mandiri SAP & Bukti PDF)"
           className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium transition-all bg-amber-950/50 text-amber-300 border border-amber-500/40 hover:bg-amber-900/60 hover:border-amber-400 rounded-sm"
         >
           <span className="material-symbols-outlined" style={{ fontSize: 14 }}>picture_as_pdf</span>
-          <span className="hidden sm:inline">SAP Simulation</span>
+          <span className="hidden sm:inline">Simulasi Label</span>
         </button>
       )}
 

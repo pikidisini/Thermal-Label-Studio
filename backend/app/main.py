@@ -78,6 +78,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from .api.operator_import_guard import OperatorImportGuardMiddleware
+
+# Operator multipart intake early guard (bounded stream & fail-fast auth before Starlette disk spooling)
+app.add_middleware(OperatorImportGuardMiddleware)
+
 # Setup CORS for Frontend Integration
 app.add_middleware(
     CORSMiddleware,

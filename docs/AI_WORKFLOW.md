@@ -56,6 +56,8 @@ Merge hanya dilakukan setelah quality gate lulus, review menyatakan siap, dan pe
 
 Folder task dibuat untuk Level 2/3, pekerjaan multi-sesi, atau handoff lintas provider. Subfase kecil tetap dicatat dalam folder fase induk. Perbaikan ringan cukup dicatat dalam commit/PR dan tidak perlu folder baru.
 
+Penamaan mulai setelah fase historis B2B2O memakai nomor manusiawi `Fase 3.1 — Nama Fitur`, `Fase 3.2`, dan seterusnya, dengan folder `docs/tasks/F3.1/`, `docs/tasks/F3.2/`. Kode lama tidak diubah. Revisi dalam scope yang sama tetap memakai folder fase tersebut, bukan membuat kode fase bertingkat baru. Nomor tidak menyatakan status; baca task contract dan bukti Git/test.
+
 Struktur standar:
 
 ```text

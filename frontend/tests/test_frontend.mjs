@@ -10,6 +10,7 @@ import { barcodeGenerators } from '../src/utils/barcodeGenerators.ts';
 import { INDUSTRIAL_SYMBOLS, getSymbolSvg } from '../src/utils/industrialSymbols.ts';
 import { adaptSapContract } from '../src/utils/sapContractAdapter.ts';
 import { sapShadowSimulationApi } from '../src/utils/api/sapShadowSimulationApi.ts';
+import { shouldShowLabelSimulation } from '../src/utils/simulationCapabilities.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1014,5 +1015,256 @@ test('sapShadowSimulationApi Unit & Mock Integration Tests', async (t) => {
   await t.test('getDownloadUrl returns proper endpoint URI', () => {
     const url = sapShadowSimulationApi.getDownloadUrl('batch-abc-123');
     assert.ok(url.endsWith('/api/v1/simulation/sap-batches/batch-abc-123/pdf'));
+  });
+
+  await t.test('getSimulationStatus returns full status dictionary', async () => {
+    global.fetch = async (url) => {
+      assert.ok(url.endsWith('/api/v1/simulation/status'));
+      return {
+        ok: true,
+        json: async () => ({
+          enabled: true,
+          status: 'online',
+          service: 'SAP_SHADOW_SIMULATION_SINK',
+          monitoring_requires_identity_provider: false,
+          pilot_operator_enabled: true,
+        }),
+      };
+    };
+
+    const status = await sapShadowSimulationApi.getSimulationStatus();
+    assert.equal(status.enabled, true);
+    assert.equal(status.pilot_operator_enabled, true);
+    assert.equal(status.monitoring_requires_identity_provider, false);
+  });
+
+  await t.test('getOperatorSession probes /simulation/operator/session', async () => {
+    global.fetch = async (url, opts) => {
+      assert.ok(url.endsWith('/api/v1/simulation/operator/session'));
+      assert.equal(opts.credentials, 'same-origin');
+      return {
+        ok: true,
+        json: async () => ({
+          pilot_operator_enabled: true,
+          authenticated: true,
+          csrf_token: 'csrf-xyz-123',
+          operator_label: 'pilot_operator',
+        }),
+      };
+    };
+
+    const session = await sapShadowSimulationApi.getOperatorSession();
+    assert.equal(session.authenticated, true);
+    assert.equal(session.csrf_token, 'csrf-xyz-123');
+  });
+
+  await t.test('loginOperator POSTs password to /simulation/operator/login without leaking session_id', async () => {
+    let capturedBody = null;
+    global.fetch = async (url, opts) => {
+      assert.ok(url.endsWith('/api/v1/simulation/operator/login'));
+      assert.equal(opts.method, 'POST');
+      assert.equal(opts.credentials, 'same-origin');
+      capturedBody = JSON.parse(opts.body);
+      return {
+        ok: true,
+        json: async () => ({
+          status: 'authenticated',
+          csrf_token: 'csrf-123',
+          operator_label: 'pilot_operator',
+        }),
+      };
+    };
+
+    const resp = await sapShadowSimulationApi.loginOperator('MyPilotPass123!');
+    assert.equal(capturedBody.password, 'MyPilotPass123!');
+    assert.equal(resp.status, 'authenticated');
+    assert.equal(resp.csrf_token, 'csrf-123');
+    assert.equal(resp.session_id, undefined);
+  });
+
+  await t.test('logoutOperator sends CSRF token to /simulation/operator/logout', async () => {
+    let capturedHeaders = null;
+    global.fetch = async (url, opts) => {
+      assert.ok(url.endsWith('/api/v1/simulation/operator/logout'));
+      assert.equal(opts.method, 'POST');
+      assert.equal(opts.credentials, 'same-origin');
+      capturedHeaders = opts.headers;
+      return {
+        ok: true,
+        json: async () => ({ status: 'logged_out' }),
+      };
+    };
+
+    await sapShadowSimulationApi.logoutOperator('csrf-token-abc');
+    assert.equal(capturedHeaders['X-CSRF-Token'], 'csrf-token-abc');
+  });
+
+  await t.test('listOperatorBatches calls GET /simulation/operator/batches', async () => {
+    global.fetch = async (url, opts) => {
+      assert.ok(url.endsWith('/api/v1/simulation/operator/batches'));
+      assert.equal(opts.credentials, 'same-origin');
+      return {
+        ok: true,
+        json: async () => [
+          {
+            batch_id: 'b-op-01',
+            request_id: 'REQ-01',
+            label_code: 'N001',
+            profile_version: 'v1.0-dev',
+            status: 'completed',
+            total_items: 3,
+            completed_items: 3,
+            created_at: '2026-09-23T08:00:00Z',
+            has_pdf: true,
+          },
+        ],
+      };
+    };
+
+    const batches = await sapShadowSimulationApi.listOperatorBatches();
+    assert.equal(batches.length, 1);
+    assert.equal(batches[0].batch_id, 'b-op-01');
+    assert.equal(batches[0].has_pdf, true);
+  });
+
+  await t.test('getOperatorBatch calls GET /simulation/operator/batches/:id and returns batch detail with item sequence', async () => {
+    global.fetch = async (url, opts) => {
+      assert.ok(url.endsWith('/api/v1/simulation/operator/batches/b-op-01'));
+      assert.equal(opts.credentials, 'same-origin');
+      return {
+        ok: true,
+        json: async () => ({
+          batch_id: 'b-op-01',
+          producer_namespace: 'SAP_DEV_TRD',
+          request_id: 'REQ-01',
+          printer_id: 'VIRTUAL_SINK_DEV',
+          status: 'completed',
+          total_items: 2,
+          completed_items: 2,
+          items: [
+            {
+              item_id: 'item-001',
+              item_sequence: 1,
+              template_version_id: 'label_roll_80x200',
+              copies: 1,
+              status: 'completed',
+            },
+            {
+              item_id: 'item-002',
+              item_sequence: 2,
+              template_version_id: 'label_roll_80x200',
+              copies: 1,
+              status: 'completed',
+            },
+          ],
+          created_at: '2026-09-23T08:00:00Z',
+        }),
+      };
+    };
+
+    const detail = await sapShadowSimulationApi.getOperatorBatch('b-op-01');
+    assert.equal(detail.batch_id, 'b-op-01');
+    assert.equal(detail.status, 'completed');
+    assert.equal(detail.items.length, 2);
+    assert.equal(detail.items[0].item_sequence, 1);
+    assert.equal(detail.items[1].item_sequence, 2);
+  });
+
+  await t.test('getOperatorPdfUrl returns operator pdf endpoint URI', () => {
+    const url = sapShadowSimulationApi.getOperatorPdfUrl('b-op-99');
+    assert.ok(url.endsWith('/api/v1/simulation/operator/batches/b-op-99/pdf'));
+  });
+
+  await t.test('importOperatorJson sends multipart FormData to /simulation/operator/import-json with CSRF token', async () => {
+    global.fetch = async (url, opts) => {
+      assert.ok(url.endsWith('/api/v1/simulation/operator/import-json'));
+      assert.equal(opts.method, 'POST');
+      assert.equal(opts.credentials, 'same-origin');
+      assert.equal(opts.headers['X-CSRF-Token'], 'test-csrf-123');
+      assert.ok(opts.body instanceof FormData);
+      return {
+        ok: true,
+        status: 202,
+        json: async () => ({
+          batch_id: 'b-imported-01',
+          request_id: 'REQ-IMP-01',
+          status: 'accepted',
+          total_items: 2,
+        }),
+      };
+    };
+
+    const mockFile = new File(['{"contract_schema_version":"2.0-raw"}'], 'test.json', { type: 'application/json' });
+    const res = await sapShadowSimulationApi.importOperatorJson(mockFile, 'test-csrf-123');
+    assert.equal(res.batch_id, 'b-imported-01');
+    assert.equal(res.status, 'accepted');
+  });
+
+  await t.test('importOperatorJson handles 401, 403, 413, and 429 errors gracefully', async () => {
+    const mockFile = new File(['{}'], 'test.json', { type: 'application/json' });
+
+    // 401
+    global.fetch = async () => ({ ok: false, status: 401, json: async () => ({ detail: 'Unauthorized' }) });
+    await assert.rejects(
+      async () => await sapShadowSimulationApi.importOperatorJson(mockFile, 'csrf'),
+      /Sesi operator pilot tidak valid atau telah berakhir/
+    );
+
+    // 403
+    global.fetch = async () => ({ ok: false, status: 403, json: async () => ({ detail: 'Forbidden' }) });
+    await assert.rejects(
+      async () => await sapShadowSimulationApi.importOperatorJson(mockFile, 'csrf'),
+      /Akses ditolak: validasi CSRF gagal atau koneksi intranet wajib HTTPS/
+    );
+
+    // 413
+    global.fetch = async () => ({ ok: false, status: 413, json: async () => ({ detail: 'Too large' }) });
+    await assert.rejects(
+      async () => await sapShadowSimulationApi.importOperatorJson(mockFile, 'csrf'),
+      /Ukuran berkas melebihi batas maksimum 2 MiB/
+    );
+
+    // 429
+    global.fetch = async () => ({ ok: false, status: 429, json: async () => ({ detail: 'Rate limit' }) });
+    await assert.rejects(
+      async () => await sapShadowSimulationApi.importOperatorJson(mockFile, 'csrf'),
+      /Terlalu banyak permintaan impor/
+    );
+  });
+});
+
+test('Fase 3.1 — Unified Simulation Capabilities & Entry Evaluator', async (t) => {
+  await t.test('keduanya mati (false, false) -> false', () => {
+    assert.equal(
+      shouldShowLabelSimulation({ isSapShadowSimulationEnabled: false, isSafeDemoEnabled: false }),
+      false
+    );
+  });
+
+  await t.test('Safe Demo saja aktif (false, true) -> false (AC 1: Safe Demo saja tidak boleh menampilkan tombol operator)', () => {
+    assert.equal(
+      shouldShowLabelSimulation({ isSapShadowSimulationEnabled: false, isSafeDemoEnabled: true }),
+      false
+    );
+  });
+
+  await t.test('SAP shadow simulation saja aktif (true, false) -> true', () => {
+    assert.equal(
+      shouldShowLabelSimulation({ isSapShadowSimulationEnabled: true, isSafeDemoEnabled: false }),
+      true
+    );
+  });
+
+  await t.test('keduanya aktif (true, true) -> true (paling banyak satu tombol simulasi)', () => {
+    assert.equal(
+      shouldShowLabelSimulation({ isSapShadowSimulationEnabled: true, isSafeDemoEnabled: true }),
+      true
+    );
+  });
+
+  await t.test('input null/undefined -> false (fail-closed)', () => {
+    assert.equal(shouldShowLabelSimulation(null), false);
+    assert.equal(shouldShowLabelSimulation(undefined), false);
+    assert.equal(shouldShowLabelSimulation({}), false);
   });
 });

@@ -93,7 +93,16 @@ export default function App() {
     sapShadowSimulationApi.checkEnabled().then((enabled) => {
       setIsSapShadowSimulationEnabled(enabled);
     });
-  }, [setIsSafeDemoEnabled, setIsSapShadowSimulationEnabled]);
+
+    // Harness khusus test runner/development untuk regression modal Safe Demo legacy;
+    // Dieliminasi total oleh bundler pada production build (import.meta.env.DEV === false).
+    if (import.meta.env.DEV && isSafeDemoEnabled && typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('dev_safe_demo') === 'true') {
+        setSafeDemoModalOpen(true);
+      }
+    }
+  }, [setIsSafeDemoEnabled, setIsSapShadowSimulationEnabled, isSafeDemoEnabled]);
 
 
   React.useEffect(() => {
@@ -166,6 +175,7 @@ export default function App() {
         isSafeDemoEnabled={isSafeDemoEnabled}
         onOpenSapSimulation={() => setSapShadowSimulationModalOpen(true)}
         isSapShadowSimulationEnabled={isSapShadowSimulationEnabled}
+        onOpenLabelSimulation={() => setSapShadowSimulationModalOpen(true)}
       />
 
 
