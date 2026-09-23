@@ -1,0 +1,253 @@
+{
+  "_notice": "SYNTHETIC_REDACTED_FIXTURE_ONLY: Artificial data for offline contract validation and Safe Demo simulation. Zero real SAP batch numbers, customer data, credentials, or internal endpoints.",
+  "contract_schema_version": "2.0-raw",
+  "producer_namespace": "SAP_PPIC",
+  "request_id": "REQ-SYNTH-20260922-RAW-001",
+  "printer_id": "PILOT-PRINTER-01",
+  "source_metadata": {
+    "werks": "1100",
+    "lgort": "0001",
+    "sap_user": "SYNTH_USER",
+    "system_id": "SYN_DEV",
+    "transaction_code": "ZN001_SIM"
+  },
+  "items": [
+    {
+      "item_sequence": 1,
+      "label_code": "N001",
+      "copies": 1,
+      "characteristics": [
+        {
+          "name": "ZZBRAND",
+          "value": "POLYTRON",
+          "value_type": "string",
+          "unit": null,
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZTYPEFILM",
+          "value": "ALUMINIUM FOIL",
+          "value_type": "string",
+          "unit": null,
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZBASEFILM",
+          "value": "PET FILM",
+          "value_type": "string",
+          "unit": null,
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZWIDTH",
+          "value": 80.0,
+          "value_type": "number",
+          "unit": "MM",
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZLENGTH",
+          "value": 2000.0,
+          "value_type": "number",
+          "unit": "M",
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZCONVERSIONROLLKG",
+          "value": 12.1,
+          "value_type": "number",
+          "unit": "KG",
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZCORE",
+          "value": "3",
+          "value_type": "string",
+          "unit": "INCH",
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZTREATMENT_IN",
+          "value": "Corona",
+          "value_type": "string",
+          "unit": null,
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZTREATMENT_OUT",
+          "value": "None",
+          "value_type": "string",
+          "unit": null,
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZEXPIREDLIVE",
+          "value": "24",
+          "value_type": "string",
+          "unit": null,
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZFUTURE_TENSILE_STRENGTH",
+          "value": "150.5",
+          "value_type": "number",
+          "unit": "MPA",
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZEXTRA_UNREAD_CHARACTERISTIC",
+          "value": "EXTRA_RAW_FACT_ALPHA",
+          "value_type": "string",
+          "unit": null,
+          "source": "batch_classification"
+        }
+      ],
+      "business_context": {
+        "material_number": "SYN-MAT-0001",
+        "material_description": "Synthetic Aluminum Foil Roll 80x200 Grade A",
+        "batch_number": "SYN-BAT-2026-X01",
+        "roll_number": "SYN-ROLL-001-A",
+        "sales_order": "10000001",
+        "sales_order_item": "10",
+        "customer_text": "Deliver to Synthetic Warehouse Dock A",
+        "customer_name": "Synthetic Customer Corp",
+        "production_date": "2026-09-22",
+        "production_date_provenance": {
+          "resolver_function": "Z_GET_PRODUCTION_DATE",
+          "movement_type_selected": "101",
+          "status": "SAP_RESOLVED_TRANSITIONAL"
+        }
+      }
+    },
+    {
+      "item_sequence": 2,
+      "label_code": "N001",
+      "copies": 1,
+      "characteristics": [
+        {
+          "name": "ZZBRAND",
+          "value": "POLYTRON",
+          "value_type": "string",
+          "unit": null,
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZTYPEFILM",
+          "value": "ALUMINIUM FOIL",
+          "value_type": "string",
+          "unit": null,
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZBASEFILM",
+          "value": "PET FILM",
+          "value_type": "string",
+          "unit": null,
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZWIDTH",
+          "value": 80.0,
+          "value_type": "number",
+          "unit": "MM",
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZLENGTH",
+          "value": 2500.0,
+          "value_type": "number",
+          "unit": "M",
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZCONVERSIONROLLKG",
+          "value": 15.4,
+          "value_type": "number",
+          "unit": "KG",
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZCORE",
+          "value": "3",
+          "value_type": "string",
+          "unit": "INCH",
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZUNKNOWN_OPTICAL_DENSITY",
+          "value": 2.45,
+          "value_type": "number",
+          "unit": "OD",
+          "source": "batch_classification"
+        }
+      ],
+      "business_context": {
+        "material_number": "SYN-MAT-0002",
+        "material_description": "Synthetic Aluminum Foil Roll 80x200 Grade B",
+        "batch_number": "SYN-BAT-2026-X02",
+        "roll_number": "SYN-ROLL-002-B",
+        "sales_order": "10000002",
+        "sales_order_item": "20",
+        "customer_text": null,
+        "customer_name": "Synthetic Customer LLC",
+        "production_date": "2026-09-22"
+      }
+    },
+    {
+      "item_sequence": 3,
+      "label_code": "N001",
+      "copies": 1,
+      "characteristics": [
+        {
+          "name": "ZZBRAND",
+          "value": "POLYTRON",
+          "value_type": "string",
+          "unit": null,
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZTYPEFILM",
+          "value": "ALUMINIUM FOIL",
+          "value_type": "string",
+          "unit": null,
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZBASEFILM",
+          "value": "PET FILM",
+          "value_type": "string",
+          "unit": null,
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZWIDTH",
+          "value": 80.0,
+          "value_type": "number",
+          "unit": "MM",
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZLENGTH",
+          "value": 3000.0,
+          "value_type": "number",
+          "unit": "M",
+          "source": "batch_classification"
+        },
+        {
+          "name": "ZZCONVERSIONROLLKG",
+          "value": 18.2,
+          "value_type": "number",
+          "unit": "KG",
+          "source": "batch_classification"
+        }
+      ],
+      "business_context": {
+        "material_number": "SYN-MAT-0003",
+        "material_description": "Synthetic Aluminum Foil Roll 80x200 Grade C",
+        "batch_number": "SYN-BAT-2026-X03",
+        "roll_number": "SYN-ROLL-003-C",
+        "customer_text": ""
+      }
+    }
+  ]
+}

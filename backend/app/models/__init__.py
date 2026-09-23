@@ -15,6 +15,12 @@ from .schemas import (
     ValidationRequest,
     ValidationResponse,
 )
+from .raw_sap_snapshot_v2 import (
+    RawBusinessContext,
+    RawCharacteristicItem,
+    RawSapBatchSnapshotV2,
+    RawSapItemSnapshotV2,
+)
 
 __all__ = [
     "DataContractPayload",
@@ -28,4 +34,8 @@ __all__ = [
     "TemplateDetail",
     "ValidationRequest",
     "ValidationResponse",
+    "RawBusinessContext",
+    "RawCharacteristicItem",
+    "RawSapBatchSnapshotV2",
+    "RawSapItemSnapshotV2",
 ]

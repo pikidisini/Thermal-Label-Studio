@@ -1,6 +1,34 @@
 # AI Handoff — Thermal Label Studio
 
-## Active snapshot — B2B2I SAP Shadow Print Simulation & PDF Batch Evidence (Pass 4 P1 Atomicity Resolved — WAITING_FOR_CODEX_FINAL_REVIEW)
+## Active snapshot — B2B2K Extensible Raw SAP Snapshot v2 & N001 Rule Boundary (P1-A & P1-B REMEDIATION PASSED — WAITING_FOR_CODEX_LEVEL_3_REVIEW)
+
+- Date: `2026-09-23`
+- Repository: `Thermal-Label-Studio` (`web_app/`)
+- Remote baseline: `origin/main` at `b0d711c`
+- Active branch: `codex/b2b2k-n001-pilot-safe-demo` (starting from commit `264ccd7`)
+- Status: `P1_REMEDIATION_PASSED — WAITING_FOR_CODEX_LEVEL_3_REVIEW`. Seluruh perbaikan mandatory P1 (termasuk P1-A zero fact substitution dan P1-B complete test isolation & audit) telah diselesaikan dan diverifikasi. Working tree sengaja dibiarkan uncommitted/dirty. Berhenti sebelum commit/push/PR/merge.
+- Executor: `Gemini Flash 3.8 via Antigravity`; Reviewer: `Codex`.
+- Scope & P1 Remediations:
+  - Non-lossy serialization & hashing: `exclude_unset=True` menjaga perbedaan semantik absent vs explicit `null` vs empty string `""` secara durable di disk dan dalam SHA-256 idempotency hash. Replay dengan payload absent vs null memicu HTTP 409 Conflict.
+  - Zero fake business fallbacks & no fact substitution (P1-A): menghapus total seluruh default fiktif dan substitusi fakta bisnis dari `N001DevelopmentAdapter`: `material_desc` strictly raw (nol substitusi `type_film`), `so_item` strictly raw (nol substitusi `sales_order`), `gross_weight_kg` strictly raw (nol substitusi `net_weight_kg`). Field derivasi unit (`width_inch`, `length_feet`, `weight_lbs`) dilaporkan jujur di `audit_meta`. Validasi ketat fail-closed untuk 9 fakta raw wajib. Zero fabrikasi barcode/QR (`codes=None`).
+  - Keamanan & higienitas rekursif: `validate_untrusted_data` dan `check_key_security` memeriksa secara rekursif hingga kedalaman 3 level, menolak pattern kunci sensitif, script eksekutabel, angka non-finit (NaN/Infinity), struktur array/list di dalam `business_context`, panjang kunci <= 64, dan nilai string <= 512 karakter.
+  - Collision-resistant idempotency: berkas idempotensi menggunakan nama hash SHA-256 (`hashlib.sha256(key).hexdigest() + ".json"`) dengan verifikasi integritas kunci saat dibaca dari disk. Batasan konkurensi single-process `asyncio.Lock` didokumentasikan transparan.
+  - Isolasi pengujian mutlak (P1-B): mengeliminasi total seluruh pemanggilan `clear_for_tests()` pada seluruh file test di `backend/tests/` (0 occurrences). Audit menyeluruh memastikan 0 test memakai storage default (`backend/data/out`); seluruh direct instantiation memakai `tmp_path / "artifacts"` dan `tmp_path / "sim_store"`. Test AC3 unknown-printer tidak lagi memanggil `SapShadowService()` tanpa parameter. Test AC6 membaca manifest tepat dari `artifacts_dir` temporer yang sama dengan service. Autouse fixture `isolated_service(tmp_path)` mem-patch routes dan service per-test. Regression assertions memastikan path penyimpanan berada di bawah `tmp_path`.
+  - Data minimization: `GET /simulation/sap-batches` dan `GET /simulation/sap-batches/{batch_id}` hanya mengembalikan ringkasan status tersanitasi; raw snapshot hanya dapat diakses melalui `GET /simulation/sap-batches/{batch_id}/raw-snapshot`.
+- Quality Gate:
+  - Review progression: Baseline review independen Codex (75 passed, 1 failed) -> diselesaikan tuntas menjadi 93 passed, 0 failed.
+  - Targeted Raw SAP Snapshot v2 suite: `68 passed` in 23.47s (`backend/tests/test_raw_sap_snapshot_v2.py`).
+  - Regression canonical simulation suite: `25 passed` in 35.13s (`backend/tests/test_sap_shadow_simulation.py`).
+  - Total Aktual: `93 passed, 0 failed`.
+  - Whitespace & format check: `git diff --check` bersih (0 errors).
+  - Test scan `clear_for_tests()`: 0 occurrences di `backend/tests/`.
+  - Test scan `SapShadowService`: 0 instansiasi dengan default storage.
+  - Static security scan: 0 rahasia/token riil, 0 socket live, 0 spooler, 0 live SAP calls.
+  - State preservation: File di `backend/data/out/` tidak dihapus (existing local state dipertahankan utuh).
+- Task files: `docs/tasks/B2B2K/TASK_CONTRACT.md`, `docs/tasks/B2B2K/fixtures/raw_sap_snapshot_v2_n001_synthetic.json`, `docs/tasks/B2B2K/RESULT.md`, `docs/tasks/B2B2K/REVIEW.md`.
+- Next action: Menunggu review mandiri Level 3 oleh Codex. Working tree uncommitted/dirty.
+
+## Previous snapshot — B2B2I SAP Shadow Print Simulation & PDF Batch Evidence (Pass 4 P1 Atomicity Resolved — WAITING_FOR_CODEX_FINAL_REVIEW)
 
 - Date: `2026-09-22`
 - Repository: `Thermal-Label-Studio` (`web_app/`)

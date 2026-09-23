@@ -27,6 +27,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 
 from ..config import get_sap_simulation_auth_token, is_sap_shadow_simulation_enabled
+from ..models.raw_sap_snapshot_v2 import RawSapBatchSnapshotV2
 from ..services.sap_shadow_service import (
     SapShadowBatchRequest,
     SimulationPersistenceError,
@@ -124,6 +125,44 @@ async def submit_sap_simulation_batch(
         ) from None
 
 
+@simulation_router.post(
+    "/raw-batches",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_simulation_enabled), Depends(verify_simulation_token)],
+)
+async def submit_raw_sap_simulation_batch(
+    request: RawSapBatchSnapshotV2,
+    response: Response,
+) -> Dict[str, Any]:
+    """Ingests a Raw SAP Snapshot v2 batch for shadow simulation and evidence PDF generation.
+
+    Replays with the same idempotency key (producer_namespace, request_id) return
+    the existing batch representation without re-generating artifacts.
+    """
+    try:
+        result = await sap_shadow_service.ingest_raw_batch(request, auto_process=True)
+        if result.get("idempotent_replay"):
+            response.status_code = status.HTTP_200_OK
+        return result
+    except ValueError as exc:
+        msg = str(exc)
+        if msg.startswith("Conflict:"):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=msg)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
+    except SimulationPersistenceError as exc:
+        logger.error("Durable persistence failure during raw batch ingestion: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Gagal menyimpan batch simulasi mentah secara persisten.",
+        ) from None
+    except Exception as exc:
+        logger.error("Internal error during raw simulation batch ingestion: %s", type(exc).__name__, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Simulasi batch mentah SAP mengalami kendala teknis internal.",
+        ) from None
+
+
 @simulation_router.get(
     "/sap-batches",
     dependencies=[Depends(require_simulation_enabled), Depends(verify_simulation_token)],
@@ -139,13 +178,42 @@ def list_simulation_batches() -> List[Dict[str, Any]]:
 )
 def get_simulation_batch_status(batch_id: str) -> Dict[str, Any]:
     """Retrieves simulation batch state, item sequence progression, and artifact readiness (service-token authorized)."""
-    record = sap_shadow_service.get_batch(batch_id)
+    record = sap_shadow_service.get_batch_summary(batch_id)
     if not record:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Batch '{batch_id}' not found.",
         )
     return record
+
+
+@simulation_router.get(
+    "/sap-batches/{batch_id}/raw-snapshot",
+    dependencies=[Depends(require_simulation_enabled), Depends(verify_simulation_token)],
+)
+def get_simulation_batch_raw_snapshot(batch_id: str) -> Dict[str, Any]:
+    """Retrieves preserved Raw SAP Snapshot v2 associated with batch (service-token authorized)."""
+    record = sap_shadow_service.get_batch(batch_id)
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Batch '{batch_id}' not found.",
+        )
+    raw_snapshot = sap_shadow_service.get_raw_snapshot(batch_id)
+    if not raw_snapshot:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Raw snapshot not available for batch '{batch_id}'.",
+        )
+    return {
+        "batch_id": batch_id,
+        "producer_namespace": record.get("producer_namespace"),
+        "request_id": record.get("request_id"),
+        "contract_type": record.get("contract_type", "canonical"),
+        "label_code": record.get("label_code"),
+        "profile_version": record.get("profile_version"),
+        "raw_snapshot": raw_snapshot,
+    }
 
 
 @simulation_router.get(
