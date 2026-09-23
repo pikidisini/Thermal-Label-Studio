@@ -62,41 +62,66 @@ class PdfEvidenceService:
         c.drawCentredString(0, 0, WATERMARK_TEXT)
         c.restoreState()
 
-        # Top Header Banner
+        # Top Header Banner (Structured multi-zone layout preventing title/status overlap)
+        banner_h = 98
         c.setFillColorRGB(0.06, 0.09, 0.16)  # Dark slate (#0F172A)
-        c.rect(0, page_h - 90, page_w, 90, fill=1, stroke=0)
+        c.rect(0, page_h - banner_h, page_w, banner_h, fill=1, stroke=0)
 
-        c.setFillColor(colors.white)
-        c.setFont("Helvetica-Bold", 18)
-        c.drawString(36, page_h - 42, "SAP SHADOW PRINT SIMULATION EVIDENCE")
-
+        # Zone 1 (Top Bar, y = page_h - 26 to page_h - 35): Category eyebrow left, Status pill right
         c.setFillColor(colors.HexColor("#94A3B8"))  # Slate 400
-        c.setFont("Helvetica", 10)
-        c.drawString(36, page_h - 60, "PPIC & Production Virtual Audit Trail — Pipeline Verification")
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(36, page_h - 26, "PPIC & PRODUCTION VIRTUAL AUDIT TRAIL — SAFE DEMO")
+
+        # Distinct Status Badge Pill (Right aligned at y = page_h - 35, vertically separated from title)
+        badge_w = 165
+        badge_h = 18
+        badge_x = page_w - 36 - badge_w
+        badge_y = page_h - 35
+        c.setFillColor(colors.HexColor("#1E293B"))  # Slate 800
+        c.setStrokeColor(colors.HexColor("#F59E0B"))  # Amber 500
+        c.setLineWidth(1)
+        c.roundRect(badge_x, badge_y, badge_w, badge_h, 3, fill=1, stroke=1)
 
         c.setFillColor(colors.HexColor("#F59E0B"))  # Amber 500
-        c.setFont("Helvetica-Bold", 9)
-        c.drawRightString(page_w - 36, page_h - 42, "STATUS: SIMULATED (PDF SINK)")
+        c.setFont("Helvetica-Bold", 8.5)
+        c.drawCentredString(badge_x + badge_w / 2, badge_y + 5, "STATUS: SIMULATED (PDF SINK)")
+
+        # Zone 2 (Title, y = page_h - 58): Full horizontal width (page_w - 72 pt) with dynamic sizing
+        title_text = "SAP SHADOW PRINT SIMULATION EVIDENCE"
+        max_title_w = page_w - 72
+        title_font_size = 16
+        calc_w = c.stringWidth(title_text, "Helvetica-Bold", title_font_size)
+        if calc_w > max_title_w:
+            title_font_size = max(8, int(title_font_size * (max_title_w / calc_w)))
+
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica-Bold", title_font_size)
+        c.drawString(36, page_h - 58, title_text)
+
+        # Zone 3 (Subtitle, y = page_h - 78)
+        c.setFillColor(colors.HexColor("#94A3B8"))  # Slate 400
+        c.setFont("Helvetica", 9)
+        c.drawString(36, page_h - 78, "Pipeline Verification & Label Layout Inspection — Virtual Sink")
 
         # Disclaimer Box
         c.setFillColorRGB(0.99, 0.95, 0.95)
         c.setStrokeColorRGB(0.9, 0.25, 0.25)
         c.setLineWidth(1)
-        c.roundRect(36, page_h - 145, page_w - 72, 42, 4, fill=1, stroke=1)
+        c.roundRect(36, page_h - 150, page_w - 72, 42, 4, fill=1, stroke=1)
 
         c.setFillColorRGB(0.75, 0.1, 0.1)
         c.setFont("Helvetica-Bold", 10)
-        c.drawString(48, page_h - 122, f"PERINGATAN: {WATERMARK_TEXT}")
+        c.drawString(48, page_h - 127, f"PERINGATAN: {WATERMARK_TEXT}")
         c.setFont("Helvetica", 8.5)
         c.setFillColorRGB(0.2, 0.2, 0.2)
         c.drawString(
             48,
-            page_h - 136,
+            page_h - 141,
             "Dokumen ini diproduksi oleh sink simulasi virtual untuk verifikasi layout, data SAP, dan urutan batch. Tidak ada printer fisik yang dihubungi.",
         )
 
         # Batch Metadata Grid
-        y = page_h - 165
+        y = page_h - 170
         c.setFont("Helvetica-Bold", 11)
         c.setFillColor(colors.HexColor("#0F172A"))
         c.drawString(36, y, "1. Informasi Batch & Audit Pipeline")
@@ -246,24 +271,26 @@ class PdfEvidenceService:
             else:
                 cls._draw_vector_fallback(c, item, label_w_pt, label_h_pt)
 
-            # 2. Overlaid Watermark (Mandatory per AC 5)
+            # 2. Overlaid Watermark & Safety Indicators (Mandatory per AC 2 & AC 5)
+            # Safe Demo must remain prominent without opaque ribbons occluding label content
             c.saveState()
 
-            # Top Safety Header Bar
-            header_bar_h = 14
-            c.setFillColorRGB(0.9, 0.2, 0.2, alpha=0.88)
-            c.rect(0, label_h_pt - header_bar_h, label_w_pt, header_bar_h, fill=1, stroke=0)
+            # Safety perimeter stroke border (outlining label margin without fill)
+            c.setStrokeColorRGB(0.85, 0.15, 0.15, alpha=0.5)
+            c.setLineWidth(1.0)
+            c.rect(1.5, 1.5, label_w_pt - 3, label_h_pt - 3, fill=0, stroke=1)
 
-            c.setFillColor(colors.white)
-            c.setFont("Helvetica-Bold", 7.5)
+            # Subtle margin tag in the top-right margin (no opaque background fill)
+            c.setFillColorRGB(0.85, 0.15, 0.15, alpha=0.75)
+            c.setFont("Helvetica-Bold", 6.5)
             seq_num = item.get("item_sequence", page_idx)
             header_text = (
                 f"{WATERMARK_TEXT}  |  Item: {seq_num}/{len(sorted_items)}  |  Batch: {batch_id[:8]}"
             )
-            c.drawCentredString(label_w_pt / 2, label_h_pt - 10, header_text)
+            c.drawRightString(label_w_pt - 8, label_h_pt - 8, header_text)
 
-            # Prominent Diagonal Watermark across the label
-            c.setFillColorRGB(0.85, 0.15, 0.15, alpha=0.30)
+            # Translucent Diagonal Watermark across the label (prominent but non-occluding)
+            c.setFillColorRGB(0.85, 0.15, 0.15, alpha=0.18)
             c.setFont("Helvetica-Bold", 24)
             c.translate(label_w_pt / 2, label_h_pt / 2)
             c.rotate(24)
@@ -301,7 +328,7 @@ class PdfEvidenceService:
         c.drawString(14, h_pt - 30, str(title))
 
         c.setFont("Helvetica", 9)
-        desc = fields.get("material_desc") or fields.get("type_film") or "Material / Roll Description"
+        desc = fields.get("material_desc") or "Material / Roll Description"
         c.drawString(14, h_pt - 44, str(desc))
 
         # Secondary fields

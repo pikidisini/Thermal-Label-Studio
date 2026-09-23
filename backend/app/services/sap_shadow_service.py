@@ -42,7 +42,7 @@ from ..services.pdf_evidence_service import PdfEvidenceService
 from ..services.template_service import TemplateService
 
 # Core Label Engine Modules
-from engine.renderer import inject_data
+from engine.renderer import inject_data, validate_no_orphan_tokens, OrphanTokenError
 from engine.barcode_generator import inject_barcodes_and_qr
 from engine.rasterizer import svg_to_png
 
@@ -216,8 +216,29 @@ class SapShadowBatchRequest(BaseModel):
     )
 
 
+# Explicit schema-aware list of TRULY optional fields that may render as empty string ""
+# when absent, null, or empty, per AC 3 & Design Rule 3 (no fabricated values, explicit policy).
+# Core business facts (brand, type_film, base_film, width_mm, length_m, net_weight_kg)
+# are REQUIRED for roll labels and must NOT be masked as optional.
+KNOWN_OPTIONAL_CANONICAL_FIELDS: Set[str] = {
+    "so_item",
+    "splice_1_m",
+    "splice_1_feet",
+    "splice_2_m",
+    "splice_2_feet",
+    "treatment_inside",
+    "treatment_outside",
+    "core_inch",
+    "used_before",
+    "gross_weight",
+    "gross_weight_kg",
+    "material_desc",
+    "production_date",
+}
+
+
 def normalize_canonical_for_engine(canonical_data: SapCanonicalItemData) -> Dict[str, Any]:
-    """Normalizes typed canonical data into engine pure data contract v1.1 format without fake fallbacks."""
+    """Normalizes typed canonical data into engine pure data contract v1.1 format with explicit optional token handling."""
     data_dict = canonical_data.model_dump(exclude_none=True)
 
     fields: Dict[str, Any] = {}
@@ -232,11 +253,68 @@ def normalize_canonical_for_engine(canonical_data: SapCanonicalItemData) -> Dict
         if k not in ("fields", "codes", "contract_version"):
             fields[k] = v
 
-    # Clean units if present, but NEVER invent fake fallback business facts
+    # 1. Alias synchronization between canonical pairs
+    if not fields.get("batch_text") and fields.get("batch_number"):
+        fields["batch_text"] = fields["batch_number"]
+    elif not fields.get("batch_number") and fields.get("batch_text"):
+        fields["batch_number"] = fields["batch_text"]
+
+    if not fields.get("roll_no") and fields.get("roll_number"):
+        fields["roll_no"] = fields["roll_number"]
+    elif not fields.get("roll_number") and fields.get("roll_no"):
+        fields["roll_number"] = fields["roll_no"]
+
+    if not fields.get("material_code") and fields.get("material_number"):
+        fields["material_code"] = fields["material_number"]
+    elif not fields.get("material_number") and fields.get("material_code"):
+        fields["material_number"] = fields["material_code"]
+
+    if not fields.get("net_weight_kg") and fields.get("net_weight"):
+        fields["net_weight_kg"] = fields["net_weight"]
+    elif not fields.get("net_weight") and fields.get("net_weight_kg"):
+        fields["net_weight"] = fields["net_weight_kg"]
+
+    if not fields.get("gross_weight_kg") and fields.get("gross_weight"):
+        fields["gross_weight_kg"] = fields["gross_weight"]
+    elif not fields.get("gross_weight") and fields.get("gross_weight_kg"):
+        fields["gross_weight"] = fields["gross_weight_kg"]
+
+    # 2. Clean weight unit suffixes if present
     if "net_weight_kg" in fields and fields["net_weight_kg"] is not None:
         fields["net_weight_kg"] = str(fields["net_weight_kg"]).replace("KG", "").replace("Kg", "").replace("kg", "").strip()
     if "gross_weight_kg" in fields and fields["gross_weight_kg"] is not None:
         fields["gross_weight_kg"] = str(fields["gross_weight_kg"]).replace("KG", "").replace("Kg", "").replace("kg", "").strip()
+
+    # 2b. Deterministic unit derivations for canonical path if metric values are present
+    if not fields.get("width_inch") and fields.get("width_mm") is not None and str(fields["width_mm"]).strip():
+        try:
+            w_fl = float(str(fields["width_mm"]).strip())
+            if w_fl > 0:
+                fields["width_inch"] = f"{round(w_fl / 25.4, 2):.2f}"
+        except (ValueError, TypeError):
+            pass
+
+    if not fields.get("length_feet") and fields.get("length_m") is not None and str(fields["length_m"]).strip():
+        try:
+            l_fl = float(str(fields["length_m"]).strip())
+            if l_fl > 0:
+                fields["length_feet"] = str(int(round(l_fl * 3.28084)))
+        except (ValueError, TypeError):
+            pass
+
+    if not fields.get("weight_lbs") and fields.get("net_weight_kg") is not None and str(fields["net_weight_kg"]).strip():
+        try:
+            nw_fl = float(str(fields["net_weight_kg"]).strip())
+            if nw_fl > 0:
+                fields["weight_lbs"] = f"{round(nw_fl * 2.20462, 1):.1f}"
+        except (ValueError, TypeError):
+            pass
+
+    # 3. Explicit policy for known optional canonical fields:
+    # If absent, None, or empty, render as empty string "" without fabricating business facts.
+    for opt_field in KNOWN_OPTIONAL_CANONICAL_FIELDS:
+        if opt_field not in fields or fields[opt_field] is None:
+            fields[opt_field] = ""
 
     return {"fields": fields, "codes": codes}
 
@@ -844,7 +922,11 @@ class SapShadowService:
                 # 2. Inject vector 1D/2D barcodes
                 final_svg = inject_barcodes_and_qr(injected_svg, contract_data)
 
-                # 3. Rasterize to exact media points/pixels via engine
+                # 3. Post-injection fail-closed placeholder validation (AC 3, AC 4)
+                # Validates that all {{...}} tokens are resolved; fails closed if orphan/foreign tokens remain.
+                validate_no_orphan_tokens(final_svg)
+
+                # 4. Rasterize to exact media points/pixels via engine
                 with tempfile.TemporaryDirectory() as td:
                     temp_png = Path(td) / "label_render.png"
                     svg_to_png(
