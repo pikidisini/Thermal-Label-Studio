@@ -1,5 +1,15 @@
 # AI Handoff — Thermal Label Studio
 
+## Active snapshot — B2B2N planning (2026-09-23)
+
+- Repository `web_app/`; planner Codex; branch `codex/b2b2n-self-service-safe-demo` dari `origin/main` commit `0f2cf82` (PR #24 B2B2M sudah merged).
+- Scope saat ini hanya kontrak tugas `docs/tasks/B2B2N/TASK_CONTRACT.md`; implementasi UI, auth operator, dan pengiriman SAP DEV nyata belum dimulai.
+- Tujuan: pengguna dapat memicu data dari SAP DEV, melihat batch/urutan di UI, dan membuka PDF simulasi sendiri. Token SAP machine-to-machine tetap server-side; UI anonim tetap tertutup.
+- Gemini Flash 3.8 High via Antigravity ditetapkan sebagai executor setelah checkpoint perencanaan ini; Codex reviewer Level 3.
+- Git working tree memiliki folder hasil test/PDF lokal yang tidak ter-track dari fase sebelumnya. Jangan stage, hapus, atau masukkan artefak tersebut dalam commit B2B2N.
+- Test runtime B2B2N, SAP DEV live, printer, dan database production: `NOT RUN`. Perencanaan hanya diperiksa secara statis.
+- Snapshot B2B2M di bawah adalah histori yang sudah digantikan oleh merge PR #24; jangan membacanya sebagai status Git terkini.
+
 ## Active snapshot — B2B2M: Safe Demo PDF Visual & Placeholder Hardening (REMEDIATION_P1_P2_COMPLETED — AWAITING_CODEX_LEVEL_3_REVIEW)
 
 - Date: `2026-09-23`.
