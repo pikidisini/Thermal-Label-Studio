@@ -305,6 +305,12 @@ class RawSapItemSnapshotV2(BaseModel):
         max_length=64,
         description="Business label code (e.g. N001). Checked fail-closed by rule router.",
     )
+    profile_version: Optional[str] = Field(
+        default=None,
+        max_length=32,
+        pattern=r"^[A-Za-z0-9._-]+$",
+        description="Optional immutable profile version targeting. If omitted, default active version is used.",
+    )
     copies: Literal[1] = Field(
         default=1,
         description="Number of copies (strictly 1 for Safe Demo simulation per AC 6 / P2-2)",
@@ -374,6 +380,12 @@ class RawSapBatchSnapshotV2(BaseModel):
         max_length=64,
         pattern=r"^[A-Za-z0-9_-]+$",
         description="Logical printer target resolved server-side to virtual profile",
+    )
+    profile_version: Optional[str] = Field(
+        default=None,
+        max_length=32,
+        pattern=r"^[A-Za-z0-9._-]+$",
+        description="Optional batch-level profile version targeting",
     )
     items: List[RawSapItemSnapshotV2] = Field(
         ...,

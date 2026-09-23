@@ -1,15 +1,59 @@
 # AI Handoff — Thermal Label Studio
 
-## Active snapshot — B2B2L planning
+## Reviewer update — B2B2L final, 2026-09-23
+
+- Verdict `READY_FOR_CHECKPOINT` untuk branch lokal `codex/b2b2l-profile-composition-engine`; rincian dan batas bukti ada di `docs/tasks/B2B2L/REVIEW.md` bagian review akhir.
+- Test simbol sekarang membandingkan geometri path lengkap dan merekonstruksi bit Code128/matriks QR dari SVG hasil render; celah jumlah bar sama tetapi payload berbeda sudah tertutup.
+- Verifikasi Codex putaran ini: 129 test terkait PASS; `git diff --check` dan direct whitespace scan file baru PASS; secret high-signal scan tidak menemukan temuan. Full backend 367 passed/21 skipped berasal dari review sebelumnya, tidak dijalankan ulang pada putaran test-only ini. Frontend/SAP/printer/database production NOT RUN.
+- Working tree masih dirty/uncommitted. Gemini Flash 3.8 High tetap writer tunggal untuk staged review, commit, dan push checkpoint B2B2L; jangan merge sebelum review PR. `git fetch origin` pernah terhalang sandbox Codex, sehingga executor perlu memeriksa remote/upstream sebelum PR.
+
+## Reviewer update — B2B2L review ulang, 2026-09-23
+
+- Verdict `CHANGES_REQUIRED` dengan hanya satu celah bukti P2 tersisa; lihat `docs/tasks/B2B2L/REVIEW.md` bagian review putaran terbaru.
+- Kebocoran nilai raw pada error format numerik dan pemilihan versi SAP di luar pin aplikasi telah diperbaiki. Test Code128/QR kini memeriksa SVG hasil render, tetapi hanya membandingkan jumlah bar/run; dua payload Code128 berbeda terbukti dapat menghasilkan 58 bar yang sama.
+- Verifikasi Codex: 129 test terarah PASS; seluruh backend `367 passed, 21 skipped, 2 warnings`; `git diff --check` PASS; whitespace file baru PASS. SAP/printer/database production/frontend NOT RUN. `git fetch origin` BLOCKED karena `.git/FETCH_HEAD` tidak dapat ditulis oleh sandbox.
+- Gemini Flash 3.8 High tetap executor tunggal kode pada branch lokal `codex/b2b2l-profile-composition-engine`; jangan commit/push/PR/merge sampai assertion isi simbol dan klaim evidence dikoreksi lalu direview ulang.
+
+## Reviewer update — B2B2L remediasi, review ulang 2026-09-23
+
+- Verdict tetap `CHANGES_REQUIRED`; rincian terbaru di `docs/tasks/B2B2L/REVIEW.md`.
+- Empat P1 awal diperbaiki, tetapi nilai raw SAP masih dapat bocor lewat error HTTP format numerik, pemilihan versi profile dari payload SAP masih dapat mengalahkan pin aplikasi, dan test PDF belum memverifikasi isi teks/barcode/QR yang dikomposisikan.
+- Regresi lokal B2B2L/B2B2K/B2B2I: `127 passed, 2 warnings`; frontend, SAP, PostgreSQL, dan printer: `NOT RUN` dalam review ini.
+- Branch `codex/b2b2l-profile-composition-engine` masih dirty/uncommitted. Gemini tetap executor tunggal untuk kode; Codex hanya memperbarui catatan review/handoff. Jangan commit/push/PR/merge sebelum review hijau.
+
+## Reviewer update — B2B2L
+
+- Date: `2026-09-23`; branch: `codex/b2b2l-profile-composition-engine`.
+- Verdict: `CHANGES_REQUIRED`; detail dan bukti ada di `docs/tasks/B2B2L/REVIEW.md`.
+- Codex menjalankan test B2B2L: `23 passed, 2 warnings`; probe tambahan membuktikan provenance dapat masuk QR, mutasi profile versi yang sama, teks komposisi N001 terabaikan, slot barcode/QR tertukar, dan parse angka tidak fail-closed.
+- Implementasi Gemini masih lokal dan uncommitted. Codex hanya menulis `REVIEW.md` dan update ini; Gemini melanjutkan koreksi sebagai satu-satunya writer kode.
+- Jangan PR/merge sampai review ulang menyatakan siap.
+
+
+## Active snapshot — B2B2L Versioned Label Profile Composition for Safe Demo (REMEDIATION_COMPLETED — WAITING_FOR_CODEX_LEVEL_3_REVIEW)
 
 - Date: `2026-09-23`.
 - Repository: `Thermal-Label-Studio` (`web_app/`).
 - Branch: `codex/b2b2l-profile-composition-engine` from `origin/main` at `3984469` (B2B2K merged via PR #22).
-- Status: `PLANNED`; only task contract and empty result/review handoff created. Runtime B2B2L and tests: `NOT RUN`.
-- Planner: Codex. Next sole writer: Gemini Flash 3.8 via Antigravity after planning checkpoint is pushed.
-- Scope: versioned, structured label profile composition into Safe Demo text/barcode/QR and PDF; development-only N001.
-- Task: `docs/tasks/B2B2L/TASK_CONTRACT.md`; executor records actual evidence in `RESULT.md`; Codex records independent verdict in `REVIEW.md`.
-- B2B2K history below is preserved as a historical snapshot; its old branch and dirty-tree statements do not describe current working state.
+- Status: `REMEDIATION_COMPLETED — WAITING_FOR_CODEX_LEVEL_3_REVIEW`. Seluruh temuan P1 dan P2 dari review independen Codex (termasuk putaran 2: sanitasi nilai mentah dari error HTTP publik, penegakan fail-closed profile version pinning dari SAP, dan inspeksi matematis mendalam intermediate SVG pada PDF evidence) telah diperbaiki tuntas. 36 pengujian B2B2L dan 129 total pengujian regresi gabungan lulus 100%. Working tree sengaja uncommitted/dirty. Berhenti sebelum commit/push/PR/merge.
+- Planner: Codex. Executor tunggal: Gemini Flash 3.8 via Antigravity. Reviewer: Codex Level 3.
+- Scope perbaikan P1/P2 yang diimplementasikan:
+  - **P1-1**: Mengeluarkan `production_date_provenance` dan seluruh audit field dari allowlist (`ALLOWED_BUSINESS_CONTEXT_FIELDS`); melarang substring `"provenance"`, `"audit"`, `"source_metadata"` pada nama segmen.
+  - **P1-2**: Menetapkan `frozen=True` pada seluruh model profile Pydantic; memproteksi `ProfileRegistry` dengan `threading.RLock()`; menggunakan `copy.deepcopy` pada registrasi dan query; melepaskan pemanggilan registry reset dari `SapShadowService.clear_for_tests()`.
+  - **P1-3**: Menerapkan teks hasil komposisi profile (`comp_result.fields`) ke `SapCanonicalFields` pada adapter N001 (`batch_text`, dll.); validasi slot template ketat berbasis atribut XML yang diparse tanpa substring mentah SVG; menolak slot yang tertukar atau tidak didukung kontrak renderer.
+  - **P1-4 / Round 2 P1**: Parsing angka ketat menggunakan `Decimal` dengan pembulatan industri `ROUND_HALF_UP` dan validasi `d.is_finite()`; input campuran (`12kg34`), teks non-angka (`not-a-number`), dan non-finite (`NaN`, `Infinity`) gagal tertutup dengan `ProfileCompositionError`. Nilai mentah (`val_str`) dan karakter non-ASCII disanitasi dari pesan exception sehingga tidak pernah bocor ke respons HTTP 400 publik.
+  - **P2-1 / Round 2 P2**: Menetapkan kepemilikan versi aplikasi pada `ProfileRegistry` (`set_active_version`, `get_active_version`); memvalidasi konsistensi versi fail-closed: permintaan SAP dengan `profile_version` yang berbeda dari versi aktif yang dipin oleh aplikasi ditolak dengan HTTP 400 (`ValueError`).
+  - **P2-2 / Round 2 P2**: Menyimpan `rendered_svg` pada completed item dan memverifikasi secara mendalam: kehadiran composed text `"VERIFIED-TEXT-INSPECTION"`, kecocokan geometri path vektor lengkap Code128 & QR terhadap generator referensi, penolakan beda payload dengan jumlah bar identik (`WRONG-INSPECT-99`), rekonstruksi 211-bit Code128 dari subpath SVG, rekonstruksi 2D boolean module matrix QR dari subpath SVG, serta rasterisasi halaman PDF evidence 1600x640 px pada 203.2 DPI.
+- Quality Gate Aktual:
+  - Profile Composition Suite: `36 passed, 2 warnings` in 5.33s (`backend/tests/test_profile_composition.py`).
+  - Raw SAP Snapshot v2 Suite: `68 passed` in 18.53s (`backend/tests/test_raw_sap_snapshot_v2.py`).
+  - SAP Shadow Simulation Suite: `25 passed` in 35.13s (`backend/tests/test_sap_shadow_simulation.py`).
+  - Total Regression Backend Suite: `129 passed, 2 warnings` in 54.57s.
+  - Whitespace & format check: `git diff --check` bersih (0 errors).
+  - Storage isolation: seluruh pengujian menggunakan direktori temporer terisolasi (`tmp_path / "artifacts"`, `tmp_path / "sim_store"`).
+- Batasan lingkungan (di luar scope): SAP live connection: `NOT RUN`; PPIC business approval format produksi: `NOT RUN`; Printer fisik/TCP 9100/Spooler: `NOT RUN`; Database production: `NOT RUN`.
+- Task files: `docs/tasks/B2B2L/TASK_CONTRACT.md`, `docs/tasks/B2B2L/RESULT.md`, `docs/tasks/B2B2L/REVIEW.md`.
+- Next action: Menyerahkan kembali kepada Codex Level 3 untuk review independen ulang. Working tree uncommitted/dirty. Berhenti sebelum commit, push, dan PR.
 
 ## Previous snapshot — B2B2K Extensible Raw SAP Snapshot v2 & N001 Rule Boundary (P1-A & P1-B REMEDIATION PASSED — WAITING_FOR_CODEX_LEVEL_3_REVIEW)
 

@@ -634,8 +634,8 @@ class SapShadowService:
                         "producer_namespace": request.producer_namespace,
                         "request_id": request.request_id,
                         "printer_id": target_printer_id,
-                        "label_code": N001DevelopmentAdapter.PROFILE_ID,
-                        "profile_version": N001DevelopmentAdapter.RULE_VERSION,
+                        "label_code": existing_record.get("label_code", N001DevelopmentAdapter.PROFILE_ID),
+                        "profile_version": existing_record.get("profile_version", N001DevelopmentAdapter.RULE_VERSION),
                         "status": existing_record["status"],
                         "total_items": existing_record["total_items"],
                         "idempotent_replay": True,
@@ -643,11 +643,57 @@ class SapShadowService:
                         "message": "Idempotent replay: existing raw snapshot batch returned.",
                     }
 
-            # 4. Adapt Raw items to Canonical items via N001 rule profile
+            # 4. Adapt Raw items to Canonical items via rule profile and composer
+            from .profile_composer import ProfileRegistry, ProfileComposer
+
             sorted_raw_items = sorted(request.items, key=lambda x: x.item_sequence)
             batch_items = []
+            batch_label_codes = set()
+            batch_profile_versions = set()
+
+            # Validate batch-level vs item-level version consistency fail-closed
+            batch_req_version = getattr(request, "profile_version", None)
             for it in sorted_raw_items:
-                canonical_item, tmpl_id, audit_meta = N001DevelopmentAdapter.adapt_item(it)
+                if batch_req_version and it.profile_version and it.profile_version != batch_req_version:
+                    raise ValueError(
+                        f"Batch-level profile_version '{batch_req_version}' mismatches "
+                        f"item sequence {it.item_sequence} profile_version '{it.profile_version}'."
+                    )
+
+            for it in sorted_raw_items:
+                active_ver = ProfileRegistry.get_active_version(it.label_code)
+                requested_ver = it.profile_version or batch_req_version
+
+                # Server-side policy: Application strictly owns version selection.
+                # If SAP payload requests a version differing from active pinned version, reject fail-closed.
+                if requested_ver and active_ver and requested_ver != active_ver:
+                    raise ValueError(
+                        f"Requested profile_version '{requested_ver}' is not authorized. "
+                        f"Application policy strictly enforces active profile version '{active_ver}' for label_code '{it.label_code}'."
+                    )
+
+                target_ver = active_ver or requested_ver
+                profile = ProfileRegistry.get(it.label_code, target_ver)
+                if not profile:
+                    raise ValueError(
+                        f"Unsupported label_code '{it.label_code}'. "
+                        f"Profile is unregistered or requested version '{target_ver or 'default'}' was not found in application registry."
+                    )
+
+                # Validate template compatibility with profile element slots fail-closed
+                ProfileComposer.validate_template_compatibility(profile)
+
+                if it.label_code == N001DevelopmentAdapter.PROFILE_ID:
+                    canonical_item, tmpl_id, audit_meta = N001DevelopmentAdapter.adapt_item(
+                        it, profile_version=profile.profile_version, compose_profile=True
+                    )
+                else:
+                    canonical_item, tmpl_id, audit_meta = ProfileComposer.adapt_generic_item(
+                        it, profile
+                    )
+
+                batch_label_codes.add(profile.label_code)
+                batch_profile_versions.add(profile.profile_version)
 
                 clean_id = tmpl_id.replace(".svg", "")
                 tmpl_path = TemplateService.get_template_path(clean_id)
@@ -655,6 +701,18 @@ class SapShadowService:
                     known = [t.id for t in TemplateService.list_templates()]
                     if clean_id not in known:
                         raise ValueError(f"Template '{tmpl_id}' not found.")
+
+                if tmpl_path:
+                    w_mm, h_mm = TemplateService.extract_dimensions_from_file(tmpl_path)
+                    if w_mm and h_mm:
+                        expected_w = virtual_profile.get("width_mm")
+                        expected_h = virtual_profile.get("height_mm")
+                        if expected_w and expected_h:
+                            if abs(w_mm - expected_w) > 1.0 or abs(h_mm - expected_h) > 1.0:
+                                raise ValueError(
+                                    f"Template '{tmpl_id}' dimensions ({w_mm}x{h_mm}mm) "
+                                    f"do not match virtual printer media profile ({expected_w}x{expected_h}mm)"
+                                )
 
                 item_dict = canonical_item.model_dump(exclude_none=True)
                 item_json = json.dumps(item_dict, sort_keys=True)
@@ -669,10 +727,14 @@ class SapShadowService:
                     "item_data_sha256": item_hash,
                     "status": "accepted",
                     "label_code": it.label_code,
+                    "profile_version": profile.profile_version,
                     "raw_characteristics": [c.model_dump(mode="json", exclude_unset=True) for c in it.characteristics],
                     "raw_business_context": it.business_context.model_dump(mode="json", exclude_unset=True) if it.business_context else None,
                     "n001_audit_meta": audit_meta,
                 })
+
+            resolved_label_code = list(batch_label_codes)[0] if len(batch_label_codes) == 1 else "MIXED"
+            resolved_profile_ver = list(batch_profile_versions)[0] if len(batch_profile_versions) == 1 else "MIXED"
 
             # 5. Create new batch record with full raw snapshot preserved
             batch_id = str(uuid.uuid4())
@@ -686,8 +748,8 @@ class SapShadowService:
                 "virtual_profile": virtual_profile,
                 "raw_contract_sha256": contract_hash,
                 "contract_type": "raw_snapshot_v2",
-                "label_code": N001DevelopmentAdapter.PROFILE_ID,
-                "profile_version": N001DevelopmentAdapter.RULE_VERSION,
+                "label_code": resolved_label_code,
+                "profile_version": resolved_profile_ver,
                 "raw_snapshot": request.model_dump(mode="json", exclude_unset=True),
                 "status": "accepted",
                 "total_items": len(batch_items),
@@ -731,8 +793,8 @@ class SapShadowService:
             "producer_namespace": request.producer_namespace,
             "request_id": request.request_id,
             "printer_id": target_printer_id,
-            "label_code": N001DevelopmentAdapter.PROFILE_ID,
-            "profile_version": N001DevelopmentAdapter.RULE_VERSION,
+            "label_code": resolved_label_code,
+            "profile_version": resolved_profile_ver,
             "status": "accepted",
             "total_items": len(batch_items),
             "idempotent_replay": False,
@@ -799,6 +861,7 @@ class SapShadowService:
                         f"Rendering produced empty bytes for template '{item['template_version_id']}'."
                     )
 
+                item["rendered_svg"] = final_svg
                 item["status"] = "completed"
                 record["completed_items"] += 1
 
@@ -1058,6 +1121,9 @@ class SapShadowService:
                     p.unlink()
                 except OSError:
                     pass
+
+        # Isolated test cleanup of shadow service disk and memory state only.
+        # ProfileRegistry remains decoupled and isolated.
 
 
 # Global Singleton Instance
