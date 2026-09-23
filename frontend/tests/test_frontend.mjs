@@ -1015,4 +1015,162 @@ test('sapShadowSimulationApi Unit & Mock Integration Tests', async (t) => {
     const url = sapShadowSimulationApi.getDownloadUrl('batch-abc-123');
     assert.ok(url.endsWith('/api/v1/simulation/sap-batches/batch-abc-123/pdf'));
   });
+
+  await t.test('getSimulationStatus returns full status dictionary', async () => {
+    global.fetch = async (url) => {
+      assert.ok(url.endsWith('/api/v1/simulation/status'));
+      return {
+        ok: true,
+        json: async () => ({
+          enabled: true,
+          status: 'online',
+          service: 'SAP_SHADOW_SIMULATION_SINK',
+          monitoring_requires_identity_provider: false,
+          pilot_operator_enabled: true,
+        }),
+      };
+    };
+
+    const status = await sapShadowSimulationApi.getSimulationStatus();
+    assert.equal(status.enabled, true);
+    assert.equal(status.pilot_operator_enabled, true);
+    assert.equal(status.monitoring_requires_identity_provider, false);
+  });
+
+  await t.test('getOperatorSession probes /simulation/operator/session', async () => {
+    global.fetch = async (url, opts) => {
+      assert.ok(url.endsWith('/api/v1/simulation/operator/session'));
+      assert.equal(opts.credentials, 'same-origin');
+      return {
+        ok: true,
+        json: async () => ({
+          pilot_operator_enabled: true,
+          authenticated: true,
+          csrf_token: 'csrf-xyz-123',
+          operator_label: 'pilot_operator',
+        }),
+      };
+    };
+
+    const session = await sapShadowSimulationApi.getOperatorSession();
+    assert.equal(session.authenticated, true);
+    assert.equal(session.csrf_token, 'csrf-xyz-123');
+  });
+
+  await t.test('loginOperator POSTs password to /simulation/operator/login without leaking session_id', async () => {
+    let capturedBody = null;
+    global.fetch = async (url, opts) => {
+      assert.ok(url.endsWith('/api/v1/simulation/operator/login'));
+      assert.equal(opts.method, 'POST');
+      assert.equal(opts.credentials, 'same-origin');
+      capturedBody = JSON.parse(opts.body);
+      return {
+        ok: true,
+        json: async () => ({
+          status: 'authenticated',
+          csrf_token: 'csrf-123',
+          operator_label: 'pilot_operator',
+        }),
+      };
+    };
+
+    const resp = await sapShadowSimulationApi.loginOperator('MyPilotPass123!');
+    assert.equal(capturedBody.password, 'MyPilotPass123!');
+    assert.equal(resp.status, 'authenticated');
+    assert.equal(resp.csrf_token, 'csrf-123');
+    assert.equal(resp.session_id, undefined);
+  });
+
+  await t.test('logoutOperator sends CSRF token to /simulation/operator/logout', async () => {
+    let capturedHeaders = null;
+    global.fetch = async (url, opts) => {
+      assert.ok(url.endsWith('/api/v1/simulation/operator/logout'));
+      assert.equal(opts.method, 'POST');
+      assert.equal(opts.credentials, 'same-origin');
+      capturedHeaders = opts.headers;
+      return {
+        ok: true,
+        json: async () => ({ status: 'logged_out' }),
+      };
+    };
+
+    await sapShadowSimulationApi.logoutOperator('csrf-token-abc');
+    assert.equal(capturedHeaders['X-CSRF-Token'], 'csrf-token-abc');
+  });
+
+  await t.test('listOperatorBatches calls GET /simulation/operator/batches', async () => {
+    global.fetch = async (url, opts) => {
+      assert.ok(url.endsWith('/api/v1/simulation/operator/batches'));
+      assert.equal(opts.credentials, 'same-origin');
+      return {
+        ok: true,
+        json: async () => [
+          {
+            batch_id: 'b-op-01',
+            request_id: 'REQ-01',
+            label_code: 'N001',
+            profile_version: 'v1.0-dev',
+            status: 'completed',
+            total_items: 3,
+            completed_items: 3,
+            created_at: '2026-09-23T08:00:00Z',
+            has_pdf: true,
+          },
+        ],
+      };
+    };
+
+    const batches = await sapShadowSimulationApi.listOperatorBatches();
+    assert.equal(batches.length, 1);
+    assert.equal(batches[0].batch_id, 'b-op-01');
+    assert.equal(batches[0].has_pdf, true);
+  });
+
+  await t.test('getOperatorBatch calls GET /simulation/operator/batches/:id and returns batch detail with item sequence', async () => {
+    global.fetch = async (url, opts) => {
+      assert.ok(url.endsWith('/api/v1/simulation/operator/batches/b-op-01'));
+      assert.equal(opts.credentials, 'same-origin');
+      return {
+        ok: true,
+        json: async () => ({
+          batch_id: 'b-op-01',
+          producer_namespace: 'SAP_DEV_TRD',
+          request_id: 'REQ-01',
+          printer_id: 'VIRTUAL_SINK_DEV',
+          status: 'completed',
+          total_items: 2,
+          completed_items: 2,
+          items: [
+            {
+              item_id: 'item-001',
+              item_sequence: 1,
+              template_version_id: 'label_roll_80x200',
+              copies: 1,
+              status: 'completed',
+            },
+            {
+              item_id: 'item-002',
+              item_sequence: 2,
+              template_version_id: 'label_roll_80x200',
+              copies: 1,
+              status: 'completed',
+            },
+          ],
+          created_at: '2026-09-23T08:00:00Z',
+        }),
+      };
+    };
+
+    const detail = await sapShadowSimulationApi.getOperatorBatch('b-op-01');
+    assert.equal(detail.batch_id, 'b-op-01');
+    assert.equal(detail.status, 'completed');
+    assert.equal(detail.items.length, 2);
+    assert.equal(detail.items[0].item_sequence, 1);
+    assert.equal(detail.items[1].item_sequence, 2);
+  });
+
+  await t.test('getOperatorPdfUrl returns operator pdf endpoint URI', () => {
+    const url = sapShadowSimulationApi.getOperatorPdfUrl('b-op-99');
+    assert.ok(url.endsWith('/api/v1/simulation/operator/batches/b-op-99/pdf'));
+  });
 });

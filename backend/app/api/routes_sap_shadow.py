@@ -24,10 +24,17 @@ from __future__ import annotations
 import logging
 import secrets
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, Response, status
+from pydantic import BaseModel, Field
 
-from ..config import get_sap_simulation_auth_token, is_sap_shadow_simulation_enabled
+from ..config import (
+    get_pilot_session_ttl_seconds,
+    get_sap_simulation_auth_token,
+    is_pilot_operator_enabled,
+    is_sap_shadow_simulation_enabled,
+)
 from ..models.raw_sap_snapshot_v2 import RawSapBatchSnapshotV2
+from ..services.pilot_session_service import PilotOperatorSession, pilot_session_service
 from ..services.sap_shadow_service import (
     SapShadowBatchRequest,
     SimulationPersistenceError,
@@ -37,6 +44,12 @@ from ..services.sap_shadow_service import (
 logger = logging.getLogger("routes_sap_shadow")
 
 simulation_router = APIRouter(prefix="/simulation", tags=["SAP Shadow Simulation"])
+
+
+class PilotOperatorLoginRequest(BaseModel):
+    """Payload for pilot operator authentication."""
+
+    password: str = Field(..., min_length=1, max_length=128, description="Pilot operator password")
 
 
 def require_simulation_enabled() -> None:
@@ -74,15 +87,67 @@ def verify_simulation_token(
     return x_sap_simulation_token
 
 
+def require_pilot_operator_enabled() -> None:
+    """Dependency ensuring both simulation mode and pilot operator mode are active."""
+    require_simulation_enabled()
+    if not is_pilot_operator_enabled():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Mode operator pilot dinonaktifkan.",
+        )
+
+
+def get_current_pilot_operator(
+    request: Request,
+    pilot_session_cookie: Optional[str] = Cookie(None, alias="pilot_session"),
+) -> PilotOperatorSession:
+    """Dependency resolving authenticated pilot operator session strictly from HttpOnly cookie.
+
+    Fails closed (HTTP 401) if cookie is missing, invalid, or expired.
+    """
+    require_pilot_operator_enabled()
+    if not pilot_session_cookie:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sesi operator pilot tidak valid atau belum masuk.",
+        )
+
+    session = pilot_session_service.get_valid_session(pilot_session_cookie)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sesi operator pilot tidak valid atau telah berakhir. Silakan login kembali.",
+        )
+
+    return session
+
+
+def verify_pilot_csrf(
+    request: Request,
+    x_csrf_token: Optional[str] = Header(None, alias="X-CSRF-Token"),
+    session: PilotOperatorSession = Depends(get_current_pilot_operator),
+) -> bool:
+    """Dependency verifying CSRF token for mutating operator requests."""
+    if not x_csrf_token or not pilot_session_service.verify_csrf(session, x_csrf_token):
+        logger.warning("CSRF verification failed for operator session: %s", session.session_id[:8])
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Validasi CSRF token gagal.",
+        )
+    return True
+
+
 @simulation_router.get("/status")
 def get_simulation_status() -> Dict[str, Any]:
     """Public probe endpoint to check whether SAP shadow simulation is enabled."""
     enabled = is_sap_shadow_simulation_enabled()
+    pilot_enabled = is_pilot_operator_enabled()
     return {
         "enabled": enabled,
         "status": "online" if enabled else "disabled",
         "service": "SAP_SHADOW_SIMULATION_SINK",
-        "monitoring_requires_identity_provider": True,
+        "monitoring_requires_identity_provider": not pilot_enabled,
+        "pilot_operator_enabled": pilot_enabled,
     }
 
 
@@ -244,6 +309,240 @@ def download_simulation_evidence_pdf(batch_id: str) -> Response:
         )
     except Exception as exc:
         logger.error("Internal error retrieving simulation evidence PDF %s: %s", batch_id, type(exc).__name__, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Gagal membaca berkas bukti PDF simulasi.",
+        ) from None
+
+
+# =============================================================================
+# PILOT OPERATOR SELF-SERVICE ENDPOINTS (B2B2N)
+# Strictly separated from machine-to-machine X-SAP-Simulation-Token.
+# Protected by server-side pilot operator session strictly via HttpOnly cookie.
+# =============================================================================
+
+def evaluate_pilot_transport_security(request: Request) -> Tuple[bool, bool]:
+    """Evaluates whether the request transport satisfies pilot security requirements.
+
+    Returns:
+        Tuple[is_allowed, is_secure_cookie]
+    - Over verified HTTPS (ASGI scheme == 'https'): always allowed, cookie secure=True.
+    - Over HTTP loopback (localhost, 127.0.0.1, ::1, testserver): allowed for local dev, cookie secure=False.
+    - Over HTTP non-loopback (e.g. intranet IP/hostname): rejected (fail closed, HTTP 403).
+      Raw X-Forwarded-Proto headers from client are never blindly trusted; HTTPS verification
+      must be established by the ASGI layer (e.g. native TLS or trusted proxy middleware).
+    """
+    if request.url.scheme == "https":
+        return True, True
+
+    host_header = request.headers.get("host", "").split(":")[0].strip().lower()
+    hostname = (request.url.hostname or host_header).lower()
+    client_ip = (request.client.host if request.client else "").lower()
+
+    loopback_hosts = {"127.0.0.1", "localhost", "::1", "testserver"}
+    client_is_loopback = (not client_ip) or (client_ip in loopback_hosts) or (client_ip == "testclient")
+    host_is_loopback = hostname in loopback_hosts
+
+    if host_is_loopback and client_is_loopback:
+        return True, False
+
+    return False, False
+
+
+@simulation_router.post(
+    "/operator/login",
+    dependencies=[Depends(require_simulation_enabled)],
+)
+def pilot_operator_login(
+    request: Request,
+    payload: PilotOperatorLoginRequest,
+    response: Response,
+) -> Dict[str, Any]:
+    """Authenticates a human pilot operator and creates a secure session strictly via HttpOnly cookie."""
+    # 1. Transport Security Guard (HTTPS vs Loopback)
+    is_allowed, is_secure_cookie = evaluate_pilot_transport_security(request)
+    if not is_allowed:
+        logger.warning(
+            "Pilot operator login rejected: plain HTTP over non-loopback host '%s' (client '%s')",
+            request.url.hostname,
+            request.client.host if request.client else "unknown",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Akses operator pilot melalui jaringan intranet wajib menggunakan HTTPS.",
+        )
+
+    # 2. Extract Client Identity for Rate-Limiting Lockout
+    client_id = request.client.host if request.client else "unknown"
+
+    try:
+        session = pilot_session_service.authenticate_and_create(
+            payload.password, client_id=client_id
+        )
+    except PermissionError as exc:
+        msg = str(exc)
+        if "dikunci sementara" in msg or "locked out" in msg:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=msg,
+            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Mode operator pilot dinonaktifkan.",
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Autentikasi operator pilot belum dikonfigurasi pada server.",
+        )
+
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Kata sandi operator pilot tidak valid.",
+        )
+
+    # Set secure HttpOnly cookie strictly without leaking session_id to JavaScript
+    response.set_cookie(
+        key="pilot_session",
+        value=session.session_id,
+        httponly=True,
+        samesite="strict",
+        max_age=get_pilot_session_ttl_seconds(),
+        path="/",
+        secure=is_secure_cookie,
+    )
+
+    return {
+        "status": "authenticated",
+        "csrf_token": session.csrf_token,
+        "expires_at": session.expires_at.isoformat(),
+        "operator_label": session.operator_label,
+    }
+
+
+@simulation_router.post(
+    "/operator/logout",
+    dependencies=[Depends(verify_pilot_csrf)],
+)
+def pilot_operator_logout(
+    response: Response,
+    session: PilotOperatorSession = Depends(get_current_pilot_operator),
+) -> Dict[str, Any]:
+    """Logs out pilot operator, revokes session, and clears session cookie."""
+    pilot_session_service.revoke_session(session.session_id)
+    response.delete_cookie(key="pilot_session", path="/", samesite="strict")
+    return {"status": "logged_out"}
+
+
+@simulation_router.get(
+    "/operator/session",
+    dependencies=[Depends(require_simulation_enabled)],
+)
+def get_pilot_operator_session_status(
+    pilot_session_cookie: Optional[str] = Cookie(None, alias="pilot_session"),
+) -> Dict[str, Any]:
+    """Probes session status for browser client strictly using HttpOnly cookie without exposing session_id."""
+    pilot_enabled = is_pilot_operator_enabled()
+    if not pilot_enabled:
+        return {
+            "pilot_operator_enabled": False,
+            "authenticated": False,
+        }
+
+    session = (
+        pilot_session_service.get_valid_session(pilot_session_cookie)
+        if pilot_session_cookie
+        else None
+    )
+
+    if session:
+        return {
+            "pilot_operator_enabled": True,
+            "authenticated": True,
+            "csrf_token": session.csrf_token,
+            "expires_at": session.expires_at.isoformat(),
+            "operator_label": session.operator_label,
+        }
+
+    return {
+        "pilot_operator_enabled": True,
+        "authenticated": False,
+    }
+
+
+@simulation_router.get(
+    "/operator/batches",
+    dependencies=[Depends(get_current_pilot_operator)],
+)
+def list_operator_simulation_batches() -> List[Dict[str, Any]]:
+    """Lists sanitized simulation batch summaries for authorized pilot operator.
+
+    Data minimization: omits raw snapshots, customer text, and sensitive business context.
+    """
+    raw_list = sap_shadow_service.list_batches(limit=50)
+    sanitized: List[Dict[str, Any]] = []
+    for b in raw_list:
+        sanitized.append({
+            "batch_id": b.get("batch_id"),
+            "producer_namespace": b.get("producer_namespace"),
+            "request_id": b.get("request_id"),
+            "label_code": b.get("label_code", "N001"),
+            "profile_version": b.get("profile_version", "v1.0-dev"),
+            "status": b.get("status"),
+            "total_items": b.get("total_items", 0),
+            "completed_items": b.get("completed_items", 0),
+            "created_at": b.get("created_at"),
+            "completed_at": b.get("completed_at"),
+            "error": b.get("error"),
+            "has_pdf": b.get("artifact") is not None or b.get("status") == "completed",
+        })
+    return sanitized
+
+
+@simulation_router.get(
+    "/operator/batches/{batch_id}",
+    dependencies=[Depends(get_current_pilot_operator)],
+)
+def get_operator_simulation_batch(batch_id: str) -> Dict[str, Any]:
+    """Retrieves sanitized batch summary for authorized pilot operator."""
+    record = sap_shadow_service.get_batch_summary(batch_id)
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Batch '{batch_id}' tidak ditemukan.",
+        )
+    return record
+
+
+@simulation_router.get(
+    "/operator/batches/{batch_id}/pdf",
+    dependencies=[Depends(get_current_pilot_operator)],
+)
+def download_operator_evidence_pdf(batch_id: str) -> Response:
+    """Streams verified evidence PDF artifact for authorized pilot operator."""
+    try:
+        pdf_bytes = sap_shadow_service.get_evidence_pdf(batch_id)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'inline; filename="evidence_{batch_id}.pdf"',
+                "Cache-Control": "private, no-cache, no-store, must-revalidate",
+            },
+        )
+    except KeyError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Batch '{batch_id}' tidak ditemukan.",
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        )
+    except Exception as exc:
+        logger.error("Operator error retrieving simulation evidence PDF %s: %s", batch_id, type(exc).__name__, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Gagal membaca berkas bukti PDF simulasi.",

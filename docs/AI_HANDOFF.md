@@ -1,14 +1,28 @@
 # AI Handoff — Thermal Label Studio
 
-## Active snapshot — B2B2N planning (2026-09-23)
+## Active snapshot — B2B2N: Uji Mandiri Safe Demo dengan SAP DEV (REMEDIATION_P1_P2_COMPLETED — AWAITING_CODEX_LEVEL_3_REVIEW)
 
-- Repository `web_app/`; planner Codex; branch `codex/b2b2n-self-service-safe-demo` dari `origin/main` commit `0f2cf82` (PR #24 B2B2M sudah merged).
-- Scope saat ini hanya kontrak tugas `docs/tasks/B2B2N/TASK_CONTRACT.md`; implementasi UI, auth operator, dan pengiriman SAP DEV nyata belum dimulai.
-- Tujuan: pengguna dapat memicu data dari SAP DEV, melihat batch/urutan di UI, dan membuka PDF simulasi sendiri. Token SAP machine-to-machine tetap server-side; UI anonim tetap tertutup.
-- Gemini Flash 3.8 High via Antigravity ditetapkan sebagai executor setelah checkpoint perencanaan ini; Codex reviewer Level 3.
-- Git working tree memiliki folder hasil test/PDF lokal yang tidak ter-track dari fase sebelumnya. Jangan stage, hapus, atau masukkan artefak tersebut dalam commit B2B2N.
-- Test runtime B2B2N, SAP DEV live, printer, dan database production: `NOT RUN`. Perencanaan hanya diperiksa secara statis.
-- Snapshot B2B2M di bawah adalah histori yang sudah digantikan oleh merge PR #24; jangan membacanya sebagai status Git terkini.
+- Date: `2026-09-23`.
+- Repository: `Thermal-Label-Studio` (`web_app/`).
+- Branch: `codex/b2b2n-self-service-safe-demo` from `origin/main` commit `0f2cf82` (PR #24 merged).
+- Status: `REMEDIATION_P1_P2_COMPLETED — AWAITING_CODEX_LEVEL_3_REVIEW`. Seluruh temuan P1, P2, dan P3 dari Review Level 3 telah diperbaiki tuntas dan diverifikasi dengan tes aktual:
+  1. **P1 — Sesi HttpOnly Murni Tanpa Kebocoran ke JS**: `session_id` dihapus total dari payload JSON login dan probe sesi; header `X-Pilot-Session-Token` dihapus dari dependensi autentikasi browser (auth strictly via cookie `pilot_session`).
+  2. **P1 — Guard HTTPS / Loopback, Penolakan Spoofing `X-Forwarded-Proto`, & CORS Dibatasi**: Wildcard `*` dihapus dari `CORS_ORIGINS`; login operator via plain HTTP pada host non-loopback / intranet ditolak fail-closed (`HTTP 403 Forbidden`); pemalsuan header mentah `X-Forwarded-Proto: https` dari klien tak tepercaya diabaikan dan ditolak fail-closed (`HTTP 403 Forbidden`); hanya verified ASGI HTTPS scheme yang diterima dan otomatis menyetel cookie `secure=True`; cookie disetel dengan `SameSite=Strict`.
+  3. **P2 — Tampilan Urutan Item (Item Sequence) di UI**: Modal UI kini menyediakan tombol "Urutan Item" yang mengambil data detail batch dari server dan menampilkan tabel urutan item (`#1, #2, ...`) dengan status item individual dan alert kegagalan yang aman.
+  4. **P2 — Pembatasan Percobaan Login (Rate-Limiting Lockout)**: Percobaan gagal 5 kali berturut-turut memicu penguncian sementara (lockout 300 detik) dengan respons `HTTP 429 Too Many Requests`.
+  5. **P3 — Sliding TTL & Redaksi Topologi DEV**: Sliding TTL sejati teruji memperpanjang expiry saat sesi aktif diakses; seluruh IP/host internal SAP DEV diredaksi pada dokumentasi publik.
+  6. **AC 5 (Live SAP DEV UAT) Tetap BLOCKED**: Transmisi live jaringan dari server SAP DEV ke workstation lokal tetap dilaporkan `BLOCKED` secara radikal transparan karena ketiadaan rute intranet / SM59 lokal. Prasyarat teknis lengkap tersedia di `RESULT.md`.
+- Quality Gate Aktual:
+  - Backend Pilot Operator Suite: `26 passed, 2 warnings` in 7.64s (`backend/tests/test_pilot_operator_session.py`).
+  - Total Regresi Backend Lengkap: `410 passed, 21 skipped, 2 warnings` in 106.99s (`backend/tests/`).
+  - Frontend Unit & Mock API Tests: `66 passed, 0 failed` in 602ms (`npm test` di `frontend/`).
+  - TypeScript Compilation: `0 errors` (`npm exec tsc -- --noEmit`).
+  - Frontend Production Build: Berhasil (`✓ built in 7.77s`).
+  - Playwright E2E Simulation Tests: `3 passed` in 27.4s (`sap_shadow_simulation.spec.js` + `pilot_operator_self_service.spec.js`).
+  - Whitespace & format check: `git diff --check` bersih (exit code 0).
+- Working tree: Dirty/uncommitted pada branch `codex/b2b2n-self-service-safe-demo`. Berhenti sebelum commit, push, PR, atau merge.
+- Task files: `docs/tasks/B2B2N/TASK_CONTRACT.md`, `docs/tasks/B2B2N/REVIEW.md`, `docs/tasks/B2B2N/RESULT.md`.
+- Next action: Menyerahkan kepada Codex Level 3 untuk review independen ulang. Eksekutor berhenti sebelum commit/push/merge.
 
 ## Active snapshot — B2B2M: Safe Demo PDF Visual & Placeholder Hardening (REMEDIATION_P1_P2_COMPLETED — AWAITING_CODEX_LEVEL_3_REVIEW)
 

@@ -41,15 +41,25 @@ APP_VERSION = "1.1.0"
 # Server & CORS
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))
-CORS_ORIGINS: List[str] = [
+
+DEFAULT_CORS_ORIGINS: List[str] = [
     "http://localhost:3000",
     "http://localhost:5173",
     "http://localhost:8080",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:8080",
-    "*",
 ]
+
+_custom_cors_env = os.getenv("CORS_ORIGINS")
+if _custom_cors_env:
+    CORS_ORIGINS: List[str] = [
+        orig.strip()
+        for orig in _custom_cors_env.split(",")
+        if orig.strip() and orig.strip() != "*"
+    ]
+else:
+    CORS_ORIGINS: List[str] = DEFAULT_CORS_ORIGINS
 
 DEFAULT_DPI = 203.2
 DEFAULT_WIDTH_MM = 200.0
@@ -87,3 +97,40 @@ def get_sap_simulation_auth_token() -> str:
 
 
 SAP_SIMULATION_AUTH_TOKEN = get_sap_simulation_auth_token()
+
+
+def is_pilot_operator_enabled() -> bool:
+    """Check if pilot operator self-service session mode is enabled via environment variable.
+
+    Defaults to False for fail-closed security.
+    """
+    return os.getenv("PILOT_OPERATOR_ENABLED", "false").strip().lower() in ("true", "1", "yes")
+
+
+PILOT_OPERATOR_ENABLED = is_pilot_operator_enabled()
+
+
+def get_pilot_operator_secret() -> str:
+    """Retrieve configured secret/password for pilot operator authentication.
+
+    Must be explicitly set; empty secret fails closed.
+    Supports PILOT_OPERATOR_SECRET or PILOT_OPERATOR_PASSWORD.
+    """
+    secret = os.getenv("PILOT_OPERATOR_SECRET", "").strip()
+    if not secret:
+        secret = os.getenv("PILOT_OPERATOR_PASSWORD", "").strip()
+    return secret
+
+
+PILOT_OPERATOR_SECRET = get_pilot_operator_secret()
+
+
+def get_pilot_session_ttl_seconds() -> int:
+    """Retrieve session time-to-live in seconds for pilot operator session (default 3600 = 1 hour)."""
+    try:
+        return int(os.getenv("PILOT_OPERATOR_SESSION_TTL_SECONDS", "3600").strip())
+    except (ValueError, TypeError):
+        return 3600
+
+
+PILOT_OPERATOR_SESSION_TTL_SECONDS = get_pilot_session_ttl_seconds()
