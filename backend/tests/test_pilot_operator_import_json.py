@@ -257,6 +257,76 @@ class TestOperatorJsonImportSecurity:
         assert resp.status_code == 413
         assert "2 MiB" in resp.json()["detail"]
 
+    def test_unauthenticated_large_upload_fails_closed_401_before_spooling(self):
+        client = TestClient(app)
+        # Client without session cookie sends oversized payload (> 2 MiB)
+        oversized = "x" * (2 * 1024 * 1024 + 1024)
+        resp = client.post(
+            "/api/v1/simulation/operator/import-json",
+            headers={"X-CSRF-Token": "some-token"},
+            files={"file": ("large_unauth.json", oversized, "application/json")},
+        )
+        # Must fail fast with 401 Unauthorized before spooling or parsing body
+        assert resp.status_code == 401
+        assert "belum masuk" in resp.json()["detail"].lower()
+
+    def test_invalid_content_length_header_fails_closed_400(self):
+        client = TestClient(app)
+        csrf = login_operator(client)
+
+        # Non-numeric Content-Length
+        resp = client.post(
+            "/api/v1/simulation/operator/import-json",
+            headers={"X-CSRF-Token": csrf, "Content-Length": "not-a-number"},
+            content=b"test",
+        )
+        assert resp.status_code == 400
+        assert "Content-Length tidak valid" in resp.json()["detail"]
+
+        # Negative Content-Length
+        resp_neg = client.post(
+            "/api/v1/simulation/operator/import-json",
+            headers={"X-CSRF-Token": csrf, "Content-Length": "-10"},
+            content=b"test",
+        )
+        assert resp_neg.status_code == 400
+        assert "Content-Length tidak valid" in resp_neg.json()["detail"]
+
+    def test_content_length_header_exceeding_max_request_bytes_fails_closed_413(self):
+        client = TestClient(app)
+        csrf = login_operator(client)
+
+        # Header declares size larger than MAX_IMPORT_REQUEST_BYTES
+        resp = client.post(
+            "/api/v1/simulation/operator/import-json",
+            headers={"X-CSRF-Token": csrf, "Content-Length": str(2 * 1024 * 1024 + 128 * 1024)},
+            content=b"dummy",
+        )
+        assert resp.status_code == 413
+        assert "2 MiB" in resp.json()["detail"]
+
+    def test_chunked_streaming_upload_exceeding_limit_aborts_413(self):
+        client = TestClient(app)
+        csrf = login_operator(client)
+
+        # Streaming generator without Content-Length header that exceeds limit
+        def chunk_stream():
+            chunk_size = 64 * 1024
+            # Total: 35 chunks * 64 KiB = 2.1875 MiB (> 2 MiB + 64 KiB)
+            for _ in range(35):
+                yield b"A" * chunk_size
+
+        resp = client.post(
+            "/api/v1/simulation/operator/import-json",
+            headers={
+                "X-CSRF-Token": csrf,
+                "Content-Type": "multipart/form-data; boundary=---StreamBoundary",
+            },
+            content=chunk_stream(),
+        )
+        assert resp.status_code == 413
+        assert "2 MiB" in resp.json()["detail"]
+
     def test_non_json_extension_fails_closed_400(self):
         client = TestClient(app)
         csrf = login_operator(client)

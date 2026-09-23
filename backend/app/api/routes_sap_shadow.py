@@ -322,32 +322,13 @@ def download_simulation_evidence_pdf(batch_id: str) -> Response:
 # Protected by server-side pilot operator session strictly via HttpOnly cookie.
 # =============================================================================
 
-def evaluate_pilot_transport_security(request: Request) -> Tuple[bool, bool]:
-    """Evaluates whether the request transport satisfies pilot security requirements.
+from .operator_import_guard import (
+    MAX_IMPORT_BYTES,
+    MAX_IMPORT_MULTIPART_OVERHEAD_BYTES,
+    MAX_IMPORT_REQUEST_BYTES,
+    evaluate_pilot_transport_security,
+)
 
-    Returns:
-        Tuple[is_allowed, is_secure_cookie]
-    - Over verified HTTPS (ASGI scheme == 'https'): always allowed, cookie secure=True.
-    - Over HTTP loopback (localhost, 127.0.0.1, ::1, testserver): allowed for local dev, cookie secure=False.
-    - Over HTTP non-loopback (e.g. intranet IP/hostname): rejected (fail closed, HTTP 403).
-      Raw X-Forwarded-Proto headers from client are never blindly trusted; HTTPS verification
-      must be established by the ASGI layer (e.g. native TLS or trusted proxy middleware).
-    """
-    if request.url.scheme == "https":
-        return True, True
-
-    host_header = request.headers.get("host", "").split(":")[0].strip().lower()
-    hostname = (request.url.hostname or host_header).lower()
-    client_ip = (request.client.host if request.client else "").lower()
-
-    loopback_hosts = {"127.0.0.1", "localhost", "::1", "testserver"}
-    client_is_loopback = (not client_ip) or (client_ip in loopback_hosts) or (client_ip == "testclient")
-    host_is_loopback = hostname in loopback_hosts
-
-    if host_is_loopback and client_is_loopback:
-        return True, False
-
-    return False, False
 
 
 @simulation_router.post(
@@ -562,10 +543,6 @@ def _parse_json_rejecting_duplicates(raw_text: str) -> Any:
 
     return json.loads(raw_text, object_pairs_hook=_reject_dups)
 
-
-MAX_IMPORT_BYTES = 2 * 1024 * 1024  # 2 MiB (file content limit)
-MAX_IMPORT_MULTIPART_OVERHEAD_BYTES = 64 * 1024  # 64 KiB allowance for multipart headers/boundaries
-MAX_IMPORT_REQUEST_BYTES = MAX_IMPORT_BYTES + MAX_IMPORT_MULTIPART_OVERHEAD_BYTES
 
 
 @simulation_router.post(

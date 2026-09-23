@@ -111,31 +111,63 @@ FORM VALIDATE_PARAMETERS.
 ENDFORM.
 
 FORM GET_BATCH_KEYS.
-  DATA LS_KEY TYPE TY_BATCH_KEY.
+  DATA: LT_MCH1          TYPE STANDARD TABLE OF TY_BATCH_KEY WITH DEFAULT KEY,
+        LS_MCH1          TYPE TY_BATCH_KEY,
+        LV_PREV_CHARG    TYPE MCH1-CHARG,
+        LV_AMBIGUOUS_MSG TYPE STRING.
 
   REFRESH GT_KEYS.
-  LOOP AT P_CHARG.
-    CLEAR LS_KEY.
-    SELECT SINGLE CHARG MATNR INTO (LS_KEY-CHARG, LS_KEY-MATNR)
-      FROM MCH1
-      WHERE CHARG = P_CHARG-LOW.
-    IF SY-SUBRC = 0.
-      APPEND LS_KEY TO GT_KEYS.
+
+  " Select all batches matching the SELECT-OPTIONS criteria (supports ranges, BT, EQ, CP, etc.)
+  SELECT CHARG MATNR
+    FROM MCH1
+    INTO TABLE LT_MCH1
+    WHERE CHARG IN P_CHARG.
+
+  IF SY-SUBRC <> 0 OR LT_MCH1[] IS INITIAL.
+    RETURN.
+  ENDIF.
+
+  " Sort and eliminate duplicate material-batch pairs
+  SORT LT_MCH1 BY CHARG MATNR.
+  DELETE ADJACENT DUPLICATES FROM LT_MCH1 COMPARING CHARG MATNR.
+
+  " Detect ambiguous batch assignment across multiple materials (fail-closed)
+  CLEAR LV_PREV_CHARG.
+  LOOP AT LT_MCH1 INTO LS_MCH1.
+    IF LS_MCH1-CHARG = LV_PREV_CHARG.
+      CONCATENATE 'Batch ambigu terdeteksi pada multiple material: ' LS_MCH1-CHARG
+        INTO LV_AMBIGUOUS_MSG.
+      MESSAGE LV_AMBIGUOUS_MSG TYPE 'E'.
     ENDIF.
+    LV_PREV_CHARG = LS_MCH1-CHARG.
   ENDLOOP.
-  SORT GT_KEYS BY CHARG MATNR.
-  DELETE ADJACENT DUPLICATES FROM GT_KEYS COMPARING CHARG MATNR.
+
+  GT_KEYS[] = LT_MCH1[].
 ENDFORM.
 
 FORM BUILD_PAYLOAD.
-  DATA: LS_KEY  TYPE TY_BATCH_KEY,
-        LS_ITEM TYPE TY_ITEM,
-        LV_SEQ  TYPE I.
+  DATA: LS_KEY    TYPE TY_BATCH_KEY,
+        LS_ITEM   TYPE TY_ITEM,
+        LV_SEQ    TYPE I,
+        LV_UUID   TYPE SYSUUID_C32,
+        LV_TS     TYPE TIMESTAMP,
+        LV_SUFFIX TYPE STRING.
 
   CLEAR gs_payload.
   gs_payload-contract_schema_version = '2.0-raw'.
   gs_payload-producer_namespace = 'SAP_PPIC'.
-  CONCATENATE 'SAP' SY-SYSID SY-DATUM SY-UZEIT
+
+  " Prevent sub-second request_id collision with unique execution suffix
+  TRY.
+      LV_UUID = CL_SYSTEM_UUID=>CREATE_UUID_C32_STATIC( ).
+      LV_SUFFIX = LV_UUID(8).
+    CATCH CX_UUID_ERROR.
+      GET TIME STAMP FIELD LV_TS.
+      LV_SUFFIX = LV_TS.
+  ENDTRY.
+
+  CONCATENATE 'SAP' SY-SYSID SY-DATUM SY-UZEIT LV_SUFFIX
     INTO gs_payload-request_id SEPARATED BY '-'.
   gs_payload-printer_id = 'PILOT-PRINTER-01'.
   gs_payload-source_metadata-sap_user = sy-uname.

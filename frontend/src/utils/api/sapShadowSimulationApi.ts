@@ -125,7 +125,7 @@ export const sapShadowSimulationApi = {
 
   // =========================================================================
   // PILOT OPERATOR SELF-SERVICE METHODS (B2B2N)
-  // Protected by HttpOnly session cookie or X-Pilot-Session-Token.
+  // Protected strictly by HttpOnly session cookie.
   // =========================================================================
 
   async getSimulationStatus(): Promise<{

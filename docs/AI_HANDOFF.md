@@ -1,38 +1,32 @@
 # AI Handoff — Thermal Label Studio
 
-## Active snapshot — Fase 3.1: Simulasi Label Terpadu (REMEDIATION_P2_P3_COMPLETED — AWAITING_CODEX_REVIEW)
+## Active snapshot — Fase 3.1: Simulasi Label Terpadu (REMEDIATION_LEVEL3_COMBINED_COMPLETED — AWAITING_CODEX_REVIEW)
 
 - Date: `2026-09-23`; repository: `Thermal-Label-Studio` (`web_app/`).
-- Branch: `codex/f3-1-simulasi-label-terpadu`, baseline checkpoint B2B2O `8d895a9`, commit F3.1 baseline `bcf3556`.
+- Branch: `codex/f3-1-simulasi-label-terpadu`, baseline `origin/main` `0f2cf82`, previous head `8c6baf3`.
 - Writer / Executor: Gemini Flash 3.8 High (Antigravity). Reviewer: Codex (independen).
-- Scope: satu entry UI "Simulasi Label" (`btn-label-simulation`) yang membuka alur operator impor JSON SAP -> urutan batch/item -> PDF simulasi. Backend/test Safe Demo lama dipertahankan sebagai fasilitas developer, bukan pintu pengguna kedua di HUD. Tidak ada printer fisik.
-- Status: `REMEDIATION_P2_P3_COMPLETED — AWAITING_CODEX_REVIEW`.
-  * Remediasi P2-1: Menghapus total `window.__openSafeDemoModal` dan konversi `as any` di `App.tsx`; membatasi parameter `dev_safe_demo` hanya pada mode dev (`import.meta.env.DEV && isSafeDemoEnabled`) sehingga tereliminasi total (*dead-code elimination*) pada production build.
-  * Remediasi P2-2: Memperbaiki petunjuk dan disclaimer privasi di `SapShadowSimulationModal.tsx` agar akurat untuk deployment lokal maupun intranet Linux (menyatakan berkas diunggah ke server aplikasi yang sedang digunakan, tanpa klaim perimeter jaringan sepihak).
-  * Remediasi P3: Memutakhirkan `RESULT.md` dan snapshot handoff dengan hash commit dan status pengujian aktual pasca-remediasi.
+- Scope: Remediasi lengkap temuan Review Level 3 Gabungan (B2B2N + B2B2O + F3.1) pada `docs/tasks/F3.1/REVIEW.md`:
+  1. **P1 — Batas upload dan autentikasi sebelum multipart parsing (Disk Exhaustion Guard)**:
+     - Dibuat ASGI Middleware `OperatorImportGuardMiddleware` (`backend/app/api/operator_import_guard.py`) yang didaftarkan di `backend/app/main.py`.
+     - Melakukan early fail-fast authentication (cookie HttpOnly `pilot_session`), validasi CSRF, dan transport security sebelum membaca body atau menyentuh disk.
+     - Melakukan early Content-Length validation (reject non-numeric/negative dengan 400; reject > 2 MiB + 64 KiB dengan 413) tanpa memicu parsing multipart.
+     - Membungkus ASGI `receive` callable dengan counter byte streaming (`RequestBodyTooLargeError(StarletteHTTPException)`). Chunked stream tanpa Content-Length yang melebihi batas langsung dihentikan seketika dengan HTTP 413, memicu Starlette menutup dan membersihkan seluruh temporary file di disk.
+     - Route handler tetap mempertahankan chunk read 64 KiB dan batas 2 MiB isi file sebagai lapisan pertahanan kedua.
+  2. **P1 — Semantik SELECT-OPTIONS P_CHARG dan Ambiguitas Fail-Closed di ABAP Report**:
+     - `docs/tasks/B2B2O/abap/ZMMR_LABEL_JSON.abap`: Subroutine `GET_BATCH_KEYS` diganti menggunakan Open SQL standar `SELECT CHARG MATNR FROM MCH1 INTO TABLE LT_MCH1 WHERE CHARG IN P_CHARG.` untuk mendukung range `BT`, single `EQ`, exclusion `NE`, dan wildcard `CP`.
+     - Ditambahkan deduplikasi dan deteksi ambiguitas fail-closed: jika satu `CHARG` berelasi dengan >1 `MATNR`, ekspor dibatalkan dengan `MESSAGE ... TYPE 'E'`.
+  3. **P2 — Tabrakan request_id dalam Satu Detik di ABAP Report**:
+     - Ditambahkan unique execution suffix menggunakan `CL_SYSTEM_UUID=>CREATE_UUID_C32_STATIC` (dengan fallback `GET TIME STAMP`) ke dalam `request_id` format `SAP-{SY-SYSID}-{SY-DATUM}-{SY-UZEIT}-{LV_SUFFIX}` (~32 karakter, pola `^[A-Za-z0-9_-]+$`). Replay file yang sama tetap stabil memicu HTTP 200, sedangkan dua ekspor terpisah dalam detik yang sama terisolasi tanpa tabrakan 409.
+  4. **P3 — Pembersihan Komentar Stale**:
+     - Mengoreksi komentar pada `frontend/src/utils/api/sapShadowSimulationApi.ts:128` menjadi strictly HttpOnly session cookie.
 - Quality Gates Aktual:
-  * TypeScript strict: `npm exec tsc -- --noEmit` -> PASS (0 error)
-  * Vite production build: `npm run build` -> PASS (dist/assets terkompilasi, 6.80s; verifikasi `grep dev_safe_demo dist/` -> 0 hasil)
-  * Frontend unit tests: `npm test` -> **74 passed, 0 failed** (termasuk 5 capability evaluator matrix tests)
-  * Playwright E2E Topbar & Capability Matrix: `sap_shadow_simulation.spec.js` -> **4 passed (15.7s)** (semua 4 kombinasi flag teruji)
-  * Playwright E2E Pilot Operator Self-Service: `pilot_operator_self_service.spec.js` -> **2 passed (11.4s)** (login, impor JSON, batch sequence, PDF via `btn-label-simulation`)
-  * Playwright E2E Legacy Safe Demo Regression: `safe_demo.spec.js` -> **2 passed (14.9s)** (memverifikasi tombol primer tidak muncul di HUD; harness dev berfungsi)
-  * Backend pytest regression: `test_pilot_operator_import_json.py` -> **24 passed in 28.42s**
-  * Git whitespace check: `git diff --check` -> PASS (clean)
-- Files modified/added in F3.1:
-  * `frontend/src/utils/simulationCapabilities.ts` (new)
-  * `frontend/src/components/layout/topbar/TopBarActions.tsx` (modified)
-  * `frontend/src/components/layout/TopMenuBar.tsx` (modified)
-  * `frontend/src/App.tsx` (modified)
-  * `frontend/src/components/modals/SapShadowSimulationModal.tsx` (modified)
-  * `frontend/tests/test_frontend.mjs` (modified)
-  * `frontend/tests/e2e/sap_shadow_simulation.spec.js` (modified)
-  * `frontend/tests/e2e/pilot_operator_self_service.spec.js` (modified)
-  * `frontend/tests/e2e/safe_demo.spec.js` (modified)
-  * `docs/tasks/F3.1/RESULT.md` (modified)
-  * `docs/tasks/F3.1/TASK_CONTRACT.md` (modified)
-  * `docs/architecture/simulation_experience_plan.md` (new/tracked)
-- Stop gate: Berhenti sebelum PR atau merge untuk review independen oleh Codex.
+  * Backend Pytest: `python -m pytest backend/tests/test_pilot_operator_session.py backend/tests/test_pilot_operator_import_json.py -q -p no:cacheprovider` -> **54 passed in 33.70s** (termasuk 4 test baru untuk early guard).
+  * Frontend unit tests: `npm.cmd test` (di `frontend/`) -> **74 passed, 0 failed in 698ms**.
+  * TypeScript strict: `npm.cmd exec tsc -- --noEmit` (di `frontend/`) -> PASS (0 error).
+  * Vite production build: `npm.cmd run build` -> PASS (6.60s; scan bundle: 0 match dev hooks).
+  * Playwright E2E: `npx.cmd playwright test ...` (di `frontend/`) -> **8 passed (28.0s)**.
+  * Git whitespace check: `git diff --check` -> PASS (clean).
+- Stop gate: Berhenti sebelum membuat Pull Request atau merge ke `main` sesuai instruksi.
 - Folder `output/` sudah untracked sebelum task ini dan tidak disentuh/stage.
 
 ## Active snapshot — B2B2O: Impor JSON Lokal Raw SAP Snapshot v2 ke Safe Demo (REMEDIATION_P1_P2_ENV_IGNORE_COMPLETED — AWAITING_CODEX_LEVEL_3_REVIEW)
