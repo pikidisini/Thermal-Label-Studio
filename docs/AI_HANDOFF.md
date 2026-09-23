@@ -11,9 +11,9 @@
 ## Active snapshot — Fase 3.1: Simulasi Label Terpadu (REMEDIATION_LEVEL3_COMBINED_COMPLETED — AWAITING_CODEX_REVIEW)
 
 - Date: `2026-09-23`; repository: `Thermal-Label-Studio` (`web_app/`).
-- Branch: `codex/f3-1-simulasi-label-terpadu`, baseline `origin/main` `0f2cf82`, previous head `8c6baf3`.
+- Branch: `codex/f3-1-simulasi-label-terpadu`, baseline `origin/main` `0f2cf82`, review follow-up commit `95887ab`.
 - Writer / Executor: Gemini Flash 3.8 High (Antigravity). Reviewer: Codex (independen).
-- Scope: Remediasi lengkap temuan Review Level 3 Gabungan (B2B2N + B2B2O + F3.1) pada `docs/tasks/F3.1/REVIEW.md`:
+- Scope: Remediasi lengkap temuan Review Level 3 Gabungan (B2B2N + B2B2O + F3.1) dan follow-up commit `95887ab`:
   1. **P1 — Batas upload dan autentikasi sebelum multipart parsing (Disk Exhaustion Guard)**:
      - Dibuat ASGI Middleware `OperatorImportGuardMiddleware` (`backend/app/api/operator_import_guard.py`) yang didaftarkan di `backend/app/main.py`.
      - Melakukan early fail-fast authentication (cookie HttpOnly `pilot_session`), validasi CSRF, dan transport security sebelum membaca body atau menyentuh disk.
@@ -23,17 +23,19 @@
   2. **P1 — Semantik SELECT-OPTIONS P_CHARG dan Ambiguitas Fail-Closed di ABAP Report**:
      - `docs/tasks/B2B2O/abap/ZMMR_LABEL_JSON.abap`: Subroutine `GET_BATCH_KEYS` diganti menggunakan Open SQL standar `SELECT CHARG MATNR FROM MCH1 INTO TABLE LT_MCH1 WHERE CHARG IN P_CHARG.` untuk mendukung range `BT`, single `EQ`, exclusion `NE`, dan wildcard `CP`.
      - Ditambahkan deduplikasi dan deteksi ambiguitas fail-closed: jika satu `CHARG` berelasi dengan >1 `MATNR`, ekspor dibatalkan dengan `MESSAGE ... TYPE 'E'`.
-  3. **P2 — Tabrakan request_id dalam Satu Detik di ABAP Report**:
-     - Ditambahkan unique execution suffix menggunakan `CL_SYSTEM_UUID=>CREATE_UUID_C32_STATIC` (dengan fallback `GET TIME STAMP`) ke dalam `request_id` format `SAP-{SY-SYSID}-{SY-DATUM}-{SY-UZEIT}-{LV_SUFFIX}` (~32 karakter, pola `^[A-Za-z0-9_-]+$`). Replay file yang sama tetap stabil memicu HTTP 200, sedangkan dua ekspor terpisah dalam detik yang sama terisolasi tanpa tabrakan 409.
-  4. **P3 — Pembersihan Komentar Stale**:
+  3. **P2 — Pencegahan Tabrakan request_id di ABAP Report (32-Char UUID & Fail-Closed)**:
+     - Menggunakan seluruh 32 karakter hexadecimal dari `CL_SYSTEM_UUID=>CREATE_UUID_C32_STATIC` (`LV_UUID TYPE SYSUUID_C32`).
+     - Menghapus fallback berpresisi detik; jika generator gagal (`CX_UUID_ERROR`), eksekusi langsung berhenti fail-closed (`MESSAGE ... TYPE 'E'`). Format: `SAP-{SY-SYSID}-{SY-DATUM}-{SY-UZEIT}-{LV_UUID}` (~56 karakter, pola `^[A-Za-z0-9_-]+$`).
+  4. **P3 — Pembersihan Komentar Stale & Trailing Whitespace**:
      - Mengoreksi komentar pada `frontend/src/utils/api/sapShadowSimulationApi.ts:128` menjadi strictly HttpOnly session cookie.
+     - Menghapus trailing whitespace pada `docs/tasks/F3.1/RESULT.md` sehingga verifikasi `git diff --check origin/main` bersih tanpa error.
 - Quality Gates Aktual:
-  * Backend Pytest: `python -m pytest backend/tests/test_pilot_operator_session.py backend/tests/test_pilot_operator_import_json.py -q -p no:cacheprovider` -> **54 passed in 33.70s** (termasuk 4 test baru untuk early guard).
+  * Backend Pytest: `python -m pytest backend/tests/test_pilot_operator_session.py backend/tests/test_pilot_operator_import_json.py -q -p no:cacheprovider` -> **54 passed in 33.70s**.
   * Frontend unit tests: `npm.cmd test` (di `frontend/`) -> **74 passed, 0 failed in 698ms**.
   * TypeScript strict: `npm.cmd exec tsc -- --noEmit` (di `frontend/`) -> PASS (0 error).
   * Vite production build: `npm.cmd run build` -> PASS (6.60s; scan bundle: 0 match dev hooks).
   * Playwright E2E: `npx.cmd playwright test ...` (di `frontend/`) -> **8 passed (28.0s)**.
-  * Git whitespace check: `git diff --check` -> PASS (clean).
+  * Git whitespace check: `git diff --check origin/main` -> PASS (clean, exit code 0).
 - Stop gate: Berhenti sebelum membuat Pull Request atau merge ke `main` sesuai instruksi.
 - Folder `output/` sudah untracked sebelum task ini dan tidak disentuh/stage.
 

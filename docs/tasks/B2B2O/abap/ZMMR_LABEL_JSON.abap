@@ -150,24 +150,20 @@ FORM BUILD_PAYLOAD.
   DATA: LS_KEY    TYPE TY_BATCH_KEY,
         LS_ITEM   TYPE TY_ITEM,
         LV_SEQ    TYPE I,
-        LV_UUID   TYPE SYSUUID_C32,
-        LV_TS     TYPE TIMESTAMP,
-        LV_SUFFIX TYPE STRING.
+        LV_UUID   TYPE SYSUUID_C32.
 
   CLEAR gs_payload.
   gs_payload-contract_schema_version = '2.0-raw'.
   gs_payload-producer_namespace = 'SAP_PPIC'.
 
-  " Prevent sub-second request_id collision with unique execution suffix
+  " Prevent sub-second request_id collision with unique 32-character execution UUID (fail-closed)
   TRY.
       LV_UUID = CL_SYSTEM_UUID=>CREATE_UUID_C32_STATIC( ).
-      LV_SUFFIX = LV_UUID(8).
     CATCH CX_UUID_ERROR.
-      GET TIME STAMP FIELD LV_TS.
-      LV_SUFFIX = LV_TS.
+      MESSAGE 'Gagal menghasilkan UUID unik untuk request_id' TYPE 'E'.
   ENDTRY.
 
-  CONCATENATE 'SAP' SY-SYSID SY-DATUM SY-UZEIT LV_SUFFIX
+  CONCATENATE 'SAP' SY-SYSID SY-DATUM SY-UZEIT LV_UUID
     INTO gs_payload-request_id SEPARATED BY '-'.
   gs_payload-printer_id = 'PILOT-PRINTER-01'.
   gs_payload-source_metadata-sap_user = sy-uname.
