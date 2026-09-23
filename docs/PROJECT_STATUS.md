@@ -4,6 +4,12 @@ Dokumen ini adalah ringkasan kondisi proyek aktif untuk manusia dan AI.
 
 ## Status proyek
 
+Snapshot terkini (2026-09-23): B2B2K sudah merged ke `main` melalui PR #22
+(`3984469`). B2B2L sedang direncanakan pada branch
+`codex/b2b2l-profile-composition-engine`; lihat
+`docs/tasks/B2B2L/TASK_CONTRACT.md`. Rincian fase lama di bawah adalah
+snapshot historis dan bukan status Git terkini.
+
 - Repository aktif: `Thermal-Label-Studio`
 - Lokasi kerja lokal: `web_app/`
 - Repository referensi: `JSON_LABEL_THERMAL_PRINTER_PARSER`

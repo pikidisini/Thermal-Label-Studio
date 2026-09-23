@@ -1,6 +1,17 @@
 # AI Handoff — Thermal Label Studio
 
-## Active snapshot — B2B2K Extensible Raw SAP Snapshot v2 & N001 Rule Boundary (P1-A & P1-B REMEDIATION PASSED — WAITING_FOR_CODEX_LEVEL_3_REVIEW)
+## Active snapshot — B2B2L planning
+
+- Date: `2026-09-23`.
+- Repository: `Thermal-Label-Studio` (`web_app/`).
+- Branch: `codex/b2b2l-profile-composition-engine` from `origin/main` at `3984469` (B2B2K merged via PR #22).
+- Status: `PLANNED`; only task contract and empty result/review handoff created. Runtime B2B2L and tests: `NOT RUN`.
+- Planner: Codex. Next sole writer: Gemini Flash 3.8 via Antigravity after planning checkpoint is pushed.
+- Scope: versioned, structured label profile composition into Safe Demo text/barcode/QR and PDF; development-only N001.
+- Task: `docs/tasks/B2B2L/TASK_CONTRACT.md`; executor records actual evidence in `RESULT.md`; Codex records independent verdict in `REVIEW.md`.
+- B2B2K history below is preserved as a historical snapshot; its old branch and dirty-tree statements do not describe current working state.
+
+## Previous snapshot — B2B2K Extensible Raw SAP Snapshot v2 & N001 Rule Boundary (P1-A & P1-B REMEDIATION PASSED — WAITING_FOR_CODEX_LEVEL_3_REVIEW)
 
 - Date: `2026-09-23`
 - Repository: `Thermal-Label-Studio` (`web_app/`)
