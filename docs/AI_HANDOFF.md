@@ -1,5 +1,13 @@
 # AI Handoff — Thermal Label Studio
 
+## Active review snapshot — Fase 3.1 gabungan (CHANGES_REQUIRED)
+
+- Date: `2026-09-23`; branch: `codex/f3-1-simulasi-label-terpadu`; reviewed head: `bbb791b`; baseline: `origin/main` `0f2cf82`.
+- Review independen di `docs/tasks/F3.1/REVIEW.md`: P1 upload guard dan P1 seleksi ABAP teratasi pada review kode; 54 backend tests PASS; SAP activation/UAT NOT RUN.
+- Sisa sebelum PR: fallback `request_id` masih berpresisi detik bila generator UUID gagal; `git diff --check origin/main...HEAD` FAIL pada enam baris RESULT dengan trailing whitespace. RESULT juga masih menyebut siap commit/push walau `bbb791b` sudah dipush.
+- Gemini Flash 3.8 menjadi executor koreksi berikutnya; Codex berhenti menulis setelah review ini dipush. Jangan PR atau merge sebelum review ulang.
+- Snapshot executor F3.1 berikut adalah catatan sebelum review ini; klaim bahwa semua temuan tuntas dan whitespace PASS sudah dikoreksi oleh snapshot review di atas.
+
 ## Active snapshot — Fase 3.1: Simulasi Label Terpadu (REMEDIATION_LEVEL3_COMBINED_COMPLETED — AWAITING_CODEX_REVIEW)
 
 - Date: `2026-09-23`; repository: `Thermal-Label-Studio` (`web_app/`).

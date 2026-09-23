@@ -64,3 +64,24 @@ Baseline: `origin/main` pada `0f2cf82`; head ditinjau: `e5d70e5`; diff gabungan 
 - Reviewer telah menjalankan ulang unit frontend **74 passed**, TypeScript **PASS**, dan production build **PASS** pada review F3.1 sebelumnya; tidak diulang lagi pada putaran gabungan karena belum ada perubahan kode setelahnya. Delapan E2E adalah bukti executor di `RESULT.md`, bukan rerun reviewer.
 - Static diff/`git diff --check origin/main...HEAD` **PASS**. Tidak ada file `output/` yang ter-track. ABAP activation, SAP DEV/SANDBOX runtime, PDF UAT manusia, printer fisik, dan deployment intranet **NOT RUN**.
 - F3.1 tidak boleh dibuat PR/merge sebagai paket gabungan sampai P1 diperbaiki dan bukti baru dicatat. Tidak ada kode runtime atau ABAP yang diubah oleh reviewer ini.
+
+## Review ulang Level 3 commit `bbb791b` — 2026-09-23
+
+Baseline tetap `origin/main` pada `0f2cf82`. Verdict: **CHANGES_REQUIRED sebelum PR/merge**. Kedua temuan P1 sebelumnya teratasi secara statis dan 54 test backend terkait lulus, tetapi koreksi `request_id` belum sepenuhnya menyelesaikan tabrakan dan quality gate diff yang diklaim lulus justru gagal.
+
+### Temuan tersisa
+
+1. **P2 — Fallback `request_id` masih bertabrakan dalam satu detik.** `docs/tasks/B2B2O/abap/ZMMR_LABEL_JSON.abap:154-171` memakai `LV_TS TYPE TIMESTAMP` ketika `CREATE_UUID_C32_STATIC` melempar `CX_UUID_ERROR`. Tipe `TIMESTAMP` biasa berpresisi detik; dua ekspor pada detik yang sama dalam jalur fallback menghasilkan suffix identik, sehingga masalah `409 Conflict` sebelumnya masih mungkin terjadi. Jalur sukses juga hanya mengambil 8 dari 32 karakter UUID, mengurangi ruang identitas tanpa alasan kontrak (batas `request_id` 128 karakter). Gunakan seluruh UUID bila tersedia; bila generator gagal, hentikan ekspor dengan error yang jelas, bukan fallback yang dapat menghasilkan ID sama. Verifikasi aktivasi/eksekusi di SAP SANDBOX/DEV sebelum mengklaim ABAP siap dipakai. Status SAP activation/UAT: **NOT RUN**.
+2. **P3 — Bukti checkpoint dan whitespace belum akurat.** `docs/tasks/F3.1/RESULT.md:5-10` menambah enam baris dengan dua spasi penutup; `git diff --check origin/main...HEAD` menghasilkan enam `trailing whitespace` dan exit code 1, walau RESULT mengklaim PASS. Bagian akhir RESULT masih mengatakan “Siap dilakukan commit dan push” padahal `bbb791b` sudah ada di HEAD/upstream. Rapikan kedua klaim, lalu jalankan ulang pemeriksaan terhadap diff gabungan yang benar.
+
+### Bukti review
+
+- `backend/app/api/operator_import_guard.py` melakukan mode, transport, cookie, CSRF, Content-Length, dan penghitung stream sebelum parser multipart; pemeriksaan isi file 2 MiB di route tetap ada. Empat test baru mencakup 401 awal, Content-Length invalid/terlalu besar, dan stream tanpa Content-Length. Temuan P1 upload dinilai **teratasi** pada scope ini; test tidak membuktikan UAT deployment/proxy nyata.
+- `GET_BATCH_KEYS` sekarang memakai `WHERE CHARG IN P_CHARG`, sort/dedup, dan menolak CHARG yang memiliki lebih dari satu MATNR. Temuan P1 semantik selection dan ambiguity dinilai **teratasi secara statis**. Aktivasi ABAP dan perilaku SAP nyata belum dibuktikan.
+- Reviewer menjalankan ulang 54 test backend: **54 passed, 2 dependency warnings**. Percobaan pertama gagal pada izin temporary Windows; percobaan kedua dengan path temporary yang terlalu panjang memberi delapan kegagalan persistensi berkas (`ENOENT`); percobaan ketiga dengan path pendek `t1` lulus. Hanya folder `t1` yang dibuat reviewer telah dihapus; `output/` dan folder temporary lain tidak disentuh.
+- Frontend unit, TypeScript, build, dan delapan E2E pasca-`bbb791b` adalah bukti executor di RESULT, **NOT RUN oleh reviewer**. SAP activation/UAT, printer fisik, dan deployment intranet **NOT RUN**.
+- `git fetch origin` berhasil; branch tetap tracking upstream. Tidak ada kode runtime/ABAP yang diubah reviewer.
+
+### Tindakan executor
+
+Gemini Flash 3.8 memperbaiki dua temuan tersisa pada task/folder yang sama, memperbarui RESULT dengan bukti aktual, menjalankan `git diff --check origin/main...HEAD` serta test relevan, lalu commit/push ke branch yang sama. Berhenti sebelum PR/merge untuk review singkat ulang.
