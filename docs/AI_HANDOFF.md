@@ -1,5 +1,15 @@
 # AI Handoff — Thermal Label Studio
 
+## Active snapshot — Fase 3.1: Simulasi Label Terpadu (PLANNED)
+
+- Date: `2026-09-23`; repository: `Thermal-Label-Studio` (`web_app/`).
+- Branch perencanaan: `codex/f3-1-simulasi-label-terpadu`, dibuat dari checkpoint lokal B2B2O `8d895a9`. Belum ada implementasi Fase 3.1, PR, atau merge. Status checkpoint perencanaan harus diverifikasi terhadap Git sebelum executor mulai.
+- Codex menulis aturan penamaan fase dan `docs/tasks/F3.1/TASK_CONTRACT.md`. Gemini Flash 3.8 High adalah calon executor tunggal setelah safe checkpoint/handoff; Codex berhenti menulis pada branch ini saat Gemini mulai.
+- Scope: satu entry UI "Simulasi Label" yang membuka alur operator impor JSON SAP -> urutan batch/item -> PDF simulasi. Backend/test Safe Demo lama dipertahankan sebagai fasilitas developer, bukan pintu pengguna kedua. Tidak ada printer fisik.
+- Status: `PLANNED`. Test aplikasi Fase 3.1 `NOT RUN` karena belum ada perubahan runtime. Pemeriksaan dokumentasi: `git diff --check` dan scan langsung file baru dijalankan pada perencanaan; status akhir checkpoint diverifikasi dari Git.
+- Folder `output/` sudah untracked sebelum perencanaan dan dibiarkan utuh; jangan masukkan berkas data SAP/hasil simulasi ke commit.
+- Snapshot B2B2O dan fase sebelumnya di bawah adalah arsip pada saat penulisannya, bukan status Git terkini.
+
 ## Active snapshot — B2B2O: Impor JSON Lokal Raw SAP Snapshot v2 ke Safe Demo (REMEDIATION_P1_P2_ENV_IGNORE_COMPLETED — AWAITING_CODEX_LEVEL_3_REVIEW)
 
 - Date: `2026-09-23`. Repository: `Thermal-Label-Studio` (`web_app/`).

@@ -46,6 +46,13 @@ Aturan efisiensi:
 - Buat folder `docs/tasks/<TASK_ID>/` hanya untuk Level 2/3, handoff lintas provider/perangkat, atau pekerjaan multi-sesi. Perbaikan ringan tidak memerlukan folder task.
 - Status dan pilihan model adalah panduan biaya, bukan bukti kualitas. Acceptance criteria dan hasil test tetap menjadi penentu selesai.
 
+### Penamaan fase baru
+
+- Pertahankan kode fase lama seperti `B2B2O` sebagai identitas historis; jangan mengganti nama task, commit, atau dokumen yang sudah ada.
+- Mulai pekerjaan baru setelah B2B2O dengan nomor yang mudah dibaca: `Fase 3.1 — Nama Fitur`, kemudian `Fase 3.2`, dan seterusnya. Gunakan ID folder ringkas `docs/tasks/F3.1/`, `docs/tasks/F3.2/`, dan seterusnya.
+- Perbaikan kecil tetap berada di folder/task fase terkait dan dicatat pada `RESULT.md`/`REVIEW.md` atau commit; jangan membuat rantai subfase berkode semakin panjang. Jika scope menjadi fitur berbeda, buat nomor fase berikutnya dengan task contract baru.
+- Nomor fase adalah alat navigasi, bukan bukti urutan implementasi atau status selesai. Rujuk task contract, status Git, dan hasil test untuk status aktual.
+
 ### Sebelum mengubah file
 
 1. Baca file konteks di atas.

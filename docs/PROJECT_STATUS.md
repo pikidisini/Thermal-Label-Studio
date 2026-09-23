@@ -4,6 +4,14 @@ Dokumen ini adalah ringkasan kondisi proyek aktif untuk manusia dan AI.
 
 ## Status proyek
 
+Snapshot perencanaan (2026-09-23): checkpoint B2B2O ada sebagai commit lokal
+`8d895a9` pada branch `codex/b2b2o-local-json-export-import`. Fase baru
+`3.1 — Simulasi Label Terpadu` direncanakan pada branch
+`codex/f3-1-simulasi-label-terpadu`; kontraknya ada di
+`docs/tasks/F3.1/TASK_CONTRACT.md`. Implementasi Fase 3.1 belum dimulai.
+Status push/merge B2B2O dan kesiapan produksi tidak disimpulkan dari
+checkpoint lokal. Snapshot di bawah adalah catatan historis.
+
 Snapshot terkini (2026-09-23): B2B2N memiliki checkpoint 35f9cb5. B2B2O
 disiapkan pada branch codex/b2b2o-local-json-export-import: task impor JSON
 lokal dan draft penulisan ulang ZMMR_LABEL_JSON tersedia di
