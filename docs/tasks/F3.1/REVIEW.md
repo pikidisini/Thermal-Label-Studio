@@ -35,3 +35,11 @@ Verdict: `READY_FOR_PR` dengan satu catatan dokumentasi P3 non-blocking. Belum b
 - P3 status checkpoint: **masih stale, non-blocking**. `RESULT.md` bagian akhir masih berbunyi “Siap di-commit dan di-push” walau commit `f32334d` sudah menjadi HEAD dan sama dengan upstream saat review ini. Rapikan sebelum/di PR, tetapi tidak perlu mengulang implementasi atau test karena hanya metadata dokumentasi.
 - Verifikasi ulang reviewer setelah koreksi: `npm.cmd test` **74 passed**, `npm.cmd exec tsc -- --noEmit` **PASS**, `npm.cmd run build` **PASS**, scan bundle dev hook **0 matches**, `git diff --check 0b3de08..HEAD` **PASS**. Playwright E2E (8 test) dan backend regression (24 test) adalah bukti dari executor di `RESULT.md`; reviewer tidak menjalankannya ulang. UAT SAP DEV/printer **NOT RUN**.
 - Folder `output/` tetap untracked dan tidak masuk commit. Jangan stage artefak itu.
+
+## Koreksi putusan setelah refresh baseline Git — 2026-09-23
+
+Status final: `F3.1_CODE_REVIEW_PASS; PR_TO_MAIN_NOT_YET_CLEARED`. Bagian `READY_FOR_PR` di atas hanya berlaku untuk kualitas perubahan F3.1 dan **tidak** berarti branch ini siap diajukan sebagai PR F3.1 tunggal ke `main`.
+
+Setelah `git fetch origin`, `origin/main` tetap `0f2cf82` (PR #24). Branch ini membawa checkpoint B2B2N `35f9cb5` dan B2B2O `8d895a9` **selain** commit F3.1. `git diff origin/main...HEAD` mencakup 34 file, termasuk backend auth/upload dan ABAP; area itu tidak dicakup oleh review F3.1 ini. Membuat PR ke `main` dengan judul F3.1 saja akan menyamarkan scope dan bukti review.
+
+Sebelum PR/merge, pilih salah satu jalur yang jelas: (a) review dan merge dependency B2B2N/B2B2O lebih dulu, lalu perbarui F3.1 terhadap `main`; atau (b) ajukan satu PR gabungan dengan judul/scope B2B2N+B2B2O+F3.1 dan lakukan review seluruh 34 file. Jangan menganggap review ini sebagai persetujuan atas dependency tersebut. Tidak ada rebase, reset, merge, atau perubahan dependency yang dilakukan dalam review ini.
