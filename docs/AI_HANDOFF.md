@@ -1,5 +1,12 @@
 # AI Handoff — Thermal Label Studio
 
+## Active review snapshot — Fase 3.1 gabungan (READY_FOR_COMBINED_PR)
+
+- Date: `2026-09-23`; branch: `codex/f3-1-simulasi-label-terpadu`; executor fix: `f97c8e6`; baseline: `origin/main` `0f2cf82`.
+- Review final di `docs/tasks/F3.1/REVIEW.md`: temuan P1/P2 teratasi pada review kode; `git diff --check origin/main...HEAD` PASS. Kalimat checkpoint RESULT yang stale diperbaiki reviewer tanpa mengubah runtime.
+- Siap dibuat PR **gabungan B2B2N+B2B2O+F3.1**, bukan siap merge/production. Aktivasi dan UAT ABAP SAP ECC 6, deployment intranet, serta printer fisik tetap NOT RUN.
+- Snapshot review CHANGES_REQUIRED dan catatan executor di bawah adalah riwayat sebelum koreksi ini; jangan gunakan sebagai status aktif.
+
 ## Active review snapshot — Fase 3.1 gabungan (CHANGES_REQUIRED)
 
 - Date: `2026-09-23`; branch: `codex/f3-1-simulasi-label-terpadu`; reviewed head: `bbb791b`; baseline: `origin/main` `0f2cf82`.
