@@ -57,6 +57,8 @@ class N001DevelopmentAdapter:
     def adapt_item(
         cls,
         item: RawSapItemSnapshotV2,
+        profile_version: Optional[str] = None,
+        compose_profile: Optional[bool] = None,
     ) -> Tuple[SapCanonicalItemData, str, Dict[str, Any]]:
         """Adapts a RawSapItemSnapshotV2 into canonical item data and target template.
 
@@ -130,7 +132,7 @@ class N001DevelopmentAdapter:
                 raise ValueError()
         except (ValueError, TypeError):
             raise ValueError(
-                f"Invalid numeric value '{width_raw}' for 'width_mm' in N001 item sequence {item.item_sequence}."
+                f"Invalid numeric value for 'width_mm' in N001 item sequence {item.item_sequence}."
             )
 
         try:
@@ -139,7 +141,7 @@ class N001DevelopmentAdapter:
                 raise ValueError()
         except (ValueError, TypeError):
             raise ValueError(
-                f"Invalid numeric value '{length_raw}' for 'length_m' in N001 item sequence {item.item_sequence}."
+                f"Invalid numeric value for 'length_m' in N001 item sequence {item.item_sequence}."
             )
 
         net_clean = str(net_weight_raw).replace("KG", "").replace("Kg", "").replace("kg", "").strip()
@@ -149,7 +151,7 @@ class N001DevelopmentAdapter:
                 raise ValueError()
         except (ValueError, TypeError):
             raise ValueError(
-                f"Invalid numeric value '{net_weight_raw}' for 'net_weight_kg' in N001 item sequence {item.item_sequence}."
+                f"Invalid numeric value for 'net_weight_kg' in N001 item sequence {item.item_sequence}."
             )
 
         # 5. Optional Raw Facts Handling (distinct absence / null / empty)
@@ -251,17 +253,68 @@ class N001DevelopmentAdapter:
             treatment_outside=treatment_out_str,
         )
 
+        # Determine whether to execute versioned profile composition
+        should_compose: bool
+        if compose_profile is True:
+            should_compose = True
+        elif compose_profile is False:
+            should_compose = False
+        else:
+            should_compose = bool(profile_version or getattr(item, "profile_version", None))
+
+        codes = None
+        target_template_id = cls.DEFAULT_TEMPLATE_ID
+        active_version = cls.RULE_VERSION
+        composition_hash = None
+        composed_elements: List[str] = []
+
+        if should_compose:
+            from .profile_composer import ProfileComposer, ProfileRegistry
+            target_ver = profile_version or getattr(item, "profile_version", None) or cls.RULE_VERSION
+            profile = ProfileRegistry.get(cls.PROFILE_ID, target_ver)
+            if not profile:
+                raise ValueError(
+                    f"Profile '{cls.PROFILE_ID}' version '{target_ver}' not found in ProfileRegistry."
+                )
+
+            comp_result = ProfileComposer.compose_item(item, profile)
+            active_version = profile.profile_version
+            target_template_id = profile.template_version_id
+            composition_hash = comp_result.composition_hash
+            composed_elements = list(comp_result.codes.keys()) + list(comp_result.fields.keys())
+
+            if comp_result.fields:
+                fields_dict = fields.model_dump()
+                for k, v in comp_result.fields.items():
+                    if k in fields_dict:
+                        fields_dict[k] = v
+                    else:
+                        raise ValueError(
+                            f"Composed text element '{k}' is not a recognized canonical field for {cls.PROFILE_ID}."
+                        )
+                fields = SapCanonicalFields(**fields_dict)
+
+            if comp_result.codes:
+                codes = SapCanonicalCodes(
+                    batch_barcode=comp_result.codes.get("batch_barcode"),
+                    roll_barcode=comp_result.codes.get("roll_barcode"),
+                    material_barcode=comp_result.codes.get("material_barcode"),
+                    qr_payload=comp_result.codes.get("qr_payload"),
+                )
+
         canonical_item = SapCanonicalItemData(
             contract_version="1.1",
             fields=fields,
-            codes=None,  # Zero fabricated barcodes/QR before format is approved
+            codes=codes,
         )
 
         audit_meta = {
             "rule_profile": cls.PROFILE_ID,
-            "rule_version": cls.RULE_VERSION,
+            "rule_version": active_version,
             "status": cls.STATUS,
             "is_production_approved": cls.IS_PRODUCTION_APPROVED,
+            "composition_hash": composition_hash,
+            "composed_elements": composed_elements,
             "customer_text_presence": customer_text_presence,
             "total_characteristics_received": len(item.characteristics),
             "characteristics_used": [
@@ -305,4 +358,4 @@ class N001DevelopmentAdapter:
             "barcode_qr_approved": False,
         }
 
-        return canonical_item, cls.DEFAULT_TEMPLATE_ID, audit_meta
+        return canonical_item, target_template_id, audit_meta
