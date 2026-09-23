@@ -41,7 +41,6 @@ from app.services.sap_shadow_service import (
     SapShadowBatchRequest,
     SapShadowItemInput,
     SapShadowService,
-    sap_shadow_service,
 )
 
 TEST_AUTH_TOKEN = "test-sap-simulation-token-secret-xyz"
@@ -93,11 +92,17 @@ def make_canonical_fixture_items() -> list[dict]:
 
 
 @pytest.fixture(autouse=True)
-def reset_service_state():
-    """Resets singleton state before and after each test."""
-    sap_shadow_service.clear_for_tests()
-    yield
-    sap_shadow_service.clear_for_tests()
+def isolated_service(tmp_path: Path):
+    """Provides an isolated SapShadowService per test using tmp_path, avoiding default storage."""
+    storage = DurableFilesystemArtifactStorage(tmp_path / "artifacts")
+    service = SapShadowService(artifact_storage=storage, storage_base_dir=tmp_path / "sim_store")
+    assert str(tmp_path) in str(service._batch_store_dir)
+    assert str(tmp_path) in str(service._idempotency_store_dir)
+    assert "backend/data/out" not in str(service._batch_store_dir).replace("\\", "/")
+    assert "backend/data/out" not in str(service._idempotency_store_dir).replace("\\", "/")
+    with patch("app.api.routes_sap_shadow.sap_shadow_service", service), \
+         patch("app.services.sap_shadow_service.sap_shadow_service", service):
+        yield service
 
 
 # =====================================================================
@@ -279,8 +284,15 @@ def test_ac2_idempotent_replay_and_conflict_handling():
 def test_ac3_zero_sockets_or_physical_transports_invoked(tmp_path: Path):
     """AC 3: Asserts zero socket calls or spooler transport calls occur during simulation."""
     async def _run():
-        storage = DurableFilesystemArtifactStorage(tmp_path)
-        service = SapShadowService(artifact_storage=storage)
+        storage = DurableFilesystemArtifactStorage(tmp_path / "artifacts")
+        service = SapShadowService(
+            artifact_storage=storage,
+            storage_base_dir=tmp_path / "sim_store",
+        )
+        assert str(tmp_path) in str(service._batch_store_dir)
+        assert str(tmp_path) in str(service._idempotency_store_dir)
+        assert "backend/data/out" not in str(service._batch_store_dir).replace("\\", "/")
+        assert "backend/data/out" not in str(service._idempotency_store_dir).replace("\\", "/")
 
         req = SapShadowBatchRequest(
             producer_namespace="SAP_PPIC",
@@ -310,9 +322,17 @@ def test_ac3_zero_sockets_or_physical_transports_invoked(tmp_path: Path):
     asyncio.run(_run())
 
 
-def test_ac3_unknown_printer_id_rejected():
+def test_ac3_unknown_printer_id_rejected(tmp_path: Path):
     """AC 3: Unknown printer_id is rejected by server-side registry resolution."""
-    service = SapShadowService()
+    storage = DurableFilesystemArtifactStorage(tmp_path / "artifacts")
+    service = SapShadowService(
+        artifact_storage=storage,
+        storage_base_dir=tmp_path / "sim_store",
+    )
+    assert str(tmp_path) in str(service._batch_store_dir)
+    assert str(tmp_path) in str(service._idempotency_store_dir)
+    assert "backend/data/out" not in str(service._batch_store_dir).replace("\\", "/")
+    assert "backend/data/out" not in str(service._idempotency_store_dir).replace("\\", "/")
     with pytest.raises(ValueError, match="Unknown or unauthorized printer_id"):
         service.resolve_virtual_printer("PHYSICAL-NETWORK-PRINTER-99")
 
@@ -324,8 +344,15 @@ def test_ac3_unknown_printer_id_rejected():
 def test_ac4_sequential_order_preserved(tmp_path: Path):
     """AC 4: Items are processed strictly in item_sequence ASC order."""
     async def _run():
-        storage = DurableFilesystemArtifactStorage(tmp_path)
-        service = SapShadowService(artifact_storage=storage)
+        storage = DurableFilesystemArtifactStorage(tmp_path / "artifacts")
+        service = SapShadowService(
+            artifact_storage=storage,
+            storage_base_dir=tmp_path / "sim_store",
+        )
+        assert str(tmp_path) in str(service._batch_store_dir)
+        assert str(tmp_path) in str(service._idempotency_store_dir)
+        assert "backend/data/out" not in str(service._batch_store_dir).replace("\\", "/")
+        assert "backend/data/out" not in str(service._idempotency_store_dir).replace("\\", "/")
 
         # Provide items in reverse sequence order
         items_raw = make_canonical_fixture_items()
@@ -420,8 +447,16 @@ def test_ac5_pdf_evidence_manifest_pages_and_dimensions():
 def test_ac6_durable_artifact_integrity_and_manifest(tmp_path: Path):
     """AC 6: Evidence PDF is stored with integrity manifest, exact sha256, and 7-day retention."""
     async def _run():
-        storage = DurableFilesystemArtifactStorage(tmp_path)
-        service = SapShadowService(artifact_storage=storage)
+        artifacts_dir = tmp_path / "artifacts"
+        storage = DurableFilesystemArtifactStorage(artifacts_dir)
+        service = SapShadowService(
+            artifact_storage=storage,
+            storage_base_dir=tmp_path / "sim_store",
+        )
+        assert str(tmp_path) in str(service._batch_store_dir)
+        assert str(tmp_path) in str(service._idempotency_store_dir)
+        assert "backend/data/out" not in str(service._batch_store_dir).replace("\\", "/")
+        assert "backend/data/out" not in str(service._idempotency_store_dir).replace("\\", "/")
 
         req = SapShadowBatchRequest(
             producer_namespace="SAP_PPIC",
@@ -438,8 +473,8 @@ def test_ac6_durable_artifact_integrity_and_manifest(tmp_path: Path):
         artifact_meta = batch["artifact"]
         payload_ref = artifact_meta["payload_ref"]
 
-        # Check manifest file on disk
-        manifest_file = tmp_path / f"{payload_ref}.manifest.json"
+        # Check manifest file on disk in the same temporary storage
+        manifest_file = artifacts_dir / f"{payload_ref}.manifest.json"
         assert manifest_file.is_file()
 
         manifest_data = json.loads(manifest_file.read_text(encoding="utf-8"))
@@ -463,7 +498,7 @@ def test_ac6_durable_artifact_integrity_and_manifest(tmp_path: Path):
 # AC 7 & AC 8: Monitoring, Download & Error Sanitization
 # =====================================================================
 
-def test_ac7_monitoring_and_pdf_download_workflow(tmp_path: Path):
+def test_ac7_monitoring_and_pdf_download_workflow(isolated_service: SapShadowService):
     """AC 7: End-to-end API test verifying status check and PDF binary download."""
     with (
         patch("app.api.routes_sap_shadow.is_sap_shadow_simulation_enabled", return_value=True),
@@ -485,9 +520,9 @@ def test_ac7_monitoring_and_pdf_download_workflow(tmp_path: Path):
         batch_id = res.json()["batch_id"]
 
         # Ensure batch is completed
-        batch = sap_shadow_service.get_batch(batch_id)
+        batch = isolated_service.get_batch(batch_id)
         if batch and batch.get("status") != "completed":
-            asyncio.run(sap_shadow_service.process_batch(batch_id))
+            asyncio.run(isolated_service.process_batch(batch_id))
 
         # 2. Check batch status
         status_res = client.get(f"/api/v1/simulation/sap-batches/{batch_id}", headers=headers)
@@ -508,7 +543,7 @@ def test_ac7_monitoring_and_pdf_download_workflow(tmp_path: Path):
         assert len(reader.pages) == 4
 
 
-def test_ac8_error_sanitization():
+def test_ac8_error_sanitization(isolated_service: SapShadowService):
     """AC 8: Errors do not leak internal file paths, tracebacks, or secret tokens."""
     with (
         patch("app.api.routes_sap_shadow.is_sap_shadow_simulation_enabled", return_value=True),
@@ -518,7 +553,7 @@ def test_ac8_error_sanitization():
         headers = {"X-SAP-Simulation-Token": TEST_AUTH_TOKEN}
 
         # Force an unexpected internal error during ingest
-        with patch.object(sap_shadow_service, "ingest_batch", side_effect=RuntimeError("Internal database crash /secret/path/token_12345")):
+        with patch.object(isolated_service, "ingest_batch", side_effect=RuntimeError("Internal database crash /secret/path/token_12345")):
             payload = {
                 "producer_namespace": "SAP_PPIC",
                 "request_id": "REQ-ERROR-01",
@@ -618,8 +653,15 @@ def test_p1_1_pipeline_fidelity_real_rendering_executed(tmp_path: Path):
     async def _run():
         from engine.rasterizer import svg_to_png as real_svg_to_png
 
-        storage = DurableFilesystemArtifactStorage(tmp_path)
-        service = SapShadowService(artifact_storage=storage, storage_base_dir=tmp_path)
+        storage = DurableFilesystemArtifactStorage(tmp_path / "artifacts")
+        service = SapShadowService(
+            artifact_storage=storage,
+            storage_base_dir=tmp_path / "sim_store",
+        )
+        assert str(tmp_path) in str(service._batch_store_dir)
+        assert str(tmp_path) in str(service._idempotency_store_dir)
+        assert "backend/data/out" not in str(service._batch_store_dir).replace("\\", "/")
+        assert "backend/data/out" not in str(service._idempotency_store_dir).replace("\\", "/")
 
         req = SapShadowBatchRequest(
             producer_namespace="SAP_PPIC",
@@ -665,10 +707,19 @@ def test_p1_3_durable_filesystem_persistence_across_service_reboot(tmp_path: Pat
     2. Handle identical replay idempotently without re-generating artifacts or conflicting.
     """
     async def _run():
-        storage = DurableFilesystemArtifactStorage(tmp_path)
+        storage = DurableFilesystemArtifactStorage(tmp_path / "artifacts")
+        sim_store = tmp_path / "sim_store"
 
         # 1. Instance 1 ingests and processes
-        service1 = SapShadowService(artifact_storage=storage, storage_base_dir=tmp_path)
+        service1 = SapShadowService(
+            artifact_storage=storage,
+            storage_base_dir=sim_store,
+        )
+        assert str(tmp_path) in str(service1._batch_store_dir)
+        assert str(tmp_path) in str(service1._idempotency_store_dir)
+        assert "backend/data/out" not in str(service1._batch_store_dir).replace("\\", "/")
+        assert "backend/data/out" not in str(service1._idempotency_store_dir).replace("\\", "/")
+
         req = SapShadowBatchRequest(
             producer_namespace="SAP_PPIC",
             request_id="REQ-REBOOT-TEST-001",
@@ -684,7 +735,15 @@ def test_p1_3_durable_filesystem_persistence_across_service_reboot(tmp_path: Pat
         pdf_bytes_1 = service1.get_evidence_pdf(batch_id1)
 
         # 2. Simulate Server Reboot: create brand new service instance reading same directory
-        service2 = SapShadowService(artifact_storage=storage, storage_base_dir=tmp_path)
+        service2 = SapShadowService(
+            artifact_storage=storage,
+            storage_base_dir=sim_store,
+        )
+        assert str(tmp_path) in str(service2._batch_store_dir)
+        assert str(tmp_path) in str(service2._idempotency_store_dir)
+        assert "backend/data/out" not in str(service2._batch_store_dir).replace("\\", "/")
+        assert "backend/data/out" not in str(service2._idempotency_store_dir).replace("\\", "/")
+
         # Memory caches are clean in service2
         assert batch_id1 not in service2._batches
 
@@ -795,8 +854,13 @@ def test_p1_b_startup_recovery_resumes_interrupted_batches(tmp_path: Path):
     Ensures no batch is permanently stuck if server crashed or was restarted during execution.
     """
     async def _run():
-        storage = DurableFilesystemArtifactStorage(tmp_path)
-        service1 = SapShadowService(artifact_storage=storage, storage_base_dir=tmp_path)
+        storage = DurableFilesystemArtifactStorage(tmp_path / "artifacts")
+        sim_store = tmp_path / "sim_store"
+        service1 = SapShadowService(artifact_storage=storage, storage_base_dir=sim_store)
+        assert str(tmp_path) in str(service1._batch_store_dir)
+        assert str(tmp_path) in str(service1._idempotency_store_dir)
+        assert "backend/data/out" not in str(service1._batch_store_dir).replace("\\", "/")
+        assert "backend/data/out" not in str(service1._idempotency_store_dir).replace("\\", "/")
 
         # Ingest a batch without auto-processing to leave it in 'accepted' status on disk
         req = SapShadowBatchRequest(
@@ -815,7 +879,11 @@ def test_p1_b_startup_recovery_resumes_interrupted_batches(tmp_path: Path):
         assert disk_record["status"] == "accepted"
 
         # Simulate fresh service instance upon server startup
-        service2 = SapShadowService(artifact_storage=storage, storage_base_dir=tmp_path)
+        service2 = SapShadowService(artifact_storage=storage, storage_base_dir=sim_store)
+        assert str(tmp_path) in str(service2._batch_store_dir)
+        assert str(tmp_path) in str(service2._idempotency_store_dir)
+        assert "backend/data/out" not in str(service2._batch_store_dir).replace("\\", "/")
+        assert "backend/data/out" not in str(service2._idempotency_store_dir).replace("\\", "/")
         assert batch_id not in service2._batches
 
         # Run startup recovery
@@ -843,8 +911,12 @@ def test_p1_b_startup_recovery_resumes_interrupted_batches(tmp_path: Path):
 def test_p1_b_retry_interrupted_batch_resumes_execution(tmp_path: Path):
     """P1-B: Idempotent replay of an interrupted (accepted/processing) batch triggers resume and completes."""
     async def _run():
-        storage = DurableFilesystemArtifactStorage(tmp_path)
-        service = SapShadowService(artifact_storage=storage, storage_base_dir=tmp_path)
+        storage = DurableFilesystemArtifactStorage(tmp_path / "artifacts")
+        service = SapShadowService(artifact_storage=storage, storage_base_dir=tmp_path / "sim_store")
+        assert str(tmp_path) in str(service._batch_store_dir)
+        assert str(tmp_path) in str(service._idempotency_store_dir)
+        assert "backend/data/out" not in str(service._batch_store_dir).replace("\\", "/")
+        assert "backend/data/out" not in str(service._idempotency_store_dir).replace("\\", "/")
 
         req = SapShadowBatchRequest(
             producer_namespace="SAP_PPIC",
@@ -876,7 +948,7 @@ def test_p1_b_retry_interrupted_batch_resumes_execution(tmp_path: Path):
     asyncio.run(_run())
 
 
-def test_p1_b_simulated_disk_write_failure_fails_closed():
+def test_p1_b_simulated_disk_write_failure_fails_closed(isolated_service: SapShadowService):
     """P1-B: Disk write failure rolls back in-memory state and returns HTTP 500 (no false 202 Accepted)."""
     with (
         patch("app.api.routes_sap_shadow.is_sap_shadow_simulation_enabled", return_value=True),
@@ -896,7 +968,7 @@ def test_p1_b_simulated_disk_write_failure_fails_closed():
         from app.services.sap_shadow_service import SimulationPersistenceError
 
         with patch.object(
-            sap_shadow_service,
+            isolated_service,
             "_save_batch_to_disk",
             side_effect=SimulationPersistenceError("Simulated disk write failure: No space left on device"),
         ):
@@ -907,8 +979,8 @@ def test_p1_b_simulated_disk_write_failure_fails_closed():
 
             # Verify memory state was rolled back cleanly (no phantom batch)
             key = "SAP_PPIC:REQ-DISK-FAIL-001"
-            assert key not in sap_shadow_service._idempotency_map
-            assert len(sap_shadow_service._batches) == 0
+            assert key not in isolated_service._idempotency_map
+            assert len(isolated_service._batches) == 0
 
 
 def test_p1_atomicity_idempotency_failure_cleans_orphan_and_retry_succeeds(tmp_path: Path):
@@ -1007,7 +1079,7 @@ def test_p1_atomicity_idempotency_failure_cleans_orphan_and_retry_succeeds(tmp_p
             assert len(pdf_bytes) > 500
 
 
-def test_p1_startup_recovery_failure_logs_and_fails_closed(caplog):
+def test_p1_startup_recovery_failure_logs_and_fails_closed(caplog, isolated_service: SapShadowService):
     """P1: Verifies startup recovery does NOT hide errors with 'pass'.
 
     If storage recovery raises an exception (e.g. unreadable disk partition),
@@ -1025,8 +1097,9 @@ def test_p1_startup_recovery_failure_logs_and_fails_closed(caplog):
 
     with (
         patch("app.main.is_sap_shadow_simulation_enabled", return_value=True),
-        patch(
-            "app.services.sap_shadow_service.sap_shadow_service.recover_on_startup",
+        patch.object(
+            isolated_service,
+            "recover_on_startup",
             side_effect=SimulationPersistenceError("Unreadable disk partition / EIO"),
         ),
     ):
@@ -1154,3 +1227,27 @@ def test_regression_contract_hash_mismatch_rejected_by_startup_recovery(tmp_path
         assert not (service2._batch_store_dir / f"{batch_id}.json").exists()
 
     asyncio.run(_run())
+
+
+def test_p1_b_regression_all_services_use_tmp_path_and_never_default_storage(
+    isolated_service: SapShadowService, tmp_path: Path
+):
+    """P1-B Regression: Proves isolated_service and direct instantiations strictly use tmp_path and never backend/data/out."""
+    assert str(tmp_path) in str(isolated_service._batch_store_dir)
+    assert str(tmp_path) in str(isolated_service._idempotency_store_dir)
+    assert "backend/data/out" not in str(isolated_service._batch_store_dir).replace("\\", "/")
+    assert "backend/data/out" not in str(isolated_service._idempotency_store_dir).replace("\\", "/")
+    assert "backend/data/out" not in str(isolated_service.artifact_storage.root).replace("\\", "/")
+
+    # Also verify direct instantiation with tmp_path
+    storage = DurableFilesystemArtifactStorage(tmp_path / "artifacts")
+    direct_service = SapShadowService(
+        artifact_storage=storage,
+        storage_base_dir=tmp_path / "sim_store",
+    )
+    assert direct_service._batch_store_dir == tmp_path / "sim_store" / "simulation_batches" / "records"
+    assert direct_service._idempotency_store_dir == tmp_path / "sim_store" / "simulation_batches" / "idempotency"
+    assert direct_service.artifact_storage.root == (tmp_path / "artifacts").resolve()
+    assert "backend/data/out" not in str(direct_service._batch_store_dir).replace("\\", "/")
+    assert "backend/data/out" not in str(direct_service._idempotency_store_dir).replace("\\", "/")
+    assert "backend/data/out" not in str(direct_service.artifact_storage.root).replace("\\", "/")

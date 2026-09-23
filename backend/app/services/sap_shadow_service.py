@@ -23,10 +23,15 @@ import os
 from pathlib import Path
 import re
 import tempfile
-from typing import Any, Dict, List, Literal, Optional, Set, Union
+from typing import Any, Dict, List, Literal, Optional, Set, TYPE_CHECKING, Union
 import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from ..models.raw_sap_snapshot_v2 import SapSourceMetadata
+
+if TYPE_CHECKING:
+    from ..models.raw_sap_snapshot_v2 import RawSapBatchSnapshotV2
 
 from ..config import STORAGE_OUT_DIR
 from ..print_jobs.artifact_storage import (
@@ -162,18 +167,6 @@ class SapCanonicalItemData(BaseModel):
     production_date: Optional[str] = Field(default=None, max_length=32)
 
 
-class SapSourceMetadata(BaseModel):
-    """Restricted audit metadata originating from SAP."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    werks: Optional[str] = Field(default=None, max_length=8, description="SAP Plant code (e.g. 1100)")
-    lgort: Optional[str] = Field(default=None, max_length=8, description="SAP Storage location (e.g. 0001)")
-    sap_user: Optional[str] = Field(default=None, max_length=32, description="SAP User ID (e.g. M_PPIC)")
-    system_id: Optional[str] = Field(default=None, max_length=16, description="SAP System ID (e.g. PRD, QAS)")
-    transaction_code: Optional[str] = Field(default=None, max_length=20, description="SAP T-Code (e.g. ZLABEL)")
-
-
 class SapShadowItemInput(BaseModel):
     """Canonical SAP item input for simulation."""
 
@@ -224,7 +217,7 @@ class SapShadowBatchRequest(BaseModel):
 
 
 def normalize_canonical_for_engine(canonical_data: SapCanonicalItemData) -> Dict[str, Any]:
-    """Normalizes typed canonical data into engine pure data contract v1.1 format."""
+    """Normalizes typed canonical data into engine pure data contract v1.1 format without fake fallbacks."""
     data_dict = canonical_data.model_dump(exclude_none=True)
 
     fields: Dict[str, Any] = {}
@@ -239,48 +232,11 @@ def normalize_canonical_for_engine(canonical_data: SapCanonicalItemData) -> Dict
         if k not in ("fields", "codes", "contract_version"):
             fields[k] = v
 
-    batch_val = str(fields.get("batch_text") or fields.get("batch_number") or "")
-    roll_val = str(fields.get("roll_no") or fields.get("roll_number") or "")
-    mat_val = str(fields.get("material_code") or fields.get("material_number") or "")
-    brand_val = str(fields.get("brand") or "POLYTRON")
-    film_val = str(fields.get("type_film") or fields.get("material_desc") or "ALUMINIUM FOIL")
-    base_val = str(fields.get("base_film") or "PET FILM")
-    net_val = str(fields.get("net_weight_kg") or fields.get("net_weight") or "")
-    gross_val = str(fields.get("gross_weight_kg") or fields.get("gross_weight") or "")
-
-    net_clean = net_val.replace("KG", "").replace("Kg", "").replace("kg", "").strip()
-    gross_clean = gross_val.replace("KG", "").replace("Kg", "").replace("kg", "").strip()
-
-    fields.setdefault("brand", brand_val)
-    fields.setdefault("type_film", film_val)
-    fields.setdefault("base_film", base_val)
-    fields.setdefault("batch_text", batch_val)
-    fields.setdefault("batch_number", batch_val)
-    fields.setdefault("roll_no", roll_val)
-    fields.setdefault("roll_number", roll_val)
-    fields.setdefault("material_code", mat_val)
-    fields.setdefault("material_number", mat_val)
-    fields.setdefault("width_mm", str(fields.get("width_mm", "80")))
-    fields.setdefault("length_m", str(fields.get("length_m", "2000")))
-    fields.setdefault("width_inch", str(fields.get("width_inch", "3.15")))
-    fields.setdefault("length_feet", str(fields.get("length_feet", "6561")))
-    fields.setdefault("net_weight_kg", net_clean or "12.00")
-    fields.setdefault("gross_weight_kg", gross_clean or "12.50")
-    fields.setdefault("weight_lbs", str(fields.get("weight_lbs", "26.4")))
-    fields.setdefault("core_inch", str(fields.get("core_inch", "3")))
-    fields.setdefault("used_before", str(fields.get("used_before", "12/2028")))
-    fields.setdefault("so_item", str(fields.get("so_item", "10")))
-    fields.setdefault("splice_1_m", str(fields.get("splice_1_m", "0")))
-    fields.setdefault("splice_2_m", str(fields.get("splice_2_m", "0")))
-    fields.setdefault("splice_1_feet", str(fields.get("splice_1_feet", "0")))
-    fields.setdefault("splice_2_feet", str(fields.get("splice_2_feet", "0")))
-    fields.setdefault("treatment_inside", str(fields.get("treatment_inside", "Corona")))
-    fields.setdefault("treatment_outside", str(fields.get("treatment_outside", "None")))
-
-    codes.setdefault("batch_barcode", batch_val or "BAT-DEFAULT")
-    codes.setdefault("roll_barcode", roll_val or "ROL-DEFAULT")
-    codes.setdefault("material_barcode", mat_val or "MAT-DEFAULT")
-    codes.setdefault("qr_payload", f"MAT:{mat_val};BAT:{batch_val};ROL:{roll_val}")
+    # Clean units if present, but NEVER invent fake fallback business facts
+    if "net_weight_kg" in fields and fields["net_weight_kg"] is not None:
+        fields["net_weight_kg"] = str(fields["net_weight_kg"]).replace("KG", "").replace("Kg", "").replace("kg", "").strip()
+    if "gross_weight_kg" in fields and fields["gross_weight_kg"] is not None:
+        fields["gross_weight_kg"] = str(fields["gross_weight_kg"]).replace("KG", "").replace("Kg", "").replace("kg", "").strip()
 
     return {"fields": fields, "codes": codes}
 
@@ -291,7 +247,14 @@ class SimulationPersistenceError(RuntimeError):
 
 
 class SapShadowService:
-    """Service managing SAP Shadow Print Simulation pipeline with durable persistence."""
+    """Service managing SAP Shadow Print Simulation pipeline with durable persistence.
+
+    NOTE on Concurrency:
+    The in-memory asyncio.Lock protects single-process concurrency. In a multi-worker deployment
+    sharing the same filesystem storage without distributed OS file locks or database transactions,
+    concurrent writes for the identical idempotency key could race. This is an intentional constraint
+    for pilot simulation; production deployments should use database-level unique constraints.
+    """
 
     def __init__(
         self,
@@ -324,9 +287,13 @@ class SapShadowService:
     # Durable Persistence Layer (Filesystem + Optional PostgreSQL)
     # ------------------------------------------------------------------
 
+    def _get_idempotency_filename(self, idempotency_key: str) -> str:
+        """Deterministically generates collision-resistant SHA-256 filename for idempotency key."""
+        return hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest() + ".json"
+
     def _sanitize_filename_key(self, key: str) -> str:
-        """Sanitizes idempotency key for safe filesystem path."""
-        return re.sub(r"[^A-Za-z0-9_-]", "__", key)
+        """Compatibility helper returning SHA-256 digest hex (stem of filename)."""
+        return hashlib.sha256(key.encode("utf-8")).hexdigest()
 
     def _save_batch_to_disk(self, record: Dict[str, Any]) -> None:
         """Atomically saves batch state to durable filesystem store.
@@ -377,9 +344,9 @@ class SapShadowService:
 
         Fails closed by raising SimulationPersistenceError if disk write fails.
         """
-        safe_name = self._sanitize_filename_key(idempotency_key)
-        target_path = self._idempotency_store_dir / f"{safe_name}.json"
-        temp_path = self._idempotency_store_dir / f"{safe_name}.json.tmp"
+        filename = self._get_idempotency_filename(idempotency_key)
+        target_path = self._idempotency_store_dir / filename
+        temp_path = self._idempotency_store_dir / f"{filename}.tmp"
         payload = {
             "idempotency_key": idempotency_key,
             "batch_id": batch_id,
@@ -395,14 +362,22 @@ class SapShadowService:
             raise SimulationPersistenceError(f"Failed to persist idempotency key {idempotency_key} to disk: {exc}") from exc
 
     def _load_idempotency_from_disk(self, idempotency_key: str) -> Optional[Dict[str, Any]]:
-        """Loads idempotency mapping from durable filesystem store."""
-        safe_name = self._sanitize_filename_key(idempotency_key)
-        target_path = self._idempotency_store_dir / f"{safe_name}.json"
+        """Loads idempotency mapping from durable filesystem store and verifies key integrity."""
+        filename = self._get_idempotency_filename(idempotency_key)
+        target_path = self._idempotency_store_dir / filename
         if not target_path.is_file():
             return None
         try:
             with open(target_path, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+            if data.get("idempotency_key") != idempotency_key:
+                logger.warning(
+                    "Idempotency key mismatch on disk: expected %s, found %s",
+                    idempotency_key,
+                    data.get("idempotency_key"),
+                )
+                return None
+            return data
         except Exception as exc:
             logger.error("Failed to load idempotency key %s from disk: %s", idempotency_key, exc)
             return None
@@ -602,6 +577,169 @@ class SapShadowService:
             "message": "SAP simulation batch accepted for processing.",
         }
 
+    def _calculate_raw_contract_hash(self, request: RawSapBatchSnapshotV2) -> str:
+        """Deterministically computes SHA-256 digest of incoming Raw SAP Snapshot v2 preserving explicit null vs absent fields."""
+        raw_dict = request.model_dump(mode="json", exclude_unset=True)
+        canonical_str = json.dumps(raw_dict, sort_keys=True)
+        return hashlib.sha256(canonical_str.encode("utf-8")).hexdigest()
+
+    async def ingest_raw_batch(
+        self,
+        request: RawSapBatchSnapshotV2,
+        auto_process: bool = True,
+    ) -> Dict[str, Any]:
+        """Ingests Raw SAP Snapshot v2, adapts via N001 development profile, and initiates simulation."""
+        from .n001_rule_adapter import N001DevelopmentAdapter
+
+        # 1. Resolve virtual profile (server-side only)
+        target_printer_id = request.printer_id or "PILOT-PRINTER-01"
+        virtual_profile = self.resolve_virtual_printer(target_printer_id)
+
+        # 2. Validate sequence uniqueness
+        sequences = [it.item_sequence for it in request.items]
+        if len(sequences) != len(set(sequences)):
+            raise ValueError("item_sequence values within raw batch must be strictly unique")
+
+        # 3. Check Idempotency Key (In-Memory + Durable Filesystem Store)
+        idempotency_key = f"{request.producer_namespace}:{request.request_id}"
+        contract_hash = self._calculate_raw_contract_hash(request)
+
+        async with self._lock:
+            existing_batch_id = self._idempotency_map.get(idempotency_key)
+            existing_hash = None
+
+            if existing_batch_id:
+                existing_hash = self._batch_payload_hashes.get(existing_batch_id)
+            else:
+                stored_idem = self._load_idempotency_from_disk(idempotency_key)
+                if stored_idem:
+                    existing_batch_id = stored_idem.get("batch_id")
+                    existing_hash = stored_idem.get("contract_hash")
+
+            if existing_batch_id:
+                if existing_hash and existing_hash != contract_hash:
+                    raise ValueError(
+                        f"Conflict: request_id '{request.request_id}' has already been submitted with different payload."
+                    )
+
+                existing_record = self.get_batch(existing_batch_id)
+                if existing_record:
+                    if existing_record.get("status") in ("accepted", "processing") and auto_process:
+                        task = asyncio.create_task(self.process_batch(existing_batch_id))
+                        self._background_tasks.add(task)
+                        task.add_done_callback(self._background_tasks.discard)
+
+                    return {
+                        "batch_id": existing_batch_id,
+                        "producer_namespace": request.producer_namespace,
+                        "request_id": request.request_id,
+                        "printer_id": target_printer_id,
+                        "label_code": N001DevelopmentAdapter.PROFILE_ID,
+                        "profile_version": N001DevelopmentAdapter.RULE_VERSION,
+                        "status": existing_record["status"],
+                        "total_items": existing_record["total_items"],
+                        "idempotent_replay": True,
+                        "created_at": existing_record["created_at"],
+                        "message": "Idempotent replay: existing raw snapshot batch returned.",
+                    }
+
+            # 4. Adapt Raw items to Canonical items via N001 rule profile
+            sorted_raw_items = sorted(request.items, key=lambda x: x.item_sequence)
+            batch_items = []
+            for it in sorted_raw_items:
+                canonical_item, tmpl_id, audit_meta = N001DevelopmentAdapter.adapt_item(it)
+
+                clean_id = tmpl_id.replace(".svg", "")
+                tmpl_path = TemplateService.get_template_path(clean_id)
+                if not tmpl_path and clean_id != "label_roll_80x200":
+                    known = [t.id for t in TemplateService.list_templates()]
+                    if clean_id not in known:
+                        raise ValueError(f"Template '{tmpl_id}' not found.")
+
+                item_dict = canonical_item.model_dump(exclude_none=True)
+                item_json = json.dumps(item_dict, sort_keys=True)
+                item_hash = hashlib.sha256(item_json.encode("utf-8")).hexdigest()
+
+                batch_items.append({
+                    "item_id": str(uuid.uuid4()),
+                    "item_sequence": it.item_sequence,
+                    "template_version_id": tmpl_id,
+                    "canonical_item_data": item_dict,
+                    "copies": it.copies,
+                    "item_data_sha256": item_hash,
+                    "status": "accepted",
+                    "label_code": it.label_code,
+                    "raw_characteristics": [c.model_dump(mode="json", exclude_unset=True) for c in it.characteristics],
+                    "raw_business_context": it.business_context.model_dump(mode="json", exclude_unset=True) if it.business_context else None,
+                    "n001_audit_meta": audit_meta,
+                })
+
+            # 5. Create new batch record with full raw snapshot preserved
+            batch_id = str(uuid.uuid4())
+            now = datetime.now(timezone.utc)
+
+            batch_record = {
+                "batch_id": batch_id,
+                "producer_namespace": request.producer_namespace,
+                "request_id": request.request_id,
+                "printer_id": target_printer_id,
+                "virtual_profile": virtual_profile,
+                "raw_contract_sha256": contract_hash,
+                "contract_type": "raw_snapshot_v2",
+                "label_code": N001DevelopmentAdapter.PROFILE_ID,
+                "profile_version": N001DevelopmentAdapter.RULE_VERSION,
+                "raw_snapshot": request.model_dump(mode="json", exclude_unset=True),
+                "status": "accepted",
+                "total_items": len(batch_items),
+                "completed_items": 0,
+                "items": batch_items,
+                "created_at": now.isoformat(),
+                "completed_at": None,
+                "artifact": None,
+                "error": None,
+            }
+
+            self._batches[batch_id] = batch_record
+            self._idempotency_map[idempotency_key] = batch_id
+            self._batch_payload_hashes[batch_id] = contract_hash
+
+            # Atomic save to disk with rollback
+            try:
+                self._save_batch_to_disk(batch_record)
+                self._save_idempotency_to_disk(idempotency_key, batch_id, contract_hash)
+            except Exception:
+                self._batches.pop(batch_id, None)
+                self._idempotency_map.pop(idempotency_key, None)
+                self._batch_payload_hashes.pop(batch_id, None)
+
+                batch_file = self._batch_store_dir / f"{batch_id}.json"
+                if batch_file.is_file():
+                    try:
+                        batch_file.unlink()
+                    except Exception:
+                        pass
+                raise
+
+        # 6. Trigger processing with managed task tracking
+        if auto_process:
+            task = asyncio.create_task(self.process_batch(batch_id))
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
+
+        return {
+            "batch_id": batch_id,
+            "producer_namespace": request.producer_namespace,
+            "request_id": request.request_id,
+            "printer_id": target_printer_id,
+            "label_code": N001DevelopmentAdapter.PROFILE_ID,
+            "profile_version": N001DevelopmentAdapter.RULE_VERSION,
+            "status": "accepted",
+            "total_items": len(batch_items),
+            "idempotent_replay": False,
+            "created_at": now.isoformat(),
+            "message": "SAP raw snapshot batch accepted for simulation.",
+        }
+
     async def process_batch(self, batch_id: str) -> None:
         """Executes simulation pipeline for batch: renders items with engine and produces PDF evidence."""
         record = self.get_batch(batch_id)
@@ -722,8 +860,56 @@ class SapShadowService:
             return disk_record
         return None
 
+    def get_raw_snapshot(self, batch_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves preserved Raw SAP Snapshot v2 for a given batch."""
+        record = self.get_batch(batch_id)
+        if not record:
+            return None
+        return record.get("raw_snapshot")
+
+    def _to_summary(self, record: Dict[str, Any]) -> Dict[str, Any]:
+        """Converts internal batch record to sanitized public summary (data minimization)."""
+        sanitized_items = [
+            {
+                "item_id": it.get("item_id"),
+                "item_sequence": it.get("item_sequence"),
+                "template_version_id": it.get("template_version_id"),
+                "copies": it.get("copies", 1),
+                "status": it.get("status"),
+            }
+            for it in record.get("items", [])
+        ]
+        summary = {
+            "batch_id": record.get("batch_id"),
+            "producer_namespace": record.get("producer_namespace"),
+            "request_id": record.get("request_id"),
+            "printer_id": record.get("printer_id"),
+            "virtual_profile": record.get("virtual_profile"),
+            "contract_type": record.get("contract_type", "canonical"),
+            "status": record.get("status"),
+            "total_items": record.get("total_items"),
+            "completed_items": record.get("completed_items", 0),
+            "items": sanitized_items,
+            "created_at": record.get("created_at"),
+            "completed_at": record.get("completed_at"),
+            "artifact": record.get("artifact"),
+            "error": record.get("error"),
+        }
+        if "label_code" in record:
+            summary["label_code"] = record["label_code"]
+        if "profile_version" in record:
+            summary["profile_version"] = record["profile_version"]
+        return summary
+
+    def get_batch_summary(self, batch_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves sanitized summary of simulation batch omitting raw data."""
+        record = self.get_batch(batch_id)
+        if not record:
+            return None
+        return self._to_summary(record)
+
     def list_batches(self, limit: int = 50) -> List[Dict[str, Any]]:
-        """Lists recent simulation batches sorted by created_at descending."""
+        """Lists recent simulation batches sorted by created_at descending (sanitized summaries)."""
         batches: List[Dict[str, Any]] = []
         seen_ids = set()
 
@@ -747,7 +933,7 @@ class SapShadowService:
             return str(b.get("created_at") or "")
 
         batches.sort(key=_get_sort_key, reverse=True)
-        return batches[:limit]
+        return [self._to_summary(b) for b in batches[:limit]]
 
     def get_evidence_pdf(self, batch_id: str) -> bytes:
         """Retrieves verified evidence PDF bytes from durable storage."""
