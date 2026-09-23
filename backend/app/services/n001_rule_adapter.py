@@ -220,6 +220,28 @@ class N001DevelopmentAdapter:
         used_before_raw = _get_raw("used_before", ["ZZUSEDBEFORE", "ZZEXPDATE"])
         used_before_str = str(used_before_raw) if used_before_raw is not None else ""
 
+        # Splice 1 & 2: strictly from proven raw business facts if present (ZMMR_LABEL_JSON.abap: ZZSPLICE-1, ZZSPLICE-2)
+        # Feet conversion is deferred until explicit business approval from PPIC
+        splice_1_m_raw = _get_raw("splice_1_m", ["ZZSPLICE-1", "ZZSPLICE1"])
+        splice_1_m_val: Optional[str] = None
+        if splice_1_m_raw is not None and str(splice_1_m_raw).strip():
+            try:
+                s1_float = float(str(splice_1_m_raw).replace("M", "").replace("m", "").strip())
+                if s1_float >= 0:
+                    splice_1_m_val = f"{s1_float:.0f}"
+            except (ValueError, TypeError):
+                splice_1_m_val = str(splice_1_m_raw).strip()
+
+        splice_2_m_raw = _get_raw("splice_2_m", ["ZZSPLICE-2", "ZZSPLICE2"])
+        splice_2_m_val: Optional[str] = None
+        if splice_2_m_raw is not None and str(splice_2_m_raw).strip():
+            try:
+                s2_float = float(str(splice_2_m_raw).replace("M", "").replace("m", "").strip())
+                if s2_float >= 0:
+                    splice_2_m_val = f"{s2_float:.0f}"
+            except (ValueError, TypeError):
+                splice_2_m_val = str(splice_2_m_raw).strip()
+
         # 6. Deterministic Derived Unit Conversions (application-derived fields)
         width_inch_derived = f"{round(width_float / 25.4, 2):.2f}"
         length_feet_derived = str(int(round(length_float * 3.28084)))
@@ -248,6 +270,10 @@ class N001DevelopmentAdapter:
             core_inch=core_inch_str,
             used_before=used_before_str,
             so_item=so_item_raw,
+            splice_1_m=splice_1_m_val,
+            splice_1_feet=None,
+            splice_2_m=splice_2_m_val,
+            splice_2_feet=None,
             production_date=prod_date_str,
             treatment_inside=treatment_in_str,
             treatment_outside=treatment_out_str,
@@ -323,7 +349,8 @@ class N001DevelopmentAdapter:
                     "ZZTYPEFILM", "ZZBASEFILM", "ZZCORE", "ZZTREATMENT_IN",
                     "ZZTREATMENT_OUT", "ZZEXPIREDLIVE", "ZZMATERIAL", "ZZMATNR",
                     "ZZBATCH", "ZZCHARG", "ZZROLL", "ZZROLLNO", "ZZGROSSWEIGHT",
-                    "ZZPOSNR", "ZZMATERIAL_DESC", "ZZMAKTX"
+                    "ZZPOSNR", "ZZMATERIAL_DESC", "ZZMAKTX",
+                    "ZZSPLICE-1", "ZZSPLICE-2", "ZZSPLICE1", "ZZSPLICE2",
                 )
             ],
             "unknown_characteristics_preserved": [
@@ -332,7 +359,8 @@ class N001DevelopmentAdapter:
                     "ZZTYPEFILM", "ZZBASEFILM", "ZZCORE", "ZZTREATMENT_IN",
                     "ZZTREATMENT_OUT", "ZZEXPIREDLIVE", "ZZMATERIAL", "ZZMATNR",
                     "ZZBATCH", "ZZCHARG", "ZZROLL", "ZZROLLNO", "ZZGROSSWEIGHT",
-                    "ZZPOSNR", "ZZMATERIAL_DESC", "ZZMAKTX"
+                    "ZZPOSNR", "ZZMATERIAL_DESC", "ZZMAKTX",
+                    "ZZSPLICE-1", "ZZSPLICE-2", "ZZSPLICE1", "ZZSPLICE2",
                 )
             ],
             "raw_sources_mapped": {
@@ -348,6 +376,8 @@ class N001DevelopmentAdapter:
                 "material_desc": "business_context.material_description or ZZMATERIAL_DESC/ZZMAKTX (strictly raw, no fallback)",
                 "so_item": "business_context.sales_order_item or ZZPOSNR (strictly raw, no fallback)",
                 "gross_weight_kg": "business_context.gross_weight_kg or ZZGROSSWEIGHT (strictly raw, no fallback)",
+                "splice_1_m": "business_context.splice_1_m or ZZSPLICE-1/ZZSPLICE1 (strictly raw if present)",
+                "splice_2_m": "business_context.splice_2_m or ZZSPLICE-2/ZZSPLICE2 (strictly raw if present)",
             },
             "derived_fields": ["width_inch", "length_feet", "weight_lbs"],
             "application_derived_fields": {

@@ -1,5 +1,24 @@
 # AI Handoff — Thermal Label Studio
 
+## Active snapshot — B2B2M: Safe Demo PDF Visual & Placeholder Hardening (REMEDIATION_P1_P2_COMPLETED — AWAITING_CODEX_LEVEL_3_REVIEW)
+
+- Date: `2026-09-23`.
+- Repository: `Thermal-Label-Studio` (`web_app/`).
+- Branch: `codex/b2b2m-safe-demo-pdf-hardening` from `origin/main` at `3f8c8ba` (B2B2L merged via PR #23).
+- Status: `REMEDIATION_P1_P2_COMPLETED — AWAITING_CODEX_LEVEL_3_REVIEW`. Seluruh temuan review P1 dan P2 telah diselesaikan secara sempit dan terverifikasi tuntas:
+  1. **P1 — Splice Characteristic Matching & Deferred Feet**: Adapter N001 mengekstrak karakteristik splice menggunakan nama terbukti ABAP legacy `ZMMR_LABEL_JSON.abap` baris 391 & 398 (`ZZSPLICE-1` dan `ZZSPLICE-2`, serta `ZZSPLICE1` dan `ZZSPLICE2`). Alias spekulatif dihapus. Penurunan `splice_1_feet` dan `splice_2_feet` ditunda (`None`) dari adapter; placeholder dirender `""` via kebijakan field opsional.
+  2. **P2 — Pemisahan Core vs Optional Canonical Fields**: `KNOWN_OPTIONAL_CANONICAL_FIELDS` dipersempit strictly pada 13 field yang benar-benar opsional (`so_item`, `splice_1_m`, `splice_1_feet`, `splice_2_m`, `splice_2_feet`, `treatment_inside`, `treatment_outside`, `core_inch`, `used_before`, `gross_weight`, `gross_weight_kg`, `material_desc`, `production_date`). Fakta bisnis roll wajib (`brand`, `type_film`, `base_film`, `width_mm`, `length_m`, `net_weight_kg`) dipastikan tidak di dalamnya dan fail-closed via `validate_no_orphan_tokens` jika hilang pada jalur canonical.
+  3. **P2 — Bukti Visual & Non-Occlusion 4 Halaman**: Pengujian `test_synthetic_batch_all_four_pages_deep_visual_inspection` dan `test_pdf_evidence_service_uses_perimeter_frame_and_no_opaque_rect` memeriksa seluruh 4 halaman dari simulasi nyata (Cover A4 + 3 Label 200x80mm). Terbukti: 0 balok merah terisi (`re f` / `re f*`), 1 perimeter frame stroke (`re S`), tag margin atas kanan bebas background fill, watermark translusen `alpha=0.18`, dan embedded raster image presisi 1600x640 px (203.2 DPI) memuat tinta/isi aktual.
+- Quality Gate:
+  - B2B2M Test Suite: `17 passed, 2 warnings` in 8.89s (`backend/tests/test_safe_demo_pdf_hardening.py`).
+  - Total Regresi Gabungan: `146 passed, 2 warnings` in 60.84s (`test_safe_demo_pdf_hardening.py` [17], `test_raw_sap_snapshot_v2.py` [68], `test_sap_shadow_simulation.py` [25], `test_profile_composition.py` [36]).
+  - Invarian Template Kanonikal: SHA-256 `4D3C7B18A4B30B40C682F71736F2C4CF364C8CF2005FA35D555E65CF229B1577` (identik, tidak berubah).
+  - Whitespace & format: `git diff --check` bersih (0 errors).
+  - Status Git: working tree uncommitted / unstaged.
+- Batasan lingkungan (di luar scope): SAP live connection: `NOT RUN`; PPIC business approval: `NOT RUN`; Printer fisik/TCP 9100/Spooler: `NOT RUN`; Database production: `NOT RUN`.
+- Task files: `docs/tasks/B2B2M/TASK_CONTRACT.md`, `docs/tasks/B2B2M/RESULT.md`, `docs/tasks/B2B2M/REVIEW.md`.
+- Next action: Menyerahkan kepada reviewer Codex Level 3 untuk review independen ulang. Eksekutor berhenti sebelum `git add`, `commit`, `push`, `PR`, atau `merge`.
+
 ## Reviewer update — B2B2L final, 2026-09-23
 
 - Verdict `READY_FOR_CHECKPOINT` untuk branch lokal `codex/b2b2l-profile-composition-engine`; rincian dan batas bukti ada di `docs/tasks/B2B2L/REVIEW.md` bagian review akhir.
