@@ -21,11 +21,12 @@ Honest Architectural Limitation:
 
 from __future__ import annotations
 
+import json
 import logging
 import secrets
-from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, Response, status
-from pydantic import BaseModel, Field
+from typing import Any, Dict, List, Optional, Tuple
+from fastapi import APIRouter, Cookie, Depends, File, Header, HTTPException, Request, Response, UploadFile, status
+from pydantic import BaseModel, Field, ValidationError
 
 from ..config import (
     get_pilot_session_ttl_seconds,
@@ -546,4 +547,186 @@ def download_operator_evidence_pdf(batch_id: str) -> Response:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Gagal membaca berkas bukti PDF simulasi.",
+        ) from None
+
+
+def _parse_json_rejecting_duplicates(raw_text: str) -> Any:
+    """Parses JSON text while strictly rejecting duplicate dictionary keys."""
+    def _reject_dups(pairs):
+        res = {}
+        for k, v in pairs:
+            if k in res:
+                raise ValueError(f"Kunci JSON terduplikasi: '{k}'")
+            res[k] = v
+        return res
+
+    return json.loads(raw_text, object_pairs_hook=_reject_dups)
+
+
+MAX_IMPORT_BYTES = 2 * 1024 * 1024  # 2 MiB (file content limit)
+MAX_IMPORT_MULTIPART_OVERHEAD_BYTES = 64 * 1024  # 64 KiB allowance for multipart headers/boundaries
+MAX_IMPORT_REQUEST_BYTES = MAX_IMPORT_BYTES + MAX_IMPORT_MULTIPART_OVERHEAD_BYTES
+
+
+@simulation_router.post(
+    "/operator/import-json",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_pilot_operator_enabled), Depends(verify_pilot_csrf)],
+)
+async def import_operator_sap_json(
+    request: Request,
+    response: Response,
+    file: Optional[UploadFile] = File(None),
+    session: PilotOperatorSession = Depends(get_current_pilot_operator),
+) -> Dict[str, Any]:
+    """Imports a local Raw SAP Snapshot v2 JSON file from an authenticated pilot operator.
+
+    Enforces:
+    - Transport security (HTTPS required on intranet; plain HTTP loopback allowed for dev).
+    - Rate-limiting per operator session/client.
+    - Multipart file upload required as exclusive intake format.
+    - Size bounded to 2 MiB before and during stream read.
+    - Rejection of non-JSON, malformed JSON, and duplicate keys.
+    - Strict schema validation via RawSapBatchSnapshotV2 (requires contract_schema_version='2.0-raw').
+    - Dispatches to identical sap_shadow_service without exposing machine tokens or physical printers.
+    """
+    # 1. Transport Security Guard (HTTPS vs Loopback)
+    is_allowed, _ = evaluate_pilot_transport_security(request)
+    if not is_allowed:
+        logger.warning(
+            "Operator JSON import rejected: plain HTTP over non-loopback host '%s'",
+            request.url.hostname,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Akses operator pilot melalui jaringan intranet wajib menggunakan HTTPS.",
+        )
+
+    # 2. Rate Limiting Check
+    client_id = request.client.host if request.client else "unknown"
+    rate_limit_key = f"{session.session_id}:{client_id}"
+    if not pilot_session_service.check_import_rate_limit(rate_limit_key):
+        logger.warning("Operator import rate limit exceeded for %s", rate_limit_key)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Terlalu banyak permintaan impor JSON. Silakan tunggu beberapa saat.",
+        )
+
+    # 3. Initial Content-Length Header Check (fail-fast before streaming)
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > MAX_IMPORT_REQUEST_BYTES:
+                raise HTTPException(
+                    status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                    detail="Ukuran berkas atau permintaan melebihi batas maksimum 2 MiB.",
+                )
+        except ValueError:
+            pass
+
+    # 4. Require Multipart Upload with 'file' Field (Fail-Closed)
+    if file is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unggahan berkas multipart dengan field 'file' wajib disertakan.",
+        )
+
+    filename = (file.filename or "").lower()
+    if not filename.endswith(".json"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Hanya berkas berformat .json yang diperbolehkan.",
+        )
+
+    # 5. Read & Bound Payload Chunk by Chunk
+    content_bytes = bytearray()
+    chunk_size = 64 * 1024
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        content_bytes.extend(chunk)
+        if len(content_bytes) > MAX_IMPORT_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail="Ukuran berkas melebihi batas maksimum 2 MiB.",
+            )
+
+    if not content_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Berkas atau payload JSON kosong.",
+        )
+
+    # 4. Strict UTF-8 Decoding
+    try:
+        raw_text = content_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Berkas harus berupa teks JSON berenkode UTF-8 yang valid.",
+        )
+
+    # 5. Parse JSON with Duplicate-Key Rejection
+    try:
+        data = _parse_json_rejecting_duplicates(raw_text)
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Format JSON tidak valid atau memuat kunci duplikat: {exc}",
+        )
+
+    if not isinstance(data, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payload JSON harus berupa objek (dictionary) Raw SAP Snapshot v2.",
+        )
+
+    # 6. Validate Against RawSapBatchSnapshotV2 Model
+    try:
+        snapshot = RawSapBatchSnapshotV2.model_validate(data)
+    except ValidationError as exc:
+        errors = exc.errors()
+        first_err = errors[0] if errors else {}
+        loc = " -> ".join(str(l) for l in first_err.get("loc", []))
+        msg = first_err.get("msg", "Data tidak valid")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Validasi skema Raw SAP Snapshot v2 gagal pada '{loc}': {msg}",
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Validasi data gagal: {exc}",
+        )
+
+    # 7. Check Schema Version (Must be 2.0-raw)
+    if snapshot.contract_schema_version != "2.0-raw":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Versi skema '{snapshot.contract_schema_version}' tidak didukung. Wajib '2.0-raw'.",
+        )
+
+    # 8. Dispatch to Same sap_shadow_service
+    try:
+        result = await sap_shadow_service.ingest_raw_batch(snapshot, auto_process=True)
+        if result.get("idempotent_replay"):
+            response.status_code = status.HTTP_200_OK
+        return result
+    except ValueError as exc:
+        msg = str(exc)
+        if msg.startswith("Conflict:"):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=msg)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
+    except SimulationPersistenceError as exc:
+        logger.error("Durable persistence failure during operator raw batch ingestion: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Gagal menyimpan batch simulasi mentah secara persisten.",
+        ) from None
+    except Exception as exc:
+        logger.error("Internal error during operator raw simulation batch ingestion: %s", type(exc).__name__, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Simulasi batch mentah SAP mengalami kendala teknis internal.",
         ) from None

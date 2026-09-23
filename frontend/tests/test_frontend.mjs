@@ -1173,4 +1173,61 @@ test('sapShadowSimulationApi Unit & Mock Integration Tests', async (t) => {
     const url = sapShadowSimulationApi.getOperatorPdfUrl('b-op-99');
     assert.ok(url.endsWith('/api/v1/simulation/operator/batches/b-op-99/pdf'));
   });
+
+  await t.test('importOperatorJson sends multipart FormData to /simulation/operator/import-json with CSRF token', async () => {
+    global.fetch = async (url, opts) => {
+      assert.ok(url.endsWith('/api/v1/simulation/operator/import-json'));
+      assert.equal(opts.method, 'POST');
+      assert.equal(opts.credentials, 'same-origin');
+      assert.equal(opts.headers['X-CSRF-Token'], 'test-csrf-123');
+      assert.ok(opts.body instanceof FormData);
+      return {
+        ok: true,
+        status: 202,
+        json: async () => ({
+          batch_id: 'b-imported-01',
+          request_id: 'REQ-IMP-01',
+          status: 'accepted',
+          total_items: 2,
+        }),
+      };
+    };
+
+    const mockFile = new File(['{"contract_schema_version":"2.0-raw"}'], 'test.json', { type: 'application/json' });
+    const res = await sapShadowSimulationApi.importOperatorJson(mockFile, 'test-csrf-123');
+    assert.equal(res.batch_id, 'b-imported-01');
+    assert.equal(res.status, 'accepted');
+  });
+
+  await t.test('importOperatorJson handles 401, 403, 413, and 429 errors gracefully', async () => {
+    const mockFile = new File(['{}'], 'test.json', { type: 'application/json' });
+
+    // 401
+    global.fetch = async () => ({ ok: false, status: 401, json: async () => ({ detail: 'Unauthorized' }) });
+    await assert.rejects(
+      async () => await sapShadowSimulationApi.importOperatorJson(mockFile, 'csrf'),
+      /Sesi operator pilot tidak valid atau telah berakhir/
+    );
+
+    // 403
+    global.fetch = async () => ({ ok: false, status: 403, json: async () => ({ detail: 'Forbidden' }) });
+    await assert.rejects(
+      async () => await sapShadowSimulationApi.importOperatorJson(mockFile, 'csrf'),
+      /Akses ditolak: validasi CSRF gagal atau koneksi intranet wajib HTTPS/
+    );
+
+    // 413
+    global.fetch = async () => ({ ok: false, status: 413, json: async () => ({ detail: 'Too large' }) });
+    await assert.rejects(
+      async () => await sapShadowSimulationApi.importOperatorJson(mockFile, 'csrf'),
+      /Ukuran berkas melebihi batas maksimum 2 MiB/
+    );
+
+    // 429
+    global.fetch = async () => ({ ok: false, status: 429, json: async () => ({ detail: 'Rate limit' }) });
+    await assert.rejects(
+      async () => await sapShadowSimulationApi.importOperatorJson(mockFile, 'csrf'),
+      /Terlalu banyak permintaan impor/
+    );
+  });
 });

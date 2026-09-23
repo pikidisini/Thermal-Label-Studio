@@ -1,5 +1,42 @@
 # AI Handoff — Thermal Label Studio
 
+## Active snapshot — B2B2O: Impor JSON Lokal Raw SAP Snapshot v2 ke Safe Demo (REMEDIATION_P1_P2_ENV_IGNORE_COMPLETED — AWAITING_CODEX_LEVEL_3_REVIEW)
+
+- Date: `2026-09-23`. Repository: `Thermal-Label-Studio` (`web_app/`).
+- Branch: `codex/b2b2o-local-json-export-import`, based on B2B2N checkpoint `35f9cb5`.
+- Writer for implementation: Gemini Flash via Antigravity as sole executor. Reviewer: Codex Level 3.
+- Status: `REMEDIATION_P1_P2_ENV_IGNORE_COMPLETED — AWAITING_CODEX_LEVEL_3_REVIEW`.
+  1. **Remediasi P1 Intake Eksklusif Multipart**:
+     - Fallback direct raw request body `body = await request.body()` dihapus total.
+     - Hanya unggahan berkas multipart (`file: UploadFile`) yang diterima; request `application/json` atau tanpa field `file` ditolak fail-closed dengan `HTTP 400 Bad Request`.
+     - Tidak menggunakan filename/path klien untuk penyimpanan server dan tidak membuat endpoint alternatif untuk raw JSON.
+  2. **Remediasi P2 Toleransi Overhead Multipart Content-Length**:
+     - `MAX_IMPORT_BYTES = 2 * 1024 * 1024` (2 MiB) dipertahankan sebagai batas ukuran isi file.
+     - Batas request diperluas dengan toleransi MIME boundary overhead: `MAX_IMPORT_REQUEST_BYTES = MAX_IMPORT_BYTES + 64 * 1024` (2 MiB + 64 KiB), mencegah penolakan prematur atas file JSON valid tepat 2 MiB.
+     - Pembacaan chunk 64 KiB tetap menegakkan batas isi berkas final 2 MiB (`HTTP 413`).
+  3. **Remediasi P1 Konfigurasi Docker, Fail-Closed Runtime & Perlindungan .env**:
+     - Variabel Safe Demo/operator yang sempat ditambahkan di `docker-compose.yml` telah dihapus total. `docker-compose.yml` dikembalikan ke kondisi default production-ready tanpa kata sandi atau secret default.
+     - Aturan `.gitignore` memuat `.env` dan `.env.*` secara ketat, sementara `!.env*.example` diizinkan di-track.
+     - Tidak ada berkas `.env` nyata atau secret yang disimpan di repositori.
+     - Disiapkan template `.env.example` tanpa kata sandi atau rahasia.
+     - Dependensi `reportlab>=4.0.0` dicatat secara jujur pada `backend/requirements.txt` dan `requirements.txt`.
+     - Ditambahkan suite pengujian `TestDefaultRuntimeConfigurationFailClosed` yang memvalidasi bahwa runtime default tanpa env vars tetap Safe Demo OFF dan static check membuktikan proteksi `.gitignore` atas `.env`.
+  4. **Endpoint Operator Import & Proteksi**: Menambahkan `POST /api/v1/simulation/operator/import-json` pada `routes_sap_shadow.py` dengan proteksi HttpOnly cookie, validasi CSRF, penolakan duplicate-key JSON (`object_pairs_hook`), penolakan plain HTTP intranet (403), validasi model `RawSapBatchSnapshotV2`, rate limiting (15/menit), dan pemanggilan service kanonikal `sap_shadow_service.ingest_raw_batch`.
+  5. **Client API & UI Safe Demo**: Menambahkan `importOperatorJson` pada `sapShadowSimulationApi.ts` dan tombol "Impor JSON dari SAP" serta sub-panel impor file `.json` dengan peringatan privasi data bisnis SAP DEV, penanganan error tersanitasi, dan auto-refresh/expand urutan item batch di `SapShadowSimulationModal.tsx`.
+  6. **Quality Gates Aktual**:
+     - Backend Operator Import Suite: `24 passed` (`backend/tests/test_pilot_operator_import_json.py`).
+     - Backend Pilot Operator Session Suite: `26 passed` (`backend/tests/test_pilot_operator_session.py`).
+     - Backend Regression Suite Gabungan: `188 passed` (`test_pilot_operator_import_json.py`, `test_pilot_operator_session.py`, `test_safe_demo_pdf_hardening.py`, `test_raw_sap_snapshot_v2.py`, `test_sap_shadow_simulation.py`, `test_profile_composition.py`).
+     - Frontend Unit & Mock API Tests: `68 passed, 0 failed` (`npm test` di `frontend/`).
+     - TypeScript Strict Compilation: `0 errors` (`npm exec tsc -- --noEmit`).
+     - Frontend Production Build: Berhasil (`✓ built in 7.40s`).
+     - Playwright E2E Simulation Tests: `4 passed in 36.5s` (`sap_shadow_simulation.spec.js` + `pilot_operator_self_service.spec.js`).
+     - Whitespace & format check: `git diff --check` bersih (exit code 0).
+  7. **UAT SAP DEV & ABAP Activation**: Berstatus `NOT RUN` secara jujur dan transparan.
+- Working tree: Dirty/uncommitted pada branch `codex/b2b2o-local-json-export-import`. Berhenti sebelum commit, push, PR, atau merge.
+- Task files: `docs/tasks/B2B2O/TASK_CONTRACT.md`, `docs/tasks/B2B2O/RESULT.md`, `docs/tasks/B2B2O/REVIEW.md`, `docs/tasks/B2B2O/abap/ZMMR_LABEL_JSON.abap`.
+- Next action: Menyerahkan kepada Codex Level 3 untuk peninjauan review independen ulang. Eksekutor berhenti sebelum commit/push/merge.
+
 ## Active snapshot — B2B2N: Uji Mandiri Safe Demo dengan SAP DEV (REMEDIATION_P1_P2_COMPLETED — AWAITING_CODEX_LEVEL_3_REVIEW)
 
 - Date: `2026-09-23`.

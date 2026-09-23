@@ -229,4 +229,183 @@ test.describe('Pilot Operator Self-Service Simulation (B2B2N) End-to-End Suite',
     await expect(page.getByTestId('input-pilot-password')).toBeVisible();
     await expect(page.getByTestId('badge-operator-active')).not.toBeVisible();
   });
+
+  test('B2B2O: Operator dapat mengimpor berkas JSON SAP lokal, melihat konfirmasi keamanan, mengunggah berkas, dan memeriksa batch hasil impor', async ({ page }) => {
+    // 1. Mock status API
+    await page.route('**/api/status', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'online',
+          safe_demo_mode: false,
+          sap_shadow_simulation_enabled: true,
+          pilot_operator_enabled: true,
+        }),
+      });
+    });
+
+    let isAuthenticated = false;
+    let batchesList = [];
+
+    // 2. Mock session probe
+    await page.route('**/api/v1/simulation/operator/session', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          pilot_operator_enabled: true,
+          authenticated: isAuthenticated,
+          csrf_token: isAuthenticated ? 'csrf-pilot-mock-token' : '',
+        }),
+      });
+    });
+
+    // 3. Mock login
+    await page.route('**/api/v1/simulation/operator/login', async (route) => {
+      isAuthenticated = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: {
+          'Set-Cookie': 'pilot_session=sess-pilot-mock-uuid; HttpOnly; SameSite=Strict; Path=/',
+        },
+        body: JSON.stringify({
+          status: 'authenticated',
+          csrf_token: 'csrf-pilot-mock-token',
+        }),
+      });
+    });
+
+    // 4. Mock batches list
+    await page.route('**/api/v1/simulation/operator/batches', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(batchesList),
+      });
+    });
+
+    // 5. Mock import-json endpoint
+    let importCalled = false;
+    await page.route('**/api/v1/simulation/operator/import-json', async (route) => {
+      importCalled = true;
+      const headers = route.request().headers();
+      expect(headers['x-csrf-token']).toBe('csrf-pilot-mock-token');
+
+      const newBatch = {
+        batch_id: 'batch-imported-999',
+        request_id: 'REQ-LOCAL-IMPORT-001',
+        label_code: 'N001',
+        profile_version: 'v1.0-dev',
+        status: 'completed',
+        total_items: 2,
+        completed_items: 2,
+        created_at: new Date().toISOString(),
+        has_pdf: true,
+      };
+      batchesList = [newBatch];
+
+      await route.fulfill({
+        status: 202,
+        contentType: 'application/json',
+        body: JSON.stringify(newBatch),
+      });
+    });
+
+    // 6. Mock batch detail
+    await page.route('**/api/v1/simulation/operator/batches/batch-imported-999', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          batch_id: 'batch-imported-999',
+          producer_namespace: 'SAP_DEV',
+          request_id: 'REQ-LOCAL-IMPORT-001',
+          printer_id: 'PILOT-PRINTER-01',
+          status: 'completed',
+          total_items: 2,
+          completed_items: 2,
+          items: [
+            {
+              item_id: 'item-imp-001',
+              item_sequence: 1,
+              template_version_id: 'label_roll_80x200',
+              copies: 1,
+              status: 'completed',
+            },
+            {
+              item_id: 'item-imp-002',
+              item_sequence: 2,
+              template_version_id: 'label_roll_80x200',
+              copies: 1,
+              status: 'completed',
+            },
+          ],
+          created_at: new Date().toISOString(),
+        }),
+      });
+    });
+
+    // Navigate to root and open simulation modal
+    await page.goto('/');
+    await page.getByTestId('btn-sap-simulation').click();
+
+    // Login as operator
+    await page.getByTestId('input-pilot-password').fill('OperatorPilotSecret2026!');
+    await page.getByTestId('btn-pilot-login').click();
+
+    // Verify empty state is initially shown
+    await expect(page.getByTestId('empty-simulation-batches')).toBeVisible();
+
+    // Open import JSON panel
+    const openImportBtn = page.getByTestId('btn-open-import-json');
+    await expect(openImportBtn).toBeVisible();
+    await openImportBtn.click();
+
+    // Verify import panel and privacy warning
+    const importPanel = page.getByTestId('panel-import-json');
+    await expect(importPanel).toBeVisible();
+    await expect(importPanel).toContainText('Pemberitahuan Keamanan & Privasi');
+    await expect(importPanel).toContainText('ZMMR_LABEL_JSON');
+
+    // Create synthetic JSON buffer and set file input
+    const syntheticJson = JSON.stringify({
+      contract_schema_version: '2.0-raw',
+      producer_namespace: 'SAP_DEV',
+      request_id: 'REQ-LOCAL-IMPORT-001',
+      items: [],
+    });
+
+    const fileInput = page.getByTestId('input-import-json-file');
+    await fileInput.setInputFiles({
+      name: 'export_sap_dev.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(syntheticJson),
+    });
+
+    // Verify file name and size appear
+    await expect(importPanel).toContainText('export_sap_dev.json');
+
+    // Submit import
+    const submitBtn = page.getByTestId('btn-submit-import-json');
+    await expect(submitBtn).toBeEnabled();
+    await submitBtn.click();
+
+    // Verify import API was invoked with CSRF
+    expect(importCalled).toBe(true);
+
+    // Verify success alert appeared
+    await expect(page.getByTestId('alert-import-json-success')).toContainText('berhasil diimpor');
+
+    // Verify batch now appears in the table
+    const table = page.getByTestId('table-simulation-batches');
+    await expect(table).toBeVisible();
+    await expect(table).toContainText('REQ-LOCAL-IMPORT-001');
+    await expect(table).toContainText('2/2');
+
+    // Verify item sequence detail is visible or can be opened
+    const toggleItemsBtn = page.getByTestId('btn-toggle-items-batch-imported-999');
+    await expect(toggleItemsBtn).toBeVisible();
+  });
 });

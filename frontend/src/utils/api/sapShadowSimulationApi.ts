@@ -274,4 +274,40 @@ export const sapShadowSimulationApi = {
     document.body.removeChild(a);
     window.URL.revokeObjectURL(blobUrl);
   },
+
+  async importOperatorJson(file: File, csrfToken: string): Promise<Record<string, any>> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const headers: Record<string, string> = {};
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
+
+    const res = await fetch(`${API_BASE}/simulation/operator/import-json`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers,
+      body: formData,
+    });
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new Error('Sesi operator pilot tidak valid atau telah berakhir. Silakan login kembali.');
+      }
+      if (res.status === 403) {
+        throw new Error('Akses ditolak: validasi CSRF gagal atau koneksi intranet wajib HTTPS.');
+      }
+      if (res.status === 413) {
+        throw new Error('Ukuran berkas melebihi batas maksimum 2 MiB.');
+      }
+      if (res.status === 429) {
+        throw new Error('Terlalu banyak permintaan impor. Silakan tunggu beberapa saat.');
+      }
+      const msg = await parseErrorMessage(res, 'Gagal mengimpor berkas JSON SAP');
+      throw new Error(msg);
+    }
+
+    return res.json();
+  },
 };

@@ -9,4 +9,5 @@ psycopg[binary,pool]>=3.2.0,<4.0
 Pillow>=10.0.0
 python-barcode>=0.16.1
 qrcode>=8.0
+reportlab>=4.0.0
 pywin32>=306; platform_system == "Windows"

@@ -16,6 +16,7 @@ import {
   XCircle,
   Clock,
   ListOrdered,
+  Upload,
 } from 'lucide-react';
 import { sapShadowSimulationApi } from '../../utils/api/sapShadowSimulationApi';
 import type {
@@ -55,6 +56,13 @@ export default function SapShadowSimulationModal({
   const [isLoadingDetail, setIsLoadingDetail] = useState<boolean>(false);
   const [detailError, setDetailError] = useState<string | null>(null);
 
+  // Import JSON state (B2B2O)
+  const [isImportOpen, setIsImportOpen] = useState<boolean>(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+
   useEffect(() => {
     if (!isOpen) {
       setPassword('');
@@ -62,6 +70,10 @@ export default function SapShadowSimulationModal({
       setExpandedBatchId(null);
       setBatchDetail(null);
       setDetailError(null);
+      setIsImportOpen(false);
+      setImportFile(null);
+      setUploadError(null);
+      setUploadSuccess(null);
       return;
     }
 
@@ -149,6 +161,58 @@ export default function SapShadowSimulationModal({
       setExpandedBatchId(null);
       setBatchDetail(null);
       setDetailError(null);
+      setIsImportOpen(false);
+      setImportFile(null);
+      setUploadError(null);
+      setUploadSuccess(null);
+    }
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    setUploadError(null);
+    setUploadSuccess(null);
+    const file = e.target.files?.[0] || null;
+    if (!file) {
+      setImportFile(null);
+      return;
+    }
+    if (!file.name.toLowerCase().endsWith('.json')) {
+      setUploadError('Hanya berkas berformat .json yang diperbolehkan.');
+      setImportFile(null);
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setUploadError(`Ukuran berkas (${(file.size / (1024 * 1024)).toFixed(2)} MB) melebihi batas maksimum 2 MiB.`);
+      setImportFile(null);
+      return;
+    }
+    setImportFile(file);
+  }
+
+  async function handleImportSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!importFile) {
+      setUploadError('Pilih berkas JSON terlebih dahulu.');
+      return;
+    }
+    setIsUploading(true);
+    setUploadError(null);
+    setUploadSuccess(null);
+    try {
+      const res = await sapShadowSimulationApi.importOperatorJson(importFile, csrfToken);
+      const batchId = res.batch_id || res.request_id || 'baru';
+      setUploadSuccess(`Batch ${batchId} berhasil diimpor! Menampilkan hasil simulasi.`);
+      setImportFile(null);
+      const fileInput = document.getElementById('input-import-json-file') as HTMLInputElement | null;
+      if (fileInput) fileInput.value = '';
+      await loadBatches();
+      if (res.batch_id) {
+        handleToggleDetail(res.batch_id);
+      }
+    } catch (err: any) {
+      setUploadError(err?.message || 'Gagal mengimpor berkas JSON SAP.');
+    } finally {
+      setIsUploading(false);
     }
   }
 
@@ -400,16 +464,153 @@ export default function SapShadowSimulationModal({
                     Memantau batch yang terkirim dari SAP DEV secara in-process & virtual sink
                   </p>
                 </div>
-                <button
-                  onClick={loadBatches}
-                  disabled={isLoadingBatches}
-                  className="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors flex items-center gap-1.5"
-                  data-testid="btn-refresh-batches"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isLoadingBatches ? 'animate-spin' : ''}`} />
-                  Segarkan
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setIsImportOpen(!isImportOpen);
+                      setUploadError(null);
+                      setUploadSuccess(null);
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
+                      isImportOpen
+                        ? 'bg-amber-600 text-white'
+                        : 'text-amber-400 hover:text-amber-300 bg-amber-950/40 hover:bg-amber-900/60 border border-amber-800/60'
+                    }`}
+                    data-testid="btn-open-import-json"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    Impor JSON dari SAP
+                  </button>
+                  <button
+                    onClick={loadBatches}
+                    disabled={isLoadingBatches}
+                    className="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors flex items-center gap-1.5"
+                    data-testid="btn-refresh-batches"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingBatches ? 'animate-spin' : ''}`} />
+                    Segarkan
+                  </button>
+                </div>
               </div>
+
+              {/* Import Local SAP JSON Panel (B2B2O) */}
+              {isImportOpen && (
+                <div
+                  className="p-4 bg-slate-900/90 border border-amber-800/60 rounded-xl space-y-3"
+                  data-testid="panel-import-json"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Upload className="w-4 h-4 text-amber-400" />
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                        Impor Berkas Raw SAP Snapshot v2 (.json)
+                      </h4>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setIsImportOpen(false);
+                        setUploadError(null);
+                        setUploadSuccess(null);
+                      }}
+                      className="text-slate-400 hover:text-white p-1 rounded transition-colors"
+                      data-testid="btn-cancel-import-json"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    Pilih berkas JSON hasil ekspor program <code>ZMMR_LABEL_JSON</code> dari SAP DEV di komputer Anda untuk menjalankan simulasi Safe Demo secara lokal tanpa routing jaringan.
+                  </p>
+
+                  <div className="p-2.5 bg-amber-950/40 border border-amber-800/40 rounded-lg flex items-start gap-2 text-[11px] text-amber-200">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-semibold text-amber-300">Pemberitahuan Keamanan & Privasi:</span>{' '}
+                      Berkas ini berpotensi memuat data bisnis dari SAP DEV. Data hanya diproses secara lokal untuk simulasi Safe Demo dan tidak pernah dikirim ke printer fisik atau dibagikan ke jaringan publik.
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleImportSubmit} className="space-y-3 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                        Pilih Berkas JSON (Maksimum 2 MiB):
+                      </label>
+                      <input
+                        id="input-import-json-file"
+                        type="file"
+                        accept=".json"
+                        onChange={handleFileSelect}
+                        disabled={isUploading}
+                        className="w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-600 file:text-white hover:file:bg-amber-500 file:cursor-pointer border border-slate-700 bg-slate-950 rounded-lg p-1.5 focus:outline-none focus:border-amber-500"
+                        data-testid="input-import-json-file"
+                      />
+                    </div>
+
+                    {importFile && (
+                      <div className="flex items-center gap-3 text-xs text-slate-300 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+                        <span className="font-medium text-white truncate max-w-xs">{importFile.name}</span>
+                        <span className="text-slate-400 text-[11px]">
+                          ({(importFile.size / 1024).toFixed(1)} KB)
+                        </span>
+                      </div>
+                    )}
+
+                    {uploadError && (
+                      <div
+                        className="p-2.5 bg-red-950/60 border border-red-800/60 rounded-lg text-xs text-red-300 flex items-start gap-2"
+                        data-testid="alert-import-json-error"
+                      >
+                        <XCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                        <span>{uploadError}</span>
+                      </div>
+                    )}
+
+                    {uploadSuccess && (
+                      <div
+                        className="p-2.5 bg-emerald-950/60 border border-emerald-800/60 rounded-lg text-xs text-emerald-300 flex items-start gap-2"
+                        data-testid="alert-import-json-success"
+                      >
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                        <span>{uploadSuccess}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsImportOpen(false);
+                          setUploadError(null);
+                          setUploadSuccess(null);
+                        }}
+                        disabled={isUploading}
+                        className="px-3 py-1.5 text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors"
+                      >
+                        Tutup
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isUploading || !importFile}
+                        className="px-4 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 disabled:opacity-50 rounded-lg transition-colors flex items-center gap-1.5 shadow"
+                        data-testid="btn-submit-import-json"
+                      >
+                        {isUploading ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            Mengimpor & Memproses...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-3.5 h-3.5" />
+                            Unggah & Proses Simulasi
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
 
               {batchError && (
                 <div className="p-3 bg-red-950/50 border border-red-800/60 rounded-lg text-xs text-red-300 flex items-center justify-between">

@@ -60,12 +60,30 @@ class PilotSessionService:
     MAX_FAILED_ATTEMPTS: int = 5
     LOCKOUT_SECONDS: int = 300
     ATTEMPT_WINDOW_SECONDS: int = 300
+    MAX_IMPORT_PER_MINUTE: int = 15
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._sessions: Dict[str, PilotOperatorSession] = {}
         self._failed_attempts: Dict[str, List[datetime]] = {}
         self._lockouts: Dict[str, datetime] = {}
+        self._import_attempts: Dict[str, List[datetime]] = {}
+
+    def check_import_rate_limit(
+        self, client_or_session_id: str, now: Optional[datetime] = None
+    ) -> bool:
+        """Rate limit operator JSON imports (max 15 imports per 60 seconds)."""
+        current_time = now or datetime.now(timezone.utc)
+        with self._lock:
+            history = self._import_attempts.setdefault(client_or_session_id, [])
+            cutoff = current_time - timedelta(seconds=60)
+            history = [t for t in history if t >= cutoff]
+            if len(history) >= self.MAX_IMPORT_PER_MINUTE:
+                self._import_attempts[client_or_session_id] = history
+                return False
+            history.append(current_time)
+            self._import_attempts[client_or_session_id] = history
+            return True
 
     def is_client_locked_out(
         self, client_id: str, now: Optional[datetime] = None
@@ -229,11 +247,12 @@ class PilotSessionService:
         return False
 
     def clear_for_tests(self) -> None:
-        """Purges all sessions, failed attempts, and lockouts for isolated testing."""
+        """Purges all sessions, failed attempts, lockouts, and import rate limits for isolated testing."""
         with self._lock:
             self._sessions.clear()
             self._failed_attempts.clear()
             self._lockouts.clear()
+            self._import_attempts.clear()
 
     def _cleanup_expired_locked(self, now: datetime) -> None:
         """Internal helper to clean expired sessions under lock."""

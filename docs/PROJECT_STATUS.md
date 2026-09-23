@@ -4,6 +4,13 @@ Dokumen ini adalah ringkasan kondisi proyek aktif untuk manusia dan AI.
 
 ## Status proyek
 
+Snapshot terkini (2026-09-23): B2B2N memiliki checkpoint 35f9cb5. B2B2O
+disiapkan pada branch codex/b2b2o-local-json-export-import: task impor JSON
+lokal dan draft penulisan ulang ZMMR_LABEL_JSON tersedia di
+docs/tasks/B2B2O/. Fitur impor browser belum diimplementasikan dan ABAP belum
+diaktivasi/diuji di SAP DEV. Tujuannya membuktikan alur berkas JSON nyata dari
+SAP DEV ke Safe Demo/PDF tanpa routing jaringan SAP-ke-aplikasi.
+
 Snapshot terkini (2026-09-23): B2B2M sudah merged ke `main` melalui PR #24
 (`0f2cf82`). B2B2N sedang direncanakan pada branch
 `codex/b2b2n-self-service-safe-demo`; lihat
