@@ -25,3 +25,13 @@ Verdict: `CHANGES_REQUIRED` sebelum PR/merge.
 - Pastikan tidak ada `dev_safe_demo` atau `__openSafeDemoModal` yang dapat dipakai pada bundle biasa; test tetap bisa memverifikasi fasilitas legacy tanpa pintu pengguna baru.
 - Periksa `git diff --check`, diff final, dan status Git. `output/` yang sudah ada sebelum fase ini jangan ikut commit.
 - Executor mencatat bukti baru di `RESULT.md`, commit/push perbaikan di branch yang sama, lalu berhenti sebelum PR/merge untuk review ulang Codex.
+
+## Review ulang commit `f32334d` — 2026-09-23
+
+Verdict: `READY_FOR_PR` dengan satu catatan dokumentasi P3 non-blocking. Belum berarti siap merge atau production-ready; PR tetap perlu ditinjau terhadap target branch yang benar.
+
+- P2 akses modal lama: **teratasi untuk production bundle**. Hook global dan `as any` baru dihapus. Parameter `dev_safe_demo` dibatasi oleh `import.meta.env.DEV` dan capability Safe Demo. Reviewer membangun ulang frontend dan memindai `dist/assets/`; tidak ada string `dev_safe_demo` atau `__openSafeDemoModal`. Pada Vite development server, parameter itu memang tetap dapat dipakai bila Safe Demo aktif; jangan jalankan dev server dengan flag tersebut untuk pengguna bersama. Endpoint Safe Demo lama sendiri tetap hanya dijaga oleh `SAFE_DEMO_MODE` (risiko existing di luar perubahan UI ini), sehingga flag tersebut harus OFF pada deployment yang bukan lingkungan developer/test.
+- P2 klaim privasi: **teratasi**. Teks kini menyatakan berkas diunggah ke server aplikasi yang sedang digunakan, tanpa klaim bahwa server selalu berada di komputer pengguna atau janji perimeter jaringan publik.
+- P3 status checkpoint: **masih stale, non-blocking**. `RESULT.md` bagian akhir masih berbunyi “Siap di-commit dan di-push” walau commit `f32334d` sudah menjadi HEAD dan sama dengan upstream saat review ini. Rapikan sebelum/di PR, tetapi tidak perlu mengulang implementasi atau test karena hanya metadata dokumentasi.
+- Verifikasi ulang reviewer setelah koreksi: `npm.cmd test` **74 passed**, `npm.cmd exec tsc -- --noEmit` **PASS**, `npm.cmd run build` **PASS**, scan bundle dev hook **0 matches**, `git diff --check 0b3de08..HEAD` **PASS**. Playwright E2E (8 test) dan backend regression (24 test) adalah bukti dari executor di `RESULT.md`; reviewer tidak menjalankannya ulang. UAT SAP DEV/printer **NOT RUN**.
+- Folder `output/` tetap untracked dan tidak masuk commit. Jangan stage artefak itu.
