@@ -1,99 +1,56 @@
 # AGENTS — Thermal Label Studio
 
-## 1. Role dan prioritas
+Instruksi ini berlaku untuk pekerjaan di `web_app/`. Gunakan Bahasa Indonesia yang ringkas dan mudah dipahami pengguna. Kerjakan berdasarkan kondisi repository saat ini; jangan menganggap catatan fase lama sebagai status terkini.
 
-Bertindak sebagai Principal AI Engineer, Staff Full-Stack Engineer, software architect, security reviewer, dan UI/UX lead. Gunakan Bahasa Indonesia yang jelas, proaktif, dan transparan.
+## 1. Produk dan batas kerja
 
-Prioritas keputusan: keamanan dan privasi → correctness/reliability → kebutuhan bisnis dan UX → maintainability/testability → performance → kecepatan delivery.
+- Thermal Label Studio adalah aplikasi web untuk desain template SVG, pengolahan data SAP, preview, simulasi PDF, dan pipeline cetak label termal.
+- Stack: React/Vite/TypeScript strict, Tailwind CSS, FastAPI/Python, pytest, Node test, dan Playwright.
+- Folder di luar `web_app/` berisi POC/reference. Jangan mengubahnya tanpa permintaan eksplisit.
+- GitHub dan file proyek adalah sumber konteks lintas perangkat/provider. Satu branch hanya memiliki satu penulis aktif.
 
-Jangan menulis perubahan besar sebelum scope, acceptance criteria, dan rancangan inti cukup jelas. Jangan mengklaim test, deployment, atau security review selesai tanpa bukti aktual.
+Baca seperlunya sebelum bekerja: `README.md` (penggunaan), `docs/PROJECT_STATUS.md` (status), `docs/DECISIONS.md` (keputusan), `docs/AI_HANDOFF.md` (handoff), `docs/QUALITY_GATE.md` (verifikasi), dan `docs/AI_WORKFLOW.md` (pembagian tugas/model). Periksa Git dan kode aktual bila dokumen status tampak usang.
 
-## 2. Konteks proyek dan batas repository
+## 2. Fakta arsitektur yang harus dijaga
 
-- Repository aktif: `Thermal-Label-Studio` pada folder `web_app/`.
-- Repository root di luar `web_app/`: POC desktop/reference; jangan mengubahnya ketika mengerjakan web kecuali diminta eksplisit.
-- Frontend: React + Vite + TypeScript strict.
-- Backend/API: FastAPI + Python.
-- Styling: Tailwind CSS.
-- Test: pytest, Node test, dan Playwright sesuai area perubahan.
-- Core domain: template SVG, kontrak SAP JSON, rendering/rasterisasi, barcode/QR, print job, dan local print agent.
+- Aplikasi memakai login dan sesi akun `PPIC`/`IT`. Otorisasi serta pemeriksaan kepemilikan harus dilakukan di server, bukan hanya dengan menyembunyikan tombol.
+- Alur **Simulasi Label** menerima file JSON raw dari SAP DEV/SANDBOX, menyimpan snapshot aslinya, memproses item sesuai urutan, dan membuat bukti PDF tanpa printer fisik.
+- Hanya impor JSON lokal melalui UI simulasi yang boleh toleran terhadap nilai absent/null/kosong/tidak valid: tampilkan warning per item/field dan `--` pada teks label. Jangan membuat nilai turunan palsu atau barcode/QR dari `--`.
+- Jalur machine-to-machine dan production tetap strict/fail-closed. Perubahan aturan simulasi tidak boleh diam-diam melonggarkan jalur tersebut.
+- Data raw SAP dapat memuat seluruh characteristic dan konteks bisnis lain. Aplikasi menentukan field yang digunakan template, aturan transformasi, serta komposisi barcode/QR melalui profile/rules yang terversi dan dapat diaudit; jangan membuat logika khusus per kode label tanpa kebutuhan terbukti.
+- `docs/architecture/` memuat rancangan fitur; `docs/tasks/` memuat kontrak dan bukti pekerjaan; `docs/database/` memuat desain serta skrip database. Keberadaan dokumen atau test disposable tidak berarti deployment production selesai.
+- Jenkins lokal membangun dan menerapkan simulasi dari `main` pada laptop. Runbook: `docs/deployment/jenkins_local_simulation.md`. Pilot PostgreSQL/dispatcher dan pencetakan fisik adalah jalur terpisah.
 
-Dokumen konteks:
+## 3. Sebelum dan saat mengerjakan
 
-- `README.md`: setup dan gambaran sistem.
-- `docs/PROJECT_STATUS.md`: status terbaru.
-- `docs/DECISIONS.md`: keputusan arsitektur.
-- `docs/AI_HANDOFF.md`: konteks sesi/provider/perangkat.
-- `docs/QUALITY_GATE.md`: test, security, dan Definition of Done.
+1. Baca instruksi dan file yang relevan; periksa `git status --short --branch`, baseline, dan diff yang sudah ada. Coba `git fetch origin`; jika akses terhalang, laporkan sebagai `BLOCKED` dan jangan menebak status remote.
+2. Tentukan perubahan terkecil yang memenuhi tujuan pengguna, risiko, acceptance criteria, dan test yang relevan. Pertahankan seluruh perubahan pengguna yang sudah ada.
+3. Untuk integrasi lintas modul, pekerjaan multi-sesi/provider, atau risiko tinggi, gunakan `docs/tasks/<TASK_ID>/TASK_CONTRACT.md` → `RESULT.md` → `REVIEW.md`. Perbaikan kecil cukup dijelaskan dalam commit/PR.
+4. Bangun dan uji alur vertikal yang relevan: UI, validasi, autentikasi/otorisasi, aturan bisnis, penyimpanan, serta respons error.
+5. Validasi semua input eksternal pada server. Pisahkan aturan domain dari UI dan transport. Gunakan TypeScript strict; hindari `any` baru tanpa alasan.
+6. Jalankan test yang diperlukan untuk perubahan, lalu periksa diff, whitespace, secret, dan file generated. Catat hasil `PASS`, `FAIL`, `BLOCKED`, atau `NOT RUN` sesuai bukti aktual.
+7. Perbarui `docs/AI_HANDOFF.md` untuk pekerjaan multi-sesi atau perpindahan writer. Untuk edit dokumentasi kecil, commit/PR yang jelas sudah cukup.
 
-## 3. Workflow wajib
+## 4. Batas keamanan dan otorisasi
 
-### Routing model dan biaya
+- Akses SAP melalui MCP boleh dilakukan **read-only** pada DEV atau SANDBOX untuk mencari konteks. Jangan mengubah objek SAP atau mengakses PRD tanpa instruksi eksplisit.
+- Jangan mengakses printer fisik, Windows Spooler, atau TCP port 9100 tanpa instruksi eksplisit pengguna. Jangan mengarahkan test/migration ke database production.
+- Jangan menyimpan password, token, private key, connection string, atau isi data bisnis sensitif di source, client bundle, log, screenshot, atau dokumentasi publik.
+- Perubahan yang dapat menghapus data memerlukan target yang jelas, backup/rollback yang layak, dan otorisasi pengguna.
+- Untuk endpoint baru atau perubahan mutasi, periksa authentication, authorization, CSRF bila relevan, validasi input, batas ukuran/rate, dan kebocoran data pada error.
+- Jangan masukkan `.env`, `frontend/dist/`, `playwright-report/`, `test-results/`, `.last-run.json`, recording, atau artefak sementara ke commit.
 
-Klasifikasikan task sebelum bekerja:
+## 5. Penamaan fase dan model AI
 
-- **Level 0 — sangat ringan:** typo, format, atau dokumentasi kecil. Gunakan Gemini Flash, Luna, atau kerjakan langsung tanpa review terpisah.
-- **Level 1 — rutin:** perubahan lokal dengan risiko rendah. Utamakan Gemini Flash sebagai executor; Luna dapat dipakai sebagai alternatif.
-- **Level 2 — integrasi:** menyentuh beberapa modul atau membutuhkan test lintas komponen. Gunakan Terra untuk perencanaan/review dan Gemini Flash sebagai executor utama.
-- **Level 3 — risiko tinggi:** database, concurrency, security, kontrak publik, migration, atau lifecycle cetak. Gunakan Sol High hanya untuk rancangan atau review akhir; implementasi panjang tetap dapat dikerjakan Gemini Flash setelah task contract disetujui.
-- **Level 4 — membutuhkan otorisasi:** credential, production database, tindakan destruktif, keputusan bisnis, atau printer fisik. Berhenti dan minta keputusan pengguna.
+- Kode lama seperti `B2B2O` tetap sebagai arsip. Fitur baru memakai `Fase 3.x` berikutnya; revisi kecil tetap di fase terkait, tanpa membuat rantai subfase baru.
+- Pilih model berdasarkan risiko dan biaya, bukan kebiasaan. Pekerjaan rutin dapat dikerjakan Gemini Flash/Luna; perencanaan atau review integrasi dapat memakai Terra; Sol High dipakai untuk keputusan/review berisiko tinggi. Detail ada di `docs/AI_WORKFLOW.md`.
+- Handoff ke Antigravity dilakukan melalui branch, task contract, result, dan review. Jangan mengklaim perpindahan provider otomatis. Nilai hasil dari acceptance criteria dan test, bukan nama model.
 
-Aturan efisiensi:
+## 6. Pelaporan kepada pengguna
 
-- Jangan memakai Sol High untuk pencarian, edit mekanis, test berulang, atau dokumentasi rutin.
-- Subagent Codex default bersifat read-only untuk eksplorasi/review. Hanya root agent atau executor yang ditetapkan boleh menulis.
-- Codex tidak dapat memindahkan pekerjaan ke Antigravity secara otomatis. Perpindahan provider dilakukan melalui task contract, result, review, safe checkpoint, dan push Git; jangan meminta pengguna menyalin seluruh percakapan.
-- Buat folder `docs/tasks/<TASK_ID>/` hanya untuk Level 2/3, handoff lintas provider/perangkat, atau pekerjaan multi-sesi. Perbaikan ringan tidak memerlukan folder task.
-- Status dan pilihan model adalah panduan biaya, bukan bukti kualitas. Acceptance criteria dan hasil test tetap menjadi penentu selesai.
+Jawaban default singkat:
 
-### Penamaan fase baru
+1. **Hasil:** apa yang berubah dan statusnya.
+2. **Yang perlu Anda lakukan:** satu tindakan berikutnya, atau “Anda tidak perlu melakukan apa pun.”
 
-- Pertahankan kode fase lama seperti `B2B2O` sebagai identitas historis; jangan mengganti nama task, commit, atau dokumen yang sudah ada.
-- Mulai pekerjaan baru setelah B2B2O dengan nomor yang mudah dibaca: `Fase 3.1 — Nama Fitur`, kemudian `Fase 3.2`, dan seterusnya. Gunakan ID folder ringkas `docs/tasks/F3.1/`, `docs/tasks/F3.2/`, dan seterusnya.
-- Perbaikan kecil tetap berada di folder/task fase terkait dan dicatat pada `RESULT.md`/`REVIEW.md` atau commit; jangan membuat rantai subfase berkode semakin panjang. Jika scope menjadi fitur berbeda, buat nomor fase berikutnya dengan task contract baru.
-- Nomor fase adalah alat navigasi, bukan bukti urutan implementasi atau status selesai. Rujuk task contract, status Git, dan hasil test untuk status aktual.
-
-### Sebelum mengubah file
-
-1. Baca file konteks di atas.
-2. Jalankan `git fetch origin` dan periksa `git status --short --branch`.
-3. Baca diff yang sudah ada; jangan menimpa perubahan lokal.
-4. Tentukan scope, file kandidat, risiko, acceptance criteria, dan test plan.
-5. Gunakan satu branch untuk satu task. Hanya satu AI/perangkat menjadi penulis aktif pada satu branch.
-6. Untuk task Level 2/3, baca atau buat `docs/tasks/<TASK_ID>/TASK_CONTRACT.md` sebelum implementasi.
-
-### Saat mengimplementasikan
-
-- Bangun satu vertical slice: UI → validasi → authorization → business logic → data access → test.
-- Semua input eksternal tidak tepercaya sampai divalidasi di server.
-- Pisahkan UI, state, business logic, data access, auth, dan infrastructure.
-- Gunakan TypeScript strict untuk kode frontend baru; hindari `any`.
-- Jangan mengubah database production manual atau membuat migration destruktif tanpa backup dan rollback plan.
-- Gunakan GitHub sebagai source of truth. Jangan mengandalkan riwayat chat atau copy folder antarperangkat.
-
-### Sebelum handoff/selesai
-
-1. Jalankan test yang relevan dan catat hasil aktual.
-2. Perbarui `docs/AI_HANDOFF.md` dengan provider, perangkat, branch, commit baseline, file, test, dan blocker.
-3. Review `git diff` dan pastikan secret, `.env`, report generated, screenshot hasil test, `.last-run.json`, dan artefak sementara tidak masuk commit.
-4. Jelaskan perubahan, risiko tersisa, dan langkah berikutnya. Commit/push hanya setelah scope dapat dijelaskan kepada pengguna.
-5. Untuk handoff lintas provider, penulis lama harus berhenti setelah safe checkpoint dipush. Penulis baru mengisi `RESULT.md`; reviewer mengisi `REVIEW.md`.
-
-## 4. Aturan keamanan dan quality gate
-
-- Authorization dan ownership check wajib dilakukan di server; menyembunyikan tombol bukan authorization.
-- Lindungi endpoint mutasi dengan authentication, authorization, validasi input, error handling, dan abuse protection yang relevan.
-- Jangan menyimpan password, API key, token, connection string, atau secret di source code, client bundle, log, screenshot, atau dokumentasi publik.
-- Gunakan parameterization/validation untuk query, HTML, URL redirect, upload, webhook, dan API eksternal.
-- Untuk detail test matrix, security review, evidence label, dan Definition of Done, baca `docs/QUALITY_GATE.md`.
-
-## 5. Format respons
-
-Gunakan Bahasa Indonesia sederhana untuk pembaca awam. Default respons harus pendek dan langsung:
-
-1. **Hasil:** apa yang selesai, gagal, atau masih menunggu.
-2. **Yang perlu Anda lakukan:** tepat satu tindakan berikutnya. Jika tidak ada, tulis “Anda tidak perlu melakukan apa pun.”
-
-Tambahkan bagian **Perubahan**, **Verifikasi**, atau **Risiko** hanya jika benar-benar membantu keputusan pengguna. Jangan menampilkan log panjang, daftar file lengkap, atau boilerplate berulang; simpan detail teknis di task folder, handoff, atau Pull Request.
-
-Format enam bagian lengkap hanya digunakan untuk milestone formal, review arsitektur/security, kesiapan Pull Request, atau jika pengguna memintanya. Tetap bedakan fakta terverifikasi, asumsi, kandidat, dan pekerjaan yang belum dijalankan.
+Tambahkan rincian verifikasi atau risiko hanya bila membantu keputusan. Bedakan fakta yang diuji dari asumsi. Simpan log panjang dan daftar file lengkap di task folder atau PR. Jangan menyebut fitur production-ready hanya karena unit test atau simulasi lokal lulus.
