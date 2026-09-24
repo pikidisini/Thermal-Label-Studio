@@ -1,6 +1,32 @@
 # AI Handoff — Thermal Label Studio
 
-## Snapshot aktif — F3.3 review ulang ketiga: CHANGES REQUIRED
+## Snapshot aktif — F3.3 Remediasi Review Ulang Ketiga Selesai (REMEDIATION_ROUND3_COMPLETED — AWAITING_CODEX_FINAL_REVIEW)
+
+- Tanggal: 2026-09-24. Branch `codex/f3-3-app-login`.
+- Writer / Executor: Gemini Flash (Antigravity). Reviewer: Codex Level 3 (independen).
+- Status: `REMEDIATION_ROUND3_COMPLETED — AWAITING_CODEX_FINAL_REVIEW`.
+- Seluruh 3 temuan review putaran ketiga (`docs/tasks/F3.3/REVIEW.md`) telah diselesaikan tuntas dan diverifikasi dengan tes aktual:
+  1. **P1 — Server Playwright Memaksa Simulasi-Only & Preflight 404 Fisik**:
+     - `frontend/playwright.config.js` menambahkan `LOCAL_SIMULATION_ONLY: 'true'` secara eksplisit pada `webServer[0].env` backend.
+     - `frontend/tests/e2e/auth.setup.js` menjalankan preflight probe memastikan 5 rute cetak fisik (`/api/v1/print/batch`, `/api/v1/print/tcp`, `/api/v1/print/spooler`, `/api/v1/print/printers`, `/api/v1/sap/print`) mengembalikan HTTP 404 fail-closed.
+     - `frontend/tests/e2e/pilot_operator_self_service.spec.js` mempertegas asersi HTTP 404 fail-closed pada rute cetak fisik.
+  2. **P1 — Seeder E2E Bebas Fallback & Validasi Ketat Fail-Closed**:
+     - `backend/scripts/seed_e2e_users.py` menghapus fallback ke `backend/data/auth.db`.
+     - Fungsi `validate_e2e_db_path(raw_path)` mewajibkan `AUTH_DB_PATH` disetel, menolak database live/operasional (`auth.db`, dll.), dan mewajibkan nama file memuat penanda `e2e` atau `test`.
+     - Validasi dieksekusi di awal `main()` sebelum modul `app.auth` diimpor untuk mencegah inisialisasi modul service/repository yang dapat menciptakan file database prematur di disk.
+     - Ditambahkan suite pengujian `backend/tests/test_seed_e2e_users.py` (4 tests passed) memverifikasi penolakan fail-closed saat env kosong atau mengarah ke path live.
+  3. **P2 — Ketegasan Assertion Autentikasi E2E & Cookie Sesi**:
+     - `frontend/tests/e2e/auth.setup.js` menghapus blok kondisional: `login-page` dipastikan tampil tanpa syarat, login PPIC berhasil diverifikasi dengan badge `[PPIC] ppic_operator`, dan keberadaan cookie `app_session` di browser context divalidasi sebelum menyimpan `storageState`.
+- Verifikasi Quality Gate Aktual:
+  - Playwright E2E: `7 passed (59.0s)` (`auth.setup.js` + `pilot_operator_self_service.spec.js` + `sap_shadow_simulation.spec.js`). Zero printer fisik.
+  - Targeted Seeder & Session Pytest: `44 passed, 2 warnings` in 48.27s (`test_seed_e2e_users.py`, `test_pilot_operator_session.py`, `test_auth_api.py`).
+  - Frontend Unit Test: `85 passed, 0 failed` in 10.19s (`npm test` di `frontend/`).
+  - Git Whitespace Check: `git diff --check` bersih (0 errors).
+  - Storage & Security: Zero database files committed, zero secrets committed.
+- Batasan lingkungan: Live SAP RFC/ECC: `NOT RUN`; Printer fisik/port 9100: `NOT RUN`; Database enterprise production: `NOT RUN`.
+- Target berhenti: Berhenti sebelum membuat PR atau merge ke `main`. Menyerahkan branch kepada Codex Level 3 untuk review final.
+
+## Riwayat snapshot — F3.3 review ulang ketiga: CHANGES REQUIRED
 
 - Tanggal: 2026-09-24. Branch `codex/f3-3-app-login`, koreksi executor `7a45416`.
 - Jenkins secret lama dan probe sesi sudah dikoreksi; regression endpoint sesi 25 PASS. Review menemukan harness Playwright belum mengaktifkan `LOCAL_SIMULATION_ONLY=true`, serta skrip seed E2E masih dapat memilih `backend/data/auth.db` dan mereset akun dengan password test bila env hilang. Detail di `docs/tasks/F3.3/REVIEW.md`.

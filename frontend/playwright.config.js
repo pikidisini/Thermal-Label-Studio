@@ -36,6 +36,7 @@ export default defineConfig({
       env: {
         ...process.env,
         SAFE_DEMO_MODE: 'true',
+        LOCAL_SIMULATION_ONLY: 'true',
         AUTH_DB_PATH: authDbPath,
       },
     },

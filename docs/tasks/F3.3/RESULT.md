@@ -62,6 +62,24 @@ Fase 3.3 menyatukan otentikasi Thermal Label Studio menjadi satu sesi aplikasi t
    - Request dengan cookie `app_session` yang mengakses plain HTTP intranet (non-loopback) ditolak seketika dengan `HTTP 403 Forbidden` sebelum mengembalikan status sesi atau token CSRF.
    - Ditambahkan pengujian `test_session_probe_authenticated_on_plain_http_intranet_fails_closed_403` pada [`backend/tests/test_pilot_operator_session.py`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/backend/tests/test_pilot_operator_session.py) (25 passed).
 
+### Remediasi Review Ulang Putaran 3 (Commit 7a45416 Follow-up):
+
+1. **P1 — Penegakan `LOCAL_SIMULATION_ONLY=true` pada Server Playwright & Preflight Fisik 404**:
+   - `frontend/playwright.config.js` menambahkan `LOCAL_SIMULATION_ONLY: 'true'` secara eksplisit pada `webServer[0].env` (backend).
+   - Ditambahkan probe preflight pada [`frontend/tests/e2e/auth.setup.js`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/frontend/tests/e2e/auth.setup.js) yang memverifikasi bahwa lima rute cetak fisik (`/api/v1/print/batch`, `/api/v1/print/tcp`, `/api/v1/print/spooler`, `/api/v1/print/printers`, `/api/v1/sap/print`) mengembalikan HTTP 404 fail-closed sebelum tes browser dimulai.
+   - Assertion HTTP 404 fail-closed untuk rute fisik juga dipertegas pada [`frontend/tests/e2e/pilot_operator_self_service.spec.js`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/frontend/tests/e2e/pilot_operator_self_service.spec.js).
+
+2. **P1 — Eliminasi Fallback Seeder E2E & Validasi Ketat Fail-Closed**:
+   - [`backend/scripts/seed_e2e_users.py`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/backend/scripts/seed_e2e_users.py): Menghapus fallback default `backend/data/auth.db`.
+   - Mengimplementasikan `validate_e2e_db_path(raw_path)` yang mewajibkan `AUTH_DB_PATH` disetel, menolak nama file database operasional/live (seperti `auth.db`, `auth_production.db`, dll.), dan mewajibkan nama file memuat penanda `e2e` atau `test`.
+   - Validasi dijalankan di `main()` *sebelum* modul `app.auth` diimpor, sehingga mencegah inisialisasi modul service/repository yang dapat menciptakan file database prematur di disk.
+   - Ditambahkan regression test suite [`backend/tests/test_seed_e2e_users.py`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/backend/tests/test_seed_e2e_users.py) (4 tests passed) yang membuktikan seeder exit non-zero tanpa mutasi data saat env tidak ada atau mengarah ke path live.
+
+3. **P2 — Ketegasan Assertion Autentikasi E2E & Cookie Sesi**:
+   - [`frontend/tests/e2e/auth.setup.js`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/frontend/tests/e2e/auth.setup.js): Menghapus pengecekan kondisional `if (await page.getByTestId('login-page').isVisible())`.
+   - Mengharuskan `login-page` terlihat tanpa syarat, mengisi kredensial PPIC, menekan login, dan memastikan masuk ke Studio dengan badge `[PPIC] ppic_operator`.
+   - Memvalidasi secara eksplisit bahwa cookie `app_session` berstatus aktif di browser context sebelum menyimpan `storageState` ke `frontend/.auth/user.json`.
+
 ---
 
 ## 2. Inventaris Endpoint & Guard Matriks
@@ -159,6 +177,29 @@ dist/assets/index-BkjwATtf.js               310.45 kB │ gzip: 79.48 kB
 dist/assets/vendor-fabric-CXn53Had.js       310.49 kB │ gzip: 91.50 kB
 ✓ built in 28.98s
 ```
+
+### Playwright E2E Test Suite (Simulasi-Only & Strict Auth Setup)
+```
+npm.cmd exec playwright -- test tests/e2e/pilot_operator_self_service.spec.js tests/e2e/sap_shadow_simulation.spec.js
+  ok 1 [setup] › tests/e2e/auth.setup.js:9:1 › authenticate e2e browser session and verify local simulation preflight (10.3s)
+  ok 2 [chromium] › tests/e2e/pilot_operator_self_service.spec.js:7:3 › App Login & Unified Simulation Self-Service E2E Suite (Fase 3.3) › Alur login aplikasi PPIC -> masuk Studio -> buka Simulasi Label -> periksa batch & urutan item -> periksa bukti PDF -> logout aplikasi global (6.5s)
+  ok 3 [chromium] › tests/e2e/pilot_operator_self_service.spec.js:341:3 › App Login & Unified Simulation Self-Service E2E Suite (Fase 3.3) › Operator PPIC mengimpor berkas JSON SAP lokal raw v2 dengan CSRF, melihat konfirmasi keamanan, mengunggah berkas, dan memeriksa batch hasil impor (6.4s)
+  ok 4 [chromium] › tests/e2e/sap_shadow_simulation.spec.js:4:3 › Fase 3.1 — Simulasi Label Terpadu Topbar & Capability Matrix Suite › Kombinasi 1: Keduanya mati -> tidak ada tombol simulasi apa pun di topbar (6.4s)
+  ok 5 [chromium] › tests/e2e/sap_shadow_simulation.spec.js:24:3 › Fase 3.1 — Simulasi Label Terpadu Topbar & Capability Matrix Suite › Kombinasi 2: Safe Demo saja aktif -> tidak ada tombol operator/simulasi yang tampil (AC 1) (6.0s)
+  ok 6 [chromium] › tests/e2e/sap_shadow_simulation.spec.js:44:3 › Fase 3.1 — Simulasi Label Terpadu Topbar & Capability Matrix Suite › Kombinasi 3: SAP shadow simulation saja aktif -> hanya satu tombol btn-label-simulation tampil (7.3s)
+  ok 7 [chromium] › tests/e2e/sap_shadow_simulation.spec.js:86:3 › Fase 3.1 — Simulasi Label Terpadu Topbar & Capability Matrix Suite › Kombinasi 4: Keduanya aktif -> paling banyak satu tombol simulasi (btn-label-simulation) (5.9s)
+
+  7 passed (59.0s)
+```
+- Preflight: `/api/v1/print/batch`, `/api/v1/print/tcp`, `/api/v1/print/spooler`, `/api/v1/print/printers`, `/api/v1/sap/print` mengembalikan 404 fail-closed.
+- Zero socket TCP 9100 / spooler dipanggil.
+
+### Targeted Seeder & Session Backend Tests
+```
+python -m pytest backend/tests/test_seed_e2e_users.py backend/tests/test_pilot_operator_session.py backend/tests/test_auth_api.py -q -p no:cacheprovider
+44 passed, 2 warnings in 48.27s
+```
+- `backend/tests/test_seed_e2e_users.py`: 4 passed (validasi env wajib, fail-closed jika mengarah ke database live, fail-closed nama DB tidak dikenal, sukses jika database e2e terisolasi).
 
 ### Git Diff Whitespace Check
 ```

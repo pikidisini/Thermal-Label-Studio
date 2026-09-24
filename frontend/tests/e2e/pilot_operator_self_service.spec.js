@@ -258,6 +258,19 @@ test.describe('App Login & Unified Simulation Self-Service E2E Suite (Fase 3.3)'
     await expect(page.getByTestId('topbar-username')).toContainText('ppic_operator');
     await expect(page.getByTestId('btn-app-logout')).toBeVisible();
 
+    // Safety Invariant: Ensure physical printing endpoints fail-closed with 404 in simulation-only mode
+    const physicalPrintProbe = await page.request.post('/api/v1/print/batch', {
+      data: { test: 'simulation-guard' },
+      failOnStatusCode: false,
+    });
+    expect(physicalPrintProbe.status()).toBe(404);
+
+    const sapPrintProbe = await page.request.post('/api/v1/sap/print', {
+      data: { test: 'simulation-guard' },
+      failOnStatusCode: false,
+    });
+    expect(sapPrintProbe.status()).toBe(404);
+
     // Step D: Open unified simulation modal
     const simBtn = page.getByTestId('btn-label-simulation');
     await expect(simBtn).toBeVisible();
