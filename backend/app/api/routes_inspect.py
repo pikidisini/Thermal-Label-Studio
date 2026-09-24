@@ -7,15 +7,16 @@ from __future__ import annotations
 import json
 import re
 from typing import Any, Dict
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
+from ..auth.dependencies import get_current_user
 from ..config import DATA_SAMPLES_DIR
 from ..models.schemas import ValidationRequest, ValidationResponse
 from ..services.template_service import TemplateService
 
 from engine.renderer import load_json_contract
 
-router = APIRouter(prefix="/inspect", tags=["Inspect & Validation"])
+router = APIRouter(prefix="/inspect", tags=["Inspect & Validation"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/sample-contract", summary="Get sample SAP JSON Contract v1.1")

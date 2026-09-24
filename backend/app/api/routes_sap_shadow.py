@@ -100,37 +100,60 @@ def require_pilot_operator_enabled() -> None:
 
 def get_current_pilot_operator(
     request: Request,
+    app_session_cookie: Optional[str] = Cookie(None, alias="app_session"),
     pilot_session_cookie: Optional[str] = Cookie(None, alias="pilot_session"),
-) -> PilotOperatorSession:
-    """Dependency resolving authenticated pilot operator session strictly from HttpOnly cookie.
+) -> Any:
+    """Dependency resolving authenticated session (app session with PPIC/IT role, or legacy pilot operator session).
 
     Fails closed (HTTP 401) if cookie is missing, invalid, or expired.
     """
-    require_pilot_operator_enabled()
-    if not pilot_session_cookie:
+    require_simulation_enabled()
+    session_token = app_session_cookie or pilot_session_cookie
+    if not session_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Sesi operator pilot tidak valid atau belum masuk.",
+            detail="Sesi aplikasi tidak valid atau belum masuk.",
         )
 
-    session = pilot_session_service.get_valid_session(pilot_session_cookie)
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Sesi operator pilot tidak valid atau telah berakhir. Silakan login kembali.",
-        )
+    # 1. Try resolving via unified AuthService (PPIC / IT user)
+    from ..auth.service import auth_service
+    app_session = auth_service.validate_session(session_token)
+    if app_session:
+        return app_session
 
-    return session
+    # 2. Fallback to legacy pilot session if enabled
+    if is_pilot_operator_enabled():
+        legacy_session = pilot_session_service.get_valid_session(session_token)
+        if legacy_session:
+            return legacy_session
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Sesi aplikasi tidak valid atau telah berakhir. Silakan login kembali.",
+    )
 
 
 def verify_pilot_csrf(
     request: Request,
     x_csrf_token: Optional[str] = Header(None, alias="X-CSRF-Token"),
-    session: PilotOperatorSession = Depends(get_current_pilot_operator),
+    session: Any = Depends(get_current_pilot_operator),
 ) -> bool:
     """Dependency verifying CSRF token for mutating operator requests."""
+    from ..auth.service import auth_service
+    from ..auth.models import Session as AppSession
+
+    if isinstance(session, AppSession):
+        if not x_csrf_token or not auth_service.verify_csrf(session, x_csrf_token):
+            logger.warning("CSRF verification failed for app session: %s", session.username)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Validasi CSRF token gagal.",
+            )
+        return True
+
+    # Legacy PilotOperatorSession
     if not x_csrf_token or not pilot_session_service.verify_csrf(session, x_csrf_token):
-        logger.warning("CSRF verification failed for operator session: %s", session.session_id[:8])
+        logger.warning("CSRF verification failed for operator session: %s", getattr(session, "session_id", "")[:8])
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Validasi CSRF token gagal.",
@@ -422,9 +445,25 @@ def pilot_operator_logout(
     dependencies=[Depends(require_simulation_enabled)],
 )
 def get_pilot_operator_session_status(
+    app_session_cookie: Optional[str] = Cookie(None, alias="app_session"),
     pilot_session_cookie: Optional[str] = Cookie(None, alias="pilot_session"),
 ) -> Dict[str, Any]:
     """Probes session status for browser client strictly using HttpOnly cookie without exposing session_id."""
+    token = app_session_cookie or pilot_session_cookie
+    if token:
+        from ..auth.service import auth_service
+        app_sess = auth_service.validate_session(token)
+        if app_sess:
+            return {
+                "pilot_operator_enabled": True,
+                "authenticated": True,
+                "csrf_token": app_sess.csrf_token,
+                "expires_at": app_sess.expires_at.isoformat(),
+                "operator_label": f"[{app_sess.role.value}] {app_sess.username}",
+                "role": app_sess.role.value,
+                "username": app_sess.username,
+            }
+
     pilot_enabled = is_pilot_operator_enabled()
     if not pilot_enabled:
         return {
@@ -453,6 +492,10 @@ def get_pilot_operator_session_status(
     }
 
 
+@simulation_router.get(
+    "/batches",
+    dependencies=[Depends(get_current_pilot_operator)],
+)
 @simulation_router.get(
     "/operator/batches",
     dependencies=[Depends(get_current_pilot_operator)],
@@ -483,6 +526,10 @@ def list_operator_simulation_batches() -> List[Dict[str, Any]]:
 
 
 @simulation_router.get(
+    "/batches/{batch_id}",
+    dependencies=[Depends(get_current_pilot_operator)],
+)
+@simulation_router.get(
     "/operator/batches/{batch_id}",
     dependencies=[Depends(get_current_pilot_operator)],
 )
@@ -497,6 +544,10 @@ def get_operator_simulation_batch(batch_id: str) -> Dict[str, Any]:
     return record
 
 
+@simulation_router.get(
+    "/batches/{batch_id}/pdf",
+    dependencies=[Depends(get_current_pilot_operator)],
+)
 @simulation_router.get(
     "/operator/batches/{batch_id}/pdf",
     dependencies=[Depends(get_current_pilot_operator)],
@@ -546,15 +597,20 @@ def _parse_json_rejecting_duplicates(raw_text: str) -> Any:
 
 
 @simulation_router.post(
+    "/import-json",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(verify_pilot_csrf)],
+)
+@simulation_router.post(
     "/operator/import-json",
     status_code=status.HTTP_202_ACCEPTED,
-    dependencies=[Depends(require_pilot_operator_enabled), Depends(verify_pilot_csrf)],
+    dependencies=[Depends(verify_pilot_csrf)],
 )
 async def import_operator_sap_json(
     request: Request,
     response: Response,
     file: Optional[UploadFile] = File(None),
-    session: PilotOperatorSession = Depends(get_current_pilot_operator),
+    session: Any = Depends(get_current_pilot_operator),
 ) -> Dict[str, Any]:
     """Imports a local Raw SAP Snapshot v2 JSON file from an authenticated pilot operator.
 
@@ -581,7 +637,8 @@ async def import_operator_sap_json(
 
     # 2. Rate Limiting Check
     client_id = request.client.host if request.client else "unknown"
-    rate_limit_key = f"{session.session_id}:{client_id}"
+    session_id_str = getattr(session, "session_id", None) or getattr(session, "session_hash", "default")
+    rate_limit_key = f"{session_id_str}:{client_id}"
     if not pilot_session_service.check_import_rate_limit(rate_limit_key):
         logger.warning("Operator import rate limit exceeded for %s", rate_limit_key)
         raise HTTPException(

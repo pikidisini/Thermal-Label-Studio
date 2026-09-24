@@ -1,12 +1,37 @@
 # AI Handoff — Thermal Label Studio
 
-## Snapshot aktif — Perencanaan Fase 3.3 login aplikasi (2026-09-24)
+## Snapshot aktif — Fase 3.3: Implementasi Selesai (IMPLEMENTATION_COMPLETED — AWAITING_CODEX_LEVEL_3_REVIEW)
 
-- Writer perencanaan: Codex pada laptop pengguna. Branch `codex/f3-3-app-login`, baseline `main`/`origin/main` `98a5983` (F3.2 telah merged melalui PR #26). Tidak ada kode runtime F3.3 yang diubah pada perencanaan ini.
-- Kebutuhan pengguna: halaman login untuk Thermal Label Studio; akun PPIC dan IT yang masuk dapat memakai Simulasi Label tanpa login operator pilot kedua. Hak simulasi tidak otomatis memberi hak cetak fisik.
-- Rancangan dan kontrak eksekusi: `docs/architecture/application_authentication_plan.md` dan `docs/tasks/F3.3/TASK_CONTRACT.md`. `RESULT.md` serta `REVIEW.md` masih template `NOT STARTED`.
-- Executor berikut: Gemini Flash 3.8 High sebagai satu-satunya writer setelah checkpoint ini. Codex melakukan review Level 3 setelah handoff. Test runtime F3.3, Jenkins build F3.3, dan UAT login baru: `NOT RUN` karena baru perencanaan.
-- Snapshot F3.2 dan fase sebelumnya di bawah adalah arsip pada saat ditulis; status Git terkini harus diperiksa ulang oleh executor.
+- Tanggal: 2026-09-24
+- Repository: `Thermal-Label-Studio` (`web_app/`)
+- Branch: `codex/f3-3-app-login`, baseline `origin/main` at `98a5983` (PR #26 merged).
+- Writer / Executor: Gemini Flash (Antigravity). Reviewer: Codex Level 3 (independen).
+- Status: `IMPLEMENTATION_COMPLETED — AWAITING_CODEX_LEVEL_3_REVIEW`. Seluruh kriteria penerimaan (AC 1-7) pada `docs/tasks/F3.3/TASK_CONTRACT.md` telah diimplementasikan dan diverifikasi secara menyeluruh:
+  1. **Login Aplikasi & Autentikasi Terpadu**:
+     - Ditambahkan antarmuka login aplikasi (`frontend/src/components/auth/LoginPage.tsx`) yang menangani login user PPIC dan IT dengan penanganan error aman dan feedback visual.
+     - Sesi server-side terkelola via cookie HttpOnly `app_session` (SameSite=lax, Secure di HTTPS, loopback allowed untuk local dev). Token sesi disimpan dalam hash SHA-256 pada SQLite `backend/data/auth.db` (terpisah dari database batch `sap_shadow_simulation.db` dan diproteksi volume Docker).
+     - Perlindungan brute force: 5 kali percobaan gagal berturut-turut memicu penguncian sementara akun (lockout 300 detik).
+     - Mitigasi timing attack: verifikasi password dummy berjalan konstan bahkan saat user tidak ditemukan.
+  2. **Pengalaman Pengguna & Satu Sesi Simulasi**:
+     - Header aplikasi (`TopMenuBar.tsx`) menampilkan badge role pengguna aktif (`[PPIC] user` atau `[IT] user`) serta tombol logout global.
+     - Modal Simulasi Label (`SapShadowSimulationModal.tsx`) tidak lagi menampilkan card form login pilot operator terpisah; pengguna yang sudah login dapat langsung menggunakan fitur simulasi (impor JSON SAP, pantau sequence batch/item, unduh bukti PDF).
+     - Endpoint alias `/batches`, `/batches/{batch_id}`, `/batches/{batch_id}/pdf`, dan `/import-json` pada `routes_sap_shadow.py` serta `OperatorImportGuardMiddleware` mendukung autentikasi terpadu via `app_session`.
+  3. **Proteksi Endpoint Sensitif & Guard Fisik**:
+     - Seluruh endpoint browser sensitif (`/api/v1/templates`, `/api/v1/render`, `/api/v1/inspect`) dilindungi server-side dengan `Depends(get_current_user)` (fail-closed HTTP 401 jika unauthenticated).
+     - Hak simulasi PPIC/IT tidak membuka akses cetak fisik: rute cetak fisik tetap diblokir (HTTP 404) pada local simulation (`LOCAL_SIMULATION_ONLY=true`).
+  4. **CLI Admin Bootstrap**:
+     - Tersedia CLI tool `backend/app/cli/user_admin.py` (`python -m app.cli.user_admin`) dengan perintah `create-user`, `set-password`, `deactivate-user`, `activate-user`, dan `list-users`.
+     - Zero hardcoded / default passwords di kode dan repositori.
+  5. **Verifikasi Quality Gates Aktual**:
+     - Pytest Backend: `477 passed, 21 skipped, 0 failed` in 85.34s (mencakup `test_auth_service.py`, `test_auth_api.py`, `test_user_admin_cli.py`, dan seluruh regresi).
+     - Frontend Test Suite: `79 passed, 0 failed` in 617ms (`npm test` di `frontend/`).
+     - Frontend Production Build: `npm run build` PASS (0 errors, 6.78s).
+     - Ops script preflight: `deploy-local.sh` diperbarui untuk memvalidasi proteksi fail-closed `/api/v1/auth/me` dan CLI admin help.
+     - Whitespace check: `git diff --check` bersih (0 errors).
+     - Secret & database scan: Zero `.db` committed, `.gitignore` melindungi `backend/data/*.db`.
+- Batas Lingkungan: Live SAP RFC/ECC: `NOT RUN`; Printer fisik/port 9100: `NOT RUN`; Database enterprise production: `NOT RUN`.
+- Task Files: `docs/tasks/F3.3/TASK_CONTRACT.md`, `docs/tasks/F3.3/RESULT.md`, `docs/tasks/F3.3/REVIEW.md`.
+- Next Action: Stop sebelum PR/merge. Menyerahkan branch kepada Codex Level 3 untuk review independen melalui `docs/tasks/F3.3/REVIEW.md`.
 
 ## Snapshot aktif — Fase 3.2 Jenkins lokal (2026-09-24)
 

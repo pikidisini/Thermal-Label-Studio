@@ -7,12 +7,13 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from typing import List
 from typing import Optional
-from fastapi import APIRouter, Body, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile, status
 
+from ..auth.dependencies import get_current_user
 from ..models.schemas import RawSvgRequest, SaveTemplateRequest, TemplateDetail, TemplateSummary
 from ..services.template_service import TemplateService
 
-router = APIRouter(prefix="/templates", tags=["Templates"])
+router = APIRouter(prefix="/templates", tags=["Templates"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("", response_model=List[TemplateSummary], summary="List all templates")

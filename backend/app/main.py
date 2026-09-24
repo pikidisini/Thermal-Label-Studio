@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 logger = logging.getLogger("main")
 
 from .api import (
+    auth_router,
     inspect_router,
     print_agent_router,
     print_router,
@@ -93,6 +94,7 @@ app.add_middleware(
 )
 
 # Mount API Routers under /api/v1
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(templates_router, prefix="/api/v1")
 app.include_router(render_router, prefix="/api/v1")
 app.include_router(print_router, prefix="/api/v1")

@@ -35,8 +35,74 @@ def isolate_backend_outputs(tmp_path, monkeypatch):
     monkeypatch.setattr(sap_service, "STORAGE_OUT_DIR", output_dir)
 
 
+@pytest.fixture(autouse=True)
+def isolate_auth_service(tmp_path, monkeypatch):
+    """Isolate auth SQLite repository and clear lockouts in tests."""
+    from app.auth.models import Role
+    from app.auth.repository import SqliteAuthRepository
+    from app.auth.service import auth_service
+
+    test_auth_db = tmp_path / "test_auth.db"
+    test_repo = SqliteAuthRepository(test_auth_db)
+    monkeypatch.setattr(auth_service, "repository", test_repo)
+    monkeypatch.setattr(auth_service, "_lockouts", {})
+
+
 @pytest.fixture
-def client():
+def test_ppic_session(isolate_auth_service):
+    """Creates a default active PPIC user and authenticated session."""
+    from app.auth.models import Role
+    from app.auth.security import hash_password
+    from app.auth.service import auth_service
+
+    auth_service.repository.create_user("test_ppic", hash_password("TestPass123!"), Role.PPIC)
+    session, _ = auth_service.authenticate("test_ppic", "TestPass123!", client_ip="127.0.0.1")
+    return session
+
+
+@pytest.fixture
+def test_it_session(isolate_auth_service):
+    """Creates a default active IT user and authenticated session."""
+    from app.auth.models import Role
+    from app.auth.security import hash_password
+    from app.auth.service import auth_service
+
+    auth_service.repository.create_user("test_it", hash_password("AdminPass123!"), Role.IT)
+    session, _ = auth_service.authenticate("test_it", "AdminPass123!", client_ip="127.0.0.1")
+    return session
+
+
+@pytest.fixture
+def client(test_ppic_session):
+    """Standard authenticated client for studio and simulation routes."""
+    c = TestClient(app)
+    resp = c.post(
+        "/api/v1/auth/login",
+        json={"username": "test_ppic", "password": "TestPass123!"},
+    )
+    assert resp.status_code == 200, f"Login failed: {resp.text}"
+    csrf_token = resp.json()["csrf_token"]
+    c.headers.update({"X-CSRF-Token": csrf_token})
+    return c
+
+
+@pytest.fixture
+def it_client(test_it_session):
+    """Authenticated client with IT role."""
+    c = TestClient(app)
+    resp = c.post(
+        "/api/v1/auth/login",
+        json={"username": "test_it", "password": "AdminPass123!"},
+    )
+    assert resp.status_code == 200, f"Login failed: {resp.text}"
+    csrf_token = resp.json()["csrf_token"]
+    c.headers.update({"X-CSRF-Token": csrf_token})
+    return c
+
+
+@pytest.fixture
+def unauthenticated_client():
+    """Client with zero cookies or authentication credentials."""
     return TestClient(app)
 
 

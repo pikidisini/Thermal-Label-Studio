@@ -39,11 +39,15 @@ import SapShadowSimulationModal from './components/modals/SapShadowSimulationMod
 import { exportFabricToSvg } from './utils/fabricSvgExporter';
 import { safeDemoApi } from './utils/api/safeDemoApi';
 import { sapShadowSimulationApi } from './utils/api/sapShadowSimulationApi';
+import { useAuthStore } from './store/useAuthStore';
+import { LoginPage } from './components/auth/LoginPage';
 
 
 export default function App() {
   const canvasRef = useRef<fabric.Canvas | null>(null);
   const pxPerMm = 4;
+
+  const { isAuthenticated, isLoading: isAuthLoading, checkAuth } = useAuthStore();
 
   const { viewMode, activeTool, setActiveTool, selectedObject, setZoom } = useStudioStore();
   const {
@@ -86,6 +90,12 @@ export default function App() {
   const templateMgr = useTemplateManager(canvasRef, calculateAutoFitZoom, triggerRenderSimulation, pxPerMm);
 
   React.useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  React.useEffect(() => {
+    if (!isAuthenticated) return;
+
     templateMgr.initData();
     safeDemoApi.checkEnabled().then((enabled) => {
       setIsSafeDemoEnabled(enabled);
@@ -102,7 +112,23 @@ export default function App() {
         setSafeDemoModalOpen(true);
       }
     }
-  }, [setIsSafeDemoEnabled, setIsSapShadowSimulationEnabled, isSafeDemoEnabled]);
+  }, [isAuthenticated, setIsSafeDemoEnabled, setIsSapShadowSimulationEnabled, isSafeDemoEnabled]);
+
+  if (isAuthLoading) {
+    return (
+      <div
+        data-testid="app-auth-loading"
+        className="h-screen w-screen bg-slate-950 flex flex-col items-center justify-center space-y-3 text-slate-400 font-sans"
+      >
+        <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+        <span className="text-xs font-mono">Memverifikasi sesi aplikasi...</span>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
 
 
   React.useEffect(() => {

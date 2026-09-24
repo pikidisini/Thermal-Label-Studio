@@ -4,13 +4,14 @@ API Routes for Label Rendering, Preview, and File Downloads.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import FileResponse, Response
 
+from ..auth.dependencies import get_current_user
 from ..models.schemas import PreviewRequest, RenderRequest, RenderResponse
 from ..services.render_service import RenderService
 
-router = APIRouter(prefix="/render", tags=["Render & Preview"])
+router = APIRouter(prefix="/render", tags=["Render & Preview"], dependencies=[Depends(get_current_user)])
 
 
 @router.post("", response_model=RenderResponse, summary="Execute full label rendering pipeline")
