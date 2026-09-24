@@ -1,5 +1,29 @@
 # Hasil Implementasi B2B2O — Ekspor Raw SAP Snapshot v2 & Impor JSON Lokal ke Safe Demo
 
+## Addendum Simulasi Missing Fields — 2026-09-24
+
+### Hasil
+
+Jalur unggah JSON lokal di modal **Simulasi SAP** kini tetap memproses batch ketika fakta display tidak tersedia, alih-alih menolak seluruh batch. Nilai yang hilang (`absent`, `null`, atau string kosong/whitespace) ditampilkan sebagai `--`; warning aman memuat nomor item dan nama field tanpa menyalin nilai mentah SAP. Warning terlihat segera setelah unggah, pada jumlah warning di daftar batch, dan di detail batch. Error fatal validasi struktur, template, atau rendering tetap ditampilkan sebagai error dan tidak diubah menjadi warning.
+
+Mode `simulation_tolerant` hanya dinyalakan oleh endpoint browser `POST /api/v1/simulation/operator/import-json`. Adapter N001 default, endpoint machine-to-machine raw SAP, dispatcher, dan jalur produksi tetap strict. Raw snapshot yang disimpan tidak diubah. Nilai numerik yang hilang/tidak valid tidak dipakai untuk derivasi; nilai turunannya menjadi `--`. Barcode/QR yang sumbernya tidak lengkap tidak dihasilkan dari sentinel atau fallback sintetis.
+
+### Verifikasi aktual
+
+- Backend suite penuh: **492 passed, 21 skipped, 2 warnings**.
+- Backend regression terarah: **156 passed, 2 warnings** pada `test_auth_api.py::test_unified_simulation_session_for_ppic_and_it` serta `test_safe_demo_pdf_hardening.py`, `test_pilot_operator_import_json.py`, `test_profile_composition.py`, dan `test_raw_sap_snapshot_v2.py`.
+- Tes sentinel render isolasi: **11 passed, 2 warnings** mencakup tes boundary/sentinel dan impor missing-field, termasuk pemeriksaan SVG hasil render tanpa placeholder `{{...}}` dan bukti PDF berhasil dibuat.
+- Frontend unit tests: **85 passed**.
+- TypeScript strict check: **PASS** (`npm.cmd exec tsc -- --noEmit`).
+- Frontend production build: **PASS** (`npm.cmd run build`).
+- Playwright E2E terarah: **BLOCKED/NOT RUN**; konfigurasi Playwright menolak berjalan karena `http://127.0.0.1:8000/api/v1/health` sudah dipakai. Layanan yang sudah berjalan tidak dihentikan atau ditimpa.
+- `git diff --check`: **PASS** (tidak ada whitespace error; Git menampilkan warning normal line-ending LF/CRLF pada Windows).
+- SAP DEV, printer fisik, TCP 9100, Windows Spooler, Docker, dan database production: **NOT RUN**.
+
+Catatan: run backend penuh pertama mendeteksi test auth lama memakai `request_id` statis yang sudah tersimpan dari run sebelumnya; replay lintas mode strict/tolerant ditolak 409 sesuai perlindungan idempotency. Fixture diperbaiki memakai `request_id` unik, lalu suite penuh dijalankan ulang dan lulus seluruhnya.
+
+Perubahan ini merupakan addendum perilaku presentasi **simulasi lokal** pada task B2B2O, bukan perubahan kontrak raw SAP atau pelonggaran validasi production.
+
 ## Ringkasan Eksekutif
 
 - **Status**: `REMEDIATION_P1_P2_ENV_IGNORE_COMPLETED_AWAITING_REVIEW` (Implementasi vertical slice impor JSON lokal operator, remediasi P1 intake eksklusif multipart, P2 toleransi multipart overhead Content-Length, P1 Docker fail-closed, dan perlindungan pengabaian .env selesai 100%; seluruh 24 pengujian unit/integrasi impor backend, 26 pengujian sesi operator, 188 tes regresi backend, 68 tes unit frontend, tsc strict, dan 4 Playwright E2E simulasi lulus; aktivasi ABAP di SAP DEV dan UAT ekspor langsung tetap berstatus `NOT RUN` secara jujur dan transparan).

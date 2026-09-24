@@ -665,6 +665,7 @@ class SapShadowService:
         self,
         request: RawSapBatchSnapshotV2,
         auto_process: bool = True,
+        simulation_tolerant: bool = False,
     ) -> Dict[str, Any]:
         """Ingests Raw SAP Snapshot v2, adapts via N001 development profile, and initiates simulation."""
         from .n001_rule_adapter import N001DevelopmentAdapter
@@ -702,6 +703,10 @@ class SapShadowService:
 
                 existing_record = self.get_batch(existing_batch_id)
                 if existing_record:
+                    if bool(existing_record.get("simulation_tolerant", False)) != simulation_tolerant:
+                        raise ValueError(
+                            "Conflict: request_id was previously submitted through a different simulation validation mode."
+                        )
                     if existing_record.get("status") in ("accepted", "processing") and auto_process:
                         task = asyncio.create_task(self.process_batch(existing_batch_id))
                         self._background_tasks.add(task)
@@ -718,6 +723,13 @@ class SapShadowService:
                         "total_items": existing_record["total_items"],
                         "idempotent_replay": True,
                         "created_at": existing_record["created_at"],
+                        "simulation_tolerant": simulation_tolerant,
+                        "warning_count": int(existing_record.get("warning_count", 0)),
+                        "warnings": [
+                            warning
+                            for stored_item in existing_record.get("items", [])
+                            for warning in stored_item.get("warnings", [])
+                        ],
                         "message": "Idempotent replay: existing raw snapshot batch returned.",
                     }
 
@@ -763,7 +775,10 @@ class SapShadowService:
 
                 if it.label_code == N001DevelopmentAdapter.PROFILE_ID:
                     canonical_item, tmpl_id, audit_meta = N001DevelopmentAdapter.adapt_item(
-                        it, profile_version=profile.profile_version, compose_profile=True
+                        it,
+                        profile_version=profile.profile_version,
+                        compose_profile=True,
+                        simulation_tolerant=simulation_tolerant,
                     )
                 else:
                     canonical_item, tmpl_id, audit_meta = ProfileComposer.adapt_generic_item(
@@ -809,6 +824,10 @@ class SapShadowService:
                     "raw_characteristics": [c.model_dump(mode="json", exclude_unset=True) for c in it.characteristics],
                     "raw_business_context": it.business_context.model_dump(mode="json", exclude_unset=True) if it.business_context else None,
                     "n001_audit_meta": audit_meta,
+                    "simulation_tolerant": simulation_tolerant,
+                    "missing_fields": audit_meta.get("missing_fields", []),
+                    "warning_count": audit_meta.get("warning_count", 0),
+                    "warnings": audit_meta.get("warnings", []),
                 })
 
             resolved_label_code = list(batch_label_codes)[0] if len(batch_label_codes) == 1 else "MIXED"
@@ -826,6 +845,8 @@ class SapShadowService:
                 "virtual_profile": virtual_profile,
                 "raw_contract_sha256": contract_hash,
                 "contract_type": "raw_snapshot_v2",
+                "simulation_tolerant": simulation_tolerant,
+                "warning_count": sum(it.get("warning_count", 0) for it in batch_items),
                 "label_code": resolved_label_code,
                 "profile_version": resolved_profile_ver,
                 "raw_snapshot": request.model_dump(mode="json", exclude_unset=True),
@@ -878,6 +899,9 @@ class SapShadowService:
             "idempotent_replay": False,
             "created_at": now.isoformat(),
             "message": "SAP raw snapshot batch accepted for simulation.",
+            "simulation_tolerant": simulation_tolerant,
+            "warning_count": batch_record["warning_count"],
+            "warnings": [warning for it in batch_items for warning in it.get("warnings", [])],
         }
 
     async def process_batch(self, batch_id: str) -> None:
@@ -920,7 +944,11 @@ class SapShadowService:
                 # 1. Inject pure text data
                 injected_svg = inject_data(svg_template_content, contract_data)
                 # 2. Inject vector 1D/2D barcodes
-                final_svg = inject_barcodes_and_qr(injected_svg, contract_data)
+                final_svg = inject_barcodes_and_qr(
+                    injected_svg,
+                    contract_data,
+                    fail_closed_empty_codes=bool(item.get("simulation_tolerant")),
+                )
 
                 # 3. Post-injection fail-closed placeholder validation (AC 3, AC 4)
                 # Validates that all {{...}} tokens are resolved; fails closed if orphan/foreign tokens remain.
@@ -1021,6 +1049,9 @@ class SapShadowService:
                 "template_version_id": it.get("template_version_id"),
                 "copies": it.get("copies", 1),
                 "status": it.get("status"),
+                "missing_fields": list(it.get("missing_fields", [])),
+                "warning_count": int(it.get("warning_count", 0)),
+                "warnings": list(it.get("warnings", [])),
             }
             for it in record.get("items", [])
         ]
@@ -1039,6 +1070,9 @@ class SapShadowService:
             "completed_at": record.get("completed_at"),
             "artifact": record.get("artifact"),
             "error": record.get("error"),
+            "simulation_tolerant": bool(record.get("simulation_tolerant", False)),
+            "warning_count": int(record.get("warning_count", 0)),
+            "warnings": [warning for it in record.get("items", []) for warning in it.get("warnings", [])],
         }
         if "label_code" in record:
             summary["label_code"] = record["label_code"]

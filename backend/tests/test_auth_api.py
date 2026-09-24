@@ -3,6 +3,7 @@
 import io
 import json
 from pathlib import Path
+import uuid
 import unittest.mock
 import pytest
 from fastapi.testclient import TestClient
@@ -187,7 +188,7 @@ def test_unified_simulation_session_for_ppic_and_it(auth_api_setup, monkeypatch)
     valid_raw_snapshot = {
         "contract_schema_version": "2.0-raw",
         "producer_namespace": "SAP_DEV",
-        "request_id": "REQ-UNIFIED-001",
+        "request_id": f"REQ-UNIFIED-{uuid.uuid4().hex}",
         "printer_id": "PILOT-PRINTER-01",
         "items": [
             {
@@ -240,6 +241,7 @@ def test_unified_simulation_session_for_ppic_and_it(auth_api_setup, monkeypatch)
     assert r_import.status_code in (200, 202)
     batch_id = r_import.json().get("batch_id")
     assert batch_id is not None
+    assert r_import.json()["simulation_tolerant"] is True
 
     # PPIC views batch details
     r_detail = client_ppic.get(f"/api/v1/simulation/batches/{batch_id}")

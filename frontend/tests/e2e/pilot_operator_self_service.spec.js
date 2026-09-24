@@ -441,6 +441,14 @@ test.describe('App Login & Unified Simulation Self-Service E2E Suite (Fase 3.3)'
         status: 'completed',
         total_items: 2,
         completed_items: 2,
+        simulation_tolerant: true,
+        warning_count: 1,
+        warnings: [{
+          item_sequence: 2,
+          field: 'type_film',
+          reason: 'missing',
+          message: "Informasi 'type_film' tidak ditemukan pada item 2; label menampilkan --.",
+        }],
         created_at: new Date().toISOString(),
         has_pdf: true,
       };
@@ -466,6 +474,14 @@ test.describe('App Login & Unified Simulation Self-Service E2E Suite (Fase 3.3)'
           status: 'completed',
           total_items: 2,
           completed_items: 2,
+          simulation_tolerant: true,
+          warning_count: 1,
+          warnings: [{
+            item_sequence: 2,
+            field: 'type_film',
+            reason: 'missing',
+            message: "Informasi 'type_film' tidak ditemukan pada item 2; label menampilkan --.",
+          }],
           items: [
             {
               item_id: 'item-imp-001',
@@ -537,7 +553,8 @@ test.describe('App Login & Unified Simulation Self-Service E2E Suite (Fase 3.3)'
     expect(importCalled).toBe(true);
 
     // Verify success alert appeared
-    await expect(page.getByTestId('alert-import-json-success')).toContainText('berhasil diimpor');
+    await expect(page.getByTestId('alert-import-json-success')).toContainText('1 peringatan');
+    await expect(page.getByTestId('alert-import-json-warnings')).toContainText('Item 2: type_film');
 
     // Verify batch now appears in the table
     const table = page.getByTestId('table-simulation-batches');
@@ -548,5 +565,7 @@ test.describe('App Login & Unified Simulation Self-Service E2E Suite (Fase 3.3)'
     // Verify item sequence detail is visible or can be opened
     const toggleItemsBtn = page.getByTestId('btn-toggle-items-batch-imported-999');
     await expect(toggleItemsBtn).toBeVisible();
+    await toggleItemsBtn.click();
+    await expect(page.getByTestId('batch-detail-warnings')).toContainText('Item 2: type_film');
   });
 });

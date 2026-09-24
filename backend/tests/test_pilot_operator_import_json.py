@@ -12,7 +12,6 @@ Verifies Acceptance Criteria & Security Hardening:
 
 from __future__ import annotations
 
-import io
 import json
 from pathlib import Path
 from typing import Any, Dict, Generator
@@ -27,7 +26,7 @@ from app.auth.service import auth_service
 from app.main import app
 from app.print_jobs.artifact_storage import DurableFilesystemArtifactStorage
 from app.services.pilot_session_service import pilot_session_service
-from app.services.sap_shadow_service import SapShadowService, sap_shadow_service
+from app.services.sap_shadow_service import SapShadowService
 
 
 TEST_SIMULATION_TOKEN = "test-secret-sap-token-b2b2o"
@@ -460,6 +459,56 @@ class TestOperatorJsonImportFunctional:
         assert pdf_resp.status_code == 200
         assert pdf_resp.headers["content-type"] == "application/pdf"
         assert len(pdf_resp.content) > 100
+
+    def test_missing_display_fact_imports_with_warning_and_pdf_sentinel(self):
+        client = TestClient(app)
+        csrf = login_operator(client)
+        item = build_valid_n001_raw_item(seq=7)
+        item["characteristics"] = [
+            char for char in item["characteristics"]
+            if char["name"] not in ("ZZTYPEFILM", "ZZWIDTH")
+        ]
+        payload = {
+            "contract_schema_version": "2.0-raw",
+            "producer_namespace": "SAP_DEV",
+            "request_id": "REQ-MISSING-FIELD-007",
+            "printer_id": "PILOT-PRINTER-01",
+            "items": [item],
+        }
+
+        response = client.post(
+            "/api/v1/simulation/operator/import-json",
+            headers={"X-CSRF-Token": csrf},
+            files={"file": ("missing-fields.json", json.dumps(payload), "application/json")},
+        )
+        assert response.status_code == 202
+        accepted = response.json()
+        assert accepted["simulation_tolerant"] is True
+        assert accepted["warning_count"] > 0
+        assert {w["field"] for w in accepted["warnings"]} >= {"type_film", "width_mm", "width_inch"}
+        assert all(w["item_sequence"] == 7 for w in accepted["warnings"])
+
+        batch_id = accepted["batch_id"]
+        detail_response = client.get(f"/api/v1/simulation/operator/batches/{batch_id}")
+        assert detail_response.status_code == 200
+        detail = detail_response.json()
+        assert detail["status"] == "completed"
+        assert detail["simulation_tolerant"] is True
+        assert detail["warning_count"] == accepted["warning_count"]
+        assert any(w["field"] == "type_film" and w["item_sequence"] == 7 for w in detail["warnings"])
+
+        raw_response = client.get(
+            f"/api/v1/simulation/sap-batches/{batch_id}/raw-snapshot",
+            headers={"X-SAP-Simulation-Token": TEST_SIMULATION_TOKEN},
+        )
+        assert raw_response.status_code == 200
+        preserved_item = raw_response.json()["raw_snapshot"]["items"][0]
+        assert preserved_item["characteristics"] == item["characteristics"]
+        assert not any(char["name"] in ("ZZTYPEFILM", "ZZWIDTH") for char in preserved_item["characteristics"])
+
+        pdf_response = client.get(f"/api/v1/simulation/operator/batches/{batch_id}/pdf")
+        assert pdf_response.status_code == 200
+        assert len(pdf_response.content) > 100
 
     def test_idempotent_replay_with_identical_payload_returns_200(self):
         client = TestClient(app)

@@ -16,6 +16,7 @@ Verifies all Acceptance Criteria (AC 1 through AC 7) and resolves review finding
 from __future__ import annotations
 
 import asyncio
+import copy
 from datetime import datetime, timezone
 import hashlib
 import io
@@ -585,6 +586,71 @@ class TestFailClosedBoundary:
         with pytest.raises(ValueError) as exc_info:
             N001DevelopmentAdapter.adapt_item(raw_item)
         assert "Missing required raw business fact" in str(exc_info.value)
+
+    @pytest.mark.parametrize("state", ["absent", "null", "blank"])
+    def test_simulation_tolerant_adapter_uses_marker_but_default_stays_strict(self, state: str):
+        item_dict = copy.deepcopy(load_synthetic_raw_request().items[0].model_dump(mode="json"))
+        if state == "absent":
+            item_dict["characteristics"] = [c for c in item_dict["characteristics"] if c["name"] != "ZZTYPEFILM"]
+        elif state == "null":
+            next(c for c in item_dict["characteristics"] if c["name"] == "ZZTYPEFILM")["value"] = None
+        else:
+            next(c for c in item_dict["characteristics"] if c["name"] == "ZZTYPEFILM")["value"] = "  "
+
+        raw_item = RawSapItemSnapshotV2(**item_dict)
+        with pytest.raises(ValueError, match="type_film"):
+            N001DevelopmentAdapter.adapt_item(raw_item)
+
+        canonical, _, audit = N001DevelopmentAdapter.adapt_item(raw_item, simulation_tolerant=True)
+        assert canonical.fields.type_film == "--"
+        assert audit["simulation_tolerant"] is True
+        assert audit["item_sequence"] == raw_item.item_sequence
+        assert audit["warning_count"] > 0
+        assert "type_film" in audit["missing_fields"]
+
+    def test_simulation_tolerant_invalid_numeric_does_not_derive_fabricated_values(self):
+        item_dict = copy.deepcopy(load_synthetic_raw_request().items[0].model_dump(mode="json"))
+        next(c for c in item_dict["characteristics"] if c["name"] == "ZZWIDTH")["value"] = "unknown"
+        raw_item = RawSapItemSnapshotV2(**item_dict)
+
+        canonical, _, audit = N001DevelopmentAdapter.adapt_item(raw_item, simulation_tolerant=True)
+
+        assert canonical.fields.width_mm == "--"
+        assert canonical.fields.width_inch == "--"
+        assert "width_mm" in audit["invalid_fields"]
+        assert all("nan" not in str(value).lower() for value in canonical.fields.model_dump().values())
+
+    def test_local_raw_simulation_renders_missing_fields_as_marker_and_keeps_raw_snapshot(
+        self, isolated_service: SapShadowService
+    ):
+        raw_payload = load_synthetic_raw_request().model_dump(mode="json")
+        raw_item = raw_payload["items"][0]
+        raw_item["characteristics"] = [
+            char for char in raw_item["characteristics"]
+            if char["name"] not in ("ZZTYPEFILM", "ZZWIDTH")
+        ]
+        original_raw_chars = copy.deepcopy(raw_item["characteristics"])
+        request = RawSapBatchSnapshotV2(**raw_payload)
+
+        async def _run():
+            accepted = await isolated_service.ingest_raw_batch(
+                request, auto_process=False, simulation_tolerant=True
+            )
+            await isolated_service.process_batch(accepted["batch_id"])
+            return accepted["batch_id"]
+
+        batch_id = asyncio.run(_run())
+        record = isolated_service.get_batch(batch_id)
+
+        assert record["status"] == "completed"
+        assert record["artifact"] is not None
+        assert record["raw_snapshot"]["items"][0]["characteristics"] == original_raw_chars
+        assert record["items"][0]["canonical_item_data"]["fields"]["type_film"] == "--"
+        assert record["items"][0]["canonical_item_data"]["fields"]["width_mm"] == "--"
+        rendered_svg = record["items"][0]["rendered_svg"]
+        assert "{{" not in rendered_svg and "}}" not in rendered_svg
+        assert "--" in rendered_svg
+        assert record["items"][0]["warning_count"] > 0
 
 
 # =============================================================================

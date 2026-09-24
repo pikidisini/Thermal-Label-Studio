@@ -138,7 +138,12 @@ def create_qr_svg_group(
     return group
 
 
-def inject_barcodes_and_qr(svg_content: str, contract_data: Dict[str, Any]) -> str:
+def inject_barcodes_and_qr(
+    svg_content: str,
+    contract_data: Dict[str, Any],
+    *,
+    fail_closed_empty_codes: bool = False,
+) -> str:
     """
     Parses SVG XML, replaces <rect data-barcode="..."> and <rect data-qr="...">
     (including Fabric.js exported <g> wrappers) with generated vector barcode groups.
@@ -155,15 +160,10 @@ def inject_barcodes_and_qr(svg_content: str, contract_data: Dict[str, Any]) -> s
 
     def resolve_barcode_val(key: str) -> str:
         clean_key = key.replace("{{", "").replace("}}", "").strip()
-        val = (
-            codes.get(clean_key, "")
-            or fields.get(clean_key, "")
-            or contract_data.get(clean_key, "")
-            or codes.get(key, "")
-            or fields.get(key, "")
-            or contract_data.get(key, "")
-        )
-        if not val:
+        val = codes.get(clean_key, "") or codes.get(key, "")
+        if not fail_closed_empty_codes:
+            val = val or fields.get(clean_key, "") or contract_data.get(clean_key, "") or fields.get(key, "") or contract_data.get(key, "")
+        if not val and not fail_closed_empty_codes:
             if clean_key in ("batch_barcode", "batch_number", "batch_text") or "batch" in clean_key:
                 val = fields.get("batch_text") or fields.get("batch_number") or contract_data.get("batch_number") or ""
             elif clean_key in ("roll_barcode", "roll_no") or "roll" in clean_key:
@@ -174,15 +174,10 @@ def inject_barcodes_and_qr(svg_content: str, contract_data: Dict[str, Any]) -> s
 
     def resolve_qr_val(key: str) -> str:
         clean_key = key.replace("{{", "").replace("}}", "").strip()
-        payload = (
-            codes.get(clean_key, "")
-            or fields.get(clean_key, "")
-            or contract_data.get(clean_key, "")
-            or codes.get(key, "")
-            or fields.get(key, "")
-            or contract_data.get(key, "")
-        )
-        if not payload:
+        payload = codes.get(clean_key, "") or codes.get(key, "")
+        if not fail_closed_empty_codes:
+            payload = payload or fields.get(clean_key, "") or contract_data.get(clean_key, "") or fields.get(key, "") or contract_data.get(key, "")
+        if not payload and not fail_closed_empty_codes:
             if clean_key in ("batch_text", "batch_number") or "batch" in clean_key:
                 payload = fields.get("batch_text") or fields.get("batch_number") or contract_data.get("batch_number") or ""
             elif clean_key in ("material_number", "matnr") or "material" in clean_key or "mat" in clean_key:
@@ -238,7 +233,7 @@ def inject_barcodes_and_qr(svg_content: str, contract_data: Dict[str, Any]) -> s
             if is_barcode:
                 key = barcode_key or "batch_barcode"
                 code_val = resolve_barcode_val(key)
-                if not code_val and barcode_key:
+                if not code_val and barcode_key and not fail_closed_empty_codes:
                     code_val = barcode_key
                 if code_val:
                     if tag in ("rect", "image"):
@@ -285,7 +280,7 @@ def inject_barcodes_and_qr(svg_content: str, contract_data: Dict[str, Any]) -> s
             elif is_qr:
                 key = qr_key or "qr_payload"
                 payload = resolve_qr_val(key)
-                if not payload and qr_key:
+                if not payload and qr_key and not fail_closed_empty_codes:
                     payload = qr_key
                 if payload:
                     if tag in ("rect", "image"):

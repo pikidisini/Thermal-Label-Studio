@@ -95,6 +95,25 @@ export interface PilotOperatorBatchSummary {
   completed_at?: string | null;
   error?: string | null;
   has_pdf: boolean;
+  simulation_tolerant?: boolean;
+  warning_count?: number;
+  warnings?: SapSimulationWarning[];
+}
+
+export interface SapSimulationWarning {
+  item_sequence: number;
+  field: string;
+  reason: 'missing' | 'invalid';
+  message: string;
+}
+
+export interface OperatorRawImportResult {
+  batch_id: string;
+  status: 'accepted' | 'processing' | 'completed' | 'failed';
+  simulation_tolerant?: boolean;
+  warning_count?: number;
+  warnings?: SapSimulationWarning[];
+  [key: string]: unknown;
 }
 
 export interface PilotOperatorItemSummary {
@@ -104,6 +123,9 @@ export interface PilotOperatorItemSummary {
   copies: number;
   status: 'accepted' | 'rendering' | 'completed' | 'failed';
   error?: string | null;
+  missing_fields?: string[];
+  warning_count?: number;
+  warnings?: SapSimulationWarning[];
 }
 
 export interface PilotOperatorBatchDetail {
@@ -128,4 +150,7 @@ export interface PilotOperatorBatchDetail {
   completed_at?: string | null;
   artifact?: SapShadowArtifact | null;
   error?: string | null;
+  simulation_tolerant?: boolean;
+  warning_count?: number;
+  warnings?: SapSimulationWarning[];
 }

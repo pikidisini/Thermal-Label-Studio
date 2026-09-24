@@ -211,3 +211,17 @@ ENDIF.
 
 lo_http_client->close( ).
 ```
+
+---
+
+## 6. Impor Raw JSON Lokal untuk Simulasi Toleran
+
+Jalur UI **Impor JSON dari SAP** (`POST /api/v1/simulation/operator/import-json`) adalah jalur simulasi lokal, bukan endpoint integrasi produksi. Untuk membantu PPIC melihat layout meskipun sebagian fakta SAP tidak tersedia, jalur ini menjalankan validasi N001 dengan mode `simulation_tolerant` yang eksplisit:
+
+- Fakta display yang hilang karena tidak ada, `null`, atau string kosong/whitespace ditampilkan sebagai `--` dan dicatat sebagai warning yang aman (`item_sequence`, nama field, alasan); batch dan PDF tetap diproses.
+- Nilai numerik yang hilang atau tidak valid tidak dipakai untuk derivasi. Field turunannya juga menjadi `--`; aplikasi tidak mengarang nilai bisnis.
+- Jika bagian barcode/QR tidak punya data sumber yang valid, simbol barcode/QR tidak dibuat dari `--`. Warning tetap ditampilkan; tidak ada payload kode palsu.
+- Berkas raw SAP yang diarsipkan dalam batch tidak dimutasi; `--` hanya nilai presentasi hasil adaptasi simulasi.
+- Warning tampil setelah impor dan pada daftar/rincian batch. Error fatal (payload/schema rusak, template tidak valid, kegagalan rendering) tetap menghentikan batch dan ditampilkan sebagai error.
+
+Mode toleran ini **hanya** diaktifkan pada endpoint impor JSON lokal oleh UI. Adapter N001 default, endpoint machine-to-machine `POST /api/v1/simulation/sap-batches`, dispatcher, dan semua jalur produksi tetap strict/fail-closed. Mengirim string `--` dari SAP tidak menjadikannya fakta bisnis yang sah dan tidak memberi izin untuk melewati validasi produksi.

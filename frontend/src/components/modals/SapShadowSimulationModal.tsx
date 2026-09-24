@@ -58,6 +58,7 @@ export default function SapShadowSimulationModal({
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const [uploadWarnings, setUploadWarnings] = useState<Array<{ item_sequence: number; field: string; reason: 'missing' | 'invalid'; message: string }>>([]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -68,6 +69,7 @@ export default function SapShadowSimulationModal({
       setImportFile(null);
       setUploadError(null);
       setUploadSuccess(null);
+      setUploadWarnings([]);
       return;
     }
 
@@ -127,6 +129,7 @@ export default function SapShadowSimulationModal({
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     setUploadError(null);
     setUploadSuccess(null);
+    setUploadWarnings([]);
     const file = e.target.files?.[0] || null;
     if (!file) {
       setImportFile(null);
@@ -157,7 +160,13 @@ export default function SapShadowSimulationModal({
     try {
       const res = await sapShadowSimulationApi.importOperatorJson(importFile, csrfToken);
       const batchId = res.batch_id || res.request_id || 'baru';
-      setUploadSuccess(`Batch ${batchId} berhasil diimpor! Menampilkan hasil simulasi.`);
+      const warnings = Array.isArray(res.warnings) ? res.warnings : [];
+      setUploadWarnings(warnings);
+      setUploadSuccess(
+        warnings.length
+          ? `Batch ${batchId} diproses dengan ${warnings.length} peringatan. Nilai yang tidak tersedia ditampilkan sebagai --.`
+          : `Batch ${batchId} berhasil diimpor! Menampilkan hasil simulasi.`
+      );
       setImportFile(null);
       const fileInput = document.getElementById('input-import-json-file') as HTMLInputElement | null;
       if (fileInput) fileInput.value = '';
@@ -307,6 +316,7 @@ export default function SapShadowSimulationModal({
                       setIsImportOpen(!isImportOpen);
                       setUploadError(null);
                       setUploadSuccess(null);
+                      setUploadWarnings([]);
                     }}
                     className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
                       isImportOpen
@@ -410,6 +420,26 @@ export default function SapShadowSimulationModal({
                       >
                         <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                         <span>{uploadSuccess}</span>
+                      </div>
+                    )}
+
+                    {uploadWarnings.length > 0 && (
+                      <div
+                        className="p-3 bg-amber-950/50 border border-amber-700/60 rounded-lg text-xs text-amber-100 space-y-2"
+                        role="status"
+                        data-testid="alert-import-json-warnings"
+                      >
+                        <div className="flex items-center gap-2 font-semibold text-amber-300">
+                          <AlertTriangle className="w-4 h-4 shrink-0" />
+                          <span>Simulasi tetap diproses; periksa informasi yang tidak tersedia:</span>
+                        </div>
+                        <ul className="list-disc pl-6 space-y-1">
+                          {uploadWarnings.map((warning, index) => (
+                            <li key={`${warning.item_sequence}-${warning.field}-${index}`}>
+                              Item {warning.item_sequence}: <code>{warning.field}</code> — {warning.reason === 'invalid' ? 'nilainya tidak valid' : 'tidak ditemukan'}; label menampilkan <code>--</code>.
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     )}
 
@@ -539,6 +569,11 @@ export default function SapShadowSimulationModal({
                           </td>
                           <td className="py-3 px-3 text-slate-300 font-medium">
                             {b.completed_items}/{b.total_items}
+                            {(b.warning_count ?? 0) > 0 && (
+                              <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-semibold text-amber-300" data-testid={`batch-warning-count-${b.batch_id}`}>
+                                <AlertTriangle className="w-3 h-3" /> {b.warning_count} warning
+                              </span>
+                            )}
                           </td>
                           <td className="py-3 px-3 text-right space-x-1.5 whitespace-nowrap">
                             <button
@@ -627,6 +662,26 @@ export default function SapShadowSimulationModal({
                                         <span>
                                           <strong>Kendala Simulasi:</strong> {batchDetail.error}
                                         </span>
+                                      </div>
+                                    )}
+
+                                    {batchDetail.warnings && batchDetail.warnings.length > 0 && (
+                                      <div
+                                        className="p-3 bg-amber-950/40 border border-amber-800/60 rounded text-amber-100 text-xs space-y-2"
+                                        role="status"
+                                        data-testid="batch-detail-warnings"
+                                      >
+                                        <div className="font-semibold text-amber-300 flex items-center gap-2">
+                                          <AlertTriangle className="w-4 h-4 shrink-0" />
+                                          Informasi tidak tersedia pada batch ini:
+                                        </div>
+                                        <ul className="list-disc pl-6 space-y-1">
+                                          {batchDetail.warnings.map((warning, index) => (
+                                            <li key={`${warning.item_sequence}-${warning.field}-${index}`}>
+                                              Item {warning.item_sequence}: <code>{warning.field}</code> — {warning.reason === 'invalid' ? 'nilainya tidak valid' : 'tidak ditemukan'}; ditampilkan sebagai <code>--</code>.
+                                            </li>
+                                          ))}
+                                        </ul>
                                       </div>
                                     )}
 

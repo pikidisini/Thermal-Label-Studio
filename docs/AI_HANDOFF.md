@@ -1,5 +1,15 @@
 # AI Handoff — Thermal Label Studio
 
+## Snapshot aktif — Simulasi tetap berjalan saat data SAP display hilang
+
+- Tanggal: 2026-09-24. Branch: `codex/simulation-missing-fields-warning`, dibuat dari `origin/main` `792eff8`.
+- Perubahan: mode `simulation_tolerant` khusus impor JSON lokal pada UI; fakta display absent/null/blank menjadi `--` dan warning per item+field. Warning aman muncul di hasil upload/list/detail. Derived numeric tidak dihitung dari data hilang/tidak valid; barcode/QR tidak dibuat dari sentinel; raw snapshot tetap dipertahankan.
+- Batas ketat: adapter N001 default, endpoint machine-to-machine, dispatcher, dan production path tetap strict. Tidak ada perubahan raw SAP contract.
+- Bukti aktual: backend suite penuh **492 passed, 21 skipped, 2 warnings**; backend target **156 passed/2 warnings**; frontend unit **85 passed**; TypeScript strict check PASS; frontend build PASS. Tes boundary + sentinel **11 passed/2 warnings**. Full-suite pertama mendeteksi fixture auth dengan request ID statis yang sudah pernah dipakai; fixture kini memakai ID unik dan full-suite rerun lulus.
+- Playwright E2E terarah `NOT RUN/BLOCKED`: `127.0.0.1:8000/api/v1/health` sudah dipakai, layanan yang sedang berjalan tidak dihentikan.
+- Belum ada commit/push/PR/merge pada branch ini. SAP, printer fisik, TCP 9100, Windows Spooler, Docker, dan database production tidak diakses.
+- Detail keputusan implementasi dan keterbatasan: `docs/tasks/B2B2O/RESULT.md` addendum 2026-09-24; kontrak arsitektur di `docs/architecture/sap_shadow_simulation_contract.md`.
+
 ## Snapshot aktif — Koreksi Docker bridge login PASS (PR-ready)
 
 - Branch `codex/fix-docker-bridge-transport`, commit executor `25a4070`. Browser host sebelumnya ditolak HTTP 403 karena Docker meneruskan client sebagai `172.17.0.1`; evaluator kini mengenali gateway Docker hanya saat host yang diminta adalah loopback.
