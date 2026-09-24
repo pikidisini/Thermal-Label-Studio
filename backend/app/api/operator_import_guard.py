@@ -13,6 +13,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from ..config import is_local_simulation_only
 from ..services.pilot_session_service import pilot_session_service
 
 logger = logging.getLogger("operator_import_guard")
@@ -78,11 +79,19 @@ class OperatorImportGuardMiddleware:
         }
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        path = scope.get("path", "")
+        if scope["type"] == "http" and is_local_simulation_only() and (
+            path == "/api/v1/print"
+            or path.startswith("/api/v1/print/")
+            or path == "/api/v1/sap/print"
+        ):
+            await JSONResponse(status_code=404, content={"detail": "Not Found"})(scope, receive, send)
+            return
+
         if scope["type"] != "http" or scope.get("method") != "POST":
             await self.app(scope, receive, send)
             return
 
-        path = scope.get("path", "")
         if path not in self.guarded_paths and not path.endswith("/simulation/operator/import-json"):
             await self.app(scope, receive, send)
             return

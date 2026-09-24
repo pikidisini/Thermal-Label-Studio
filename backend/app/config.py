@@ -77,6 +77,11 @@ def is_safe_demo_enabled() -> bool:
 SAFE_DEMO_MODE = is_safe_demo_enabled()
 
 
+def is_local_simulation_only() -> bool:
+    """Disable legacy physical dispatch routes in local simulation deployments."""
+    return os.getenv("LOCAL_SIMULATION_ONLY", "false").strip().lower() == "true"
+
+
 def is_sap_shadow_simulation_enabled() -> bool:
     """Check if SAP shadow print simulation mode is explicitly enabled via environment variable.
 
