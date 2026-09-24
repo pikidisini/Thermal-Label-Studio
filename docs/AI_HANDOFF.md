@@ -1,5 +1,12 @@
 # AI Handoff — Thermal Label Studio
 
+## Snapshot aktif — F3.3 review Level 3: CHANGES REQUIRED
+
+- Tanggal: 2026-09-24. Branch `codex/f3-3-app-login`; implementasi executor pada `9cfa3f6`.
+- Reviewer Codex menemukan tiga P1: urutan React hooks saat transisi login, jalur password pilot lama yang masih membuka simulasi, dan mutasi studio berbasis cookie tanpa guard CSRF. Tiga P2 tambahan ada di `docs/tasks/F3.3/REVIEW.md`.
+- Verifikasi independen terarah: backend 37 passed; frontend 79 passed. Full backend/build/E2E/Jenkins tidak dijalankan ulang oleh reviewer. Jangan PR/merge sebelum koreksi dan review ulang.
+- Snapshot implementasi di bawah adalah laporan executor pada saat handoff; klaim AC lengkap di sana belum menjadi verdict review akhir.
+
 ## Snapshot aktif — Fase 3.3: Implementasi Selesai (IMPLEMENTATION_COMPLETED — AWAITING_CODEX_LEVEL_3_REVIEW)
 
 - Tanggal: 2026-09-24
