@@ -1,6 +1,20 @@
 # Review Fase 3.3 — Login aplikasi
 
-Status: `CHANGES REQUIRED`. Review ulang Level 3 terhadap koreksi `7a45416`; jangan buat PR atau merge dahulu.
+Status: `PASS — PR-ready` pada commit `9e7ef36`. Tidak ada P0/P1/P2 terbuka dari review ini. Belum di-merge atau dinyatakan production-ready.
+
+## Review final keempat — commit `9e7ef36`
+
+Ketiga temuan putaran ketiga tertutup pada diff aktual `d174a20..9e7ef36`:
+
+1. Server backend Playwright sekarang memaksa `LOCAL_SIMULATION_ONLY=true`; `reuseExistingServer=false` mencegah test memakai server yang sudah berjalan. Setup browser mengharuskan lima rute cetak fisik mengembalikan 404 sebelum login.
+2. Seeder tidak lagi memiliki fallback ke `auth.db`. `AUTH_DB_PATH` wajib eksplisit, nama database operasional yang dikenal ditolak, dan target harus bernama E2E/test. Validasi terjadi sebelum repository dibuka; empat test baru mencakup penolakan dan target terisolasi.
+3. Setup E2E sekarang wajib melihat halaman login, berhasil memasuki studio sebagai PPIC, dan memiliki cookie `app_session` sebelum menyimpan state. Tidak ada lagi jalur lulus diam-diam tanpa login.
+
+Verifikasi reviewer: `git fetch origin` PASS; branch bersih dan tracking remote pada `9e7ef36`; `git diff --check origin/main...HEAD` PASS; `python -m pytest backend/tests/test_seed_e2e_users.py backend/tests/test_pilot_operator_session.py -q -p no:cacheprovider --tb=short` **29 passed, 2 deprecation warnings**. Tidak ada file database E2E atau state Playwright yang tracked. Upaya menjalankan Playwright berhenti **sebelum test** karena `127.0.0.1:8000` sudah digunakan oleh proses lokal; reviewer tidak menghentikan atau mengganti layanan pengguna. Jadi E2E reviewer **BLOCKED**, bukan PASS. `RESULT.md` melaporkan E2E executor **7 passed**, tetapi angka itu tidak diverifikasi ulang secara independen. Jenkins runtime, SAP, printer fisik, dan deployment produksi **NOT RUN** oleh reviewer.
+
+Verdict: branch layak dibuat PR untuk review dan merge setelah pemeriksaan PR biasa. Keterbatasan rerun E2E dicatat transparan dan bukan temuan kode baru. Mode simulasi lokal tetap tidak boleh dianggap sebagai kesiapan deployment intranet/produksi.
+
+---
 
 ## Review ulang ketiga — commit `7a45416`
 
