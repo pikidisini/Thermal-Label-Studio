@@ -71,7 +71,7 @@ except urllib.error.HTTPError as error:
 ' >/dev/null
 
   # Verify user_admin CLI is packaged and executable
-  docker exec "$name" python -m app.cli.user_admin --help >/dev/null
+  docker exec "$name" env PYTHONPATH=/app/backend python -m app.cli.user_admin --help >/dev/null
 }
 
 cleanup_candidate() {

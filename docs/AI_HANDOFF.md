@@ -1,6 +1,26 @@
 # AI Handoff — Thermal Label Studio
 
-## Snapshot aktif — F3.3 review final keempat PASS (PR-ready)
+## Snapshot aktif — Perbaikan CI Jenkins: PYTHONPATH Container Safety Check
+
+- Tanggal: 2026-09-24. Branch `codex/fix-jenkins-pythonpath`, baseline `origin/main` (`bd0b78e`).
+- Writer / Executor: Gemini Flash (Antigravity). Reviewer: Codex.
+- Status: `REMEDIATION_COMPLETED — AWAITING_CODEX_REVIEW`.
+- File yang diubah: `ops/jenkins/deploy-local.sh`, `docs/tasks/F3.2/RESULT.md`, `docs/AI_HANDOFF.md`.
+- Penyebab error: Build Jenkins #11 pada commit `bd0b78e` gagal pada safety check kandidat dengan `ModuleNotFoundError: No module named 'app'` karena perintah CLI `python -m app.cli.user_admin --help` dijalankan dari working directory `/app` (di mana `PYTHONPATH=/app`), sedangkan modul `app` berada di `/app/backend/app`.
+- Perbaikan: Menambahkan `env PYTHONPATH=/app/backend` pada perintah `docker exec "$name" env PYTHONPATH=/app/backend python -m app.cli.user_admin --help >/dev/null` di `ops/jenkins/deploy-local.sh`.
+- Verifikasi aktual:
+  - Bash syntax check (`bash.exe -n ops/jenkins/deploy-local.sh`): PASS.
+  - Reproduksi & verifikasi isolasi container kandidat lokal (`tls-local-sim:bd0b78ee6c36`) tanpa publish port dan tanpa volume live:
+    - Sebelum perbaikan: FAIL (`ModuleNotFoundError: No module named 'app'`).
+    - Sesudah perbaikan: PASS (exit code 0, menu help tercetak).
+  - Jenkins build ulang: NOT RUN (menunggu review dan trigger pipeline berikutnya).
+  - Safety check: Kegagalan Build #11 terjadi pada container kandidat sebelum container live (`tls-local-sim`) disentuh/diganti; container live tetap aman dan beroperasi normal.
+  - `git diff --check origin/main...HEAD`: PASS.
+  - Secret scan: PASS (0 secrets).
+- Batas keras: Tidak mengubah Dockerfile, source backend/frontend, auth, database production, port printer, TCP 9100, Spooler, atau SAP.
+- Next step: Stop sebelum PR/merge. Meminta Codex melakukan review sebelum PR.
+
+## Riwayat snapshot — F3.3 review final keempat PASS (PR-ready)
 
 - Tanggal 2026-09-24; branch `codex/f3-3-app-login`; kode executor pada `9e7ef36`. Reviewer Codex Level 3 menutup seluruh temuan sebelumnya; rincian ada di `docs/tasks/F3.3/REVIEW.md`.
 - Verifikasi reviewer: status branch awal bersih dan tracking remote; `git diff --check origin/main...HEAD` PASS; backend targeted 29 PASS. Laporan executor mencatat Playwright 7 PASS, tetapi rerun reviewer BLOCKED sebelum test karena port lokal 8000 sedang digunakan; layanan pengguna tidak dihentikan.
