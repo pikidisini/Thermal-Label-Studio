@@ -48,7 +48,16 @@ from app.services.sap_shadow_service import (
 )
 from engine.renderer import OrphanTokenError, inject_data, validate_no_orphan_tokens
 
-CANONICAL_TEMPLATE_SHA256 = "4D3C7B18A4B30B40C682F71736F2C4CF364C8CF2005FA35D555E65CF229B1577"
+# Canonical SVG template reference hashes:
+# - LF (Linux / Git canonical object digest): 112D959A7C4DA10AB078C0F8D5AD9643F0FA00AD25FC9C78D614C5371BAF4535
+# - CRLF (Windows git checkout with core.autocrlf=true): 4D3C7B18A4B30B40C682F71736F2C4CF364C8CF2005FA35D555E65CF229B1577
+CANONICAL_TEMPLATE_SHA256_LF = "112D959A7C4DA10AB078C0F8D5AD9643F0FA00AD25FC9C78D614C5371BAF4535"
+CANONICAL_TEMPLATE_SHA256_CRLF = "4D3C7B18A4B30B40C682F71736F2C4CF364C8CF2005FA35D555E65CF229B1577"
+CANONICAL_TEMPLATE_SHA256 = CANONICAL_TEMPLATE_SHA256_CRLF
+CANONICAL_TEMPLATE_SHA256_ALLOWED = {
+    CANONICAL_TEMPLATE_SHA256_LF,
+    CANONICAL_TEMPLATE_SHA256_CRLF,
+}
 SYNTHETIC_FIXTURE_PATH = (
     Path(__file__).resolve().parent.parent.parent
     / "docs"
@@ -656,7 +665,7 @@ class TestCanonicalTemplateIntegrity:
     """Verifies that the canonical SVG template was not modified."""
 
     def test_canonical_template_sha256_unmodified(self):
-        """Canonical SVG template must match reference SHA-256 digest exactly."""
+        """Canonical SVG template must match reference SHA-256 digest exactly across platforms."""
         tmpl_path = (
             Path(__file__).resolve().parent.parent.parent
             / "assets"
@@ -664,7 +673,16 @@ class TestCanonicalTemplateIntegrity:
             / "label_roll_80x200.svg"
         )
         assert tmpl_path.is_file(), f"Canonical template not found at {tmpl_path}"
-        actual_sha = hashlib.sha256(tmpl_path.read_bytes()).hexdigest().upper()
-        assert actual_sha == CANONICAL_TEMPLATE_SHA256, (
-            f"Canonical template SHA-256 altered!\nExpected: {CANONICAL_TEMPLATE_SHA256}\nActual:   {actual_sha}"
+        raw_bytes = tmpl_path.read_bytes()
+        actual_sha = hashlib.sha256(raw_bytes).hexdigest().upper()
+        normalized_lf_sha = hashlib.sha256(raw_bytes.replace(b"\r\n", b"\n")).hexdigest().upper()
+        assert (
+            actual_sha in CANONICAL_TEMPLATE_SHA256_ALLOWED
+            or normalized_lf_sha == CANONICAL_TEMPLATE_SHA256_LF
+        ), (
+            f"Canonical template SHA-256 altered!\n"
+            f"Expected LF:   {CANONICAL_TEMPLATE_SHA256_LF}\n"
+            f"Expected CRLF: {CANONICAL_TEMPLATE_SHA256_CRLF}\n"
+            f"Actual raw:    {actual_sha}\n"
+            f"Actual norm LF:{normalized_lf_sha}"
         )
