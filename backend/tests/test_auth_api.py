@@ -358,3 +358,48 @@ def test_session_transport_guard_on_me_and_csrf_endpoints(auth_api_setup):
     r_me_https = https_client.get("/api/v1/auth/me")
     assert r_me_https.status_code == 200
     assert r_me_https.json()["authenticated"] is True
+
+    # 5. Docker bridge gateway connecting to /auth/me on loopback Host succeeds
+    docker_client = TestClient(app, client=("172.17.0.1", 55555))
+    docker_client.cookies.set("app_session", session_cookie)
+    r_me_docker = docker_client.get(
+        "/api/v1/auth/me",
+        headers={"Host": "127.0.0.1:8000"},
+    )
+    assert r_me_docker.status_code == 200
+    assert r_me_docker.json()["authenticated"] is True
+
+    # 6. Intranet client with spoofed loopback Host rejected with 403 on /auth/me
+    lan_client = TestClient(app, client=("192.168.1.50", 55555))
+    lan_client.cookies.set("app_session", session_cookie)
+    r_me_lan_spoof = lan_client.get(
+        "/api/v1/auth/me",
+        headers={"Host": "127.0.0.1:8000"},
+    )
+    assert r_me_lan_spoof.status_code == 403
+
+
+def test_docker_bridge_and_loopback_client_evaluator():
+    """Unit test for is_loopback_or_docker_bridge_client across various origins."""
+    from backend.app.auth.dependencies import is_loopback_or_docker_bridge_client
+
+    # Loopback origins are allowed
+    assert is_loopback_or_docker_bridge_client("") is True
+    assert is_loopback_or_docker_bridge_client("127.0.0.1") is True
+    assert is_loopback_or_docker_bridge_client("localhost") is True
+    assert is_loopback_or_docker_bridge_client("::1") is True
+    assert is_loopback_or_docker_bridge_client("testclient") is True
+    assert is_loopback_or_docker_bridge_client("testserver") is True
+
+    # Standard Docker bridge gateways and subnets are allowed
+    assert is_loopback_or_docker_bridge_client("172.17.0.1") is True
+    assert is_loopback_or_docker_bridge_client("172.17.0.2") is True
+    assert is_loopback_or_docker_bridge_client("192.168.65.1") is True
+    assert is_loopback_or_docker_bridge_client("192.168.65.2") is True
+
+    # Arbitrary intranet IPs are rejected
+    assert is_loopback_or_docker_bridge_client("192.168.1.50") is False
+    assert is_loopback_or_docker_bridge_client("10.0.0.1") is False
+    assert is_loopback_or_docker_bridge_client("10.10.10.10") is False
+    assert is_loopback_or_docker_bridge_client("8.8.8.8") is False
+    assert is_loopback_or_docker_bridge_client("corp.internal") is False

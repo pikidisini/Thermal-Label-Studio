@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import ipaddress
 import logging
-from typing import Callable, Optional, Tuple
+import os
+from typing import Callable, Optional, Set, Tuple
 from fastapi import Cookie, Depends, Header, HTTPException, Request, status
 
 from .models import Role, Session
@@ -13,6 +15,65 @@ logger = logging.getLogger("auth_dependencies")
 
 SESSION_COOKIE_NAME = "app_session"
 
+LOOPBACK_HOSTS: Set[str] = {"127.0.0.1", "localhost", "::1", "testserver"}
+LOOPBACK_CLIENTS: Set[str] = {"127.0.0.1", "localhost", "::1", "testserver", "testclient"}
+DOCKER_KNOWN_GATEWAYS: Set[str] = {"172.17.0.1", "192.168.65.1"}
+DOCKER_DEFAULT_BRIDGE_NETWORK = ipaddress.ip_network("172.17.0.0/16")
+DOCKER_DESKTOP_NETWORK = ipaddress.ip_network("192.168.65.0/24")
+
+
+def _get_linux_default_gateways() -> Set[str]:
+    """Extracts default route gateways from Linux /proc/net/route if running in a container."""
+    gateways: Set[str] = set()
+    try:
+        with open("/proc/net/route", "r", encoding="utf-8") as f:
+            for line in f.readlines()[1:]:
+                parts = line.strip().split()
+                if len(parts) >= 3 and parts[1] == "00000000":
+                    import socket
+                    import struct
+
+                    gw_hex = int(parts[2], 16)
+                    if gw_hex != 0:
+                        gw_ip = socket.inet_ntoa(struct.pack("<L", gw_hex))
+                        gateways.add(gw_ip)
+    except Exception:
+        pass
+    return gateways
+
+
+def is_loopback_or_docker_bridge_client(client_ip: str) -> bool:
+    """Verifies whether client IP is a local loopback origin or a recognized Docker bridge gateway.
+
+    Handles containerized environments where port forwarding (e.g. -p 127.0.0.1:8000:8000)
+    forwards host loopback traffic across the Docker bridge gateway (typically 172.17.0.1
+    or Docker Desktop 192.168.65.1).
+    """
+    if not client_ip:
+        return True
+
+    clean_ip = client_ip.lower().strip()
+    if clean_ip in LOOPBACK_CLIENTS:
+        return True
+
+    if clean_ip in DOCKER_KNOWN_GATEWAYS:
+        return True
+
+    if clean_ip in _get_linux_default_gateways():
+        return True
+
+    try:
+        ip_obj = ipaddress.ip_address(clean_ip)
+        if ip_obj in DOCKER_DEFAULT_BRIDGE_NETWORK or ip_obj in DOCKER_DESKTOP_NETWORK:
+            return True
+        # If running in a container (/.dockerenv exists), allow user-defined Docker bridge networks
+        if os.path.exists("/.dockerenv") and ip_obj in ipaddress.ip_network("172.16.0.0/12"):
+            return True
+    except Exception:
+        pass
+
+    return False
+
 
 def evaluate_app_transport_security(request: Request) -> Tuple[bool, bool]:
     """Evaluates whether request transport satisfies security requirements.
@@ -21,6 +82,7 @@ def evaluate_app_transport_security(request: Request) -> Tuple[bool, bool]:
         Tuple[is_allowed, is_secure_cookie]
     - Over HTTPS: always allowed, cookie secure=True.
     - Over HTTP loopback (localhost, 127.0.0.1, ::1, testserver, testclient): allowed for local dev, cookie secure=False.
+    - Over HTTP Docker bridge (forwarded from host loopback via docker-proxy / bridge gateway): allowed for local dev, cookie secure=False.
     - Over HTTP non-loopback (e.g. plain intranet IP/hostname): rejected (fail-closed, HTTP 403).
     """
     if request.url.scheme == "https":
@@ -30,11 +92,10 @@ def evaluate_app_transport_security(request: Request) -> Tuple[bool, bool]:
     hostname = (request.url.hostname or host_header).lower()
     client_ip = (request.client.host if request.client else "").lower()
 
-    loopback_hosts = {"127.0.0.1", "localhost", "::1", "testserver"}
-    client_is_loopback = (not client_ip) or (client_ip in loopback_hosts) or (client_ip == "testclient")
-    host_is_loopback = hostname in loopback_hosts
+    host_is_loopback = hostname in LOOPBACK_HOSTS
+    client_is_allowed = is_loopback_or_docker_bridge_client(client_ip)
 
-    if host_is_loopback and client_is_loopback:
+    if host_is_loopback and client_is_allowed:
         return True, False
 
     return False, False

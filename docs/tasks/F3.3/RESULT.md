@@ -80,6 +80,23 @@ Fase 3.3 menyatukan otentikasi Thermal Label Studio menjadi satu sesi aplikasi t
    - Mengharuskan `login-page` terlihat tanpa syarat, mengisi kredensial PPIC, menekan login, dan memastikan masuk ke Studio dengan badge `[PPIC] ppic_operator`.
    - Memvalidasi secara eksplisit bahwa cookie `app_session` berstatus aktif di browser context sebelum menyimpan `storageState` ke `frontend/.auth/user.json`.
 
+### Remediasi Tambahan: Kompatibilitas Transport Security pada Jaringan Docker Bridge:
+
+1. **Penyebab (Root Cause)**:
+   - Saat aplikasi dijalankan di dalam kontainer Docker dengan binding host loopback (`-p 127.0.0.1:8000:8000`), permintaan HTTP dari peramban host diteruskan melalui antarmuka bridge Docker.
+   - Header `Host` atau `request.url.hostname` bernilai `127.0.0.1` atau `localhost`, namun `request.client.host` terdeteksi sebagai alamat IP gateway Docker bridge (`172.17.0.1` atau `192.168.65.1`).
+   - Implementasi evaluasi transport sebelumnya hanya mengizinkan `client_ip in loopback_hosts`, sehingga permintaan login sah dari browser lokal ditolak dengan HTTP 403 (`Login rejected: plain HTTP over non-loopback host '127.0.0.1' (client '172.17.0.1')`).
+
+2. **Solusi Implementasi**:
+   - Menambahkan fungsi pembantu `is_loopback_or_docker_bridge_client` pada [`backend/app/auth/dependencies.py`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/backend/app/auth/dependencies.py) yang memvalidasi bahwa `client_ip` adalah loopback langsung (`127.0.0.1`, `localhost`, `::1`, `testserver`, `testclient`) atau gateway/jaringan Docker bridge yang sah (`172.17.0.1`, `192.168.65.1`, default gateway dari `/proc/net/route`, subnet `172.17.0.0/16`, atau subnet Docker Desktop `192.168.65.0/24`).
+   - Menyelaraskan [`backend/app/api/operator_import_guard.py`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/backend/app/api/operator_import_guard.py) (`evaluate_pilot_transport_security`) untuk mendelegasikan secara langsung ke `evaluate_app_transport_security`, menjamin konsistensi evaluasi transport di seluruh endpoint aplikasi.
+   - **Invarian Keamanan Terjaga**: Permintaan plain HTTP ke hostname/IP intranet (`Host: 192.168.1.50`, dsb.) tetap ditolak fail-closed HTTP 403. Permintaan dari IP intranet eksternal yang memalsukan header `Host: 127.0.0.1` tetap ditolak fail-closed HTTP 403 karena IP klien bukan loopback dan bukan gateway bridge Docker lokal.
+
+3. **Verifikasi & Bukti Uji**:
+   - Ditambahkan pengujian gateway Docker bridge (`172.17.0.1`, `192.168.65.1`) pada `backend/tests/test_pilot_operator_session.py` dan `backend/tests/test_auth_api.py`.
+   - Ditambahkan pengujian penolakan spoofing klien intranet (`192.168.1.50`) dengan `Host: 127.0.0.1:8000` (fail-closed HTTP 403).
+   - Ditambahkan unit test evaluator `test_docker_bridge_and_loopback_client_evaluator` di `test_auth_api.py`.
+
 ---
 
 ## 2. Inventaris Endpoint & Guard Matriks
