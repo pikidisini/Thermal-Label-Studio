@@ -1,5 +1,12 @@
 # AI Handoff — Thermal Label Studio
 
+## Snapshot aktif — Koreksi Docker bridge login PASS (PR-ready)
+
+- Branch `codex/fix-docker-bridge-transport`, commit executor `25a4070`. Browser host sebelumnya ditolak HTTP 403 karena Docker meneruskan client sebagai `172.17.0.1`; evaluator kini mengenali gateway Docker hanya saat host yang diminta adalah loopback.
+- Verifikasi Codex: auth/transport regression **41 passed, 2 warnings**; `git diff --check origin/main...HEAD` PASS. Intranet spoof (`192.168.1.50` + Host loopback) tetap 403.
+- Container live belum diperbarui oleh koreksi ini; Jenkins build/deploy ulang diperlukan setelah merge. Detail review ada di `docs/tasks/F3.3/REVIEW.md`.
+- Belum ada PR/merge pada koreksi ini. SAP, printer fisik, TCP 9100, Spooler, dan database production tidak diakses.
+
 ## Snapshot aktif — Perbaikan Bug Docker Bridge pada Transport Security Login F3.3
 
 - Tanggal: 2026-09-24. Branch `codex/fix-docker-bridge-transport`, baseline `origin/main` (`bd0b78e`).

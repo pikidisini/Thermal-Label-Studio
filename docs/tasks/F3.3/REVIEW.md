@@ -1,6 +1,28 @@
 # Review Fase 3.3 — Login aplikasi
 
-Status: `PASS — PR-ready` pada commit `9e7ef36`. Tidak ada P0/P1/P2 terbuka dari review ini. Belum di-merge atau dinyatakan production-ready.
+Status: `PASS — koreksi Docker bridge siap PR` pada commit `25a4070`. Belum di-merge atau dinyatakan production-ready.
+
+## Review koreksi Docker bridge — commit `25a4070`
+
+Koreksi menutup kegagalan login aktual pada container Docker. Log live sebelumnya menunjukkan browser host masuk melalui `172.17.0.1`, sedangkan evaluator lama hanya mengizinkan client loopback langsung dan mengembalikan HTTP 403 sebelum password diperiksa.
+
+Verifikasi kode:
+
+- `evaluate_app_transport_security()` kini menerima loopback host (`127.0.0.1`/`localhost`) dari gateway Docker yang dikenali, gateway default container, dan jaringan Docker yang relevan.
+- Host non-loopback tetap ditolak melalui HTTP; test spoofing dari `192.168.1.50` dengan `Host: 127.0.0.1` tetap menghasilkan 403.
+- `operator_import_guard` memakai evaluator yang sama sehingga login dan import JSON tidak memiliki aturan transport yang berbeda.
+
+Verifikasi aktual:
+
+- `python -m pytest backend/tests/test_auth_api.py backend/tests/test_pilot_operator_session.py -q -p no:cacheprovider --tb=short`: **41 passed, 2 deprecation warnings**. Percobaan awal tanpa akses temporary Windows menghasilkan PermissionError dari pytest; rerun dengan izin temporary yang diperlukan lulus.
+- `git diff --check origin/main...HEAD`: PASS.
+- Tidak ada akses SAP, printer fisik, TCP 9100, Spooler, atau database production.
+
+Verdict: koreksi layak dibuat PR. Container `tls-local-sim` yang sedang berjalan belum otomatis memakai image ini; Jenkins harus membangun dan mendeploy ulang setelah merge.
+
+Catatan hardening non-blocking: allowlist gateway Docker sebaiknya tetap dipertahankan sempit pada deployment intranet dan tidak boleh menggantikan HTTPS ketika binding aplikasi dibuka ke jaringan kantor.
+
+---
 
 ## Review final keempat — commit `9e7ef36`
 
