@@ -1,5 +1,12 @@
 # AI Handoff — Thermal Label Studio
 
+## Snapshot aktif — F3.3 review ulang ketiga: CHANGES REQUIRED
+
+- Tanggal: 2026-09-24. Branch `codex/f3-3-app-login`, koreksi executor `7a45416`.
+- Jenkins secret lama dan probe sesi sudah dikoreksi; regression endpoint sesi 25 PASS. Review menemukan harness Playwright belum mengaktifkan `LOCAL_SIMULATION_ONLY=true`, serta skrip seed E2E masih dapat memilih `backend/data/auth.db` dan mereset akun dengan password test bila env hilang. Detail di `docs/tasks/F3.3/REVIEW.md`.
+- E2E tidak dijalankan ulang oleh reviewer karena konfigurasi server test belum menutup rute cetak fisik. Jangan PR/merge sebelum koreksi keselamatan, test E2E, dan review final.
+- Snapshot executor/review lama di bawah dipertahankan sebagai riwayat, bukan verdict terkini.
+
 ## Snapshot aktif — F3.3 Remediasi Review Ulang Selesai (REMEDIATION_ROUND2_COMPLETED — AWAITING_CODEX_FINAL_REVIEW)
 
 - Tanggal: 2026-09-24. Branch `codex/f3-3-app-login`.

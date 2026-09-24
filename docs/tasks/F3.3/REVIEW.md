@@ -1,6 +1,21 @@
 # Review Fase 3.3 — Login aplikasi
 
-Status: `CHANGES REQUIRED`. Review ulang Level 3 terhadap koreksi `c07179c`; jangan buat PR atau merge dahulu.
+Status: `CHANGES REQUIRED`. Review ulang Level 3 terhadap koreksi `7a45416`; jangan buat PR atau merge dahulu.
+
+## Review ulang ketiga — commit `7a45416`
+
+Temuan putaran kedua pada Jenkins dan probe sesi sudah tertutup secara inspeksi kode; `test_pilot_operator_session.py` lulus 25 test. Spec E2E lama sudah diubah menjadi alur login aplikasi. Namun, dua batas keselamatan pada harness E2E baru masih perlu diperbaiki:
+
+1. **P1 — Server Playwright tidak memaksa simulasi-only.** `frontend/playwright.config.js` mengatur `SAFE_DEMO_MODE=true` dan `AUTH_DB_PATH`, tetapi tidak `LOCAL_SIMULATION_ONLY=true`. Default `backend/app/config.py` untuk variabel itu adalah `false`; middleware hanya menutup `/api/v1/print/*` bila variabel bernilai true. Jadi selama E2E berjalan, rute cetak fisik berpotensi terbuka di server test. Setel `LOCAL_SIMULATION_ONLY=true` secara eksplisit pada konfigurasi `webServer` backend dan tambahkan assertion E2E/preflight bahwa rute fisik memberi 404. Jangan menjalankan E2E lagi sebelum guard ini dipasang.
+2. **P1 — Seeder E2E memiliki fallback ke database akun biasa.** `backend/scripts/seed_e2e_users.py:20–24` memilih `backend/data/auth.db` ketika `AUTH_DB_PATH` tidak ada, lalu membuat atau mereset akun dengan password test tetap (baris 28–44). Menjalankan skrip di luar Playwright tanpa env dapat mengubah akun pilot nyata. Hapus fallback tersebut: wajibkan path E2E eksplisit, tolak path `auth.db`/volume live atau target yang tidak dikenali, dan gagal sebelum membuka repository. Tambahkan regression test bahwa tanpa env atau dengan path live skrip exit non-zero tanpa mutasi data.
+
+P2 untuk ketegasan E2E: `frontend/tests/e2e/auth.setup.js:13–24` hanya login jika halaman login kebetulan terlihat; jika tidak, ia tetap menyimpan `storageState` dan setup bisa lulus tanpa autentikasi. Jadikan tampilan login dan keberhasilan autentikasi assertion wajib, lalu pastikan cookie sesi tersedia sebelum menyimpan state.
+
+Verifikasi reviewer putaran ketiga: `git fetch origin` PASS, status bersih pada `7a45416`, `git diff --check origin/main...HEAD` PASS, `test_pilot_operator_session.py` 25 PASS. Playwright **NOT RUN oleh reviewer** karena pengaman rute fisik belum diaktifkan pada webServer test; angka E2E di `RESULT.md` adalah laporan executor. Setelah dua P1 dan P2 di atas dikoreksi, jalankan E2E dalam mode simulasi-only, catat hasil, lalu minta review final. Jangan PR/merge terlebih dahulu.
+
+---
+
+## Riwayat review putaran kedua — commit `c07179c`
 
 ## Review ulang — commit `c07179c`
 
