@@ -30,3 +30,19 @@ Tanggal: 2026-09-24. Branch: `codex/f3-2-jenkins-local-simulation`, baseline `or
 2. Credential operator harus dimasukkan pengguna langsung ke Jenkins. Sampai itu selesai, deploy sengaja fail-closed.
 3. Job `main` tidak akan menemukan Jenkinsfile sampai branch ini direview dan di-merge. Setelah merge, jalankan job pertama secara manual; polling berikutnya otomatis.
 4. Tindakan pengguna berikutnya: selesaikan wizard admin Jenkins di `http://127.0.0.1:8081` tanpa membagikan password awal atau credential ke chat. Lihat `docs/deployment/jenkins_local_simulation.md`.
+
+---
+
+## Update 2026-09-24 — Perbaikan PYTHONPATH pada Container Safety Check (Build #11)
+
+- **Konteks**: Build Jenkins #11 pada commit `bd0b78e` (`main`) berhasil menjalankan full backend test, frontend build/test, dan Docker build. Tahap deployment gagal pada safety check kandidat dengan pesan error: `ModuleNotFoundError: No module named 'app'`.
+- **Root Cause**: Dockerfile menempatkan package pada `/app/backend/app`. Skrip `ops/jenkins/deploy-local.sh` memanggil `docker exec "$name" python -m app.cli.user_admin --help` dengan working directory default `/app` dan `PYTHONPATH=/app`, sehingga modul `app` tidak ditemukan. Kegagalan terjadi pada container kandidat sebelum container live (`tls-local-sim`) diganti/disentuh.
+- **Solusi**: Menambahkan `env PYTHONPATH=/app/backend` pada pemanggilan CLI user_admin di `ops/jenkins/deploy-local.sh`:
+  `docker exec "$name" env PYTHONPATH=/app/backend python -m app.cli.user_admin --help >/dev/null`
+- **Verifikasi**:
+  - Bash syntax check (`bash.exe -n ops/jenkins/deploy-local.sh`): PASS.
+  - Pengujian container kandidat lokal terisolasi (`tls-local-sim:bd0b78ee6c36`) tanpa port publish dan tanpa volume live:
+    - Sebelum perbaikan: FAIL (`ModuleNotFoundError: No module named 'app'`).
+    - Sesudah perbaikan: PASS (exit code 0, help menu tercetak sempurna).
+  - Jenkins build ulang: NOT RUN (menunggu review dan build baru).
+  - Live container `tls-local-sim`: Tidak tersentuh dan tetap berjalan normal pada versi deployed sebelumnya.
