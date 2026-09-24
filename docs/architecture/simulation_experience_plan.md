@@ -30,4 +30,6 @@ Penyatuan ini hanya pada navigasi dan bahasa UI. Backend Safe Demo lama dan SAP 
 - Kebijakan retensi dan akses PDF simulasi untuk penggunaan tim di luar pilot.
 - Penyelarasan istilah Safe Demo di dokumentasi teknis lama; jangan mengubah nama kontrak atau API lama hanya demi copy UI.
 
+Pembaruan rencana (2026-09-24): Fase 3.3 mengusulkan login aplikasi satu kali untuk PPIC/IT dan menghilangkan login operator tambahan di modal Simulasi Label setelah endpoint browser terlindungi sesi aplikasi. Lihat `application_authentication_plan.md` dan `docs/tasks/F3.3/TASK_CONTRACT.md`. Ini belum diimplementasikan; alur login operator pada bagian sebelumnya tetap menggambarkan kondisi F3.1.
+
 Topik di atas bukan bagian otomatis dari Fase 3.1. Masing-masing memerlukan task, kebutuhan bisnis, dan verifikasi sendiri sebelum dijadwalkan.

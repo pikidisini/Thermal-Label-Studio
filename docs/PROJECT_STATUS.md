@@ -4,6 +4,8 @@ Dokumen ini adalah ringkasan kondisi proyek aktif untuk manusia dan AI.
 
 ## Status proyek
 
+Snapshot aktif (2026-09-24): Fase 3.2 telah merged ke `main` melalui PR #26 (`98a5983`). Fase 3.3 direncanakan pada branch `codex/f3-3-app-login`: login aplikasi satu kali untuk akun PPIC/IT, lalu Simulasi Label memakai sesi aplikasi yang sama tanpa form login operator pilot. Rancangan berada di `docs/architecture/application_authentication_plan.md`; kontrak kerja berada di `docs/tasks/F3.3/TASK_CONTRACT.md`. Implementasi dan test F3.3 belum dijalankan. Snapshot lama di bawah adalah riwayat pada saat ditulis.
+
 Snapshot aktif (2026-09-24): Fase 3.2 menyiapkan Jenkins self-hosted lokal di branch `codex/f3-2-jenkins-local-simulation` dari `main` `04bb368`. Container Jenkins sudah berjalan hanya pada `127.0.0.1:8081`; pipeline dan aplikasi simulasi live belum aktif sampai wizard admin, credential, job SCM, review, dan merge selesai. Backend `440 passed, 21 skipped`; frontend `74 passed`; app Docker smoke test PASS. Detail dan batas verifikasi ada di `docs/tasks/F3.2/RESULT.md`. Snapshot F3.1 di bawah adalah riwayat, bukan status Git terkini.
 
 Snapshot implementasi (2026-09-23): Fase `3.1 — Simulasi Label Terpadu`

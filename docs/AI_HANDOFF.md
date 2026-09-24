@@ -1,5 +1,13 @@
 # AI Handoff — Thermal Label Studio
 
+## Snapshot aktif — Perencanaan Fase 3.3 login aplikasi (2026-09-24)
+
+- Writer perencanaan: Codex pada laptop pengguna. Branch `codex/f3-3-app-login`, baseline `main`/`origin/main` `98a5983` (F3.2 telah merged melalui PR #26). Tidak ada kode runtime F3.3 yang diubah pada perencanaan ini.
+- Kebutuhan pengguna: halaman login untuk Thermal Label Studio; akun PPIC dan IT yang masuk dapat memakai Simulasi Label tanpa login operator pilot kedua. Hak simulasi tidak otomatis memberi hak cetak fisik.
+- Rancangan dan kontrak eksekusi: `docs/architecture/application_authentication_plan.md` dan `docs/tasks/F3.3/TASK_CONTRACT.md`. `RESULT.md` serta `REVIEW.md` masih template `NOT STARTED`.
+- Executor berikut: Gemini Flash 3.8 High sebagai satu-satunya writer setelah checkpoint ini. Codex melakukan review Level 3 setelah handoff. Test runtime F3.3, Jenkins build F3.3, dan UAT login baru: `NOT RUN` karena baru perencanaan.
+- Snapshot F3.2 dan fase sebelumnya di bawah adalah arsip pada saat ditulis; status Git terkini harus diperiksa ulang oleh executor.
+
 ## Snapshot aktif — Fase 3.2 Jenkins lokal (2026-09-24)
 
 - Writer: Codex pada laptop pengguna. Branch `codex/f3-2-jenkins-local-simulation`, baseline `origin/main` `04bb368`; perubahan F3.2 masih uncommitted/unpushed. Folder `output/` adalah data lokal sebelumnya, tidak disentuh, dan kini di-ignore.
