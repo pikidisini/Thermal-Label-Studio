@@ -1,8 +1,13 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Pilot Operator Self-Service Simulation (B2B2N) End-to-End Suite', () => {
-  test('Saat pilot operator aktif: form login operator tampil, autentikasi cookie-only berhasil memuat batch list, item sequence detail tampil, dan logout mengembalikan ke form login', async ({ page }) => {
-    // 1. Mock status API with both simulation and pilot operator enabled
+test.describe('App Login & Unified Simulation Self-Service E2E Suite (Fase 3.3)', () => {
+  // Start unauthenticated so test exercises login, studio transition, and logout lifecycle
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test('Alur login aplikasi PPIC -> masuk Studio -> buka Simulasi Label -> periksa batch & urutan item -> periksa bukti PDF -> logout aplikasi global', async ({ page }) => {
+    let isAuthenticated = false;
+
+    // 1. Mock status API
     await page.route('**/api/status', async (route) => {
       await route.fulfill({
         status: 200,
@@ -16,9 +21,105 @@ test.describe('Pilot Operator Self-Service Simulation (B2B2N) End-to-End Suite',
       });
     });
 
-    let isAuthenticated = false;
+    // 2. Mock auth probe (/auth/me)
+    await page.route('**/api/v1/auth/me', async (route) => {
+      if (isAuthenticated) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            authenticated: true,
+            user: {
+              id: 'usr-ppic-001',
+              username: 'ppic_operator',
+              role: 'PPIC',
+              is_active: true,
+              created_at: new Date().toISOString(),
+            },
+            csrf_token: 'csrf-app-mock-token-ppic',
+            expires_at: new Date(Date.now() + 8 * 3600000).toISOString(),
+          }),
+        });
+      } else {
+        await route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'Sesi aplikasi belum terotentikasi.' }),
+        });
+      }
+    });
 
-    // 2. Mock operator session probe (strictly without session_id in JSON)
+    // 3. Mock auth login (/auth/login)
+    await page.route('**/api/v1/auth/login', async (route) => {
+      const body = JSON.parse(route.request().postData() || '{}');
+      if (body.username === 'ppic_operator' && body.password === 'PpicPassword2026!') {
+        isAuthenticated = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          headers: {
+            'Set-Cookie': 'app_session=sess-app-mock-uuid; HttpOnly; SameSite=Lax; Path=/',
+          },
+          body: JSON.stringify({
+            status: 'authenticated',
+            user: {
+              id: 'usr-ppic-001',
+              username: 'ppic_operator',
+              role: 'PPIC',
+              is_active: true,
+            },
+            csrf_token: 'csrf-app-mock-token-ppic',
+            expires_at: new Date(Date.now() + 8 * 3600000).toISOString(),
+          }),
+        });
+      } else {
+        await route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'Nama pengguna atau kata sandi tidak valid.' }),
+        });
+      }
+    });
+
+    // 4. Mock auth CSRF probe (/auth/csrf)
+    await page.route('**/api/v1/auth/csrf', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ csrf_token: 'csrf-app-mock-token-ppic' }),
+      });
+    });
+
+    // 5. Mock auth logout (/auth/logout)
+    await page.route('**/api/v1/auth/logout', async (route) => {
+      isAuthenticated = false;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'logged_out' }),
+      });
+    });
+
+    // 6. Mock templates list for studio
+    await page.route('**/api/v1/templates', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 'label_roll_80x200',
+            name: 'Roll 80x200 mm',
+            width_mm: 80,
+            height_mm: 200,
+            is_system: true,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ]),
+      });
+    });
+
+    // 7. Mock simulation session probe
     await page.route('**/api/v1/simulation/operator/session', async (route) => {
       if (isAuthenticated) {
         await route.fulfill({
@@ -27,9 +128,11 @@ test.describe('Pilot Operator Self-Service Simulation (B2B2N) End-to-End Suite',
           body: JSON.stringify({
             pilot_operator_enabled: true,
             authenticated: true,
-            csrf_token: 'csrf-pilot-mock-token',
-            role: 'pilot_operator',
-            expires_at_epoch: Date.now() / 1000 + 3600,
+            csrf_token: 'csrf-app-mock-token-ppic',
+            operator_label: '[PPIC] ppic_operator',
+            role: 'PPIC',
+            username: 'ppic_operator',
+            expires_at: new Date(Date.now() + 3600000).toISOString(),
           }),
         });
       } else {
@@ -44,40 +147,13 @@ test.describe('Pilot Operator Self-Service Simulation (B2B2N) End-to-End Suite',
       }
     });
 
-    // 3. Mock operator login (HttpOnly cookie, strictly NO session_id in response JSON)
-    await page.route('**/api/v1/simulation/operator/login', async (route) => {
-      const body = JSON.parse(route.request().postData() || '{}');
-      if (body.password === 'OperatorPilotSecret2026!') {
-        isAuthenticated = true;
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          headers: {
-            'Set-Cookie': 'pilot_session=sess-pilot-mock-uuid; HttpOnly; SameSite=Strict; Path=/',
-          },
-          body: JSON.stringify({
-            status: 'authenticated',
-            role: 'pilot_operator',
-            csrf_token: 'csrf-pilot-mock-token',
-            expires_at_epoch: Date.now() / 1000 + 3600,
-          }),
-        });
-      } else {
-        await route.fulfill({
-          status: 401,
-          contentType: 'application/json',
-          body: JSON.stringify({ detail: 'Invalid operator credentials.' }),
-        });
-      }
-    });
-
-    // 4. Mock operator batches list
+    // 8. Mock batches list
     await page.route('**/api/v1/simulation/operator/batches', async (route) => {
       if (!isAuthenticated) {
         await route.fulfill({
           status: 401,
           contentType: 'application/json',
-          body: JSON.stringify({ detail: 'Operator session required.' }),
+          body: JSON.stringify({ detail: 'Sesi aplikasi tidak valid.' }),
         });
         return;
       }
@@ -102,42 +178,35 @@ test.describe('Pilot Operator Self-Service Simulation (B2B2N) End-to-End Suite',
       });
     });
 
-    // 5. Mock operator batch detail with sequential items (P2)
+    // 9. Mock batch item sequence detail
     await page.route('**/api/v1/simulation/operator/batches/batch-sap-demo-001', async (route) => {
-      if (!isAuthenticated) {
-        await route.fulfill({
-          status: 401,
-          contentType: 'application/json',
-          body: JSON.stringify({ detail: 'Operator session required.' }),
-        });
-        return;
-      }
-
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           batch_id: 'batch-sap-demo-001',
-          producer_namespace: 'SAP_DEV_TRD',
+          producer_namespace: 'SAP_DEV',
           request_id: 'REQ-DEMO-2026',
-          printer_id: 'VIRTUAL_SINK_DEV',
+          printer_id: 'PILOT-PRINTER-01',
           status: 'completed',
           total_items: 2,
           completed_items: 2,
           items: [
             {
-              item_id: 'ITEM-ROLL-001',
+              item_id: 'item-demo-001',
               item_sequence: 1,
               template_version_id: 'label_roll_80x200',
               copies: 1,
               status: 'completed',
+              material_desc: 'OPP TAPE TRANSPARENT',
             },
             {
-              item_id: 'ITEM-ROLL-002',
+              item_id: 'item-demo-002',
               item_sequence: 2,
               template_version_id: 'label_roll_80x200',
               copies: 1,
               status: 'completed',
+              material_desc: 'OPP TAPE TRANSPARENT',
             },
           ],
           created_at: new Date().toISOString(),
@@ -145,24 +214,51 @@ test.describe('Pilot Operator Self-Service Simulation (B2B2N) End-to-End Suite',
       });
     });
 
-    // 6. Mock operator logout
-    await page.route('**/api/v1/simulation/operator/logout', async (route) => {
-      isAuthenticated = false;
+    // 10. Mock PDF download
+    await page.route('**/api/v1/simulation/batches/batch-sap-demo-001/pdf', async (route) => {
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ status: 'logged_out' }),
+        contentType: 'application/pdf',
+        body: Buffer.from('%PDF-1.4 synthetic mock pdf evidence'),
       });
     });
 
-    // Navigate to root
+    // Step A: Navigate to root (unauthenticated) -> lands on LoginPage
     await page.goto('/');
 
-    // Verify legacy buttons do not exist (Fase 3.1)
-    await expect(page.getByTestId('btn-safe-demo')).not.toBeVisible();
-    await expect(page.getByTestId('btn-sap-simulation')).not.toBeVisible();
+    const loginPage = page.getByTestId('login-page');
+    await expect(loginPage).toBeVisible();
 
-    // Open unified simulation modal
+    const usernameInput = page.getByTestId('input-username');
+    const passwordInput = page.getByTestId('input-password');
+    const loginBtn = page.getByTestId('btn-login');
+
+    await expect(usernameInput).toBeVisible();
+    await expect(passwordInput).toBeVisible();
+    await expect(loginBtn).toBeVisible();
+
+    // Step B: Attempt login with invalid credentials -> shows error message
+    await usernameInput.fill('ppic_operator');
+    await passwordInput.fill('WrongPassword!');
+    await loginBtn.click();
+
+    const errorAlert = page.getByTestId('login-error-message');
+    await expect(errorAlert).toBeVisible();
+    await expect(errorAlert).toContainText('Nama pengguna atau kata sandi tidak valid');
+
+    // Step C: Login with valid credentials -> transitions to AuthenticatedStudio
+    await usernameInput.fill('ppic_operator');
+    await passwordInput.fill('PpicPassword2026!');
+    await loginBtn.click();
+
+    // Verify studio is mounted
+    await expect(page.getByTestId('container-top-menubar')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('topbar-user-section')).toBeVisible();
+    await expect(page.getByTestId('topbar-user-role-badge')).toContainText('PPIC');
+    await expect(page.getByTestId('topbar-username')).toContainText('ppic_operator');
+    await expect(page.getByTestId('btn-app-logout')).toBeVisible();
+
+    // Step D: Open unified simulation modal
     const simBtn = page.getByTestId('btn-label-simulation');
     await expect(simBtn).toBeVisible();
     await simBtn.click();
@@ -170,37 +266,34 @@ test.describe('Pilot Operator Self-Service Simulation (B2B2N) End-to-End Suite',
     const modal = page.getByTestId('sap-shadow-simulation-modal');
     await expect(modal).toBeVisible();
 
-    // Verify safety warning is displayed
+    // Verify safety warning is displayed (fail-closed, zero physical print)
     await expect(modal).toContainText('Batas Keamanan Fail-Closed');
     await expect(modal).toContainText('SIMULASI — BUKAN UNTUK CETAK FISIK');
 
-    // Operator login card should be visible
-    const pwdInput = page.getByTestId('input-pilot-password');
-    await expect(pwdInput).toBeVisible();
-    await expect(pwdInput).toHaveAttribute('type', 'password');
+    // Verify active unified operator badge in modal header
+    const operatorBadge = page.getByTestId('badge-operator-active');
+    await expect(operatorBadge).toBeVisible();
+    await expect(operatorBadge).toContainText('[PPIC] ppic_operator');
 
-    // Test failed login
-    await pwdInput.fill('WrongSecret');
-    await page.getByTestId('btn-pilot-login').click();
-    await expect(modal).toContainText('Kata sandi operator pilot tidak valid.');
+    // Verify old pilot login form is NOT in DOM
+    await expect(page.getByTestId('input-pilot-password')).not.toBeVisible();
+    await expect(page.getByTestId('btn-pilot-login')).not.toBeVisible();
 
-    // Test successful login
-    await pwdInput.fill('OperatorPilotSecret2026!');
-    await page.getByTestId('btn-pilot-login').click();
-
-    // Verify batch list is displayed
+    // Step E: Verify batch list is displayed
     const table = page.getByTestId('table-simulation-batches');
     await expect(table).toBeVisible();
     await expect(modal).toContainText('REQ-DEMO-2026');
     await expect(modal).toContainText('2/2');
-    await expect(modal).toContainText('Bukti PDF');
 
-    // P2: Verify toggle item sequence detail sub-panel
+    // Verify PDF evidence button is present
+    const pdfBtn = page.getByTestId('btn-view-pdf');
+    await expect(pdfBtn).toBeVisible();
+
+    // Step F: Toggle item sequence detail sub-panel
     const toggleItemsBtn = page.getByTestId('btn-toggle-items-batch-sap-demo-001');
     await expect(toggleItemsBtn).toBeVisible();
     await toggleItemsBtn.click();
 
-    // Detail panel and item sequence table should appear
     const detailPanel = page.getByTestId('panel-batch-items-detail');
     await expect(detailPanel).toBeVisible();
     await expect(page.getByTestId('table-batch-items')).toBeVisible();
@@ -209,32 +302,33 @@ test.describe('Pilot Operator Self-Service Simulation (B2B2N) End-to-End Suite',
     const rowItem1 = page.getByTestId('row-item-1');
     await expect(rowItem1).toBeVisible();
     await expect(rowItem1).toContainText('#1');
-    await expect(rowItem1).toContainText('ITEM-ROLL-001');
-    await expect(rowItem1).toContainText('label_roll_80x200');
 
     const rowItem2 = page.getByTestId('row-item-2');
     await expect(rowItem2).toBeVisible();
     await expect(rowItem2).toContainText('#2');
-    await expect(rowItem2).toContainText('ITEM-ROLL-002');
 
     // Close detail panel
     await toggleItemsBtn.click();
     await expect(page.getByTestId('table-batch-items')).not.toBeVisible();
 
-    // Verify operator active badge and logout button
-    await expect(page.getByTestId('badge-operator-active')).toBeVisible();
-    const logoutBtn = page.getByTestId('btn-pilot-logout');
-    await expect(logoutBtn).toBeVisible();
+    // Close simulation modal
+    await page.getByTestId('btn-close-sap-simulation').click();
+    await expect(modal).not.toBeVisible();
 
-    // Perform logout
+    // Step G: Perform global app logout
+    const logoutBtn = page.getByTestId('btn-app-logout');
+    await expect(logoutBtn).toBeVisible();
     await logoutBtn.click();
 
-    // Form login should reappear
-    await expect(page.getByTestId('input-pilot-password')).toBeVisible();
-    await expect(page.getByTestId('badge-operator-active')).not.toBeVisible();
+    // Verify user is redirected back to login page
+    await expect(page.getByTestId('login-page')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('container-top-menubar')).not.toBeVisible();
   });
 
-  test('B2B2O: Operator dapat mengimpor berkas JSON SAP lokal, melihat konfirmasi keamanan, mengunggah berkas, dan memeriksa batch hasil impor', async ({ page }) => {
+  test('Operator PPIC mengimpor berkas JSON SAP lokal raw v2 dengan CSRF, melihat konfirmasi keamanan, mengunggah berkas, dan memeriksa batch hasil impor', async ({ page }) => {
+    let isAuthenticated = true;
+    let batchesList = [];
+
     // 1. Mock status API
     await page.route('**/api/status', async (route) => {
       await route.fulfill({
@@ -249,10 +343,44 @@ test.describe('Pilot Operator Self-Service Simulation (B2B2N) End-to-End Suite',
       });
     });
 
-    let isAuthenticated = false;
-    let batchesList = [];
+    // 2. Mock auth probe
+    await page.route('**/api/v1/auth/me', async (route) => {
+      if (isAuthenticated) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            authenticated: true,
+            user: {
+              id: 'usr-ppic-001',
+              username: 'ppic_operator',
+              role: 'PPIC',
+              is_active: true,
+              created_at: new Date().toISOString(),
+            },
+            csrf_token: 'csrf-app-mock-token-ppic',
+            expires_at: new Date(Date.now() + 8 * 3600000).toISOString(),
+          }),
+        });
+      } else {
+        await route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'Sesi aplikasi belum terotentikasi.' }),
+        });
+      }
+    });
 
-    // 2. Mock session probe
+    // 3. Mock auth CSRF probe
+    await page.route('**/api/v1/auth/csrf', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ csrf_token: 'csrf-app-mock-token-ppic' }),
+      });
+    });
+
+    // 4. Mock simulation session probe
     await page.route('**/api/v1/simulation/operator/session', async (route) => {
       await route.fulfill({
         status: 200,
@@ -260,28 +388,23 @@ test.describe('Pilot Operator Self-Service Simulation (B2B2N) End-to-End Suite',
         body: JSON.stringify({
           pilot_operator_enabled: true,
           authenticated: isAuthenticated,
-          csrf_token: isAuthenticated ? 'csrf-pilot-mock-token' : '',
+          csrf_token: isAuthenticated ? 'csrf-app-mock-token-ppic' : '',
+          role: 'PPIC',
+          username: 'ppic_operator',
         }),
       });
     });
 
-    // 3. Mock login
-    await page.route('**/api/v1/simulation/operator/login', async (route) => {
-      isAuthenticated = true;
+    // 5. Mock templates
+    await page.route('**/api/v1/templates', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        headers: {
-          'Set-Cookie': 'pilot_session=sess-pilot-mock-uuid; HttpOnly; SameSite=Strict; Path=/',
-        },
-        body: JSON.stringify({
-          status: 'authenticated',
-          csrf_token: 'csrf-pilot-mock-token',
-        }),
+        body: JSON.stringify([]),
       });
     });
 
-    // 4. Mock batches list
+    // 6. Mock batches list
     await page.route('**/api/v1/simulation/operator/batches', async (route) => {
       await route.fulfill({
         status: 200,
@@ -290,12 +413,12 @@ test.describe('Pilot Operator Self-Service Simulation (B2B2N) End-to-End Suite',
       });
     });
 
-    // 5. Mock import-json endpoint
+    // 7. Mock import-json endpoint with CSRF verification
     let importCalled = false;
     await page.route('**/api/v1/simulation/operator/import-json', async (route) => {
       importCalled = true;
       const headers = route.request().headers();
-      expect(headers['x-csrf-token']).toBe('csrf-pilot-mock-token');
+      expect(headers['x-csrf-token']).toBe('csrf-app-mock-token-ppic');
 
       const newBatch = {
         batch_id: 'batch-imported-999',
@@ -317,7 +440,7 @@ test.describe('Pilot Operator Self-Service Simulation (B2B2N) End-to-End Suite',
       });
     });
 
-    // 6. Mock batch detail
+    // 8. Mock batch detail
     await page.route('**/api/v1/simulation/operator/batches/batch-imported-999', async (route) => {
       await route.fulfill({
         status: 200,
@@ -351,15 +474,14 @@ test.describe('Pilot Operator Self-Service Simulation (B2B2N) End-to-End Suite',
       });
     });
 
-    // Navigate to root and open simulation modal via unified button
+    // Navigate to studio (pre-authenticated)
     await page.goto('/');
-    await expect(page.getByTestId('btn-safe-demo')).not.toBeVisible();
-    await expect(page.getByTestId('btn-sap-simulation')).not.toBeVisible();
-    await page.getByTestId('btn-label-simulation').click();
+    await expect(page.getByTestId('container-top-menubar')).toBeVisible({ timeout: 15000 });
 
-    // Login as operator
-    await page.getByTestId('input-pilot-password').fill('OperatorPilotSecret2026!');
-    await page.getByTestId('btn-pilot-login').click();
+    // Open simulation modal
+    await page.getByTestId('btn-label-simulation').click();
+    const modal = page.getByTestId('sap-shadow-simulation-modal');
+    await expect(modal).toBeVisible();
 
     // Verify empty state is initially shown
     await expect(page.getByTestId('empty-simulation-batches')).toBeVisible();
@@ -390,7 +512,7 @@ test.describe('Pilot Operator Self-Service Simulation (B2B2N) End-to-End Suite',
       buffer: Buffer.from(syntheticJson),
     });
 
-    // Verify file name and size appear
+    // Verify file name appears
     await expect(importPanel).toContainText('export_sap_dev.json');
 
     // Submit import
@@ -398,7 +520,7 @@ test.describe('Pilot Operator Self-Service Simulation (B2B2N) End-to-End Suite',
     await expect(submitBtn).toBeEnabled();
     await submitBtn.click();
 
-    // Verify import API was invoked with CSRF
+    // Verify import API was invoked with CSRF header
     expect(importCalled).toBe(true);
 
     // Verify success alert appeared

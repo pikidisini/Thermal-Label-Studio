@@ -326,6 +326,18 @@ class TestPilotOperatorRoutes:
         assert "csrf_token" in data
         assert "session_id" not in data
 
+    def test_session_probe_authenticated_on_plain_http_intranet_fails_closed_403(self, client: TestClient):
+        """P2: Probe /simulation/operator/session with authenticated cookie over plain HTTP intranet is rejected with 403."""
+        login_operator(client)
+
+        # Non-loopback plain HTTP intranet host must be rejected fail-closed with 403
+        resp = client.get(
+            "/api/v1/simulation/operator/session",
+            headers={"Host": "192.168.1.50:8000"},
+        )
+        assert resp.status_code == 403
+        assert "wajib menggunakan https" in resp.json()["detail"].lower()
+
     def test_anonymous_access_to_operator_batches_fails_closed_401(self, client: TestClient):
         """AC 1: Anonymous request to /simulation/operator/batches returns HTTP 401."""
         resp = client.get("/api/v1/simulation/operator/batches")

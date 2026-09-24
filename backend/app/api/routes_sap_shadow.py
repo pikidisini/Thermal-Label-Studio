@@ -28,7 +28,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from fastapi import APIRouter, Cookie, Depends, File, Header, HTTPException, Request, Response, UploadFile, status
 from pydantic import BaseModel, Field, ValidationError
 
-from ..auth.dependencies import verify_csrf_token
+from ..auth.dependencies import get_current_user_optional, verify_csrf_token
+from ..auth.models import Session
 from ..config import (
     get_pilot_session_ttl_seconds,
     get_sap_simulation_auth_token,
@@ -392,22 +393,23 @@ def pilot_operator_logout(
     summary="Legacy Operator Session Probe",
 )
 def get_pilot_operator_session_status(
-    app_session_cookie: Optional[str] = Cookie(None, alias="app_session"),
+    current_user: Optional[Session] = Depends(get_current_user_optional),
 ) -> Dict[str, Any]:
-    """Probes session status for browser client strictly using unified app_session cookie."""
-    if app_session_cookie:
-        from ..auth.service import auth_service
-        app_sess = auth_service.validate_session(app_session_cookie)
-        if app_sess:
-            return {
-                "pilot_operator_enabled": is_pilot_operator_enabled(),
-                "authenticated": True,
-                "csrf_token": app_sess.csrf_token,
-                "expires_at": app_sess.expires_at.isoformat(),
-                "operator_label": f"[{app_sess.role.value}] {app_sess.username}",
-                "role": app_sess.role.value,
-                "username": app_sess.username,
-            }
+    """Probes session status for browser client strictly using unified app_session cookie.
+
+    Applies transport security checks (fail-closed HTTP 403 on plain HTTP intranet)
+    before returning authenticated status and CSRF token.
+    """
+    if current_user:
+        return {
+            "pilot_operator_enabled": is_pilot_operator_enabled(),
+            "authenticated": True,
+            "csrf_token": current_user.csrf_token,
+            "expires_at": current_user.expires_at.isoformat(),
+            "operator_label": f"[{current_user.role.value}] {current_user.username}",
+            "role": current_user.role.value,
+            "username": current_user.username,
+        }
 
     return {
         "pilot_operator_enabled": is_pilot_operator_enabled(),

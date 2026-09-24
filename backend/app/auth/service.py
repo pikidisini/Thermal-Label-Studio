@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import logging
+import os
 from pathlib import Path
 import secrets
 from threading import RLock
@@ -50,7 +51,11 @@ class AuthService:
         session_ttl_seconds: int = DEFAULT_SESSION_TTL_SECONDS,
     ) -> None:
         if repository is None:
-            db_path = BACKEND_DIR / "data" / "auth.db"
+            env_db = os.environ.get("AUTH_DB_PATH")
+            if env_db:
+                db_path = Path(env_db)
+            else:
+                db_path = BACKEND_DIR / "data" / "auth.db"
             repository = SqliteAuthRepository(db_path)
         self.repository = repository
         self.session_ttl_seconds = session_ttl_seconds

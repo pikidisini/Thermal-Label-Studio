@@ -43,6 +43,25 @@ Fase 3.3 menyatukan otentikasi Thermal Label Studio menjadi satu sesi aplikasi t
    - Endpoint mutasi `/safe-demo/run` dan `/safe-demo/reset` dilindungi dengan `Depends(verify_csrf_token)`.
    - Rute cetak fisik (`/api/v1/print/*`, `/api/v1/sap/print`) tetap dicegat 404 pada mode simulasi lokal.
 
+### Remediasi Review Ulang Putaran 2 (Commit c07179c Follow-up):
+
+1. **P1 — E2E Browser Playwright Mewakili Alur Login Baru & Setup Otomatis**:
+   - Skrip E2E [`frontend/tests/e2e/pilot_operator_self_service.spec.js`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/frontend/tests/e2e/pilot_operator_self_service.spec.js) diperbarui total:
+     - Menguji alur pengguna nyata: `LoginPage` unauthenticated → validasi penolakan password salah → login berhasil sebagai PPIC → transisi ke `AuthenticatedStudio` dengan topbar role badge `[PPIC]` dan username → buka modal Simulasi Label → verifikasi safety warning fail-closed & badge operator aktif → tabel batch & rincian urutan item (`#1`, `#2`) → tombol bukti PDF → unggah berkas JSON SAP lokal dengan verifikasi header `X-CSRF-Token` → kemunculan batch baru di tabel → logout global via `btn-app-logout` mengembalikan user ke `LoginPage`.
+     - Dibuat [`backend/scripts/seed_e2e_users.py`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/backend/scripts/seed_e2e_users.py) dan [`frontend/tests/e2e/global-setup.js`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/frontend/tests/e2e/global-setup.js) untuk bootstrapping akun E2E deterministik ke database terisolasi `backend/data/auth_e2e.db`.
+     - [`frontend/playwright.config.js`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/frontend/playwright.config.js) dikonfigurasi dengan `globalSetup`, `AUTH_DB_PATH` terisolasi, dan setup project [`frontend/tests/e2e/auth.setup.js`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/frontend/tests/e2e/auth.setup.js) yang menyimpan authenticated `storageState` ke `frontend/.auth/user.json`.
+     - Pengujian E2E aktual: `3 passed (28.1s)` pada `pilot_operator_self_service.spec.js` dan `5 passed (39.5s)` pada `sap_shadow_simulation.spec.js`. Zero socket / printer fisik dipanggil.
+
+2. **P2 — Pelepasan Ketergantungan Credential Pilot Legacy di Jenkins**:
+   - Blok `withCredentials([string(credentialsId: 'tls-pilot-operator-secret', ...)])` dihapus dari [`Jenkinsfile`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/Jenkinsfile) dan [`Jenkinsfile.rollback`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/Jenkinsfile.rollback).
+   - Tahap deploy `ops/jenkins/deploy-local.sh` dieksekusi bersih tanpa secret legacy.
+   - Dokumentasi [`docs/deployment/jenkins_local_simulation.md`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/docs/deployment/jenkins_local_simulation.md) diperbarui untuk menghapus persyaratan credential tersebut dan menjelaskan langkah bootstrap akun pasca-deploy via CLI interaktif.
+
+3. **P2 — Transport Guard pada Probe Sesi `/operator/session`**:
+   - Handler `get_pilot_operator_session_status` pada [`backend/app/api/routes_sap_shadow.py`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/backend/app/api/routes_sap_shadow.py) diperbarui menggunakan `Depends(get_current_user_optional)`.
+   - Request dengan cookie `app_session` yang mengakses plain HTTP intranet (non-loopback) ditolak seketika dengan `HTTP 403 Forbidden` sebelum mengembalikan status sesi atau token CSRF.
+   - Ditambahkan pengujian `test_session_probe_authenticated_on_plain_http_intranet_fails_closed_403` pada [`backend/tests/test_pilot_operator_session.py`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/backend/tests/test_pilot_operator_session.py) (25 passed).
+
 ---
 
 ## 2. Inventaris Endpoint & Guard Matriks

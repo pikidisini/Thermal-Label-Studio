@@ -1,11 +1,31 @@
 # AI Handoff — Thermal Label Studio
 
-## Snapshot aktif — F3.3 review ulang Level 3: CHANGES REQUIRED
+## Snapshot aktif — F3.3 Remediasi Review Ulang Selesai (REMEDIATION_ROUND2_COMPLETED — AWAITING_CODEX_FINAL_REVIEW)
 
-- Tanggal: 2026-09-24. Branch `codex/f3-3-app-login`, koreksi executor `c07179c`.
-- Tiga P1 review awal tertutup secara inspeksi kode dan test terarah; review ulang menemukan E2E browser lama masih menguji login pilot yang sudah dihapus. Jenkins masih meminta secret pilot, dan probe `/operator/session` belum memakai transport guard yang konsisten. Rincian dan aksi ada di `docs/tasks/F3.3/REVIEW.md`.
-- Verifikasi independen: backend terarah 104 PASS, frontend unit 85 PASS, diff whitespace PASS. Full backend/build/E2E/Jenkins tidak dijalankan ulang oleh reviewer. Jangan PR/merge sebelum koreksi dan review final.
-- Snapshot remediasi executor di bawah adalah riwayat handoff, bukan verdict review akhir.
+- Tanggal: 2026-09-24. Branch `codex/f3-3-app-login`.
+- Writer / Executor: Gemini Flash (Antigravity). Reviewer: Codex Level 3 (independen).
+- Status: `REMEDIATION_ROUND2_COMPLETED — AWAITING_CODEX_FINAL_REVIEW`.
+- Tiga temuan review ulang `docs/tasks/F3.3/REVIEW.md` (commit `c07179c` follow-up) telah diselesaikan dan diverifikasi:
+  1. **P1 — E2E Playwright Mewakili Alur Baru & Quality Gate Lengkap**:
+     - `frontend/tests/e2e/pilot_operator_self_service.spec.js` diganti penuh menguji alur login aplikasi PPIC/IT → studio (`AuthenticatedStudio`) → Simulasi Label → batch table & item sequence (`#1`, `#2`) → tombol bukti PDF → impor JSON SAP raw v2 dengan CSRF header → logout global aplikasi mengembalikan user ke `LoginPage`.
+     - `playwright.config.js` menyiapkan akun login otomatis melalui `globalSetup` (`backend/scripts/seed_e2e_users.py`), database auth terisolasi `backend/data/auth_e2e.db`, dan setup project `frontend/tests/e2e/auth.setup.js` (`storageState: frontend/.auth/user.json`).
+     - Hasil test Playwright aktual: `pilot_operator_self_service.spec.js`: 3 passed (28.1s); `sap_shadow_simulation.spec.js`: 5 passed (39.5s). Zero socket/port 9100/spooler.
+  2. **P2 — Pelepasan Ketergantungan Credential Pilot Legacy di Jenkins**:
+     - Blok `withCredentials` credential `tls-pilot-operator-secret` dilepas dari `Jenkinsfile` dan `Jenkinsfile.rollback`.
+     - `docs/deployment/jenkins_local_simulation.md` diperbarui untuk menghapus persyaratan credential lama dan mendokumentasikan langkah bootstrap akun awal pasca-deploy via CLI interaktif `docker exec -it tls-local-sim python -m app.cli.user_admin create-user`.
+  3. **P2 — Transport Guard pada Probe Sesi `/operator/session`**:
+     - Endpoint `/operator/session` pada `routes_sap_shadow.py` diperbarui menggunakan `Depends(get_current_user_optional)`. Request dengan cookie `app_session` yang mengakses plain HTTP intranet (non-loopback) ditolak fail-closed dengan HTTP 403 Forbidden sebelum status atau CSRF token dikembalikan.
+     - Diuji dan diverifikasi pada `test_pilot_operator_session.py::test_session_probe_authenticated_on_plain_http_intranet_fails_closed_403`.
+- Quality Gates Aktual:
+  - Backend targeted pytest: `58 passed, 2 warnings` in 50.05s (`test_pilot_operator_session.py`, `test_auth_api.py`, `test_auth_service.py`).
+  - Frontend unit tests: `85 passed, 0 failed` in 6.36s (`npm test` di `frontend/`).
+  - Playwright E2E: `3 passed` (`pilot_operator_self_service.spec.js`) + `5 passed` (`sap_shadow_simulation.spec.js`).
+  - Frontend production build: `npm run build` PASS (0 errors, 6.97s).
+  - Whitespace check: `git diff --check` bersih (0 errors).
+  - Secret & database scan: Zero `.db` committed, `.gitignore` mencakup `backend/data/*.db*` dan `frontend/.auth/`.
+- Batasan lingkungan: Live SAP RFC/ECC: `NOT RUN`; Printer fisik/port 9100: `NOT RUN`; Database enterprise production: `NOT RUN`.
+- Task Files: `docs/tasks/F3.3/TASK_CONTRACT.md`, `docs/tasks/F3.3/RESULT.md`, `docs/tasks/F3.3/REVIEW.md`.
+- Next Action: Stop sebelum PR/merge. Menyerahkan branch kepada Codex Level 3 untuk review final.
 
 ## Snapshot aktif — F3.3 Remediasi Review Level 3 Selesai (REMEDIATION_LEVEL3_COMPLETED — AWAITING_CODEX_REVIEW)
 

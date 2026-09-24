@@ -16,9 +16,7 @@ pipeline {
         stage('Restore previous local image') {
             steps {
                 sh 'docker image inspect tls-local-sim:previous >/dev/null'
-                withCredentials([string(credentialsId: 'tls-pilot-operator-secret', variable: 'PILOT_OPERATOR_SECRET')]) {
-                    sh 'bash ops/jenkins/deploy-local.sh tls-local-sim:previous'
-                }
+                sh 'bash ops/jenkins/deploy-local.sh tls-local-sim:previous'
             }
         }
     }

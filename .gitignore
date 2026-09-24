@@ -22,7 +22,7 @@ env/
 ENV/
 backend/data/out/*
 !backend/data/out/.gitkeep
-backend/data/*.db
+backend/data/*.db*
 backend/data/*.sqlite*
 
 # Executables & Binary Assets
@@ -46,6 +46,7 @@ playwright-report/
 test-results/
 frontend/playwright-report/
 frontend/test-results/
+frontend/.auth/
 frontend/recordings/*
 !frontend/recordings/.gitkeep
 **/.last-run.json
