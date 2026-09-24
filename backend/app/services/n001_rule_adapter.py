@@ -16,6 +16,7 @@ Implements the application-owned N001 development rule boundary:
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..models.raw_sap_snapshot_v2 import RawSapItemSnapshotV2
@@ -26,6 +27,17 @@ from ..services.sap_shadow_service import (
 )
 
 logger = logging.getLogger("n001_rule_adapter")
+SIMULATION_TEXT_FIELDS = (
+    "type_film", "base_film", "brand", "width_mm", "length_m", "width_inch",
+    "length_feet", "treatment_inside", "treatment_outside", "batch_text",
+    "net_weight_kg", "weight_lbs",
+    "core_inch", "used_before", "splice_1_m", "splice_1_feet", "splice_2_m",
+    "splice_2_feet", "roll_no", "so_item",
+)
+
+
+def _is_missing(value: Any) -> bool:
+    return value is None or (isinstance(value, str) and not value.strip())
 
 
 class N001DevelopmentAdapter:
@@ -59,6 +71,7 @@ class N001DevelopmentAdapter:
         item: RawSapItemSnapshotV2,
         profile_version: Optional[str] = None,
         compose_profile: Optional[bool] = None,
+        simulation_tolerant: bool = False,
     ) -> Tuple[SapCanonicalItemData, str, Dict[str, Any]]:
         """Adapts a RawSapItemSnapshotV2 into canonical item data and target template.
 
@@ -109,50 +122,52 @@ class N001DevelopmentAdapter:
             ("base_film", _get_raw("base_film", ["ZZBASEFILM"])),
         ]
 
-        for field_name, field_val in required_checks:
-            if field_val is None or (isinstance(field_val, str) and not field_val.strip()):
+        missing_raw_fields = [name for name, value in required_checks if _is_missing(value)]
+        if missing_raw_fields and not simulation_tolerant:
+            field_name = missing_raw_fields[0]
+            field_val = next(value for name, value in required_checks if name == field_name)
+            if _is_missing(field_val):
                 raise ValueError(
                     f"Missing required raw business fact '{field_name}' for N001 item sequence {item.item_sequence}."
                 )
 
-        mat_no = str(required_checks[0][1]).strip()
-        batch_no = str(required_checks[1][1]).strip()
-        roll_no = str(required_checks[2][1]).strip()
-        brand_raw = str(required_checks[3][1]).strip()
+        def _raw_text(index: int) -> Optional[str]:
+            value = required_checks[index][1]
+            return None if _is_missing(value) else str(value).strip()
+
+        mat_no = _raw_text(0)
+        batch_no = _raw_text(1)
+        roll_no = _raw_text(2)
+        brand_raw = _raw_text(3)
         width_raw = required_checks[4][1]
         length_raw = required_checks[5][1]
         net_weight_raw = required_checks[6][1]
-        type_film_raw = str(required_checks[7][1]).strip()
-        base_film_raw = str(required_checks[8][1]).strip()
+        type_film_raw = _raw_text(7)
+        base_film_raw = _raw_text(8)
 
         # Numeric parsing and validation for dimensions & weight
-        try:
-            width_float = float(str(width_raw).strip())
-            if width_float <= 0:
-                raise ValueError()
-        except (ValueError, TypeError):
-            raise ValueError(
-                f"Invalid numeric value for 'width_mm' in N001 item sequence {item.item_sequence}."
-            )
+        def _positive_number(field_name: str, value: Any) -> Optional[float]:
+            try:
+                number = float(str(value).strip())
+                if not math.isfinite(number) or number <= 0:
+                    raise ValueError()
+                return number
+            except (ValueError, TypeError):
+                if simulation_tolerant:
+                    return None
+                raise ValueError(
+                    f"Invalid numeric value for '{field_name}' in N001 item sequence {item.item_sequence}."
+                )
 
-        try:
-            length_float = float(str(length_raw).strip())
-            if length_float <= 0:
-                raise ValueError()
-        except (ValueError, TypeError):
-            raise ValueError(
-                f"Invalid numeric value for 'length_m' in N001 item sequence {item.item_sequence}."
-            )
+        width_float = _positive_number("width_mm", width_raw)
 
-        net_clean = str(net_weight_raw).replace("KG", "").replace("Kg", "").replace("kg", "").strip()
-        try:
-            net_weight_float = float(net_clean)
-            if net_weight_float <= 0:
-                raise ValueError()
-        except (ValueError, TypeError):
-            raise ValueError(
-                f"Invalid numeric value for 'net_weight_kg' in N001 item sequence {item.item_sequence}."
-            )
+        length_float = _positive_number("length_m", length_raw)
+
+        net_clean = (
+            None if _is_missing(net_weight_raw)
+            else str(net_weight_raw).replace("KG", "").replace("Kg", "").replace("kg", "").strip()
+        )
+        net_weight_float = _positive_number("net_weight_kg", net_clean)
 
         # 5. Optional Raw Facts Handling (distinct absence / null / empty)
         customer_text_presence = "absent"
@@ -243,9 +258,9 @@ class N001DevelopmentAdapter:
                 splice_2_m_val = str(splice_2_m_raw).strip()
 
         # 6. Deterministic Derived Unit Conversions (application-derived fields)
-        width_inch_derived = f"{round(width_float / 25.4, 2):.2f}"
-        length_feet_derived = str(int(round(length_float * 3.28084)))
-        weight_lbs_derived = f"{round(net_weight_float * 2.20462, 1):.1f}"
+        width_inch_derived = f"{round(width_float / 25.4, 2):.2f}" if width_float is not None else None
+        length_feet_derived = str(int(round(length_float * 3.28084))) if length_float is not None else None
+        weight_lbs_derived = f"{round(net_weight_float * 2.20462, 1):.1f}" if net_weight_float is not None else None
 
         # 7. Assemble Canonical Fields & Codes
         # Per Codex: DO NOT fabricate barcode/QR before format is approved
@@ -260,8 +275,8 @@ class N001DevelopmentAdapter:
             batch_text=batch_no,
             roll_number=roll_no,
             roll_no=roll_no,
-            width_mm=f"{width_float:.1f}".rstrip("0").rstrip("."),
-            length_m=f"{length_float:.0f}",
+            width_mm=f"{width_float:.1f}".rstrip("0").rstrip(".") if width_float is not None else None,
+            length_m=f"{length_float:.0f}" if length_float is not None else None,
             width_inch=width_inch_derived,
             length_feet=length_feet_derived,
             net_weight_kg=net_clean,
@@ -303,7 +318,9 @@ class N001DevelopmentAdapter:
                     f"Profile '{cls.PROFILE_ID}' version '{target_ver}' not found in ProfileRegistry."
                 )
 
-            comp_result = ProfileComposer.compose_item(item, profile)
+            comp_result = ProfileComposer.compose_item(
+                item, profile, simulation_tolerant=simulation_tolerant
+            )
             active_version = profile.profile_version
             target_template_id = profile.template_version_id
             composition_hash = comp_result.composition_hash
@@ -332,6 +349,54 @@ class N001DevelopmentAdapter:
             contract_version="1.1",
             fields=fields,
             codes=codes,
+        )
+
+        missing_display_fields: List[str] = []
+        invalid_numeric_fields = [
+            name for name, raw, parsed in (
+                ("width_mm", width_raw, width_float),
+                ("length_m", length_raw, length_float),
+                ("net_weight_kg", net_weight_raw, net_weight_float),
+            )
+            if not _is_missing(raw) and parsed is None
+        ]
+        if simulation_tolerant:
+            field_values = fields.model_dump()
+            missing_display_fields = [
+                name for name in SIMULATION_TEXT_FIELDS
+                if _is_missing(field_values.get(name)) and name not in invalid_numeric_fields
+            ]
+            # Profile composition may depend on raw facts that are not text tokens.
+            if should_compose and comp_result.audit_metadata.get("missing_fields"):
+                missing_display_fields.extend(comp_result.audit_metadata["missing_fields"])
+            missing_display_fields = sorted(set(missing_display_fields))
+            fields = SapCanonicalFields(**{
+                **field_values,
+                **{name: "--" for name in SIMULATION_TEXT_FIELDS if _is_missing(field_values.get(name))},
+            })
+            canonical_item = SapCanonicalItemData(
+                contract_version="1.1",
+                fields=fields,
+                codes=codes,
+            )
+
+        warning_records = [
+            {
+                "item_sequence": item.item_sequence,
+                "field": name,
+                "reason": "missing",
+                "message": f"Informasi '{name}' tidak ditemukan pada item {item.item_sequence}; label menampilkan --.",
+            }
+            for name in missing_display_fields
+        ]
+        warning_records.extend(
+            {
+                "item_sequence": item.item_sequence,
+                "field": name,
+                "reason": "invalid",
+                "message": f"Informasi '{name}' tidak valid pada item {item.item_sequence}; label menampilkan --.",
+            }
+            for name in invalid_numeric_fields
         )
 
         audit_meta = {
@@ -386,6 +451,12 @@ class N001DevelopmentAdapter:
                 "weight_lbs": f"round(net_weight_kg * 2.20462, 1) -> {weight_lbs_derived}",
             },
             "barcode_qr_approved": False,
+            "simulation_tolerant": simulation_tolerant,
+            "item_sequence": item.item_sequence,
+            "missing_fields": missing_display_fields,
+            "invalid_fields": invalid_numeric_fields if simulation_tolerant else [],
+            "warning_count": len(warning_records),
+            "warnings": warning_records,
         }
 
         return canonical_item, target_template_id, audit_meta

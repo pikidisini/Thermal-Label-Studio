@@ -154,6 +154,8 @@ class ProfileComposer:
         item: RawSapItemSnapshotV2,
         segment: FieldSegment,
         chars_by_name: Dict[str, Any],
+        simulation_tolerant: bool = False,
+        missing_fields: Optional[List[str]] = None,
     ) -> str:
         """Resolves a FieldSegment against an item snapshot, distinguishing absent vs null vs empty."""
         state = "absent"
@@ -189,6 +191,10 @@ class ProfileComposer:
 
         # Apply granular policy for non-present states
         if state != "present":
+            if simulation_tolerant:
+                if missing_fields is not None:
+                    missing_fields.append(segment.field_name)
+                return "--"
             policy: EmptyPolicy = getattr(segment, f"on_{state}")
             if policy == "block":
                 raise EmptyFieldBlockedError(
@@ -208,6 +214,7 @@ class ProfileComposer:
         cls,
         item: RawSapItemSnapshotV2,
         profile: LabelProfileConfig,
+        simulation_tolerant: bool = False,
     ) -> ProfileCompositionResult:
         """Composes all configured elements for a single raw item according to profile rules."""
         # Normalize characteristics lookup once
@@ -219,14 +226,22 @@ class ProfileComposer:
         composed_fields: Dict[str, Any] = {}
         composed_codes: Dict[str, Any] = {}
         element_audit: Dict[str, Any] = {}
+        missing_fields: List[str] = []
 
         for elem in profile.elements:
             assembled_parts: List[str] = []
+            missing_before_element = len(missing_fields)
             for seg in elem.segments:
                 if isinstance(seg, LiteralSegment) or seg.type == "literal":
                     assembled_parts.append(seg.value)
                 elif isinstance(seg, FieldSegment) or seg.type == "field":
-                    part = cls.resolve_field_segment(item, seg, chars_by_name)
+                    part = cls.resolve_field_segment(
+                        item,
+                        seg,
+                        chars_by_name,
+                        simulation_tolerant=simulation_tolerant,
+                        missing_fields=missing_fields,
+                    )
                     assembled_parts.append(part)
 
             assembled_str = "".join(assembled_parts)
@@ -240,11 +255,13 @@ class ProfileComposer:
 
             # Symbology validation
             if elem.output_type == "barcode":
-                validate_code128_payload(assembled_str, elem.slot_id)
-                composed_codes[elem.slot_id] = assembled_str
+                if not (simulation_tolerant and len(missing_fields) > missing_before_element):
+                    validate_code128_payload(assembled_str, elem.slot_id)
+                    composed_codes[elem.slot_id] = assembled_str
             elif elem.output_type == "qr":
-                validate_qr_payload(assembled_str, elem.slot_id, max_length=elem.max_length)
-                composed_codes[elem.slot_id] = assembled_str
+                if not (simulation_tolerant and len(missing_fields) > missing_before_element):
+                    validate_qr_payload(assembled_str, elem.slot_id, max_length=elem.max_length)
+                    composed_codes[elem.slot_id] = assembled_str
             elif elem.output_type == "text":
                 composed_fields[elem.slot_id] = assembled_str
 
@@ -273,6 +290,8 @@ class ProfileComposer:
             "template_version_id": profile.template_version_id,
             "composition_hash": comp_hash,
             "elements": element_audit,
+            "missing_fields": sorted(set(missing_fields)),
+            "simulation_tolerant": simulation_tolerant,
         }
 
         return ProfileCompositionResult(

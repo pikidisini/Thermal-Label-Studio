@@ -668,7 +668,11 @@ async def import_operator_sap_json(
 
     # 8. Dispatch to Same sap_shadow_service
     try:
-        result = await sap_shadow_service.ingest_raw_batch(snapshot, auto_process=True)
+        # Browser-driven local SAP simulation may continue with presentation sentinels.
+        # Machine-to-machine raw ingestion keeps the strict default.
+        result = await sap_shadow_service.ingest_raw_batch(
+            snapshot, auto_process=True, simulation_tolerant=True
+        )
         if result.get("idempotent_replay"):
             response.status_code = status.HTTP_200_OK
         return result

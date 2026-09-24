@@ -7,6 +7,7 @@ import type {
   PilotOperatorLoginResponse,
   PilotOperatorBatchSummary,
   PilotOperatorBatchDetail,
+  OperatorRawImportResult,
 } from '../../types/sapShadowSimulation';
 
 async function parseErrorMessage(res: Response, fallback: string): Promise<string> {
@@ -275,7 +276,7 @@ export const sapShadowSimulationApi = {
     window.URL.revokeObjectURL(blobUrl);
   },
 
-  async importOperatorJson(file: File, csrfToken: string): Promise<Record<string, any>> {
+  async importOperatorJson(file: File, csrfToken: string): Promise<OperatorRawImportResult> {
     const formData = new FormData();
     formData.append('file', file);
 
