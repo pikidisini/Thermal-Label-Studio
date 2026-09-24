@@ -1,5 +1,11 @@
 # AI Handoff — Thermal Label Studio
 
+## Snapshot aktif — Review F3.2 Jenkins PYTHONPATH PASS (PR-ready)
+
+- Branch `codex/fix-jenkins-pythonpath`, commit executor `e030c19`. Review Codex PASS setelah disposable Docker smoke check: `python -m app.cli.user_admin --help` berhasil dengan `PYTHONPATH=/app/backend`.
+- `git diff --check origin/main...HEAD` PASS. Jenkins build ulang masih `NOT RUN`; Bash syntax check tidak tersedia karena Bash/WSL tidak tersedia pada shell review.
+- Detail review: `docs/tasks/F3.2/REVIEW.md`. Belum ada PR atau merge; tidak ada akses SAP, printer fisik, TCP 9100, Spooler, atau database production.
+
 ## Snapshot aktif — Perbaikan CI Jenkins: PYTHONPATH Container Safety Check
 
 - Tanggal: 2026-09-24. Branch `codex/fix-jenkins-pythonpath`, baseline `origin/main` (`bd0b78e`).
