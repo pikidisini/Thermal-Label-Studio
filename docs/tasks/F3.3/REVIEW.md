@@ -1,6 +1,22 @@
 # Review Fase 3.3 — Login aplikasi
 
-Status: `CHANGES REQUIRED`. Review Level 3 terhadap `origin/main...9cfa3f6`; jangan buat PR atau merge dahulu.
+Status: `CHANGES REQUIRED`. Review ulang Level 3 terhadap koreksi `c07179c`; jangan buat PR atau merge dahulu.
+
+## Review ulang — commit `c07179c`
+
+Tiga P1 putaran pertama tertutup secara inspeksi kode: `AuthenticatedStudio` memisahkan hooks dari gerbang login; endpoint simulasi dan upload guard hanya menerima `app_session`, sedangkan `/operator/login` memberi 404; POST/DELETE studio telah memakai guard CSRF. Transport sesi, CLI password interaktif, dan Safe Demo juga diperbaiki. Backend terarah `104 passed, 2 warnings`; frontend `85 passed`. Ini belum menggantikan E2E browser maupun build Jenkins.
+
+Temuan yang masih perlu ditindaklanjuti:
+
+1. **P1 — E2E lama pasti tidak mewakili alur baru dan quality gate belum lengkap.** `frontend/tests/e2e/pilot_operator_self_service.spec.js` masih menunggu `input-pilot-password`, menekan `btn-pilot-login`, dan menekan `btn-pilot-logout` (baris 178–233, 361–362). Komponen baru telah menghapus ketiganya. `playwright.config.js` juga tidak menyiapkan akun login aplikasi bagi browser E2E. Ganti spec lama dengan alur login aplikasi PPIC/IT → studio → Simulasi Label → impor/detail/PDF → logout; pastikan test tidak memakai printer fisik. Jalankan E2E yang relevan, atau laporkan blocker aktual dan jangan klaim AC 7 terpenuhi.
+2. **P2 — Jenkins masih mensyaratkan secret pilot yang sudah dipensiunkan.** `Jenkinsfile:58–59` membungkus deploy dengan credential `tls-pilot-operator-secret`, padahal `ops/jenkins/deploy-local.sh` tidak lagi menggunakannya. Build/deploy tetap bergantung pada credential lama dan task meminta penggantian ketergantungan itu. Lepas wrapper credential tersebut; uji syntax/pipeline branch, dan dokumentasikan bootstrap akun setelah deploy.
+3. **P2 — Probe sesi kompatibilitas melewati transport guard.** `routes_sap_shadow.py:394–405` pada `/operator/session` memvalidasi `app_session` dan mengembalikan `csrf_token` tanpa `evaluate_app_transport_security`/dependency sesi yang sudah diberi guard. Semua route browser lain menolak HTTP LAN. Terapkan pemeriksaan transport yang sama dan test HTTP LAN bersesi ditolak sebelum token CSRF dikembalikan.
+
+Verifikasi reviewer putaran kedua: `git fetch origin` PASS; status branch bersih pada `c07179c`; `git diff --check origin/main...HEAD` PASS; backend terarah 104 PASS; `npm.cmd test` 85 PASS. Full backend, production build, Playwright, Jenkins runtime, dan deployment **NOT RUN oleh reviewer**. Angka full suite di `RESULT.md` merupakan laporan executor. Setelah koreksi di atas, ulang review final sebelum PR.
+
+---
+
+## Riwayat review putaran pertama — commit `9cfa3f6`
 
 ## Temuan yang wajib diperbaiki
 

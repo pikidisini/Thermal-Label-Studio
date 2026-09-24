@@ -1,5 +1,12 @@
 # AI Handoff — Thermal Label Studio
 
+## Snapshot aktif — F3.3 review ulang Level 3: CHANGES REQUIRED
+
+- Tanggal: 2026-09-24. Branch `codex/f3-3-app-login`, koreksi executor `c07179c`.
+- Tiga P1 review awal tertutup secara inspeksi kode dan test terarah; review ulang menemukan E2E browser lama masih menguji login pilot yang sudah dihapus. Jenkins masih meminta secret pilot, dan probe `/operator/session` belum memakai transport guard yang konsisten. Rincian dan aksi ada di `docs/tasks/F3.3/REVIEW.md`.
+- Verifikasi independen: backend terarah 104 PASS, frontend unit 85 PASS, diff whitespace PASS. Full backend/build/E2E/Jenkins tidak dijalankan ulang oleh reviewer. Jangan PR/merge sebelum koreksi dan review final.
+- Snapshot remediasi executor di bawah adalah riwayat handoff, bukan verdict review akhir.
+
 ## Snapshot aktif — F3.3 Remediasi Review Level 3 Selesai (REMEDIATION_LEVEL3_COMPLETED — AWAITING_CODEX_REVIEW)
 
 - Tanggal: 2026-09-24. Branch `codex/f3-3-app-login`.
