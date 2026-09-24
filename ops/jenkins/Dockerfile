@@ -15,6 +15,7 @@ COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=docker-cli /usr/local/bin/docker-compose /usr/local/bin/docker-compose
 COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins/docker-compose /usr/local/libexec/docker/cli-plugins/docker-compose
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
-    && mkdir -p /usr/local/lib/docker/cli-plugins \
-    && ln -s /usr/local/libexec/docker/cli-plugins/docker-compose /usr/local/lib/docker/cli-plugins/docker-compose
+    && mkdir -p /usr/local/lib/docker/cli-plugins /usr/lib/docker/cli-plugins \
+    && ln -s /usr/local/libexec/docker/cli-plugins/docker-compose /usr/local/lib/docker/cli-plugins/docker-compose \
+    && ln -s /usr/local/libexec/docker/cli-plugins/docker-compose /usr/lib/docker/cli-plugins/docker-compose
 USER jenkins
