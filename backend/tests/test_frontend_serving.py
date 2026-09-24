@@ -16,7 +16,7 @@ def test_serve_frontend_static_assets(client: TestClient):
     # Verify index.html contains proper script and css link tags
     resp = client.get("/")
     assert resp.status_code == 200
-    assert "assets/" in resp.text or "src/main.jsx" in resp.text
+    assert "assets/" in resp.text or "src/main.tsx" in resp.text or "src/main.jsx" in resp.text
 
 
 def test_api_status_endpoint(client: TestClient):

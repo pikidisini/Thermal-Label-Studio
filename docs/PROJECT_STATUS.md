@@ -4,6 +4,8 @@ Dokumen ini adalah ringkasan kondisi proyek aktif untuk manusia dan AI.
 
 ## Status proyek
 
+Snapshot aktif (2026-09-24): Fase 3.2 menyiapkan Jenkins self-hosted lokal di branch `codex/f3-2-jenkins-local-simulation` dari `main` `04bb368`. Container Jenkins sudah berjalan hanya pada `127.0.0.1:8081`; pipeline dan aplikasi simulasi live belum aktif sampai wizard admin, credential, job SCM, review, dan merge selesai. Backend `440 passed, 21 skipped`; frontend `74 passed`; app Docker smoke test PASS. Detail dan batas verifikasi ada di `docs/tasks/F3.2/RESULT.md`. Snapshot F3.1 di bawah adalah riwayat, bukan status Git terkini.
+
 Snapshot implementasi (2026-09-23): Fase `3.1 — Simulasi Label Terpadu`
 telah diimplementasikan pada branch `codex/f3-1-simulasi-label-terpadu`.
 Topbar menyatukan pintu masuk simulasi menjadi satu tombol `Simulasi Label`

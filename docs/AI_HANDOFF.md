@@ -1,5 +1,14 @@
 # AI Handoff — Thermal Label Studio
 
+## Snapshot aktif — Fase 3.2 Jenkins lokal (2026-09-24)
+
+- Writer: Codex pada laptop pengguna. Branch `codex/f3-2-jenkins-local-simulation`, baseline `origin/main` `04bb368`; perubahan F3.2 masih uncommitted/unpushed. Folder `output/` adalah data lokal sebelumnya, tidak disentuh, dan kini di-ignore.
+- Jenkins self-hosted berjalan di Docker Desktop pada `127.0.0.1:8081`. Image Jenkins dan image app preflight berhasil dibangun; app **belum** dideploy live karena setup admin/credential/job SCM di UI belum selesai.
+- Batas deployment: hanya `main` yang lolos seluruh test boleh memperbarui `127.0.0.1:8000`; `LOCAL_SIMULATION_ONLY=true` menolak rute cetak fisik lama; `SAFE_DEMO_MODE=false`; volume data terpisah; rollback image sebelumnya tersedia.
+- Verifikasi: backend `440 passed, 21 skipped`, frontend `74 passed`, TypeScript PASS, Docker app build/smoke PASS, Compose PASS, Bash syntax PASS, `git diff --check` PASS. Pipeline Jenkins end-to-end dan rollback runtime **NOT RUN**. Tidak ada akses SAP, printer, database perusahaan, atau port 9100.
+- Task contract dan bukti: `docs/tasks/F3.2/TASK_CONTRACT.md`, `docs/tasks/F3.2/RESULT.md`; langkah operator: `docs/deployment/jenkins_local_simulation.md`. Berhenti sebelum commit/push/PR/merge sampai review dan setup awal dilakukan.
+- Entri F3.1 dan fase lama di bawah adalah riwayat; gunakan snapshot F3.2 dan status Git aktual untuk kondisi sekarang.
+
 ## Active review snapshot — Fase 3.1 gabungan (READY_FOR_COMBINED_PR)
 
 - Date: `2026-09-23`; branch: `codex/f3-1-simulasi-label-terpadu`; executor fix: `f97c8e6`; baseline: `origin/main` `0f2cf82`.

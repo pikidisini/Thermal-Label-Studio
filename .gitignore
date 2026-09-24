@@ -12,7 +12,11 @@ __pycache__/
 *.class
 *.so
 .pytest_cache/
+.pytest-*/
+tmp/
+output/
 .venv/
+.venv-jenkins/
 venv/
 env/
 ENV/

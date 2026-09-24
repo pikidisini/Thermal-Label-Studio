@@ -7,6 +7,14 @@ __pycache__
 **/*.pyc
 **/*.pyo
 .pytest_cache
+.pytest-*
+.venv-jenkins
+output
+tmp
+backend/data
+.env
+.env.*
+!.env*.example
 playwright-report
 test-results
 dist
