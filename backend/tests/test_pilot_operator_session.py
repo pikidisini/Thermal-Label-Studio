@@ -295,6 +295,47 @@ class TestPilotOperatorRoutes:
         assert "samesite=lax" in set_cookie_https
         assert "httponly" in set_cookie_https
 
+        # 5. Docker bridge gateway connecting to loopback Host succeeds
+        docker_client = TestClient(app, client=("172.17.0.1", 55555))
+        resp_docker = docker_client.post(
+            "/api/v1/auth/login",
+            headers={"Host": "127.0.0.1:8000"},
+            json={"username": "operator_ppic", "password": "OperatorPass123!"},
+        )
+        assert resp_docker.status_code == 200
+        set_cookie_docker = resp_docker.headers.get("set-cookie", "").lower()
+        assert "secure" not in set_cookie_docker
+        assert "samesite=lax" in set_cookie_docker
+        assert "httponly" in set_cookie_docker
+
+        # 6. Docker Desktop gateway connecting to loopback Host succeeds
+        desktop_client = TestClient(app, client=("192.168.65.1", 55555))
+        resp_desktop = desktop_client.post(
+            "/api/v1/auth/login",
+            headers={"Host": "localhost:8000"},
+            json={"username": "operator_ppic", "password": "OperatorPass123!"},
+        )
+        assert resp_desktop.status_code == 200
+
+        # 7. Intranet client connecting with spoofed loopback Host fails closed (HTTP 403)
+        intranet_spoof_client = TestClient(app, client=("192.168.1.50", 55555))
+        resp_intranet_spoof = intranet_spoof_client.post(
+            "/api/v1/auth/login",
+            headers={"Host": "127.0.0.1:8000"},
+            json={"username": "operator_ppic", "password": "OperatorPass123!"},
+        )
+        assert resp_intranet_spoof.status_code == 403
+        assert "https" in resp_intranet_spoof.json()["detail"].lower() or "intranet" in resp_intranet_spoof.json()["detail"].lower()
+
+        # 8. Docker bridge client connecting with non-loopback intranet Host fails closed (HTTP 403)
+        resp_docker_intranet = docker_client.post(
+            "/api/v1/auth/login",
+            headers={"Host": "label-server.corp.internal:8000"},
+            json={"username": "operator_ppic", "password": "OperatorPass123!"},
+        )
+        assert resp_docker_intranet.status_code == 403
+
+
     def test_rate_limit_lockout_http_429(self, client: TestClient):
         """P2: 5 consecutive invalid login attempts from same client trigger HTTP 429 lockout."""
         for _ in range(5):

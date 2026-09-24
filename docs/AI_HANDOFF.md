@@ -1,6 +1,28 @@
 # AI Handoff — Thermal Label Studio
 
-## Snapshot aktif — Review F3.2 Jenkins PYTHONPATH PASS (PR-ready)
+## Snapshot aktif — Perbaikan Bug Docker Bridge pada Transport Security Login F3.3
+
+- Tanggal: 2026-09-24. Branch `codex/fix-docker-bridge-transport`, baseline `origin/main` (`bd0b78e`).
+- Writer / Executor: Gemini Flash (Antigravity). Reviewer: Codex.
+- Status: `REMEDIATION_COMPLETED — AWAITING_CODEX_REVIEW`.
+- Root cause: Saat aplikasi berjalan di container Docker (`-p 127.0.0.1:8000:8000`), permintaan browser lokal dari host diteruskan via Docker bridge network. `request.url.hostname` adalah `127.0.0.1`, tetapi `request.client.host` adalah IP gateway Docker bridge (`172.17.0.1` atau `192.168.65.1`). Evaluasi transport sebelumnya hanya mengizinkan `client_ip in loopback_hosts`, sehingga login sah dari browser ditolak fail-closed dengan HTTP 403 Forbidden (`Login rejected: plain HTTP over non-loopback host '127.0.0.1' (client '172.17.0.1')`).
+- File yang diubah:
+  - `backend/app/auth/dependencies.py`: Ditambahkan helper `is_loopback_or_docker_bridge_client` yang memvalidasi loopback IP (`127.0.0.1`, `localhost`, `::1`, `testserver`, `testclient`) serta Docker bridge gateway (`172.17.0.1`, `192.168.65.1`, gateway dari `/proc/net/route`, subnet `172.17.0.0/16`, atau `192.168.65.0/24`).
+  - `backend/app/api/operator_import_guard.py`: `evaluate_pilot_transport_security` didelegasikan langsung ke `evaluate_app_transport_security`.
+  - `backend/tests/test_pilot_operator_session.py`: Ditambahkan test login via Docker bridge gateway (`172.17.0.1`, `192.168.65.1`), penolakan spoofing klien intranet (`192.168.1.50`), dan penolakan host non-loopback.
+  - `backend/tests/test_auth_api.py`: Ditambahkan test `/auth/me` via Docker bridge gateway, penolakan spoofing klien intranet, dan unit test `test_docker_bridge_and_loopback_client_evaluator`.
+  - `docs/tasks/F3.3/RESULT.md`: Catatan remediasi Docker bridge.
+  - `docs/AI_HANDOFF.md`: Snapshot aktif handoff.
+- Verifikasi Quality Gates:
+  - Backend targeted Pytest: `69 passed, 2 warnings` in 82.58s (`test_auth_api.py`, `test_pilot_operator_session.py`, `test_pilot_operator_import_json.py`).
+  - Frontend Unit Tests: `85 passed, 0 failed` in 6.73s (`npm test` di `frontend/`).
+  - Playwright E2E Suite: `7 passed (45.2s)` (`auth.setup.js` + `pilot_operator_self_service.spec.js` + `sap_shadow_simulation.spec.js`).
+  - Git whitespace check: `git diff --check origin/main...HEAD` bersih (0 error).
+  - Secret scan: Bersih (0 secret).
+- Batas keras: Tidak mengubah port printer, tidak ada TCP 9100, tidak ada Spooler, tidak ada SAP, dan tidak ada database production.
+- Next step: Stop sebelum PR/merge. Meminta Codex melakukan review sebelum PR.
+
+## Riwayat snapshot — Review F3.2 Jenkins PYTHONPATH PASS (PR-ready)
 
 - Branch `codex/fix-jenkins-pythonpath`, commit executor `e030c19`. Review Codex PASS setelah disposable Docker smoke check: `python -m app.cli.user_admin --help` berhasil dengan `PYTHONPATH=/app/backend`.
 - `git diff --check origin/main...HEAD` PASS. Jenkins build ulang masih `NOT RUN`; Bash syntax check tidak tersedia karena Bash/WSL tidak tersedia pada shell review.

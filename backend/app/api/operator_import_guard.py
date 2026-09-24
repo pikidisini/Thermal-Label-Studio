@@ -30,32 +30,23 @@ class RequestBodyTooLargeError(StarletteHTTPException):
         super().__init__(status_code=413, detail=detail)
 
 
+from ..auth.dependencies import evaluate_app_transport_security
+
+
 def evaluate_pilot_transport_security(request: Request) -> Tuple[bool, bool]:
     """Evaluates whether the request transport satisfies pilot security requirements.
 
     Returns:
         Tuple[is_allowed, is_secure_cookie]
     - Over verified HTTPS (ASGI scheme == 'https'): always allowed, cookie secure=True.
-    - Over HTTP loopback (localhost, 127.0.0.1, ::1, testserver): allowed for local dev, cookie secure=False.
+    - Over HTTP loopback (localhost, 127.0.0.1, ::1, testserver, testclient): allowed for local dev, cookie secure=False.
+    - Over HTTP Docker bridge (forwarded from host loopback via docker-proxy / bridge gateway): allowed for local dev, cookie secure=False.
     - Over HTTP non-loopback (e.g. intranet IP/hostname): rejected (fail closed, HTTP 403).
       Raw X-Forwarded-Proto headers from client are never blindly trusted; HTTPS verification
       must be established by the ASGI layer (e.g. native TLS or trusted proxy middleware).
     """
-    if request.url.scheme == "https":
-        return True, True
+    return evaluate_app_transport_security(request)
 
-    host_header = request.headers.get("host", "").split(":")[0].strip().lower()
-    hostname = (request.url.hostname or host_header).lower()
-    client_ip = (request.client.host if request.client else "").lower()
-
-    loopback_hosts = {"127.0.0.1", "localhost", "::1", "testserver"}
-    client_is_loopback = (not client_ip) or (client_ip in loopback_hosts) or (client_ip == "testclient")
-    host_is_loopback = hostname in loopback_hosts
-
-    if host_is_loopback and client_is_loopback:
-        return True, False
-
-    return False, False
 
 
 class OperatorImportGuardMiddleware:
