@@ -7,15 +7,16 @@ from __future__ import annotations
 import json
 import re
 from typing import Any, Dict
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
+from ..auth.dependencies import get_current_user, verify_csrf_token
 from ..config import DATA_SAMPLES_DIR
 from ..models.schemas import ValidationRequest, ValidationResponse
 from ..services.template_service import TemplateService
 
 from engine.renderer import load_json_contract
 
-router = APIRouter(prefix="/inspect", tags=["Inspect & Validation"])
+router = APIRouter(prefix="/inspect", tags=["Inspect & Validation"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/sample-contract", summary="Get sample SAP JSON Contract v1.1")
@@ -49,7 +50,7 @@ def get_sample_contract() -> Dict[str, Any]:
     }
 
 
-@router.post("/validate", response_model=ValidationResponse, summary="Validate JSON contract against template")
+@router.post("/validate", response_model=ValidationResponse, dependencies=[Depends(verify_csrf_token)], summary="Validate JSON contract against template")
 def validate_contract_compatibility(req: ValidationRequest) -> ValidationResponse:
     """
     Validates whether a JSON data contract satisfies all required placeholders

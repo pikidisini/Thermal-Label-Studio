@@ -1,5 +1,5 @@
 """
-Automated tests for Safe Demo Mode (B2B2H).
+Automated tests for Safe Demo Mode (B2B2H & F3.3 Authentication Guard).
 
 Verifies:
 - AC 1: Default-off fail-closed enforcement (SAFE_DEMO_MODE != 'true' returns 404).
@@ -9,6 +9,7 @@ Verifies:
 - AC 5: In-memory reset without touching durable files or PostgreSQL.
 - AC 6: Clear safety notices and disclaimers.
 - AC 7: Sanitized error responses without leaking internal stack traces or secrets.
+- F3.3 Security: Unauthenticated access rejected with HTTP 401; mutations without CSRF rejected with HTTP 403.
 """
 
 from __future__ import annotations
@@ -18,8 +19,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.app.main import app
-from backend.app.services.safe_demo_service import safe_demo_service
+from app.services.safe_demo_service import safe_demo_service
 
 
 @pytest.fixture(autouse=True)
@@ -30,10 +30,39 @@ def reset_demo_state():
     safe_demo_service.reset()
 
 
-def test_safe_demo_default_off_fail_closed(monkeypatch):
-    """AC 1: When SAFE_DEMO_MODE is false or unset, all demo endpoints return 404."""
+def test_safe_demo_unauthenticated_fails_closed_401(unauthenticated_client, monkeypatch):
+    """F3.3: Anonymous requests to /safe-demo endpoints must fail closed with 401."""
+    monkeypatch.setenv("SAFE_DEMO_MODE", "true")
+
+    r_batch = unauthenticated_client.get("/api/v1/safe-demo/batch")
+    assert r_batch.status_code == 401
+
+    r_status = unauthenticated_client.get("/api/v1/safe-demo/status")
+    assert r_status.status_code == 401
+
+    r_run = unauthenticated_client.post("/api/v1/safe-demo/run")
+    assert r_run.status_code == 401
+
+    r_reset = unauthenticated_client.post("/api/v1/safe-demo/reset")
+    assert r_reset.status_code == 401
+
+
+def test_safe_demo_missing_csrf_fails_closed_403(client, monkeypatch):
+    """F3.3: Mutating requests to /safe-demo without CSRF token must fail closed with 403."""
+    monkeypatch.setenv("SAFE_DEMO_MODE", "true")
+
+    # Run without CSRF header
+    r_run = client.post("/api/v1/safe-demo/run", headers={"X-CSRF-Token": ""})
+    assert r_run.status_code == 403
+
+    # Reset without CSRF header
+    r_reset = client.post("/api/v1/safe-demo/reset", headers={"X-CSRF-Token": ""})
+    assert r_reset.status_code == 403
+
+
+def test_safe_demo_default_off_fail_closed(client, monkeypatch):
+    """AC 1: When SAFE_DEMO_MODE is false or unset, authenticated demo endpoints return 404."""
     monkeypatch.delenv("SAFE_DEMO_MODE", raising=False)
-    client = TestClient(app)
 
     # All safe demo endpoints must fail-closed
     r_batch = client.get("/api/v1/safe-demo/batch")
@@ -55,10 +84,9 @@ def test_safe_demo_default_off_fail_closed(monkeypatch):
     assert r_sys.json().get("safe_demo_mode") is False
 
 
-def test_safe_demo_visible_batch_fixture(monkeypatch):
+def test_safe_demo_visible_batch_fixture(client, monkeypatch):
     """AC 3 & AC 6: Batch fixture has >= 3 distinct sequential items with copies=1 and synthetic disclaimer."""
     monkeypatch.setenv("SAFE_DEMO_MODE", "true")
-    client = TestClient(app)
 
     res = client.get("/api/v1/safe-demo/batch")
     assert res.status_code == 200
@@ -100,14 +128,13 @@ def test_safe_demo_visible_batch_fixture(monkeypatch):
             assert "password" not in str(val).lower()
 
 
-def test_safe_demo_run_simulation_zero_sockets(monkeypatch):
+def test_safe_demo_run_simulation_zero_sockets(client, monkeypatch):
     """AC 2 & AC 4: Simulation dispatches to simulator without opening any network sockets."""
     monkeypatch.setenv("SAFE_DEMO_MODE", "true")
-    client = TestClient(app)
 
     # Patch RawTcpSocketTransport to guarantee no physical transport can be constructed
     with patch(
-        "backend.app.print_jobs.socket_transport.RawTcpSocketTransport"
+        "app.print_jobs.socket_transport.RawTcpSocketTransport"
     ) as mock_raw_transport:
         mock_raw_transport.side_effect = AssertionError(
             "CRITICAL: RawTcpSocketTransport must never be used in Safe Demo Mode!"
@@ -121,7 +148,6 @@ def test_safe_demo_run_simulation_zero_sockets(monkeypatch):
 
     batch_data = res.json()
     assert batch_data["status"] == "completed"
-
 
     items = batch_data["items"]
     assert len(items) == 3
@@ -157,11 +183,9 @@ async def test_safe_demo_service_direct_socket_guard():
         assert res["status"] == "completed"
 
 
-
-def test_safe_demo_status_endpoint(monkeypatch):
+def test_safe_demo_status_endpoint(client, monkeypatch):
     """Verify GET /api/v1/safe-demo/status returns accurate simulation summary."""
     monkeypatch.setenv("SAFE_DEMO_MODE", "true")
-    client = TestClient(app)
 
     # Before run
     res_before = client.get("/api/v1/safe-demo/status")
@@ -184,10 +208,9 @@ def test_safe_demo_status_endpoint(monkeypatch):
     assert stat_after["dispatches_count"] == 3
 
 
-def test_safe_demo_reset(monkeypatch):
+def test_safe_demo_reset(client, monkeypatch):
     """AC 5: Reset only affects in-memory demo state without touching external files/DB."""
     monkeypatch.setenv("SAFE_DEMO_MODE", "true")
-    client = TestClient(app)
 
     # 1. Run simulation
     client.post("/api/v1/safe-demo/run")
@@ -213,10 +236,9 @@ def test_safe_demo_reset(monkeypatch):
     assert len(safe_demo_service.transport.dispatches) == 0
 
 
-def test_safe_demo_error_resilience(monkeypatch):
+def test_safe_demo_error_resilience(client, monkeypatch):
     """AC 7: Unexpected internal errors return generic safe messages without leaking traces."""
     monkeypatch.setenv("SAFE_DEMO_MODE", "true")
-    client = TestClient(app)
 
     with patch.object(safe_demo_service, "run_simulation", side_effect=Exception("InternalDBTokenSecretError")):
         res = client.post("/api/v1/safe-demo/run")

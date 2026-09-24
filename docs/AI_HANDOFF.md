@@ -1,5 +1,127 @@
 # AI Handoff — Thermal Label Studio
 
+## Snapshot aktif — F3.3 review final keempat PASS (PR-ready)
+
+- Tanggal 2026-09-24; branch `codex/f3-3-app-login`; kode executor pada `9e7ef36`. Reviewer Codex Level 3 menutup seluruh temuan sebelumnya; rincian ada di `docs/tasks/F3.3/REVIEW.md`.
+- Verifikasi reviewer: status branch awal bersih dan tracking remote; `git diff --check origin/main...HEAD` PASS; backend targeted 29 PASS. Laporan executor mencatat Playwright 7 PASS, tetapi rerun reviewer BLOCKED sebelum test karena port lokal 8000 sedang digunakan; layanan pengguna tidak dihentikan.
+- Verdict: PR-ready, belum production-ready. Jenkins runtime, SAP, printer fisik, dan deployment produksi tidak diverifikasi reviewer. Jangan menafsirkan angka E2E executor sebagai verifikasi independen.
+- Review/handoff ini hanya mengubah dokumentasi; histori di bawah tetap dipertahankan.
+
+## Snapshot aktif — F3.3 Remediasi Review Ulang Ketiga Selesai (REMEDIATION_ROUND3_COMPLETED — AWAITING_CODEX_FINAL_REVIEW)
+
+- Tanggal: 2026-09-24. Branch `codex/f3-3-app-login`.
+- Writer / Executor: Gemini Flash (Antigravity). Reviewer: Codex Level 3 (independen).
+- Status: `REMEDIATION_ROUND3_COMPLETED — AWAITING_CODEX_FINAL_REVIEW`.
+- Seluruh 3 temuan review putaran ketiga (`docs/tasks/F3.3/REVIEW.md`) telah diselesaikan tuntas dan diverifikasi dengan tes aktual:
+  1. **P1 — Server Playwright Memaksa Simulasi-Only & Preflight 404 Fisik**:
+     - `frontend/playwright.config.js` menambahkan `LOCAL_SIMULATION_ONLY: 'true'` secara eksplisit pada `webServer[0].env` backend.
+     - `frontend/tests/e2e/auth.setup.js` menjalankan preflight probe memastikan 5 rute cetak fisik (`/api/v1/print/batch`, `/api/v1/print/tcp`, `/api/v1/print/spooler`, `/api/v1/print/printers`, `/api/v1/sap/print`) mengembalikan HTTP 404 fail-closed.
+     - `frontend/tests/e2e/pilot_operator_self_service.spec.js` mempertegas asersi HTTP 404 fail-closed pada rute cetak fisik.
+  2. **P1 — Seeder E2E Bebas Fallback & Validasi Ketat Fail-Closed**:
+     - `backend/scripts/seed_e2e_users.py` menghapus fallback ke `backend/data/auth.db`.
+     - Fungsi `validate_e2e_db_path(raw_path)` mewajibkan `AUTH_DB_PATH` disetel, menolak database live/operasional (`auth.db`, dll.), dan mewajibkan nama file memuat penanda `e2e` atau `test`.
+     - Validasi dieksekusi di awal `main()` sebelum modul `app.auth` diimpor untuk mencegah inisialisasi modul service/repository yang dapat menciptakan file database prematur di disk.
+     - Ditambahkan suite pengujian `backend/tests/test_seed_e2e_users.py` (4 tests passed) memverifikasi penolakan fail-closed saat env kosong atau mengarah ke path live.
+  3. **P2 — Ketegasan Assertion Autentikasi E2E & Cookie Sesi**:
+     - `frontend/tests/e2e/auth.setup.js` menghapus blok kondisional: `login-page` dipastikan tampil tanpa syarat, login PPIC berhasil diverifikasi dengan badge `[PPIC] ppic_operator`, dan keberadaan cookie `app_session` di browser context divalidasi sebelum menyimpan `storageState`.
+- Verifikasi Quality Gate Aktual:
+  - Playwright E2E: `7 passed (59.0s)` (`auth.setup.js` + `pilot_operator_self_service.spec.js` + `sap_shadow_simulation.spec.js`). Zero printer fisik.
+  - Targeted Seeder & Session Pytest: `44 passed, 2 warnings` in 48.27s (`test_seed_e2e_users.py`, `test_pilot_operator_session.py`, `test_auth_api.py`).
+  - Frontend Unit Test: `85 passed, 0 failed` in 10.19s (`npm test` di `frontend/`).
+  - Git Whitespace Check: `git diff --check` bersih (0 errors).
+  - Storage & Security: Zero database files committed, zero secrets committed.
+- Batasan lingkungan: Live SAP RFC/ECC: `NOT RUN`; Printer fisik/port 9100: `NOT RUN`; Database enterprise production: `NOT RUN`.
+- Target berhenti: Berhenti sebelum membuat PR atau merge ke `main`. Menyerahkan branch kepada Codex Level 3 untuk review final.
+
+## Riwayat snapshot — F3.3 review ulang ketiga: CHANGES REQUIRED
+
+- Tanggal: 2026-09-24. Branch `codex/f3-3-app-login`, koreksi executor `7a45416`.
+- Jenkins secret lama dan probe sesi sudah dikoreksi; regression endpoint sesi 25 PASS. Review menemukan harness Playwright belum mengaktifkan `LOCAL_SIMULATION_ONLY=true`, serta skrip seed E2E masih dapat memilih `backend/data/auth.db` dan mereset akun dengan password test bila env hilang. Detail di `docs/tasks/F3.3/REVIEW.md`.
+- E2E tidak dijalankan ulang oleh reviewer karena konfigurasi server test belum menutup rute cetak fisik. Jangan PR/merge sebelum koreksi keselamatan, test E2E, dan review final.
+- Snapshot executor/review lama di bawah dipertahankan sebagai riwayat, bukan verdict terkini.
+
+## Snapshot aktif — F3.3 Remediasi Review Ulang Selesai (REMEDIATION_ROUND2_COMPLETED — AWAITING_CODEX_FINAL_REVIEW)
+
+- Tanggal: 2026-09-24. Branch `codex/f3-3-app-login`.
+- Writer / Executor: Gemini Flash (Antigravity). Reviewer: Codex Level 3 (independen).
+- Status: `REMEDIATION_ROUND2_COMPLETED — AWAITING_CODEX_FINAL_REVIEW`.
+- Tiga temuan review ulang `docs/tasks/F3.3/REVIEW.md` (commit `c07179c` follow-up) telah diselesaikan dan diverifikasi:
+  1. **P1 — E2E Playwright Mewakili Alur Baru & Quality Gate Lengkap**:
+     - `frontend/tests/e2e/pilot_operator_self_service.spec.js` diganti penuh menguji alur login aplikasi PPIC/IT → studio (`AuthenticatedStudio`) → Simulasi Label → batch table & item sequence (`#1`, `#2`) → tombol bukti PDF → impor JSON SAP raw v2 dengan CSRF header → logout global aplikasi mengembalikan user ke `LoginPage`.
+     - `playwright.config.js` menyiapkan akun login otomatis melalui `globalSetup` (`backend/scripts/seed_e2e_users.py`), database auth terisolasi `backend/data/auth_e2e.db`, dan setup project `frontend/tests/e2e/auth.setup.js` (`storageState: frontend/.auth/user.json`).
+     - Hasil test Playwright aktual: `pilot_operator_self_service.spec.js`: 3 passed (28.1s); `sap_shadow_simulation.spec.js`: 5 passed (39.5s). Zero socket/port 9100/spooler.
+  2. **P2 — Pelepasan Ketergantungan Credential Pilot Legacy di Jenkins**:
+     - Blok `withCredentials` credential `tls-pilot-operator-secret` dilepas dari `Jenkinsfile` dan `Jenkinsfile.rollback`.
+     - `docs/deployment/jenkins_local_simulation.md` diperbarui untuk menghapus persyaratan credential lama dan mendokumentasikan langkah bootstrap akun awal pasca-deploy via CLI interaktif `docker exec -it tls-local-sim python -m app.cli.user_admin create-user`.
+  3. **P2 — Transport Guard pada Probe Sesi `/operator/session`**:
+     - Endpoint `/operator/session` pada `routes_sap_shadow.py` diperbarui menggunakan `Depends(get_current_user_optional)`. Request dengan cookie `app_session` yang mengakses plain HTTP intranet (non-loopback) ditolak fail-closed dengan HTTP 403 Forbidden sebelum status atau CSRF token dikembalikan.
+     - Diuji dan diverifikasi pada `test_pilot_operator_session.py::test_session_probe_authenticated_on_plain_http_intranet_fails_closed_403`.
+- Quality Gates Aktual:
+  - Backend targeted pytest: `58 passed, 2 warnings` in 50.05s (`test_pilot_operator_session.py`, `test_auth_api.py`, `test_auth_service.py`).
+  - Frontend unit tests: `85 passed, 0 failed` in 6.36s (`npm test` di `frontend/`).
+  - Playwright E2E: `3 passed` (`pilot_operator_self_service.spec.js`) + `5 passed` (`sap_shadow_simulation.spec.js`).
+  - Frontend production build: `npm run build` PASS (0 errors, 6.97s).
+  - Whitespace check: `git diff --check` bersih (0 errors).
+  - Secret & database scan: Zero `.db` committed, `.gitignore` mencakup `backend/data/*.db*` dan `frontend/.auth/`.
+- Batasan lingkungan: Live SAP RFC/ECC: `NOT RUN`; Printer fisik/port 9100: `NOT RUN`; Database enterprise production: `NOT RUN`.
+- Task Files: `docs/tasks/F3.3/TASK_CONTRACT.md`, `docs/tasks/F3.3/RESULT.md`, `docs/tasks/F3.3/REVIEW.md`.
+- Next Action: Stop sebelum PR/merge. Menyerahkan branch kepada Codex Level 3 untuk review final.
+
+## Snapshot aktif — F3.3 Remediasi Review Level 3 Selesai (REMEDIATION_LEVEL3_COMPLETED — AWAITING_CODEX_REVIEW)
+
+- Tanggal: 2026-09-24. Branch `codex/f3-3-app-login`.
+- Writer / Executor: Gemini Flash (Antigravity). Reviewer: Codex Level 3 (independen).
+- Status: `REMEDIATION_LEVEL3_COMPLETED — AWAITING_CODEX_REVIEW`.
+- Remediasi temuan `docs/tasks/F3.3/REVIEW.md` (P1 & P2) telah tuntas:
+  1. **P1 — Urutan React hooks**: Komponen studio diekstraksi ke `AuthenticatedStudio.tsx`. `App.tsx` bersih dari conditional hook execution; siklus hidup loading, login, studio, dan logout diuji di `frontend/tests/test_auth_flow.mjs`.
+  2. **P1 — Jalur password pilot lama dihapus**: `/operator/login` ditutup (HTTP 404), cookie legacy `pilot_session` ditolak fail-closed (HTTP 401), env pilot legacy dibersihkan dari `deploy-local.sh`, simulasi terintegrasi sepenuhnya ke akun PPIC/IT bersesi `app_session`.
+  3. **P1 — CSRF guard mutasi studio**: Endpoint mutasi POST/DELETE di `templates`, `render`, `inspect`, `safe-demo`, dan `operator/logout` diproteksi `Depends(verify_csrf_token)`. Frontend API clients mengirim `X-CSRF-Token` via `csrfHelper.ts` dan `credentials: 'same-origin'`.
+  4. **P2 — Konsistensi transport guard**: `evaluate_app_transport_security()` dipasang di `get_current_user_optional` (menolak plain HTTP intranet non-loopback dengan HTTP 403 pada `/auth/me`, `/auth/csrf`, dan seluruh rute bersesi).
+  5. **P2 — CLI user_admin aman**: Argumen `--password` dihapus dari argv parser CLI; password wajib dimasukkan via prompt interaktif `getpass.getpass` dengan konfirmasi.
+  6. **P2 — Safe Demo browser guard**: `safe_demo_router` dilindungi `Depends(get_current_user)` dan mutasi `/run`, `/reset` dilindungi `Depends(verify_csrf_token)`. Rute cetak fisik tetap dicegat 404 pada local simulation.
+- Quality Gates Aktual:
+  - Backend pytest: `480 passed, 21 skipped, 0 failed` in 277.50s.
+  - Frontend unit tests: `85 passed, 0 failed` in 654ms (`npm test` di `frontend/`).
+  - Frontend production build: `npm run build` PASS (0 errors, 6.75s).
+  - Whitespace check: `git diff --check` bersih (0 errors).
+  - Secret & database scan: Zero `.db` committed, zero secrets committed.
+- Batasan lingkungan: Live SAP RFC/ECC: `NOT RUN`; Printer fisik/port 9100: `NOT RUN`; Database enterprise production: `NOT RUN`.
+- Task Files: `docs/tasks/F3.3/TASK_CONTRACT.md`, `docs/tasks/F3.3/RESULT.md`, `docs/tasks/F3.3/REVIEW.md`.
+- Next Action: Stop sebelum PR/merge. Menyerahkan branch kepada Codex Level 3 untuk review independen ulang.
+
+## Snapshot aktif — Fase 3.3: Implementasi Selesai (IMPLEMENTATION_COMPLETED — AWAITING_CODEX_LEVEL_3_REVIEW)
+
+- Tanggal: 2026-09-24
+- Repository: `Thermal-Label-Studio` (`web_app/`)
+- Branch: `codex/f3-3-app-login`, baseline `origin/main` at `98a5983` (PR #26 merged).
+- Writer / Executor: Gemini Flash (Antigravity). Reviewer: Codex Level 3 (independen).
+- Status: `IMPLEMENTATION_COMPLETED — AWAITING_CODEX_LEVEL_3_REVIEW`. Seluruh kriteria penerimaan (AC 1-7) pada `docs/tasks/F3.3/TASK_CONTRACT.md` telah diimplementasikan dan diverifikasi secara menyeluruh:
+  1. **Login Aplikasi & Autentikasi Terpadu**:
+     - Ditambahkan antarmuka login aplikasi (`frontend/src/components/auth/LoginPage.tsx`) yang menangani login user PPIC dan IT dengan penanganan error aman dan feedback visual.
+     - Sesi server-side terkelola via cookie HttpOnly `app_session` (SameSite=lax, Secure di HTTPS, loopback allowed untuk local dev). Token sesi disimpan dalam hash SHA-256 pada SQLite `backend/data/auth.db` (terpisah dari database batch `sap_shadow_simulation.db` dan diproteksi volume Docker).
+     - Perlindungan brute force: 5 kali percobaan gagal berturut-turut memicu penguncian sementara akun (lockout 300 detik).
+     - Mitigasi timing attack: verifikasi password dummy berjalan konstan bahkan saat user tidak ditemukan.
+  2. **Pengalaman Pengguna & Satu Sesi Simulasi**:
+     - Header aplikasi (`TopMenuBar.tsx`) menampilkan badge role pengguna aktif (`[PPIC] user` atau `[IT] user`) serta tombol logout global.
+     - Modal Simulasi Label (`SapShadowSimulationModal.tsx`) tidak lagi menampilkan card form login pilot operator terpisah; pengguna yang sudah login dapat langsung menggunakan fitur simulasi (impor JSON SAP, pantau sequence batch/item, unduh bukti PDF).
+     - Endpoint alias `/batches`, `/batches/{batch_id}`, `/batches/{batch_id}/pdf`, dan `/import-json` pada `routes_sap_shadow.py` serta `OperatorImportGuardMiddleware` mendukung autentikasi terpadu via `app_session`.
+  3. **Proteksi Endpoint Sensitif & Guard Fisik**:
+     - Seluruh endpoint browser sensitif (`/api/v1/templates`, `/api/v1/render`, `/api/v1/inspect`) dilindungi server-side dengan `Depends(get_current_user)` (fail-closed HTTP 401 jika unauthenticated).
+     - Hak simulasi PPIC/IT tidak membuka akses cetak fisik: rute cetak fisik tetap diblokir (HTTP 404) pada local simulation (`LOCAL_SIMULATION_ONLY=true`).
+  4. **CLI Admin Bootstrap**:
+     - Tersedia CLI tool `backend/app/cli/user_admin.py` (`python -m app.cli.user_admin`) dengan perintah `create-user`, `set-password`, `deactivate-user`, `activate-user`, dan `list-users`.
+     - Zero hardcoded / default passwords di kode dan repositori.
+  5. **Verifikasi Quality Gates Aktual**:
+     - Pytest Backend: `477 passed, 21 skipped, 0 failed` in 85.34s (mencakup `test_auth_service.py`, `test_auth_api.py`, `test_user_admin_cli.py`, dan seluruh regresi).
+     - Frontend Test Suite: `79 passed, 0 failed` in 617ms (`npm test` di `frontend/`).
+     - Frontend Production Build: `npm run build` PASS (0 errors, 6.78s).
+     - Ops script preflight: `deploy-local.sh` diperbarui untuk memvalidasi proteksi fail-closed `/api/v1/auth/me` dan CLI admin help.
+     - Whitespace check: `git diff --check` bersih (0 errors).
+     - Secret & database scan: Zero `.db` committed, `.gitignore` melindungi `backend/data/*.db`.
+- Batas Lingkungan: Live SAP RFC/ECC: `NOT RUN`; Printer fisik/port 9100: `NOT RUN`; Database enterprise production: `NOT RUN`.
+- Task Files: `docs/tasks/F3.3/TASK_CONTRACT.md`, `docs/tasks/F3.3/RESULT.md`, `docs/tasks/F3.3/REVIEW.md`.
+- Next Action: Stop sebelum PR/merge. Menyerahkan branch kepada Codex Level 3 untuk review independen melalui `docs/tasks/F3.3/REVIEW.md`.
+
 ## Snapshot aktif — Fase 3.2 Jenkins lokal (2026-09-24)
 
 - Writer: Codex pada laptop pengguna. Branch `codex/f3-2-jenkins-local-simulation`, baseline `origin/main` `04bb368`; perubahan F3.2 masih uncommitted/unpushed. Folder `output/` adalah data lokal sebelumnya, tidak disentuh, dan kini di-ignore.

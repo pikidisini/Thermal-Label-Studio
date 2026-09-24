@@ -76,6 +76,8 @@ class OperatorImportGuardMiddleware:
         self.guarded_paths = {
             "/api/v1/simulation/operator/import-json",
             "/simulation/operator/import-json",
+            "/api/v1/simulation/import-json",
+            "/simulation/import-json",
         }
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -92,7 +94,7 @@ class OperatorImportGuardMiddleware:
             await self.app(scope, receive, send)
             return
 
-        if path not in self.guarded_paths and not path.endswith("/simulation/operator/import-json"):
+        if path not in self.guarded_paths and not path.endswith("/simulation/operator/import-json") and not path.endswith("/simulation/import-json"):
             await self.app(scope, receive, send)
             return
 
@@ -110,16 +112,7 @@ class OperatorImportGuardMiddleware:
             await response(scope, receive, send)
             return
 
-        if not is_pilot_operator_enabled():
-            response = JSONResponse(
-                status_code=404,
-                content={"detail": "Mode operator pilot dinonaktifkan."},
-            )
-            await response(scope, receive, send)
-            return
-
         # 2. Early Transport Security Check (Fail-Closed)
-        # Construct lightweight Starlette Request object from scope without reading the body.
         req = Request(scope)
         is_allowed, _ = evaluate_pilot_transport_security(req)
         if not is_allowed:
@@ -134,31 +127,33 @@ class OperatorImportGuardMiddleware:
             await response(scope, receive, send)
             return
 
-        # 3. Early Authentication Check (HttpOnly Cookie)
-        session_cookie = req.cookies.get("pilot_session")
+        # 3. Early Authentication Check (HttpOnly Cookie: strictly app_session)
+        session_cookie = req.cookies.get("app_session")
         if not session_cookie:
-            logger.warning("Early guard: Missing pilot_session cookie on import-json.")
+            logger.warning("Early guard: Missing app_session cookie on import-json.")
             response = JSONResponse(
                 status_code=401,
-                content={"detail": "Sesi operator pilot tidak valid atau belum masuk."},
+                content={"detail": "Sesi tidak valid atau belum masuk. Sesi operator pilot legacy telah dinonaktifkan."},
             )
             await response(scope, receive, send)
             return
 
-        session = pilot_session_service.get_valid_session(session_cookie)
-        if not session:
-            logger.warning("Early guard: Invalid or expired pilot_session cookie on import-json.")
+        from ..auth.service import auth_service
+        app_user_session = auth_service.validate_session(session_cookie)
+
+        if not app_user_session:
+            logger.warning("Early guard: Invalid or expired session cookie on import-json.")
             response = JSONResponse(
                 status_code=401,
-                content={"detail": "Sesi operator pilot tidak valid atau telah berakhir. Silakan login kembali."},
+                content={"detail": "Sesi tidak valid atau telah berakhir. Silakan login kembali."},
             )
             await response(scope, receive, send)
             return
 
         # 4. Early CSRF Verification
         csrf_token = req.headers.get("x-csrf-token")
-        if not csrf_token or not pilot_session_service.verify_csrf(session, csrf_token):
-            logger.warning("Early guard: CSRF verification failed on import-json for session: %s", session.session_id[:8])
+        if not csrf_token or not auth_service.verify_csrf(app_user_session, csrf_token):
+            logger.warning("Early guard: CSRF verification failed on import-json.")
             response = JSONResponse(
                 status_code=403,
                 content={"detail": "Validasi CSRF token gagal."},

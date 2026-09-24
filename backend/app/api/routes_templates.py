@@ -7,12 +7,13 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from typing import List
 from typing import Optional
-from fastapi import APIRouter, Body, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile, status
 
+from ..auth.dependencies import get_current_user, verify_csrf_token
 from ..models.schemas import RawSvgRequest, SaveTemplateRequest, TemplateDetail, TemplateSummary
 from ..services.template_service import TemplateService
 
-router = APIRouter(prefix="/templates", tags=["Templates"])
+router = APIRouter(prefix="/templates", tags=["Templates"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("", response_model=List[TemplateSummary], summary="List all templates")
@@ -21,7 +22,7 @@ def list_templates() -> List[TemplateSummary]:
     return TemplateService.list_templates()
 
 
-@router.post("", response_model=TemplateDetail, summary="Save or create a custom SVG template")
+@router.post("", response_model=TemplateDetail, dependencies=[Depends(verify_csrf_token)], summary="Save or create a custom SVG template")
 def save_template(req: SaveTemplateRequest) -> TemplateDetail:
     """Saves a custom SVG template from editor JSON payload."""
     if not req.svg_content or not req.svg_content.strip().startswith("<") or "<svg" not in req.svg_content:
@@ -44,7 +45,7 @@ def get_template(template_id: str) -> TemplateDetail:
     return detail
 
 
-@router.delete("/{template_id}", summary="Delete a custom template")
+@router.delete("/{template_id}", dependencies=[Depends(verify_csrf_token)], summary="Delete a custom template")
 def delete_template(template_id: str):
     """Deletes a custom template from server storage."""
     deleted = TemplateService.delete_custom_template(template_id)
@@ -56,7 +57,7 @@ def delete_template(template_id: str):
     return {"status": "success", "message": f"Template '{template_id}' deleted successfully."}
 
 
-@router.post("/upload", response_model=TemplateDetail, summary="Upload a custom SVG template")
+@router.post("/upload", response_model=TemplateDetail, dependencies=[Depends(verify_csrf_token)], summary="Upload a custom SVG template")
 async def upload_template(
     file: UploadFile = File(..., description="SVG template file"),
     template_name: str = Form(..., description="Friendly name / ID for the template"),
@@ -86,7 +87,7 @@ async def upload_template(
     return TemplateService.save_custom_template(template_name, svg_content)
 
 
-@router.post("/parse-raw", response_model=TemplateDetail, summary="Parse raw SVG string")
+@router.post("/parse-raw", response_model=TemplateDetail, dependencies=[Depends(verify_csrf_token)], summary="Parse raw SVG string")
 def parse_raw_svg(
     req: Optional[RawSvgRequest] = Body(default=None),
     legacy_svg_content: Optional[str] = Query(default=None, alias="svg_content"),

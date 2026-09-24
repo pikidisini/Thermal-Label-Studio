@@ -18,6 +18,7 @@ import {
   ListOrdered,
   Upload,
 } from 'lucide-react';
+import { useAuthStore } from '../../store/useAuthStore';
 import { sapShadowSimulationApi } from '../../utils/api/sapShadowSimulationApi';
 import type {
   PilotOperatorBatchSummary,
@@ -33,16 +34,11 @@ export default function SapShadowSimulationModal({
   isOpen,
   onClose,
 }: SapShadowSimulationModalProps) {
-  const [pilotEnabled, setPilotEnabled] = useState<boolean>(false);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const { user, csrfToken: authCsrfToken } = useAuthStore();
+  const [pilotEnabled, setPilotEnabled] = useState<boolean>(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [csrfToken, setCsrfToken] = useState<string>('');
   const [isCheckingSession, setIsCheckingSession] = useState<boolean>(true);
-
-  // Login form state
-  const [password, setPassword] = useState<string>('');
-  const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
 
   // Dashboard batch list state
   const [batches, setBatches] = useState<PilotOperatorBatchSummary[]>([]);
@@ -65,8 +61,6 @@ export default function SapShadowSimulationModal({
 
   useEffect(() => {
     if (!isOpen) {
-      setPassword('');
-      setLoginError(null);
       setExpandedBatchId(null);
       setBatchDetail(null);
       setDetailError(null);
@@ -86,18 +80,23 @@ export default function SapShadowSimulationModal({
         if (!isMounted) return;
 
         setPilotEnabled(Boolean(session.pilot_operator_enabled));
-        setIsAuthenticated(Boolean(session.authenticated));
+        const authed = Boolean(session.authenticated) || Boolean(user);
+        setIsAuthenticated(authed);
         if (session.csrf_token) {
           setCsrfToken(session.csrf_token);
+        } else if (authCsrfToken) {
+          setCsrfToken(authCsrfToken);
         }
 
-        if (session.authenticated) {
+        if (authed) {
           loadBatches();
         }
       } catch {
         if (!isMounted) return;
-        setPilotEnabled(false);
-        setIsAuthenticated(false);
+        setIsAuthenticated(Boolean(user));
+        if (user) {
+          loadBatches();
+        }
       } finally {
         if (isMounted) {
           setIsCheckingSession(false);
@@ -110,7 +109,7 @@ export default function SapShadowSimulationModal({
     return () => {
       isMounted = false;
     };
-  }, [isOpen]);
+  }, [isOpen, user, authCsrfToken]);
 
   async function loadBatches() {
     setIsLoadingBatches(true);
@@ -122,49 +121,6 @@ export default function SapShadowSimulationModal({
       setBatchError(err?.message || 'Gagal memuat daftar batch simulasi.');
     } finally {
       setIsLoadingBatches(false);
-    }
-  }
-
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    if (!password.trim()) {
-      setLoginError('Masukkan kata sandi operator pilot.');
-      return;
-    }
-
-    setIsLoggingIn(true);
-    setLoginError(null);
-
-    try {
-      const resp = await sapShadowSimulationApi.loginOperator(password.trim());
-      setIsAuthenticated(true);
-      setCsrfToken(resp.csrf_token);
-      setPassword('');
-      await loadBatches();
-    } catch (err: any) {
-      setLoginError(err?.message || 'Kata sandi operator pilot tidak valid.');
-    } finally {
-      setIsLoggingIn(false);
-    }
-  }
-
-  async function handleLogout() {
-    try {
-      await sapShadowSimulationApi.logoutOperator(csrfToken);
-    } catch {
-      // Ignore network logout error
-    } finally {
-      setIsAuthenticated(false);
-      setCsrfToken('');
-      setBatches([]);
-      setPassword('');
-      setExpandedBatchId(null);
-      setBatchDetail(null);
-      setDetailError(null);
-      setIsImportOpen(false);
-      setImportFile(null);
-      setUploadError(null);
-      setUploadSuccess(null);
     }
   }
 
@@ -272,13 +228,17 @@ export default function SapShadowSimulationModal({
                 <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">
                   Simulasi SAP DEV
                 </span>
-                {isAuthenticated && (
+                {user && (
                   <span
-                    className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 flex items-center gap-1"
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase border flex items-center gap-1 ${
+                      user.role === 'IT'
+                        ? 'bg-purple-900/40 text-purple-300 border-purple-700/50'
+                        : 'bg-emerald-900/40 text-emerald-300 border-emerald-700/50'
+                    }`}
                     data-testid="badge-operator-active"
                   >
                     <CheckCircle2 className="w-3 h-3" />
-                    Operator Aktif
+                    [{user.role}] {user.username}
                   </span>
                 )}
               </div>
@@ -288,17 +248,6 @@ export default function SapShadowSimulationModal({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {isAuthenticated && (
-              <button
-                onClick={handleLogout}
-                className="px-2.5 py-1 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors flex items-center gap-1.5"
-                title="Keluar Sesi Operator"
-                data-testid="btn-pilot-logout"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                Keluar
-              </button>
-            )}
             <button
               onClick={onClose}
               className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
@@ -326,131 +275,19 @@ export default function SapShadowSimulationModal({
           {isCheckingSession ? (
             <div className="py-12 flex flex-col items-center justify-center space-y-3 text-slate-400">
               <RefreshCw className="w-6 h-6 animate-spin text-amber-400" />
-              <p className="text-xs">Memeriksa status sesi operator...</p>
+              <p className="text-xs">Memeriksa status sesi simulasi...</p>
             </div>
-          ) : !pilotEnabled ? (
-            /* Fail-Closed Notice when PILOT_OPERATOR_ENABLED=false */
-            <div className="p-5 bg-slate-950/70 border border-slate-800 rounded-xl space-y-4">
-              <div className="flex items-start gap-3.5">
-                <div className="p-2.5 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-400 mt-0.5 shrink-0">
-                  <Lock className="w-5 h-5" />
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-white text-sm">
-                      Monitoring Membutuhkan Identity Provider
-                    </h3>
-                    <span
-                      className="text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-blue-500/20 text-blue-300 border border-blue-500/30"
-                      data-testid="status-batch-badge"
-                    >
-                      Fail-Closed
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    Akses browser anonim ke data kanonikal SAP dan bukti PDF evidence dinonaktifkan secara fail-closed.
-                    Mode operator pilot dinonaktifkan di server (<code>PILOT_OPERATOR_ENABLED=false</code>).
-                  </p>
-                </div>
+          ) : !isAuthenticated && !user ? (
+            <div className="p-6 bg-slate-950/80 border border-slate-800 rounded-xl space-y-4 max-w-md mx-auto text-center" data-testid="simulation-auth-required">
+              <div className="p-3 bg-red-950/40 border border-red-800/50 rounded-lg text-red-400 inline-block">
+                <Lock className="w-6 h-6 mx-auto" />
               </div>
-
-              <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-lg text-xs space-y-2 text-slate-300">
-                <div className="flex items-center gap-2 font-semibold text-slate-200">
-                  <ShieldAlert className="w-4 h-4 text-amber-400" />
-                  <span>Rencana Penerapan Access Control & RBAC:</span>
-                </div>
-                <p className="text-slate-400 leading-relaxed text-[11px]">
-                  Aplikasi belum memiliki integrasi enterprise Identity Provider (SSO/OIDC/RBAC).
-                  UI monitoring PPIC interaktif akan diaktifkan pada fase access-control/RBAC setelah mekanisme
-                  autentikasi pengguna berbasis sesi/peran tersedia.
-                </p>
-              </div>
-
-              <div className="p-3.5 bg-slate-900/50 border border-slate-800 rounded-lg text-xs space-y-2 text-slate-400">
-                <div className="flex items-center gap-2 font-semibold text-slate-300">
-                  <Server className="w-4 h-4 text-emerald-400" />
-                  <span>Jalur Ingestion SAP Tetap Aktif (Machine-to-Machine):</span>
-                </div>
-                <p className="text-[11px] text-slate-400">
-                  Sistem SAP (ZLABEL / ZMM_LABEL_JSON) tetap dapat mendorong payload simulasi secara langsung
-                  ke API backend melalui endpoint terotentikasi:
-                </p>
-                <code className="block p-2 bg-slate-950 font-mono text-[11px] text-amber-300 rounded border border-slate-800">
-                  POST /api/v1/simulation/sap-batches (Header: X-SAP-Simulation-Token)
-                </code>
-              </div>
-            </div>
-          ) : !isAuthenticated ? (
-            /* Login Operator Card */
-            <div className="max-w-md mx-auto py-4" data-testid="pilot-login-card">
-              <div className="p-6 bg-slate-950/80 border border-slate-800 rounded-xl space-y-4 shadow-lg">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-400">
-                    <KeyRound className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-white text-sm">
-                      Login Operator Simulasi
-                    </h3>
-                    <p className="text-[11px] text-slate-400">
-                      Sesi terbatas untuk uji mandiri simulasi label SAP DEV (tanpa cetak fisik)
-                    </p>
-                  </div>
-                </div>
-
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Masukkan kata sandi operator pilot yang telah dikonfigurasi di server untuk mengakses daftar batch simulasi dan berkas bukti PDF. Kredensial mesin SAP tetap aman di server.
-                </p>
-
-                <form onSubmit={handleLogin} className="space-y-3">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                      Kata Sandi Operator Pilot
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Masukkan kata sandi pilot..."
-                        className="w-full px-3 py-2 pr-10 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
-                        data-testid="input-pilot-password"
-                        autoFocus
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-200"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  {loginError && (
-                    <div className="p-2.5 bg-red-950/50 border border-red-800/60 rounded-lg text-xs text-red-300 flex items-center gap-2">
-                      <XCircle className="w-4 h-4 shrink-0 text-red-400" />
-                      <span>{loginError}</span>
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={isLoggingIn}
-                    className="w-full py-2 px-4 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-semibold text-xs rounded-lg transition-colors flex items-center justify-center gap-2 shadow"
-                    data-testid="btn-pilot-login"
-                  >
-                    {isLoggingIn ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        Memverifikasi...
-                      </>
-                    ) : (
-                      'Masuk sebagai Operator'
-                    )}
-                  </button>
-                </form>
-              </div>
+              <h3 className="font-bold text-white text-sm">
+                Sesi Aplikasi Belum Masuk atau Telah Berakhir
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Silakan masuk ke aplikasi dengan akun PPIC atau IT untuk mengakses fitur Simulasi Label.
+              </p>
             </div>
           ) : (
             /* Dashboard Batch List */

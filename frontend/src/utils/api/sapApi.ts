@@ -1,9 +1,12 @@
 import { API_BASE } from './apiConfig';
+import { getCsrfHeaders } from './csrfHelper';
 
 export const sapApi = {
   async getSampleContracts() {
     try {
-      const res = await fetch(`${API_BASE}/inspect/sample-contract`);
+      const res = await fetch(`${API_BASE}/inspect/sample-contract`, {
+        credentials: 'same-origin',
+      });
       if (res.ok) {
         return await res.json();
       }
@@ -51,7 +54,11 @@ export const sapApi = {
   async validateSapPayload(templateId: string, jsonData = {}) {
     const res = await fetch(`${API_BASE}/inspect/validate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getCsrfHeaders(),
+      },
       body: JSON.stringify({
         template_id: templateId,
         data: jsonData

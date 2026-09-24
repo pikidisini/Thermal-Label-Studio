@@ -1,4 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const authDbPath = path.resolve(__dirname, '../backend/data/auth_e2e.db');
 
 export default defineConfig({
   testDir: './tests',
@@ -9,6 +15,7 @@ export default defineConfig({
   },
   fullyParallel: false,
   workers: 1,
+  globalSetup: './tests/e2e/global-setup.js',
   reporter: [
     ['list'],
     ['html', { outputFolder: 'playwright-report', open: 'never' }]
@@ -29,6 +36,8 @@ export default defineConfig({
       env: {
         ...process.env,
         SAFE_DEMO_MODE: 'true',
+        LOCAL_SIMULATION_ONLY: 'true',
+        AUTH_DB_PATH: authDbPath,
       },
     },
 
@@ -41,8 +50,16 @@ export default defineConfig({
   ],
   projects: [
     {
+      name: 'setup',
+      testMatch: /.*auth\.setup\.js/,
+    },
+    {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: './.auth/user.json',
+      },
+      dependencies: ['setup'],
     },
   ],
 });

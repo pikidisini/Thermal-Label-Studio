@@ -12,12 +12,13 @@ import logging
 from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from ..auth.dependencies import get_current_user, verify_csrf_token
 from ..config import is_safe_demo_enabled
 from ..services.safe_demo_service import safe_demo_service
 
 logger = logging.getLogger("safe_demo_router")
 
-safe_demo_router = APIRouter(prefix="/safe-demo", tags=["Safe Demo"])
+safe_demo_router = APIRouter(prefix="/safe-demo", tags=["Safe Demo"], dependencies=[Depends(get_current_user)])
 
 
 def require_safe_demo_enabled() -> None:
@@ -41,7 +42,7 @@ def get_demo_status() -> Dict[str, Any]:
     return safe_demo_service.get_status()
 
 
-@safe_demo_router.post("/run", dependencies=[Depends(require_safe_demo_enabled)])
+@safe_demo_router.post("/run", dependencies=[Depends(require_safe_demo_enabled), Depends(verify_csrf_token)])
 async def run_demo_simulation() -> Dict[str, Any]:
     """Execute the in-memory batch simulation.
 
@@ -58,7 +59,7 @@ async def run_demo_simulation() -> Dict[str, Any]:
         ) from None
 
 
-@safe_demo_router.post("/reset", dependencies=[Depends(require_safe_demo_enabled)])
+@safe_demo_router.post("/reset", dependencies=[Depends(require_safe_demo_enabled), Depends(verify_csrf_token)])
 def reset_demo_simulation() -> Dict[str, Any]:
     """Reset the demo state in-memory back to its initial fixture.
 

@@ -55,9 +55,7 @@ pipeline {
                 }
             }
             steps {
-                withCredentials([string(credentialsId: 'tls-pilot-operator-secret', variable: 'PILOT_OPERATOR_SECRET')]) {
-                    sh 'bash ops/jenkins/deploy-local.sh "$IMAGE_TAG"'
-                }
+                sh 'bash ops/jenkins/deploy-local.sh "$IMAGE_TAG"'
             }
         }
     }

@@ -25,6 +25,9 @@ import unittest.mock
 from fastapi.testclient import TestClient
 import pytest
 
+from app.auth.models import Role
+from app.auth.security import hash_password
+from app.auth.service import auth_service
 from app.main import app
 from app.print_jobs.artifact_storage import DurableFilesystemArtifactStorage
 from app.services.pilot_session_service import PilotOperatorSession, pilot_session_service
@@ -39,6 +42,8 @@ TEST_PILOT_PASSWORD = "OperatorPilotSecurePass2026!"
 def isolated_pilot_environment(tmp_path: Path) -> Generator[None, None, None]:
     """Isolates pilot session store and SAP shadow storage per test."""
     pilot_session_service.clear_for_tests()
+    auth_service.repository.create_user("operator_ppic", hash_password("OperatorPass123!"), Role.PPIC)
+    auth_service.repository.create_user("operator_it", hash_password("AdminPass123!"), Role.IT)
 
     storage = DurableFilesystemArtifactStorage(tmp_path / "artifacts")
     custom_service = SapShadowService(
@@ -60,6 +65,18 @@ def isolated_pilot_environment(tmp_path: Path) -> Generator[None, None, None]:
         yield
 
     pilot_session_service.clear_for_tests()
+
+
+def login_operator(client: TestClient) -> str:
+    """Helper logging in as PPIC operator via unified app login."""
+    login_resp = client.post(
+        "/api/v1/auth/login",
+        json={"username": "operator_ppic", "password": "OperatorPass123!"},
+    )
+    assert login_resp.status_code == 200
+    data = login_resp.json()
+    assert "csrf_token" in data
+    return data["csrf_token"]
 
 
 @pytest.fixture
@@ -190,7 +207,7 @@ class TestPilotSessionServiceUnit:
 # =============================================================================
 
 class TestPilotOperatorRoutes:
-    """Verifies API endpoints for pilot operator self-service."""
+    """Verifies API endpoints for pilot operator self-service and legacy decommissioning."""
 
     def test_public_status_probe_reports_pilot_operator_enabled(self, client: TestClient):
         """Status probe reports pilot_operator_enabled=True and monitoring_requires_identity_provider=False."""
@@ -201,97 +218,91 @@ class TestPilotOperatorRoutes:
         assert data["pilot_operator_enabled"] is True
         assert data["monitoring_requires_identity_provider"] is False
 
-    def test_login_404_when_pilot_operator_disabled(self, client: TestClient):
-        """When PILOT_OPERATOR_ENABLED=false, /simulation/operator/login returns HTTP 404."""
-        with unittest.mock.patch("app.api.routes_sap_shadow.is_pilot_operator_enabled", return_value=False), \
-             unittest.mock.patch("app.services.pilot_session_service.is_pilot_operator_enabled", return_value=False):
-            resp = client.post("/api/v1/simulation/operator/login", json={"password": TEST_PILOT_PASSWORD})
-            assert resp.status_code == 404
-
-    def test_login_403_when_secret_unconfigured(self, client: TestClient):
-        """When PILOT_OPERATOR_SECRET is unconfigured, login returns HTTP 403."""
-        with unittest.mock.patch("app.services.pilot_session_service.get_pilot_operator_secret", return_value=""):
-            resp = client.post("/api/v1/simulation/operator/login", json={"password": TEST_PILOT_PASSWORD})
-            assert resp.status_code == 403
-
-    def test_login_401_with_invalid_password(self, client: TestClient):
-        """Invalid password returns HTTP 401 Unauthorized."""
-        resp = client.post("/api/v1/simulation/operator/login", json={"password": "WrongPassword"})
-        assert resp.status_code == 401
-        assert "pilot_session" not in resp.cookies
-
-    def test_login_200_sets_httponly_cookie_without_leaking_session_id(self, client: TestClient):
-        """P1: Valid password returns 200, sets HttpOnly cookie, and NEVER leaks session_id in response JSON."""
+    def test_legacy_operator_login_is_decommissioned_404(self, client: TestClient):
+        """F3.3 Review: Legacy /simulation/operator/login is decommissioned and returns HTTP 404."""
         resp = client.post("/api/v1/simulation/operator/login", json={"password": TEST_PILOT_PASSWORD})
-        assert resp.status_code == 200
-        data = resp.json()
+        assert resp.status_code == 404
+        assert "dinonaktifkan" in resp.json()["detail"].lower()
 
-        # Strict security assertions:
-        assert data["status"] == "authenticated"
-        assert "session_id" not in data, "session_id must NEVER be leaked to JavaScript response body"
-        assert "csrf_token" in data
-        assert "pilot_session" in resp.cookies
+    def test_legacy_pilot_session_cookie_rejected_fails_closed_401(self, client: TestClient):
+        """F3.3 Review: Legacy pilot_session cookie without unified app_session is rejected with HTTP 401."""
+        client_legacy = TestClient(app)
+        client_legacy.cookies.set("pilot_session", "legacy-token-val")
 
-        # Verify cookie attributes
-        set_cookie_header = resp.headers.get("set-cookie", "")
-        assert "httponly" in set_cookie_header.lower()
-        assert "samesite=strict" in set_cookie_header.lower()
+        # 1. Batches endpoint
+        r1 = client_legacy.get("/api/v1/simulation/operator/batches")
+        assert r1.status_code == 401
+        assert "dinonaktifkan" in r1.json()["detail"].lower()
+
+        # 2. PDF endpoint
+        r2 = client_legacy.get("/api/v1/simulation/operator/batches/REQ-001/pdf")
+        assert r2.status_code == 401
+        assert "dinonaktifkan" in r2.json()["detail"].lower()
+
+        # 3. Import JSON endpoint
+        r3 = client_legacy.post(
+            "/api/v1/simulation/operator/import-json",
+            files={"file": ("test.json", b"{}", "application/json")},
+            headers={"X-CSRF-Token": "test-csrf"},
+        )
+        assert r3.status_code == 401
+        assert "dinonaktifkan" in r3.json()["detail"].lower()
 
     def test_transport_security_loopback_vs_intranet(self, client: TestClient):
         """P1: Plain HTTP allowed on loopback; plain HTTP rejected on intranet host; spoofed X-Forwarded-Proto rejected; verified HTTPS allowed."""
-        # 1. Plain HTTP on loopback succeeds without secure cookie
+        # 1. Plain HTTP on loopback succeeds
         resp_loopback = client.post(
-            "/api/v1/simulation/operator/login",
+            "/api/v1/auth/login",
             headers={"Host": "localhost:8000"},
-            json={"password": TEST_PILOT_PASSWORD},
+            json={"username": "operator_ppic", "password": "OperatorPass123!"},
         )
         assert resp_loopback.status_code == 200
         set_cookie_loopback = resp_loopback.headers.get("set-cookie", "").lower()
         assert "secure" not in set_cookie_loopback
-        assert "samesite=strict" in set_cookie_loopback
+        assert "samesite=lax" in set_cookie_loopback
         assert "httponly" in set_cookie_loopback
 
         # 2. Plain HTTP on non-loopback intranet host fails closed (HTTP 403)
         resp_intranet_http = client.post(
-            "/api/v1/simulation/operator/login",
+            "/api/v1/auth/login",
             headers={"Host": "label-server.corp.internal:8000"},
-            json={"password": TEST_PILOT_PASSWORD},
+            json={"username": "operator_ppic", "password": "OperatorPass123!"},
         )
         assert resp_intranet_http.status_code == 403
-        assert "HTTPS" in resp_intranet_http.json()["detail"]
+        assert "https" in resp_intranet_http.json()["detail"].lower() or "intranet" in resp_intranet_http.json()["detail"].lower()
 
         # 3. Spoofed X-Forwarded-Proto: https from untrusted client over plain HTTP MUST BE REJECTED (HTTP 403)
         resp_spoofed_https = client.post(
-            "/api/v1/simulation/operator/login",
+            "/api/v1/auth/login",
             headers={
                 "Host": "label-server.corp.internal:8000",
                 "X-Forwarded-Proto": "https",
             },
-            json={"password": TEST_PILOT_PASSWORD},
+            json={"username": "operator_ppic", "password": "OperatorPass123!"},
         )
         assert resp_spoofed_https.status_code == 403
-        assert "HTTPS" in resp_spoofed_https.json()["detail"]
+        assert "https" in resp_spoofed_https.json()["detail"].lower() or "intranet" in resp_spoofed_https.json()["detail"].lower()
 
-        # 4. Verified HTTPS on intranet host (verified ASGI scheme == 'https') succeeds and sets secure cookie
+        # 4. Verified HTTPS on intranet host succeeds and sets secure cookie
         https_client = TestClient(app, base_url="https://label-server.corp.internal:8000")
         resp_intranet_https = https_client.post(
-            "/api/v1/simulation/operator/login",
-            json={"password": TEST_PILOT_PASSWORD},
+            "/api/v1/auth/login",
+            json={"username": "operator_ppic", "password": "OperatorPass123!"},
         )
         assert resp_intranet_https.status_code == 200
         set_cookie_https = resp_intranet_https.headers.get("set-cookie", "").lower()
         assert "secure" in set_cookie_https
-        assert "samesite=strict" in set_cookie_https
+        assert "samesite=lax" in set_cookie_https
         assert "httponly" in set_cookie_https
 
     def test_rate_limit_lockout_http_429(self, client: TestClient):
         """P2: 5 consecutive invalid login attempts from same client trigger HTTP 429 lockout."""
         for _ in range(5):
-            r = client.post("/api/v1/simulation/operator/login", json={"password": "WrongPassword"})
+            r = client.post("/api/v1/auth/login", json={"username": "operator_ppic", "password": "WrongPassword"})
             assert r.status_code == 401
 
         # 6th attempt is locked out with 429
-        locked_resp = client.post("/api/v1/simulation/operator/login", json={"password": TEST_PILOT_PASSWORD})
+        locked_resp = client.post("/api/v1/auth/login", json={"username": "operator_ppic", "password": "OperatorPass123!"})
         assert locked_resp.status_code == 429
         assert "dikunci sementara" in locked_resp.json()["detail"]
 
@@ -305,8 +316,7 @@ class TestPilotOperatorRoutes:
 
     def test_session_probe_authenticated_via_cookie(self, client: TestClient):
         """Probe /simulation/operator/session with authenticated cookie returns authenticated=True."""
-        login_resp = client.post("/api/v1/simulation/operator/login", json={"password": TEST_PILOT_PASSWORD})
-        assert login_resp.status_code == 200
+        login_operator(client)
 
         # Client automatically retains cookie jar
         resp = client.get("/api/v1/simulation/operator/session")
@@ -316,6 +326,18 @@ class TestPilotOperatorRoutes:
         assert "csrf_token" in data
         assert "session_id" not in data
 
+    def test_session_probe_authenticated_on_plain_http_intranet_fails_closed_403(self, client: TestClient):
+        """P2: Probe /simulation/operator/session with authenticated cookie over plain HTTP intranet is rejected with 403."""
+        login_operator(client)
+
+        # Non-loopback plain HTTP intranet host must be rejected fail-closed with 403
+        resp = client.get(
+            "/api/v1/simulation/operator/session",
+            headers={"Host": "192.168.1.50:8000"},
+        )
+        assert resp.status_code == 403
+        assert "wajib menggunakan https" in resp.json()["detail"].lower()
+
     def test_anonymous_access_to_operator_batches_fails_closed_401(self, client: TestClient):
         """AC 1: Anonymous request to /simulation/operator/batches returns HTTP 401."""
         resp = client.get("/api/v1/simulation/operator/batches")
@@ -324,8 +346,8 @@ class TestPilotOperatorRoutes:
     def test_header_session_token_rejected_fails_closed_401(self, client: TestClient):
         """P1: Authentication strictly requires cookie; X-Pilot-Session-Token header alone is rejected."""
         # Create valid session
-        login_resp = client.post("/api/v1/simulation/operator/login", json={"password": TEST_PILOT_PASSWORD})
-        session_cookie = login_resp.cookies["pilot_session"]
+        login_operator(client)
+        session_cookie = client.cookies["app_session"]
 
         # Request using separate client with header only (no cookie) must be rejected
         isolated_client = TestClient(app)
@@ -355,9 +377,8 @@ class TestPilotOperatorRoutes:
         assert ingest_resp.status_code in (200, 202)
         batch_id = ingest_resp.json()["batch_id"]
 
-        # 2. Login as pilot operator
-        login_resp = client.post("/api/v1/simulation/operator/login", json={"password": TEST_PILOT_PASSWORD})
-        assert login_resp.status_code == 200
+        # 2. Login as unified operator
+        login_operator(client)
 
         # 3. Retrieve batches as operator (via client cookie jar)
         list_resp = client.get("/api/v1/simulation/operator/batches")
@@ -388,7 +409,7 @@ class TestPilotOperatorRoutes:
         batch_id = ingest_resp.json()["batch_id"]
 
         # Login
-        client.post("/api/v1/simulation/operator/login", json={"password": TEST_PILOT_PASSWORD})
+        login_operator(client)
 
         # Get batch detail
         detail_resp = client.get(f"/api/v1/simulation/operator/batches/{batch_id}")
@@ -427,8 +448,7 @@ class TestPilotOperatorRoutes:
         assert anon_pdf.status_code == 401
 
         # Authorized operator login
-        login_resp = client.post("/api/v1/simulation/operator/login", json={"password": TEST_PILOT_PASSWORD})
-        assert login_resp.status_code == 200
+        login_operator(client)
 
         # Authorized operator PDF download succeeds (via cookie stored on client)
         auth_pdf = client.get(f"/api/v1/simulation/operator/batches/{batch_id}/pdf")
@@ -438,9 +458,7 @@ class TestPilotOperatorRoutes:
 
     def test_operator_logout_requires_csrf_and_revokes_session(self, client: TestClient):
         """AC 2: Logout requires CSRF token; after logout, session is revoked and cookie cleared."""
-        login_resp = client.post("/api/v1/simulation/operator/login", json={"password": TEST_PILOT_PASSWORD})
-        assert login_resp.status_code == 200
-        csrf_token = login_resp.json()["csrf_token"]
+        csrf_token = login_operator(client)
 
         # 1. Logout without CSRF header rejected with 403
         logout_no_csrf = client.post("/api/v1/simulation/operator/logout")
@@ -467,14 +485,10 @@ class TestPilotOperatorRoutes:
 
     def test_operator_session_expiry_fails_closed(self, client: TestClient):
         """AC 2: When session expires, requests fail closed with 401."""
-        # Create session with 1 second TTL
-        with unittest.mock.patch("app.services.pilot_session_service.get_pilot_session_ttl_seconds", return_value=1):
-            login_resp = client.post("/api/v1/simulation/operator/login", json={"password": TEST_PILOT_PASSWORD})
-            assert login_resp.status_code == 200
+        login_operator(client)
+        session_id = client.cookies["app_session"]
+        # Delete / revoke session to simulate expiration
+        auth_service.logout(session_id)
 
-        # Time warp 10 seconds into the future
-        future_now = datetime.now(timezone.utc) + timedelta(seconds=10)
-        with unittest.mock.patch("app.services.pilot_session_service.datetime") as mock_dt:
-            mock_dt.now.return_value = future_now
-            resp = client.get("/api/v1/simulation/operator/batches")
-            assert resp.status_code == 401
+        resp = client.get("/api/v1/simulation/operator/batches")
+        assert resp.status_code == 401

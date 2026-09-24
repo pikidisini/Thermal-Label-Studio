@@ -17,19 +17,23 @@ Jenkins hanya memakai source GitHub sebagai sumber kode. GitHub Actions tidak di
 1. Pastikan Docker Desktop menyala. Dari `web_app/`, jalankan `docker compose -f ops/jenkins/compose.yml up -d --build`.
 2. Buka `http://127.0.0.1:8081`. Untuk layar Unlock Jenkins, baca initial admin password **di laptop Anda sendiri** dengan `docker exec thermal-label-jenkins-local cat /var/jenkins_home/secrets/initialAdminPassword`. Jangan kirim nilainya ke chat atau Git.
 3. Pilih **Install suggested plugins**, lalu buat akun administrator Jenkins pribadi. Pastikan plugin **Pipeline**, **Git**, dan **Credentials Binding** terpasang. Jangan izinkan anonymous build atau konfigurasi job. Biarkan Jenkins hanya dapat diakses dari laptop (port sudah bind loopback).
-4. Di Jenkins, tambahkan credential **Secret text** dengan ID persis `tls-pilot-operator-secret`. Nilainya adalah password operator simulasi pilihan Anda; jangan tulis di repository. Ini adalah login operator aplikasi yang sudah ada, **bukan** pengganti rancangan login aplikasi penuh nanti.
-5. Buat job **Pipeline** bernama `thermal-label-local-simulation`, pilih **Pipeline script from SCM**, SCM **Git**, repository URL `https://github.com/pikidisini/Thermal-Label-Studio.git`, branch `*/main`, script path `Jenkinsfile`. Bila repo GitHub privat, masukkan credential Git read-only di Jenkins; jangan menaruh token dalam URL. Jalankan **Build Now** sekali. `pollSCM` baru aktif setelah Jenkinsfile pertama berhasil dibaca.
+4. Buat job **Pipeline** bernama `thermal-label-local-simulation`, pilih **Pipeline script from SCM**, SCM **Git**, repository URL `https://github.com/pikidisini/Thermal-Label-Studio.git`, branch `*/main`, script path `Jenkinsfile`. Bila repo GitHub privat, masukkan credential Git read-only di Jenkins; jangan menaruh token dalam URL. Jalankan **Build Now** sekali. `pollSCM` baru aktif setelah Jenkinsfile pertama berhasil dibaca.
    Opsional untuk tombol rollback manual: buat job Pipeline kedua dengan SCM/branch yang sama, script path `Jenkinsfile.rollback`, dan **jangan** tambahkan polling. Job ini hanya dijalankan manual bila image sebelumnya perlu dipulihkan.
-6. Setelah build pertama berhasil, lihat `http://127.0.0.1:8000`. Gunakan password operator yang tadi ditaruh di Jenkins Credential untuk login simulasi.
+5. Setelah build dan deploy pertama berhasil, buka `http://127.0.0.1:8000`. Layar login aplikasi akan meminta akun pengguna resmi.
+6. **Bootstrap Akun Pengguna**: Buat akun awal (PPIC atau IT) langsung di dalam container aplikasi melalui CLI aman interaktif:
+   ```bash
+   docker exec -it tls-local-sim python -m app.cli.user_admin create-user --username ppic_operator --role PPIC
+   ```
+   CLI akan meminta konfirmasi kata sandi secara aman tanpa menyimpannya dalam history shell atau argumen proses. Akun dan hash kata sandi PBKDF2 tersimpan secara persisten pada volume Docker `tls-local-sim-data` (`backend/data/auth.db`).
 
-Jika fase ini belum di-merge ke `main`, job `main` belum menemukan `Jenkinsfile`. Untuk verifikasi pra-merge, gunakan job terpisah sementara yang membaca branch F3.2; tahap deploy secara sengaja akan **dilewati** pada branch tersebut. Sesudah review dan merge, arahkan job utama ke `*/main`.
+Jika fase ini belum di-merge ke `main`, job `main` belum menemukan `Jenkinsfile`. Untuk verifikasi pra-merge, gunakan job terpisah sementara yang membaca branch yang diuji; tahap deploy secara sengaja akan **dilewati** pada branch non-main. Sesudah review dan merge, arahkan job utama ke `*/main`.
 
 ## Batas keamanan
 
-- **Jangan** mengganti port menjadi `0.0.0.0`, IP LAN, atau host kantor sebelum login aplikasi penuh, HTTPS, dan review keamanan deployment selesai.
-- `LOCAL_SIMULATION_ONLY=true` membuat endpoint legacy `/api/v1/print/*` dan `/api/v1/sap/print` mengembalikan 404 sebelum memproses body. `SAFE_DEMO_MODE=false`; alur operator memakai `SAP_SHADOW_SIMULATION_ENABLED=true` dan login yang sudah ada.
+- **Jangan** mengganti port menjadi `0.0.0.0`, IP LAN, atau host kantor sebelum HTTPS dan review keamanan deployment selesai.
+- `LOCAL_SIMULATION_ONLY=true` membuat endpoint legacy `/api/v1/print/*` dan `/api/v1/sap/print` mengembalikan 404 sebelum memproses body. `SAFE_DEMO_MODE=false`; alur simulasi memakai `SAP_SHADOW_SIMULATION_ENABLED=true` dan login aplikasi terpadu.
 - Jenkins diberi akses Docker socket untuk membangun dan mengganti container. Akses ini setara hak administratif atas Docker host. Hanya pengguna tepercaya yang boleh mengubah job/Jenkinsfile; jangan menjalankan PR dari pihak lain secara otomatis. [Docker menjelaskan risiko akses daemon](https://docs.docker.com/engine/security/protect-access/).
-- Secret operator disuntikkan Jenkins saat deploy; administrator Docker host masih dapat melihat environment container. Jangan memakai password SAP atau perusahaan.
+- Tidak ada password bersama atau rahasia default di environment / Jenkinsfile; akun dikelola per pengguna melalui CLI admin terproteksi hash PBKDF2 pada volume data terisolasi.
 - Laptop/Docker mati berarti Jenkins dan aplikasi lokal berhenti. Setelah menyala lagi, polling dapat mengejar perubahan Git berikutnya, tetapi tidak menjamin ketersediaan 24 jam.
 
 ## Pemeriksaan dan pemulihan

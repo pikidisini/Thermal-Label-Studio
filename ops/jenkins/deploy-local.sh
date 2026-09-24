@@ -6,10 +6,6 @@ LIVE="tls-local-sim"
 CANDIDATE="tls-local-sim-candidate"
 DATA_VOLUME="tls-local-sim-data"
 
-if [[ -z "${PILOT_OPERATOR_SECRET:-}" ]]; then
-  echo "Jenkins credential tls-pilot-operator-secret is required; deployment stopped."
-  exit 1
-fi
 if docker container inspect "$CANDIDATE" >/dev/null 2>&1; then
   echo "A candidate container already exists; inspect it before continuing."
   exit 1
@@ -19,12 +15,13 @@ run_app() {
   local name="$1"
   local image="$2"
   shift 2
+  local env_args=(
+    --env LOCAL_SIMULATION_ONLY=true
+    --env SAFE_DEMO_MODE=false
+    --env SAP_SHADOW_SIMULATION_ENABLED=true
+  )
   docker run --detach --name "$name" "$@" \
-    --env LOCAL_SIMULATION_ONLY=true \
-    --env SAFE_DEMO_MODE=false \
-    --env SAP_SHADOW_SIMULATION_ENABLED=true \
-    --env PILOT_OPERATOR_ENABLED=true \
-    --env PILOT_OPERATOR_SECRET \
+    "${env_args[@]}" \
     "$image" >/dev/null
 }
 
@@ -53,6 +50,8 @@ base = "http://127.0.0.1:8000"
 status = json.load(urllib.request.urlopen(base + "/api/status", timeout=3))
 assert status["safe_demo_mode"] is False
 assert status["sap_shadow_simulation_enabled"] is True
+
+# Physical dispatch must be fail-closed (404)
 for path in ("/api/v1/print/tcp", "/api/v1/sap/print"):
     request = urllib.request.Request(base + path, data=b"{}", method="POST")
     try:
@@ -61,7 +60,18 @@ for path in ("/api/v1/print/tcp", "/api/v1/sap/print"):
         assert error.code == 404, (path, error.code)
     else:
         raise AssertionError("Physical dispatch route unexpectedly open: " + path)
+
+# Unauthenticated browser sensitive endpoints must fail-closed (401)
+req_me = urllib.request.Request(base + "/api/v1/auth/me", method="GET")
+try:
+    urllib.request.urlopen(req_me, timeout=3)
+    raise AssertionError("Unauthenticated access to /api/v1/auth/me unexpectedly allowed")
+except urllib.error.HTTPError as error:
+    assert error.code == 401, ("Auth guard failed", error.code)
 ' >/dev/null
+
+  # Verify user_admin CLI is packaged and executable
+  docker exec "$name" python -m app.cli.user_admin --help >/dev/null
 }
 
 cleanup_candidate() {
