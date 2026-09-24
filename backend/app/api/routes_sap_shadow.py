@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from fastapi import APIRouter, Cookie, Depends, File, Header, HTTPException, Request, Response, UploadFile, status
 from pydantic import BaseModel, Field, ValidationError
 
+from ..auth.dependencies import verify_csrf_token
 from ..config import (
     get_pilot_session_ttl_seconds,
     get_sap_simulation_auth_token,
@@ -103,34 +104,46 @@ def get_current_pilot_operator(
     app_session_cookie: Optional[str] = Cookie(None, alias="app_session"),
     pilot_session_cookie: Optional[str] = Cookie(None, alias="pilot_session"),
 ) -> Any:
-    """Dependency resolving authenticated session (app session with PPIC/IT role, or legacy pilot operator session).
+    """Dependency resolving authenticated session for simulation operations.
 
-    Fails closed (HTTP 401) if cookie is missing, invalid, or expired.
+    Accepts ONLY unified app_session (PPIC/IT role).
+    Rejects legacy pilot_session cookie with HTTP 401 fail-closed.
+    Enforces transport security (HTTPS or loopback dev) on session boundary.
     """
     require_simulation_enabled()
-    session_token = app_session_cookie or pilot_session_cookie
-    if not session_token:
+
+    from ..auth.dependencies import evaluate_app_transport_security
+    is_allowed, _ = evaluate_app_transport_security(request)
+    if not is_allowed:
+        logger.warning(
+            "Session access rejected: plain HTTP over non-loopback host '%s'",
+            request.url.hostname,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Akses sesi aplikasi melalui jaringan intranet wajib menggunakan HTTPS.",
+        )
+
+    if not app_session_cookie:
+        if pilot_session_cookie:
+            logger.warning("Rejected legacy pilot_session cookie: legacy pilot mode decommissioned.")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Sesi operator pilot legacy telah dinonaktifkan. Silakan login menggunakan akun PPIC atau IT.",
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Sesi aplikasi tidak valid atau belum masuk.",
         )
 
-    # 1. Try resolving via unified AuthService (PPIC / IT user)
     from ..auth.service import auth_service
-    app_session = auth_service.validate_session(session_token)
-    if app_session:
-        return app_session
-
-    # 2. Fallback to legacy pilot session if enabled
-    if is_pilot_operator_enabled():
-        legacy_session = pilot_session_service.get_valid_session(session_token)
-        if legacy_session:
-            return legacy_session
-
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Sesi aplikasi tidak valid atau telah berakhir. Silakan login kembali.",
-    )
+    app_session = auth_service.validate_session(app_session_cookie)
+    if not app_session:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sesi aplikasi tidak valid atau telah berakhir. Silakan login kembali.",
+        )
+    return app_session
 
 
 def verify_pilot_csrf(
@@ -140,20 +153,9 @@ def verify_pilot_csrf(
 ) -> bool:
     """Dependency verifying CSRF token for mutating operator requests."""
     from ..auth.service import auth_service
-    from ..auth.models import Session as AppSession
 
-    if isinstance(session, AppSession):
-        if not x_csrf_token or not auth_service.verify_csrf(session, x_csrf_token):
-            logger.warning("CSRF verification failed for app session: %s", session.username)
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Validasi CSRF token gagal.",
-            )
-        return True
-
-    # Legacy PilotOperatorSession
-    if not x_csrf_token or not pilot_session_service.verify_csrf(session, x_csrf_token):
-        logger.warning("CSRF verification failed for operator session: %s", getattr(session, "session_id", "")[:8])
+    if not x_csrf_token or not auth_service.verify_csrf(session, x_csrf_token):
+        logger.warning("CSRF verification failed for app session: %s", getattr(session, "username", "unknown"))
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Validasi CSRF token gagal.",
@@ -356,86 +358,30 @@ from .operator_import_guard import (
 
 @simulation_router.post(
     "/operator/login",
-    dependencies=[Depends(require_simulation_enabled)],
+    summary="Legacy Pilot Operator Login (Decommissioned)",
 )
-def pilot_operator_login(
-    request: Request,
-    payload: PilotOperatorLoginRequest,
-    response: Response,
-) -> Dict[str, Any]:
-    """Authenticates a human pilot operator and creates a secure session strictly via HttpOnly cookie."""
-    # 1. Transport Security Guard (HTTPS vs Loopback)
-    is_allowed, is_secure_cookie = evaluate_pilot_transport_security(request)
-    if not is_allowed:
-        logger.warning(
-            "Pilot operator login rejected: plain HTTP over non-loopback host '%s' (client '%s')",
-            request.url.hostname,
-            request.client.host if request.client else "unknown",
-        )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Akses operator pilot melalui jaringan intranet wajib menggunakan HTTPS.",
-        )
-
-    # 2. Extract Client Identity for Rate-Limiting Lockout
-    client_id = request.client.host if request.client else "unknown"
-
-    try:
-        session = pilot_session_service.authenticate_and_create(
-            payload.password, client_id=client_id
-        )
-    except PermissionError as exc:
-        msg = str(exc)
-        if "dikunci sementara" in msg or "locked out" in msg:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=msg,
-            )
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Mode operator pilot dinonaktifkan.",
-        )
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Autentikasi operator pilot belum dikonfigurasi pada server.",
-        )
-
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Kata sandi operator pilot tidak valid.",
-        )
-
-    # Set secure HttpOnly cookie strictly without leaking session_id to JavaScript
-    response.set_cookie(
-        key="pilot_session",
-        value=session.session_id,
-        httponly=True,
-        samesite="strict",
-        max_age=get_pilot_session_ttl_seconds(),
-        path="/",
-        secure=is_secure_cookie,
+def pilot_operator_login() -> Dict[str, Any]:
+    """Decommissioned in F3.3 in favor of unified application login (/api/v1/auth/login)."""
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Mode login operator pilot legacy telah dinonaktifkan. Silakan login menggunakan /api/v1/auth/login dengan akun PPIC atau IT.",
     )
-
-    return {
-        "status": "authenticated",
-        "csrf_token": session.csrf_token,
-        "expires_at": session.expires_at.isoformat(),
-        "operator_label": session.operator_label,
-    }
 
 
 @simulation_router.post(
     "/operator/logout",
-    dependencies=[Depends(verify_pilot_csrf)],
+    dependencies=[Depends(verify_csrf_token)],
+    summary="Legacy Operator Logout",
 )
 def pilot_operator_logout(
     response: Response,
-    session: PilotOperatorSession = Depends(get_current_pilot_operator),
+    app_session_cookie: Optional[str] = Cookie(None, alias="app_session"),
 ) -> Dict[str, Any]:
-    """Logs out pilot operator, revokes session, and clears session cookie."""
-    pilot_session_service.revoke_session(session.session_id)
+    """Logs out session and clears cookies."""
+    if app_session_cookie:
+        from ..auth.service import auth_service
+        auth_service.revoke_session(app_session_cookie)
+        response.delete_cookie(key="app_session", path="/", samesite="lax")
     response.delete_cookie(key="pilot_session", path="/", samesite="strict")
     return {"status": "logged_out"}
 
@@ -443,19 +389,18 @@ def pilot_operator_logout(
 @simulation_router.get(
     "/operator/session",
     dependencies=[Depends(require_simulation_enabled)],
+    summary="Legacy Operator Session Probe",
 )
 def get_pilot_operator_session_status(
     app_session_cookie: Optional[str] = Cookie(None, alias="app_session"),
-    pilot_session_cookie: Optional[str] = Cookie(None, alias="pilot_session"),
 ) -> Dict[str, Any]:
-    """Probes session status for browser client strictly using HttpOnly cookie without exposing session_id."""
-    token = app_session_cookie or pilot_session_cookie
-    if token:
+    """Probes session status for browser client strictly using unified app_session cookie."""
+    if app_session_cookie:
         from ..auth.service import auth_service
-        app_sess = auth_service.validate_session(token)
+        app_sess = auth_service.validate_session(app_session_cookie)
         if app_sess:
             return {
-                "pilot_operator_enabled": True,
+                "pilot_operator_enabled": is_pilot_operator_enabled(),
                 "authenticated": True,
                 "csrf_token": app_sess.csrf_token,
                 "expires_at": app_sess.expires_at.isoformat(),
@@ -464,30 +409,8 @@ def get_pilot_operator_session_status(
                 "username": app_sess.username,
             }
 
-    pilot_enabled = is_pilot_operator_enabled()
-    if not pilot_enabled:
-        return {
-            "pilot_operator_enabled": False,
-            "authenticated": False,
-        }
-
-    session = (
-        pilot_session_service.get_valid_session(pilot_session_cookie)
-        if pilot_session_cookie
-        else None
-    )
-
-    if session:
-        return {
-            "pilot_operator_enabled": True,
-            "authenticated": True,
-            "csrf_token": session.csrf_token,
-            "expires_at": session.expires_at.isoformat(),
-            "operator_label": session.operator_label,
-        }
-
     return {
-        "pilot_operator_enabled": True,
+        "pilot_operator_enabled": is_pilot_operator_enabled(),
         "authenticated": False,
     }
 

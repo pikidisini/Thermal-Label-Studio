@@ -1,11 +1,26 @@
 # AI Handoff — Thermal Label Studio
 
-## Snapshot aktif — F3.3 review Level 3: CHANGES REQUIRED
+## Snapshot aktif — F3.3 Remediasi Review Level 3 Selesai (REMEDIATION_LEVEL3_COMPLETED — AWAITING_CODEX_REVIEW)
 
-- Tanggal: 2026-09-24. Branch `codex/f3-3-app-login`; implementasi executor pada `9cfa3f6`.
-- Reviewer Codex menemukan tiga P1: urutan React hooks saat transisi login, jalur password pilot lama yang masih membuka simulasi, dan mutasi studio berbasis cookie tanpa guard CSRF. Tiga P2 tambahan ada di `docs/tasks/F3.3/REVIEW.md`.
-- Verifikasi independen terarah: backend 37 passed; frontend 79 passed. Full backend/build/E2E/Jenkins tidak dijalankan ulang oleh reviewer. Jangan PR/merge sebelum koreksi dan review ulang.
-- Snapshot implementasi di bawah adalah laporan executor pada saat handoff; klaim AC lengkap di sana belum menjadi verdict review akhir.
+- Tanggal: 2026-09-24. Branch `codex/f3-3-app-login`.
+- Writer / Executor: Gemini Flash (Antigravity). Reviewer: Codex Level 3 (independen).
+- Status: `REMEDIATION_LEVEL3_COMPLETED — AWAITING_CODEX_REVIEW`.
+- Remediasi temuan `docs/tasks/F3.3/REVIEW.md` (P1 & P2) telah tuntas:
+  1. **P1 — Urutan React hooks**: Komponen studio diekstraksi ke `AuthenticatedStudio.tsx`. `App.tsx` bersih dari conditional hook execution; siklus hidup loading, login, studio, dan logout diuji di `frontend/tests/test_auth_flow.mjs`.
+  2. **P1 — Jalur password pilot lama dihapus**: `/operator/login` ditutup (HTTP 404), cookie legacy `pilot_session` ditolak fail-closed (HTTP 401), env pilot legacy dibersihkan dari `deploy-local.sh`, simulasi terintegrasi sepenuhnya ke akun PPIC/IT bersesi `app_session`.
+  3. **P1 — CSRF guard mutasi studio**: Endpoint mutasi POST/DELETE di `templates`, `render`, `inspect`, `safe-demo`, dan `operator/logout` diproteksi `Depends(verify_csrf_token)`. Frontend API clients mengirim `X-CSRF-Token` via `csrfHelper.ts` dan `credentials: 'same-origin'`.
+  4. **P2 — Konsistensi transport guard**: `evaluate_app_transport_security()` dipasang di `get_current_user_optional` (menolak plain HTTP intranet non-loopback dengan HTTP 403 pada `/auth/me`, `/auth/csrf`, dan seluruh rute bersesi).
+  5. **P2 — CLI user_admin aman**: Argumen `--password` dihapus dari argv parser CLI; password wajib dimasukkan via prompt interaktif `getpass.getpass` dengan konfirmasi.
+  6. **P2 — Safe Demo browser guard**: `safe_demo_router` dilindungi `Depends(get_current_user)` dan mutasi `/run`, `/reset` dilindungi `Depends(verify_csrf_token)`. Rute cetak fisik tetap dicegat 404 pada local simulation.
+- Quality Gates Aktual:
+  - Backend pytest: `480 passed, 21 skipped, 0 failed` in 277.50s.
+  - Frontend unit tests: `85 passed, 0 failed` in 654ms (`npm test` di `frontend/`).
+  - Frontend production build: `npm run build` PASS (0 errors, 6.75s).
+  - Whitespace check: `git diff --check` bersih (0 errors).
+  - Secret & database scan: Zero `.db` committed, zero secrets committed.
+- Batasan lingkungan: Live SAP RFC/ECC: `NOT RUN`; Printer fisik/port 9100: `NOT RUN`; Database enterprise production: `NOT RUN`.
+- Task Files: `docs/tasks/F3.3/TASK_CONTRACT.md`, `docs/tasks/F3.3/RESULT.md`, `docs/tasks/F3.3/REVIEW.md`.
+- Next Action: Stop sebelum PR/merge. Menyerahkan branch kepada Codex Level 3 untuk review independen ulang.
 
 ## Snapshot aktif — Fase 3.3: Implementasi Selesai (IMPLEMENTATION_COMPLETED — AWAITING_CODEX_LEVEL_3_REVIEW)
 

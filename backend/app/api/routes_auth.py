@@ -80,16 +80,6 @@ def login(
         path="/",
         secure=is_secure_cookie,
     )
-    # Also set pilot_session cookie for backward compatibility with pilot components
-    response.set_cookie(
-        key="pilot_session",
-        value=session.session_id,
-        httponly=True,
-        samesite="strict",
-        max_age=auth_service.session_ttl_seconds,
-        path="/",
-        secure=is_secure_cookie,
-    )
 
     return LoginResponse(
         status="authenticated",

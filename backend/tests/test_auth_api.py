@@ -272,3 +272,89 @@ def test_local_simulation_only_blocks_physical_print(client, monkeypatch):
     assert client.post("/api/v1/print/spooler", json={}).status_code == 404
     assert client.post("/api/v1/print/batch", json={}).status_code == 404
     assert client.post("/api/v1/sap/print", json={}).status_code == 404
+
+
+def test_studio_mutations_require_csrf(auth_api_setup):
+    """P1 Review: All cookie-authenticated mutating routes (POST/DELETE) in studio require CSRF."""
+    client = TestClient(app)
+    login_resp = client.post(
+        "/api/v1/auth/login",
+        json={"username": "ppic_user", "password": "PpicPass123!"},
+    )
+    assert login_resp.status_code == 200
+    csrf_token = login_resp.json()["csrf_token"]
+
+    # 1. Read-only endpoints DO NOT require CSRF header (should succeed)
+    assert client.get("/api/v1/templates").status_code == 200
+    assert client.get("/api/v1/inspect/sample-contract").status_code == 200
+
+    # 2. Mutating endpoints without CSRF token are rejected with 403
+    svg_payload = {"template_id": "test_id", "svg_content": "<svg xmlns='http://www.w3.org/2000/svg'><text>test</text></svg>"}
+    assert client.post("/api/v1/templates", json=svg_payload).status_code == 403
+    assert client.delete("/api/v1/templates/test_id").status_code == 403
+    assert client.post("/api/v1/templates/parse-raw", json={"svg_content": "<svg></svg>"}).status_code == 403
+    assert client.post("/api/v1/render", json={}).status_code == 403
+    assert client.post("/api/v1/render/preview", json={}).status_code == 403
+    assert client.post("/api/v1/inspect/validate", json={}).status_code == 403
+
+    # 3. Mutating endpoints with invalid/tampered CSRF token are rejected with 403
+    bad_headers = {"X-CSRF-Token": "invalid-tampered-token"}
+    assert client.post("/api/v1/templates", json=svg_payload, headers=bad_headers).status_code == 403
+    assert client.delete("/api/v1/templates/test_id", headers=bad_headers).status_code == 403
+    assert client.post("/api/v1/render", json={}, headers=bad_headers).status_code == 403
+    assert client.post("/api/v1/render/preview", json={}, headers=bad_headers).status_code == 403
+    assert client.post("/api/v1/inspect/validate", json={}, headers=bad_headers).status_code == 403
+
+    # 4. Mutating endpoints with valid CSRF token pass CSRF check
+    good_headers = {"X-CSRF-Token": csrf_token}
+    # parse-raw with valid SVG returns 200
+    r_parse = client.post(
+        "/api/v1/templates/parse-raw",
+        json={"svg_content": "<svg xmlns='http://www.w3.org/2000/svg'><text>{{test}}</text></svg>"},
+        headers=good_headers,
+    )
+    assert r_parse.status_code == 200
+
+
+def test_session_transport_guard_on_me_and_csrf_endpoints(auth_api_setup):
+    """P2 Review: Transport security is enforced on session boundaries (/auth/me, /auth/csrf) for intranet."""
+    client = TestClient(app)
+    # Login on loopback succeeds
+    login_resp = client.post(
+        "/api/v1/auth/login",
+        json={"username": "ppic_user", "password": "PpicPass123!"},
+    )
+    assert login_resp.status_code == 200
+
+    # 1. Plain HTTP on non-loopback intranet host rejected on /auth/me with 403
+    r_me_lan = client.get(
+        "/api/v1/auth/me",
+        headers={"Host": "label-server.corp.internal:8000"},
+    )
+    assert r_me_lan.status_code == 403
+    assert "https" in r_me_lan.json()["detail"].lower() or "intranet" in r_me_lan.json()["detail"].lower()
+
+    # 2. Spoofed X-Forwarded-Proto rejected with 403
+    r_me_spoof = client.get(
+        "/api/v1/auth/me",
+        headers={
+            "Host": "label-server.corp.internal:8000",
+            "X-Forwarded-Proto": "https",
+        },
+    )
+    assert r_me_spoof.status_code == 403
+
+    # 3. Plain HTTP on non-loopback intranet host rejected on /auth/csrf with 403
+    r_csrf_lan = client.get(
+        "/api/v1/auth/csrf",
+        headers={"Host": "label-server.corp.internal:8000"},
+    )
+    assert r_csrf_lan.status_code == 403
+
+    # 4. Verified HTTPS on intranet host succeeds on /auth/me
+    session_cookie = client.cookies["app_session"]
+    https_client = TestClient(app, base_url="https://label-server.corp.internal:8000")
+    https_client.cookies.set("app_session", session_cookie)
+    r_me_https = https_client.get("/api/v1/auth/me")
+    assert r_me_https.status_code == 200
+    assert r_me_https.json()["authenticated"] is True

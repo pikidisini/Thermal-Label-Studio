@@ -1,200 +1,164 @@
 # Hasil Fase 3.3 — Login Aplikasi & Satu Sesi untuk Simulasi Label
 
-Status: `IMPLEMENTED & VERIFIED`. Siap untuk review Level 3 Codex.
-Branch: `codex/f3-3-app-login` (dibangun dari `main` `98a5983`).
+Status: `REMEDIATION IMPLEMENTED & VERIFIED`. Siap untuk review ulang Level 3 Codex.
+Branch: `codex/f3-3-app-login`.
 
 ---
 
-## 1. Ringkasan Eksekutif & Tujuan Pengguna
+## 1. Ringkasan Eksekutif & Remediasi Temuan Review Level 3
 
-Fase 3.3 berhasil menyatukan pengalaman otentikasi Thermal Label Studio menjadi satu sesi aplikasi terpadu berbasis peran (`PPIC` dan `IT`).
-1. Pengguna masuk satu kali melalui halaman login aplikasi (`LoginPage`).
-2. Sesi server-side diterbitkan melalui cookie HttpOnly `app_session` (SameSite=lax, Secure di HTTPS, loopback allowed untuk local dev).
-3. Setelah masuk, kedua peran `PPIC` dan `IT` dapat menggunakan seluruh fitur Studio dan **Simulasi Label** (unggah/impor snapshot JSON SAP mentah, pantau batch/item sequence, dan unduh PDF bukti) tanpa memerlukan login operator pilot kedua.
-4. Form login dan tombol logout operator pilot di dalam modal simulasi telah dihapus; identitas pengguna dan aksi logout ditampilkan secara terpusat pada header aplikasi (`TopMenuBar`).
-5. Seluruh endpoint browser sensitif dilindungi di sisi server (fail-closed dengan HTTP 401 saat belum terautentikasi); pengamanan tidak hanya mengandalkan kunci SPA.
-6. Endpoint machine-to-machine (SAP shadow ingestion `X-SAP-Simulation-Token`, Print Agent token) tetap menggunakan otentikasi mesin masing-masing tanpa terpengaruh sesi browser.
-7. Rute cetak fisik (`/api/v1/print/tcp`, `/api/v1/print/spooler`, `/api/v1/print/batch`, `/api/v1/sap/print`) tetap dicegat 404 pada deployment lokal (`LOCAL_SIMULATION_ONLY=true`).
-8. Administrasi akun pilot lokal disediakan melalui CLI satu kali (`python -m app.cli.user_admin`) tanpa pendaftaran publik dan tanpa password default / hardcoded.
+Fase 3.3 menyatukan otentikasi Thermal Label Studio menjadi satu sesi aplikasi terpadu berbasis peran (`PPIC` dan `IT`) dan telah menyelesaikan seluruh remedi temuan review Level 3 (`docs/tasks/F3.3/REVIEW.md`):
 
----
+1. **P1 — Urutan React Hooks Terisolasi Penuh**:
+   - Mengekstrak seluruh hooks studio, canvas, modal, shortcuts, dan template ke komponen terpisah [`frontend/src/components/studio/AuthenticatedStudio.tsx`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/frontend/src/components/studio/AuthenticatedStudio.tsx).
+   - [`frontend/src/App.tsx`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/frontend/src/App.tsx) kini hanya memiliki hooks top-level (`useAuthStore` & `useEffect(checkAuth)`), merender loading spinner jika `isLoading`, `LoginPage` jika unauthenticated, dan `AuthenticatedStudio` setelah terautentikasi tanpa conditional early returns di atas deklarasi hook.
+   - Ditambahkan pengujian komponen nyata [`frontend/tests/test_auth_flow.mjs`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/frontend/tests/test_auth_flow.mjs) dengan runner DOM mock [`frontend/tests/setup_dom_mock.mjs`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/frontend/tests/setup_dom_mock.mjs) untuk menguji transisi siklus penuh: `loading` → `unauthenticated (LoginPage)` → `authenticated PPIC` → `authenticated IT` → `logout` tanpa pelanggaran hook order.
 
-## 2. Inventaris & Klasifikasi Endpoint
+2. **P1 — Decommissioning Total Password & Jalur Akses Operator Pilot Lama**:
+   - `POST /api/v1/simulation/operator/login` dinonaktifkan permanen dan mengembalikan HTTP 404 fail-closed.
+   - Dependensi `get_current_pilot_operator` dan intake guard `operator_import_guard.py` menolak cookie `pilot_session` legacy tanpa `app_session` dengan HTTP 401 fail-closed.
+   - Variabel `PILOT_OPERATOR_ENABLED=true` dan `PILOT_OPERATOR_SECRET` dihapus dari [`ops/jenkins/deploy-local.sh`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/ops/jenkins/deploy-local.sh). Akses simulasi kini hanya dapat diakses melalui satu identitas akun aplikasi (`app_session` PPIC/IT).
+   - Diuji dan diverifikasi pada `test_pilot_operator_session.py` (24 passed) dan `test_pilot_operator_import_json.py` (28 passed).
 
-| Endpoint | Metode | Klasifikasi | Skema Autentikasi & Guard | Keterangan |
-|---|---|---|---|---|
-| `/health`, `/api/v1/health` | GET | Publik Minimum | Tanpa autentikasi | Liveness & container health probe |
-| `/api/status` | GET | Publik Minimum | Tanpa autentikasi | Status non-sensitif & ketersediaan fitur |
-| `/api/v1/simulation/status` | GET | Publik Minimum | Tanpa autentikasi | Status kesiapan sink simulasi virtual |
-| `/api/v1/auth/login` | POST | Publik Terbatas | Transport security + Rate limiter lockout | Penerbitan HttpOnly `app_session` cookie |
-| `/api/v1/auth/me` | GET | Browser Sensitif | Cookie `app_session` (Depends `get_current_user`) | Probe identitas pengguna aktif & CSRF token |
-| `/api/v1/auth/csrf` | GET | Browser Sensitif | Cookie `app_session` (Depends `get_current_user`) | Pengambilan CSRF token sesi aktif |
-| `/api/v1/auth/logout` | POST | Browser Sensitif | Cookie `app_session` + Header `X-CSRF-Token` | Pencabutan sesi & penghapusan cookie |
-| `/api/v1/templates` (all) | GET, POST, DELETE | Browser Sensitif | Cookie `app_session` (Depends `get_current_user`) | Manajemen template SVG label |
-| `/api/v1/render` (all) | POST, GET | Browser Sensitif | Cookie `app_session` (Depends `get_current_user`) | Pipeline rendering rasterisasi & preview |
-| `/api/v1/inspect` (all) | POST, GET | Browser Sensitif | Cookie `app_session` (Depends `get_current_user`) | Validasi data contract vs template |
-| `/api/v1/simulation/batches` | GET | Browser Sensitif | Cookie `app_session` / `pilot_session` | Daftar batch simulasi (PPIC & IT) |
-| `/api/v1/simulation/batches/{id}` | GET | Browser Sensitif | Cookie `app_session` / `pilot_session` | Detail batch & urutan item (PPIC & IT) |
-| `/api/v1/simulation/batches/{id}/pdf` | GET | Browser Sensitif | Cookie `app_session` / `pilot_session` | Unduh berkas bukti PDF simulasi |
-| `/api/v1/simulation/import-json` | POST | Browser Sensitif | Early Guard + Cookie + `X-CSRF-Token` | Impor multipart JSON SAP mentah (max 2 MiB) |
-| `/api/v1/simulation/sap-batches` | POST, GET | Machine-to-Machine | Header `X-SAP-Simulation-Token` | Ingestion batch SAP DEV dari ERP |
-| `/api/v1/simulation/raw-batches` | POST | Machine-to-Machine | Header `X-SAP-Simulation-Token` | Ingestion batch mentah SAP DEV dari ERP |
-| `/api/v1/agent/*` | GET, POST | Machine-to-Machine | Agent Pairing & Polling Token | Local Print Agent polling |
-| `/api/v1/print/*`, `/api/v1/sap/print` | ALL | Rute Fisik Terblokir | Intercepted 404 (`LOCAL_SIMULATION_ONLY=true`) | Hak simulasi bukan hak cetak fisik |
+3. **P1 — Penegakan CSRF pada Seluruh Endpoint Mutasi Berbasis Cookie**:
+   - Guard `Depends(verify_csrf_token)` dipasang pada seluruh endpoint mutasi (POST/DELETE):
+     - `POST /api/v1/templates`, `DELETE /api/v1/templates/{id}`, `POST /api/v1/templates/upload`, `POST /api/v1/templates/parse-raw`
+     - `POST /api/v1/render`, `POST /api/v1/render/preview`
+     - `POST /api/v1/inspect/validate`
+     - `POST /api/v1/safe-demo/run`, `POST /api/v1/safe-demo/reset`
+     - `POST /api/v1/simulation/operator/logout`
+   - Dibuat utilitas frontend [`frontend/src/utils/api/csrfHelper.ts`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/frontend/src/utils/api/csrfHelper.ts) dan diintegrasikan ke `templatesApi.ts`, `renderApi.ts`, `sapApi.ts`, dan `safeDemoApi.ts` dengan menyertakan header `X-CSRF-Token` dan `credentials: 'same-origin'`.
+   - Endpoint read-only (GET) tetap bebas CSRF token dan autentikasi mesin SAP/Print Agent tetap terpisah.
 
----
+4. **P2 — Konsistensi Pemeriksaan Transport Security**:
+   - `evaluate_app_transport_security()` dipasang pada batas sesi browser [`get_current_user_optional`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/backend/app/auth/dependencies.py). Request dengan cookie `app_session` yang mengakses plain HTTP intranet (non-loopback) ditolak dengan HTTP 403 Forbidden.
+   - Header mentah `X-Forwarded-*` dari koneksi plain HTTP tidak dipercaya.
 
-## 3. Keputusan Arsitektur & Keamanan
+5. **P2 — Penghapusan Flag `--password` dari CLI**:
+   - Argumen `--password` dihapus dari parser CLI [`backend/app/cli/user_admin.py`](file:///c:/Users/fiqih/Documents/0000_TRST/Cline/0009_JSON_SVG_LABEL/web_app/backend/app/cli/user_admin.py) untuk mencegah password terekspos di riwayat shell / process list.
+   - Input password diwajibkan melalui prompt interaktif/piped `getpass.getpass` dengan konfirmasi ulang. Penolakan flag `--password` diuji pada `test_user_admin_cli.py`.
 
-1. **Password Hashing OWASP-Compliant**:
-   - Menggunakan PBKDF2-HMAC-SHA256 dengan 600.000 iterasi dan random salt kriptografis 16-byte (`backend/app/auth/security.py`).
-   - Verifikasi kata sandi menggunakan `secrets.compare_digest` untuk mencegah timing attacks.
-   - Waktu verifikasi konstan saat user tidak ditemukan melalui pra-komputasi dummy hash, mencegah serangan enumerasi pengguna berbasis respon waktu (*timing enumeration*).
-
-2. **Perlindungan Brute-Force & Lockout**:
-   - Pembatasan 5 kali kegagalan login berturut-turut memicu penguncian sementara akun/klien selama 300 detik (5 menit) dengan HTTP 429 Too Many Requests.
-   - Pesan kegagalan login bersifat seragam (`detail: "Nama pengguna atau kata sandi tidak valid."`) tanpa mengungkap keberadaan username.
-
-3. **Manajemen Sesi Server-Side & CSRF**:
-   - Token sesi acak berukuran 32-byte (64 karakter hex kriptografis).
-   - Di database `auth_sessions`, hanya SHA-256 hash dari token sesi yang disimpan (`session_hash`), sehingga kebocoran basis data tidak langsung mengekspos token sesi aktif.
-   - Cookie `app_session` dikonfigurasi `HttpOnly`, `SameSite=lax`, `Path=/`, dan `Secure` aktif saat request ditransmisikan melalui protokol HTTPS.
-   - Request mutasi browser (`logout`, `import-json`) mewajibkan header `X-CSRF-Token` yang divalidasi secara konstan (`secrets.compare_digest`).
-
-4. **Isolasi Database & Pencegahan Destruksi Data Lama**:
-   - Data akun dan sesi disimpan pada SQLite adapter mandiri (`backend/data/auth.db`) dengan WAL mode, foreign keys, dan busy timeout.
-   - Basis data simulasi batch (`sap_shadow_simulation.db`) tetap utuh dan terpisah, tanpa migrasi destruktif pada data batch yang sudah ada.
-
-5. **Transport Security Enforcer**:
-   - Mengizinkan koneksi HTTP loopback lokal (`127.0.0.1`, `localhost`, `::1`, `testserver`, `testclient`) untuk kebutuhan pengembangan lokal dan testing.
-   - Menolak koneksi plain HTTP jika Host/IP mengarah ke jaringan intranet/LAN (`HTTP 403 Forbidden`).
+6. **P2 — Safe Demo API Masuk Inventaris Guard Browser**:
+   - `safe_demo_router` dilindungi dengan `Depends(get_current_user)`.
+   - Endpoint mutasi `/safe-demo/run` dan `/safe-demo/reset` dilindungi dengan `Depends(verify_csrf_token)`.
+   - Rute cetak fisik (`/api/v1/print/*`, `/api/v1/sap/print`) tetap dicegat 404 pada mode simulasi lokal.
 
 ---
 
-## 4. File-File yang Diubah dan Ditambahkan
+## 2. Inventaris Endpoint & Guard Matriks
 
-### Backend
-- `backend/app/auth/__init__.py`: Ekspor modul autentikasi.
-- `backend/app/auth/models.py`: Model domain `Role` (PPIC, IT), `User`, `Session`, `LoginRequest`, `UserProfile`, `SessionInfo`.
-- `backend/app/auth/security.py`: Kriptografi PBKDF2 600.000 iterasi, SHA-256 token hashing, token acak aman.
-- `backend/app/auth/repository.py`: Interface `AuthRepository` & implementasi `SqliteAuthRepository`.
-- `backend/app/auth/service.py`: `AuthService` dengan lockout 5 percobaan/5 menit, mitigasi timing attack, validasi & revokasi sesi, CSRF.
-- `backend/app/auth/dependencies.py`: FastAPI dependencies `evaluate_app_transport_security`, `get_current_user`, `get_current_user_optional`, `require_role`, `verify_csrf_token`.
-- `backend/app/api/routes_auth.py`: Router `/api/v1/auth` (`/login`, `/logout`, `/me`, `/csrf`).
-- `backend/app/api/operator_import_guard.py`: Early multipart streaming guard yang mendukung `app_session` terpadu dan fail-closed physical print blocking.
-- `backend/app/api/routes_sap_shadow.py`: Alias route `/batches`, `/batches/{batch_id}`, `/batches/{batch_id}/pdf`, `/import-json` dengan resolusi sesi ganda (`app_session` & `pilot_session`).
-- `backend/app/api/routes_templates.py`: Diberikan guard `Depends(get_current_user)`.
-- `backend/app/api/routes_render.py`: Diberikan guard `Depends(get_current_user)`.
-- `backend/app/api/routes_inspect.py`: Diberikan guard `Depends(get_current_user)`.
-- `backend/app/cli/user_admin.py`: CLI tool satu kali untuk `create-user`, `set-password`, `deactivate-user`, `activate-user`, `list-users`.
-- `backend/tests/conftest.py`: Fixture terisolasi `test_auth.db`, seeded `test_ppic` & `test_it`, client otomatis terotentikasi, dan `unauthenticated_client`.
-- `backend/tests/test_auth_service.py`: 18 tests untuk unit AuthService & SqliteAuthRepository.
-- `backend/tests/test_auth_api.py`: 13 tests untuk Auth API, transport rejection, single-session simulation access, dan physical print guard.
-- `backend/tests/test_user_admin_cli.py`: 6 tests untuk CLI user admin.
-- `.gitignore`: Menambahkan `backend/data/*.db` dan `backend/data/*.sqlite*`.
-
-### Frontend
-- `frontend/src/types/auth.ts`: Tipe `UserRole`, `UserProfile`, `LoginResponse`, `SessionInfo`.
-- `frontend/src/utils/api/authApi.ts`: HTTP API client untuk `/auth/login`, `/auth/logout`, `/auth/me`, `/auth/csrf`.
-- `frontend/src/store/useAuthStore.ts`: Zustand store pengelola status sesi aplikasi.
-- `frontend/src/components/auth/LoginPage.tsx`: Halaman login aplikasi elegan, dark-theme, error handling lengkap.
-- `frontend/src/App.tsx`: Gating aplikasi di balik pengecekan sesi dan `LoginPage`.
-- `frontend/src/components/layout/TopMenuBar.tsx`: Badge peran & username di `BrandRow` dengan tombol Logout.
-- `frontend/src/components/modals/SapShadowSimulationModal.tsx`: Menghapus form login operator pilot dan tombol logout lokal; langsung menampilkan dashboard batch list.
-- `frontend/src/utils/api/sapShadowSimulationApi.ts`: Penggunaan `credentials: 'same-origin'`.
-- `frontend/tests/test_auth.mjs`: Unit tests untuk `authApi` dan `useAuthStore`.
-- `frontend/package.json`: Memasukkan `tests/test_auth.mjs` ke skrip `npm test`.
-
-### Ops & Deployment
-- `ops/jenkins/deploy-local.sh`: Mendukung deployment tanpa secret wajib; verifikasi keamanan kandidat memeriksa `/api/v1/auth/me` fail-closed (401), verifikasi CLI `user_admin --help`, dan dokumentasi bootstrap akun.
+| Endpoint | Metode | Guard Autentikasi | CSRF Guard | Transport Guard | Keterangan |
+|---|---|---|---|---|---|
+| `/health`, `/api/v1/health` | GET | Tanpa auth | - | - | Liveness & health probe |
+| `/api/status` | GET | Tanpa auth | - | - | Status fitur |
+| `/api/v1/simulation/status` | GET | Tanpa auth | - | - | Status sink simulasi |
+| `/api/v1/auth/login` | POST | Publik Terbatas | - | Intranet HTTPS wajib (403 jika plain HTTP) | Rate limit 5 fail/5 min (429) |
+| `/api/v1/auth/me` | GET | Cookie `app_session` | - | Intranet HTTPS wajib (403 jika plain HTTP) | User profile & CSRF token |
+| `/api/v1/auth/csrf` | GET | Cookie `app_session` | - | Intranet HTTPS wajib (403 jika plain HTTP) | CSRF token provider |
+| `/api/v1/auth/logout` | POST | Cookie `app_session` | `verify_csrf_token` | Intranet HTTPS wajib (403 jika plain HTTP) | Revokasi sesi & clear cookie |
+| `/api/v1/templates` | GET | Cookie `app_session` | - | Intranet HTTPS wajib | List template |
+| `/api/v1/templates` | POST | Cookie `app_session` | `verify_csrf_token` | Intranet HTTPS wajib | Save template |
+| `/api/v1/templates/{id}` | GET | Cookie `app_session` | - | Intranet HTTPS wajib | Detail template |
+| `/api/v1/templates/{id}` | DELETE | Cookie `app_session` | `verify_csrf_token` | Intranet HTTPS wajib | Hapus template kustom |
+| `/api/v1/templates/upload` | POST | Cookie `app_session` | `verify_csrf_token` | Intranet HTTPS wajib | Unggah template kustom |
+| `/api/v1/templates/parse-raw` | POST | Cookie `app_session` | `verify_csrf_token` | Intranet HTTPS wajib | Parse SVG string |
+| `/api/v1/render` | POST | Cookie `app_session` | `verify_csrf_token` | Intranet HTTPS wajib | Label render pipeline |
+| `/api/v1/render/preview` | POST | Cookie `app_session` | `verify_csrf_token` | Intranet HTTPS wajib | Live in-memory preview |
+| `/api/v1/render/download/{job_id}/{fn}` | GET | Cookie `app_session` | - | Intranet HTTPS wajib | Download render artifact |
+| `/api/v1/inspect/sample-contract` | GET | Cookie `app_session` | - | Intranet HTTPS wajib | Sample SAP Contract v1.1 |
+| `/api/v1/inspect/validate` | POST | Cookie `app_session` | `verify_csrf_token` | Intranet HTTPS wajib | Validasi contract vs SVG |
+| `/api/v1/safe-demo/batch` | GET | Cookie `app_session` | - | Intranet HTTPS wajib | Batch fixture data demo |
+| `/api/v1/safe-demo/status` | GET | Cookie `app_session` | - | Intranet HTTPS wajib | Status simulasi demo |
+| `/api/v1/safe-demo/run` | POST | Cookie `app_session` | `verify_csrf_token` | Intranet HTTPS wajib | Eksekusi simulator in-memory |
+| `/api/v1/safe-demo/reset` | POST | Cookie `app_session` | `verify_csrf_token` | Intranet HTTPS wajib | Reset fixture simulator |
+| `/api/v1/simulation/operator/login` | POST | Decommissioned | - | - | Mengembalikan HTTP 404 |
+| `/api/v1/simulation/operator/session` | GET | Cookie `app_session` | - | Intranet HTTPS wajib | Status sesi browser |
+| `/api/v1/simulation/operator/batches` | GET | Cookie `app_session` | - | Intranet HTTPS wajib | List batch simulasi SAP |
+| `/api/v1/simulation/operator/batches/{id}` | GET | Cookie `app_session` | - | Intranet HTTPS wajib | Rincian batch simulasi SAP |
+| `/api/v1/simulation/operator/batches/{id}/pdf` | GET | Cookie `app_session` | - | Intranet HTTPS wajib | Unduh berkas bukti PDF simulasi |
+| `/api/v1/simulation/operator/import-json` | POST | Cookie `app_session` | `verify_csrf_token` | Intranet HTTPS wajib | Impor multipart JSON SAP |
+| `/api/v1/simulation/sap-batches` | POST, GET | Token mesin | - | - | `X-SAP-Simulation-Token` |
+| `/api/v1/simulation/raw-batches` | POST | Token mesin | - | - | `X-SAP-Simulation-Token` |
+| `/api/v1/agent/*` | ALL | Token mesin | - | - | Local Print Agent token |
+| `/api/v1/print/*`, `/api/v1/sap/print` | ALL | Rute Fisik Terblokir | - | - | HTTP 404 (`LOCAL_SIMULATION_ONLY=true`) |
 
 ---
 
-## 5. Bukti Test Aktual
+## 3. Bukti Verifikasi Aktual
 
-### Backend Suite (Targeted & Full Regression)
+### Full Backend Pytest Suite
 ```
-Targeted Auth Tests (37 items):
-backend\tests\test_auth_service.py ..................                    [ 48%]
-backend\tests\test_auth_api.py .............                             [ 83%]
-backend\tests\test_user_admin_cli.py ......                              [100%]
-======================= 37 passed, 2 warnings in 26.43s =======================
+python -m pytest backend/tests -q
+================ 480 passed, 21 skipped, 2 warnings in 277.50s (0:04:37) ================
+```
+- `backend/tests/test_auth_api.py`: 15 passed (CSRF mutation protection, intranet transport guard, session rejection, print block).
+- `backend/tests/test_auth_service.py`: 18 passed (PBKDF2 hashing, lockout 5 fail/5 min, constant time compare).
+- `backend/tests/test_user_admin_cli.py`: 7 passed (interactive getpass, rejection of `--password` flag, activation/deactivation).
+- `backend/tests/test_safe_demo.py`: 9 passed (unauthenticated 401, missing CSRF 403, simulation zero sockets).
+- `backend/tests/test_pilot_operator_session.py`: 24 passed (legacy login 404, legacy cookie 401, unified session PPIC/IT).
+- `backend/tests/test_pilot_operator_import_json.py`: 28 passed (unified app_session, CSRF, transport, 2 MiB limit, idempotent replay).
+- `backend/tests/test_routes_templates.py`, `test_routes_render.py`, `test_routes_inspect.py`: 21 passed.
 
-Full Backend Regression Suite (498 items):
-backend\tests\test_auth_api.py .............                             [  2%]
-backend\tests\test_auth_service.py ..................                    [  6%]
+### Frontend Test Suite (`npm test`)
+```
+npm.cmd test
+✔ renderApi preview sends backend contract and returns Blob (1.1419ms)
+✔ renderApi monochrome preview uses the same binary endpoint (0.4384ms)
+✔ renderApi export sends one selected format and custom dimensions (1.6704ms)
+✔ renderApi inspect sends JSON body and propagates non-2xx errors (1.1347ms)
+✔ authApi.login sends credentials and returns LoginResponse (1.1704ms)
+✔ authApi.login propagates 401, 403, and 429 errors (0.7235ms)
+✔ authApi.logout sends X-CSRF-Token (0.2365ms)
+✔ authApi.getCurrentSession returns SessionInfo or unauthenticated (0.208ms)
+✔ useAuthStore login and logout workflow (0.4508ms)
+▶ App Component Lifecycle: loading -> login -> authenticated studio -> logout
+  ✔ 1. Initial loading state renders auth loading spinner (45.6738ms)
+  ✔ 2. Unauthenticated state renders LoginPage (36.1168ms)
+  ✔ 3. Authenticated PPIC state renders AuthenticatedStudio with user badge and logout button (32.8672ms)
+  ✔ 4. Authenticated IT state renders AuthenticatedStudio with IT badge (10.8289ms)
+  ✔ 5. Full Transition Lifecycle without React hook order error (18.0699ms)
+✔ App Component Lifecycle: loading -> login -> authenticated studio -> logout (149.7939ms)
 ...
-backend\tests\test_user_admin_cli.py ......                              [100%]
-=========== 477 passed, 21 skipped, 2 warnings in 215.26s (0:03:35) ===========
-```
-
-### Frontend Suite & Build
-```
-npm test:
-✔ renderApi preview sends backend contract and returns Blob (1.2412ms)
-✔ renderApi monochrome preview uses the same binary endpoint (0.4146ms)
-✔ renderApi export sends one selected format and custom dimensions (1.576ms)
-✔ renderApi inspect sends JSON body and propagates non-2xx errors (0.7247ms)
-✔ authApi.login sends credentials and returns LoginResponse (1.1654ms)
-✔ authApi.login propagates 401, 403, and 429 errors (0.6666ms)
-✔ authApi.logout sends X-CSRF-Token (0.3742ms)
-✔ authApi.getCurrentSession returns SessionInfo or unauthenticated (0.4056ms)
-✔ useAuthStore login and logout workflow (0.9067ms)
-...
-ℹ tests 79
+ℹ tests 85
 ℹ suites 0
-ℹ pass 79
+ℹ pass 85
 ℹ fail 0
-ℹ duration_ms 607.2149
+```
 
-npm run build:
-✓ 1837 modules transformed.
+### Production Build (`npm run build`)
+```
+vite v6.4.3 building for production...
+transforming...
+✓ 1839 modules transformed.
+rendering chunks...
 dist/index.html                               1.66 kB │ gzip:  0.82 kB
 dist/assets/index-q6_rBvCI.css               43.33 kB │ gzip:  8.09 kB
-dist/assets/ThermalPreviewDeck-BIniXdG2.js    6.86 kB │ gzip:  1.93 kB
-dist/assets/vendor-icons-8WaO-z2v.js         23.09 kB │ gzip:  6.55 kB
-dist/assets/vendor-react-CQt4-Az3.js        134.67 kB │ gzip: 43.22 kB
-dist/assets/index-TYc26PMh.js               309.87 kB │ gzip: 79.02 kB
-dist/assets/vendor-fabric-RHFYdypW.js       310.49 kB │ gzip: 91.50 kB
-✓ built in 9.86s
+dist/assets/ThermalPreviewDeck-DNP3y2ZN.js    6.86 kB │ gzip:  1.92 kB
+dist/assets/vendor-icons-B3O7YfLa.js         23.09 kB │ gzip:  6.55 kB
+dist/assets/vendor-react-ce_Hlx9g.js        134.67 kB │ gzip: 43.22 kB
+dist/assets/index-BkjwATtf.js               310.45 kB │ gzip: 79.48 kB
+dist/assets/vendor-fabric-CXn53Had.js       310.49 kB │ gzip: 91.50 kB
+✓ built in 28.98s
+```
+
+### Git Diff Whitespace Check
+```
+git diff --check
+[Clean — 0 whitespace errors]
 ```
 
 ---
 
-## 6. Prosedur Bootstrap, Upgrade, & Rollback
+## 4. Instruksi Bootstrap Akun Operator
 
-### Prosedur Bootstrap Akun Pertama Kali (Deployment Lokal)
-Jalankan perintah interaktif berikut pada container yang sedang berjalan untuk membuat akun PPIC dan IT:
+Untuk membuat akun pertama kali pada deployment lokal:
 ```bash
-# Membuat akun PPIC (kata sandi diinput interaktif tanpa echo di terminal)
+# Buat akun PPIC (kata sandi dimasukkan secara interaktif via prompt getpass aman)
 docker exec -it tls-local-sim python -m app.cli.user_admin create-user --username operator_ppic --role PPIC
 
-# Membuat akun IT
+# Buat akun IT
 docker exec -it tls-local-sim python -m app.cli.user_admin create-user --username admin_it --role IT
 
-# Memeriksa daftar akun aktif
+# Cek daftar pengguna aktif
 docker exec -it tls-local-sim python -m app.cli.user_admin list-users
 ```
-
-### Prosedur Upgrade dari Versi Sebelumnya
-1. Image baru `tls-local-sim-candidate` diuji secara terisolasi tanpa memublikasikan port dan tanpa menimpa volume live.
-2. Volume `tls-local-sim-data:/app/backend/data` tetap di-mount ke container live baru. Database batch lama `sap_shadow_simulation.db` tetap dipertahankan utuh.
-3. Basis data identitas `auth.db` dibuat secara otomatis pada volume yang sama tanpa mengganggu tabel batch yang ada.
-4. Buat akun pertama melalui CLI bootstrap di atas.
-
-### Prosedur Rollback
-Jika rollback diperlukan:
-1. Skrip `deploy-local.sh` secara otomatis mempertahankan tag image lama `tls-local-sim:previous`.
-2. Jika kandidat gagal dalam pemeriksaan kesehatan atau uji keamanan, deployment mengembalikan image lama secara otomatis.
-3. Seluruh sesi lama di `auth.db` bersifat terisolasi; penghapusan atau pergantian container tidak merusak file batch kanonikal simulasi.
-
----
-
-## 7. Risiko Tersisa & Batasan
-
-1. **Pilot Lokal Bukan Enterprise SSO**:
-   - Implementasi Fase 3.3 ditujukan untuk deployment pilot mandiri satu server/laptop lokal. Belum mencakup federasi SSO (LDAP / Active Directory / SAML / OIDC) atau MFA.
-2. **Administrasi Akun Berbasis CLI**:
-   - Pembuatan dan pengelolaan pengguna saat ini menggunakan CLI `user_admin` dari shell container untuk menjamin keamanan tanpa mengekspos public signup di UI. Manajemen user berbasis antarmuka grafis (admin panel) dapat dipertimbangkan pada fase lanjutan.
-3. **Penyimpanan Sesi SQLite**:
-   - Format penyimpanan sesi menggunakan SQLite yang sangat optimal untuk single-container deployment. Jika arsitektur horizontal (multiple multi-node workers) diterapkan di masa mendatang, `AuthRepository` dirancang dapat diganti dengan PostgreSQL/Redis backend tanpa mengubah business logic `AuthService`.

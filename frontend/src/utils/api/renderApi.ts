@@ -1,4 +1,5 @@
 import { API_BASE } from './apiConfig';
+import { getCsrfHeaders } from './csrfHelper';
 import type {
   JsonObject,
   PreviewRequest,
@@ -35,7 +36,11 @@ export const renderApi = {
   async renderSimulation(svgContent: string, jsonData: JsonObject = {}, options: RenderOptions = {}): Promise<Blob> {
     const res = await fetch(`${API_BASE}/render/preview`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getCsrfHeaders(),
+      },
       body: JSON.stringify(buildPreviewRequest(svgContent, jsonData, { ...options, previewType: 'png' })),
     });
     if (!res.ok) {
@@ -47,7 +52,11 @@ export const renderApi = {
   async renderPreviewBlob(svgContent: string, jsonData: JsonObject = {}, options: RenderOptions = {}): Promise<Blob> {
     const res = await fetch(`${API_BASE}/render/preview`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getCsrfHeaders(),
+      },
       body: JSON.stringify(buildPreviewRequest(svgContent, jsonData, { ...options, previewType: 'monochrome_1bit' })),
     });
     if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to generate monochrome preview'));
@@ -72,7 +81,11 @@ export const renderApi = {
     };
     const res = await fetch(`${API_BASE}/render`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getCsrfHeaders(),
+      },
       body: JSON.stringify(request),
     });
     if (!res.ok) {
@@ -84,7 +97,11 @@ export const renderApi = {
   async inspectSvgTokens(svgContent: string): Promise<SvgInspectionResponse> {
     const res = await fetch(`${API_BASE}/templates/parse-raw`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getCsrfHeaders(),
+      },
       body: JSON.stringify({ svg_content: svgContent })
     });
     if (!res.ok) {

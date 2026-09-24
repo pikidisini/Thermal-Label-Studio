@@ -7,14 +7,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import FileResponse, Response
 
-from ..auth.dependencies import get_current_user
+from ..auth.dependencies import get_current_user, verify_csrf_token
 from ..models.schemas import PreviewRequest, RenderRequest, RenderResponse
 from ..services.render_service import RenderService
 
 router = APIRouter(prefix="/render", tags=["Render & Preview"], dependencies=[Depends(get_current_user)])
 
 
-@router.post("", response_model=RenderResponse, summary="Execute full label rendering pipeline")
+@router.post("", response_model=RenderResponse, dependencies=[Depends(verify_csrf_token)], summary="Execute full label rendering pipeline")
 def render_label(req: RenderRequest, request: Request) -> RenderResponse:
     """
     Renders dynamic label from JSON data + SVG template into target formats
@@ -32,7 +32,7 @@ def render_label(req: RenderRequest, request: Request) -> RenderResponse:
         )
 
 
-@router.post("/preview", summary="Generate immediate in-memory preview image")
+@router.post("/preview", dependencies=[Depends(verify_csrf_token)], summary="Generate immediate in-memory preview image")
 def generate_preview(req: PreviewRequest) -> Response:
     """
     Generates a live in-memory preview (PNG, 1-Bit Otsu Monochrome, or SVG)

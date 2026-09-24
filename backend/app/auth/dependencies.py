@@ -46,11 +46,20 @@ def get_current_user_optional(
 ) -> Optional[Session]:
     """Resolves authenticated session if cookie is present and valid, otherwise returns None."""
     if not app_session:
-        # Fallback check for pilot_session cookie to ensure smooth transition
-        pilot_session = request.cookies.get("pilot_session")
-        if pilot_session:
-            return auth_service.validate_session(pilot_session)
         return None
+
+    # P2 Transport check on session boundary (fail-closed HTTP 403 on plain HTTP intranet)
+    is_allowed, _ = evaluate_app_transport_security(request)
+    if not is_allowed:
+        logger.warning(
+            "Session access rejected: plain HTTP over non-loopback host '%s'",
+            request.url.hostname,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Akses sesi aplikasi melalui jaringan intranet wajib menggunakan HTTPS.",
+        )
+
     return auth_service.validate_session(app_session)
 
 

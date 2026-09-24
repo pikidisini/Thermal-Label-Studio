@@ -1,4 +1,5 @@
 import { API_BASE } from './apiConfig';
+import { getCsrfHeaders } from './csrfHelper';
 import type { SafeDemoBatch, SafeDemoStatus } from '../../types/safeDemo';
 
 async function parseErrorMessage(res: Response, fallback: string): Promise<string> {
@@ -15,7 +16,9 @@ async function parseErrorMessage(res: Response, fallback: string): Promise<strin
 
 export const safeDemoApi = {
   async getBatch(): Promise<SafeDemoBatch> {
-    const res = await fetch(`${API_BASE}/safe-demo/batch`);
+    const res = await fetch(`${API_BASE}/safe-demo/batch`, {
+      credentials: 'same-origin',
+    });
     if (!res.ok) {
       if (res.status === 404) {
         throw new Error('Safe Demo Mode dinonaktifkan di backend (SAFE_DEMO_MODE != true).');
@@ -27,7 +30,9 @@ export const safeDemoApi = {
   },
 
   async getStatus(): Promise<SafeDemoStatus> {
-    const res = await fetch(`${API_BASE}/safe-demo/status`);
+    const res = await fetch(`${API_BASE}/safe-demo/status`, {
+      credentials: 'same-origin',
+    });
     if (!res.ok) {
       const msg = await parseErrorMessage(res, 'Gagal mengambil status demo');
       throw new Error(msg);
@@ -38,7 +43,11 @@ export const safeDemoApi = {
   async runDemo(): Promise<SafeDemoBatch> {
     const res = await fetch(`${API_BASE}/safe-demo/run`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getCsrfHeaders(),
+      },
     });
     if (!res.ok) {
       const msg = await parseErrorMessage(res, 'Simulasi demo mengalami kendala');
@@ -50,7 +59,11 @@ export const safeDemoApi = {
   async resetDemo(): Promise<{ status: string; message: string; batch: SafeDemoBatch }> {
     const res = await fetch(`${API_BASE}/safe-demo/reset`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getCsrfHeaders(),
+      },
     });
     if (!res.ok) {
       const msg = await parseErrorMessage(res, 'Gagal mereset state demo');

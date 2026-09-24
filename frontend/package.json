@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "tsx --test tests/test_frontend.mjs tests/render_contract.mjs tests/test_auth.mjs",
+    "test": "tsx --test tests/test_frontend.mjs tests/render_contract.mjs tests/test_auth.mjs tests/test_auth_flow.mjs",
     "test:e2e": "playwright test",
     "test:ui": "playwright test --ui",
     "record": "playwright codegen http://localhost:8000 --viewport-size=1920,1080 --output=tests/e2e/user_session.spec.js",

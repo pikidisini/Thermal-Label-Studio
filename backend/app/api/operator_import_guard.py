@@ -127,26 +127,21 @@ class OperatorImportGuardMiddleware:
             await response(scope, receive, send)
             return
 
-        # 3. Early Authentication Check (HttpOnly Cookie: app_session or legacy pilot_session)
-        session_cookie = req.cookies.get("app_session") or req.cookies.get("pilot_session")
+        # 3. Early Authentication Check (HttpOnly Cookie: strictly app_session)
+        session_cookie = req.cookies.get("app_session")
         if not session_cookie:
-            logger.warning("Early guard: Missing session cookie on import-json.")
+            logger.warning("Early guard: Missing app_session cookie on import-json.")
             response = JSONResponse(
                 status_code=401,
-                content={"detail": "Sesi tidak valid atau belum masuk."},
+                content={"detail": "Sesi tidak valid atau belum masuk. Sesi operator pilot legacy telah dinonaktifkan."},
             )
             await response(scope, receive, send)
             return
 
         from ..auth.service import auth_service
         app_user_session = auth_service.validate_session(session_cookie)
-        legacy_pilot_session = (
-            pilot_session_service.get_valid_session(session_cookie)
-            if not app_user_session
-            else None
-        )
 
-        if not app_user_session and not legacy_pilot_session:
+        if not app_user_session:
             logger.warning("Early guard: Invalid or expired session cookie on import-json.")
             response = JSONResponse(
                 status_code=401,
@@ -155,24 +150,9 @@ class OperatorImportGuardMiddleware:
             await response(scope, receive, send)
             return
 
-        # If using legacy pilot session, ensure pilot operator mode is enabled
-        if not app_user_session and legacy_pilot_session and not is_pilot_operator_enabled():
-            response = JSONResponse(
-                status_code=404,
-                content={"detail": "Mode operator pilot dinonaktifkan."},
-            )
-            await response(scope, receive, send)
-            return
-
         # 4. Early CSRF Verification
         csrf_token = req.headers.get("x-csrf-token")
-        csrf_valid = False
-        if app_user_session:
-            csrf_valid = auth_service.verify_csrf(app_user_session, csrf_token)
-        elif legacy_pilot_session:
-            csrf_valid = pilot_session_service.verify_csrf(legacy_pilot_session, csrf_token)
-
-        if not csrf_token or not csrf_valid:
+        if not csrf_token or not auth_service.verify_csrf(app_user_session, csrf_token):
             logger.warning("Early guard: CSRF verification failed on import-json.")
             response = JSONResponse(
                 status_code=403,

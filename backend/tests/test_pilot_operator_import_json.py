@@ -21,6 +21,9 @@ import unittest.mock
 from fastapi.testclient import TestClient
 import pytest
 
+from app.auth.models import Role
+from app.auth.security import hash_password
+from app.auth.service import auth_service
 from app.main import app
 from app.print_jobs.artifact_storage import DurableFilesystemArtifactStorage
 from app.services.pilot_session_service import pilot_session_service
@@ -35,6 +38,7 @@ TEST_PILOT_PASSWORD = "OperatorPilotSecurePass2026!"
 def isolated_import_environment(request: pytest.FixtureRequest, tmp_path: Path) -> Generator[None, None, None]:
     """Isolates pilot session store and SAP shadow storage per test."""
     pilot_session_service.clear_for_tests()
+    auth_service.repository.create_user("operator_ppic", hash_password("OperatorPass123!"), Role.PPIC)
 
     if getattr(request.node.cls, "SKIP_AUTOUSE_MOCKS", False):
         yield
@@ -104,8 +108,8 @@ def build_valid_raw_payload(request_id: str = "REQ-B2B2O-001") -> Dict[str, Any]
 def login_operator(client: TestClient) -> str:
     """Helper logging in the operator and returning the CSRF token."""
     login_resp = client.post(
-        "/api/v1/simulation/operator/login",
-        json={"password": TEST_PILOT_PASSWORD},
+        "/api/v1/auth/login",
+        json={"username": "operator_ppic", "password": "OperatorPass123!"},
     )
     assert login_resp.status_code == 200
     data = login_resp.json()

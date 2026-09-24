@@ -6,10 +6,6 @@ LIVE="tls-local-sim"
 CANDIDATE="tls-local-sim-candidate"
 DATA_VOLUME="tls-local-sim-data"
 
-# PILOT_OPERATOR_SECRET is retained for legacy compatibility; unified app login CLI bootstrap is primary.
-if [[ -z "${PILOT_OPERATOR_SECRET:-}" ]]; then
-  echo "INFO: PILOT_OPERATOR_SECRET not set; using unified application account bootstrap."
-fi
 if docker container inspect "$CANDIDATE" >/dev/null 2>&1; then
   echo "A candidate container already exists; inspect it before continuing."
   exit 1
@@ -23,11 +19,7 @@ run_app() {
     --env LOCAL_SIMULATION_ONLY=true
     --env SAFE_DEMO_MODE=false
     --env SAP_SHADOW_SIMULATION_ENABLED=true
-    --env PILOT_OPERATOR_ENABLED=true
   )
-  if [[ -n "${PILOT_OPERATOR_SECRET:-}" ]]; then
-    env_args+=(--env PILOT_OPERATOR_SECRET)
-  fi
   docker run --detach --name "$name" "$@" \
     "${env_args[@]}" \
     "$image" >/dev/null

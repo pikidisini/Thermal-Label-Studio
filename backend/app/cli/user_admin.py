@@ -40,13 +40,11 @@ def cmd_create_user(args: argparse.Namespace) -> int:
         print(f"Error: Pengguna '{clean_username}' sudah terdaftar.", file=sys.stderr)
         return 1
 
-    password = args.password
-    if not password:
-        password = getpass.getpass(f"Masukkan kata sandi untuk '{clean_username}': ")
-        confirm = getpass.getpass("Konfirmasi kata sandi: ")
-        if password != confirm:
-            print("Error: Konfirmasi kata sandi tidak cocok.", file=sys.stderr)
-            return 1
+    password = getpass.getpass(f"Masukkan kata sandi untuk '{clean_username}': ")
+    confirm = getpass.getpass("Konfirmasi kata sandi: ")
+    if password != confirm:
+        print("Error: Konfirmasi kata sandi tidak cocok.", file=sys.stderr)
+        return 1
 
     if len(password) < 8:
         print("Error: Kata sandi minimal harus 8 karakter.", file=sys.stderr)
@@ -66,13 +64,11 @@ def cmd_set_password(args: argparse.Namespace) -> int:
         print(f"Error: Pengguna '{clean_username}' tidak ditemukan.", file=sys.stderr)
         return 1
 
-    password = args.password
-    if not password:
-        password = getpass.getpass(f"Masukkan kata sandi baru untuk '{clean_username}': ")
-        confirm = getpass.getpass("Konfirmasi kata sandi baru: ")
-        if password != confirm:
-            print("Error: Konfirmasi kata sandi tidak cocok.", file=sys.stderr)
-            return 1
+    password = getpass.getpass(f"Masukkan kata sandi baru untuk '{clean_username}': ")
+    confirm = getpass.getpass("Konfirmasi kata sandi baru: ")
+    if password != confirm:
+        print("Error: Konfirmasi kata sandi tidak cocok.", file=sys.stderr)
+        return 1
 
     if len(password) < 8:
         print("Error: Kata sandi minimal harus 8 karakter.", file=sys.stderr)
@@ -136,13 +132,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_create = subparsers.add_parser("create-user", help="Create a new PPIC or IT user")
     p_create.add_argument("--username", required=True, help="Username")
     p_create.add_argument("--role", required=True, choices=["PPIC", "IT"], help="User role (PPIC or IT)")
-    p_create.add_argument("--password", required=False, default=None, help="Password (prompted securely if omitted)")
     p_create.set_defaults(func=cmd_create_user)
 
     # set-password
     p_pw = subparsers.add_parser("set-password", help="Set new password for a user")
     p_pw.add_argument("--username", required=True, help="Username")
-    p_pw.add_argument("--password", required=False, default=None, help="New password (prompted securely if omitted)")
     p_pw.set_defaults(func=cmd_set_password)
 
     # deactivate-user

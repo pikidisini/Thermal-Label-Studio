@@ -1,9 +1,12 @@
 import { API_BASE, FALLBACK_TEMPLATES, FALLBACK_SVGS } from './apiConfig';
+import { getCsrfHeaders } from './csrfHelper';
 
 export const templatesApi = {
   async listTemplates() {
     try {
-      const res = await fetch(`${API_BASE}/templates`);
+      const res = await fetch(`${API_BASE}/templates`, {
+        credentials: 'same-origin',
+      });
       if (res.ok) {
         const data = await res.json();
         return { templates: data };
@@ -16,7 +19,9 @@ export const templatesApi = {
 
   async getTemplate(templateId: string) {
     try {
-      const res = await fetch(`${API_BASE}/templates/${templateId}`);
+      const res = await fetch(`${API_BASE}/templates/${templateId}`, {
+        credentials: 'same-origin',
+      });
       if (res.ok) {
         return await res.json();
       }
@@ -44,7 +49,11 @@ export const templatesApi = {
   async saveTemplate(templateId: string, svgContent: string, metadata: any = {}) {
     const res = await fetch(`${API_BASE}/templates`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getCsrfHeaders(),
+      },
       body: JSON.stringify({
         template_id: templateId,
         svg_content: svgContent,
@@ -62,6 +71,10 @@ export const templatesApi = {
   async deleteTemplate(templateId: string) {
     const res = await fetch(`${API_BASE}/templates/${encodeURIComponent(templateId)}`, {
       method: 'DELETE',
+      credentials: 'same-origin',
+      headers: {
+        ...getCsrfHeaders(),
+      },
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Failed to delete template' }));
@@ -77,6 +90,10 @@ export const templatesApi = {
 
     const res = await fetch(`${API_BASE}/templates/upload`, {
       method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        ...getCsrfHeaders(),
+      },
       body: formData,
     });
     if (!res.ok) {

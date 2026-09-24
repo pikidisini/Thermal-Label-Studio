@@ -196,6 +196,10 @@ class AuthService:
         session_hash = hash_token(session_cookie)
         return self.repository.delete_session(session_hash)
 
+    def revoke_session(self, session_cookie: Optional[str]) -> bool:
+        """Revokes an active session by cookie value."""
+        return self.logout(session_cookie)
+
     def revoke_all_user_sessions(self, user_id: str) -> int:
         """Revokes all active sessions for a specific user (e.g. upon password change/deactivation)."""
         return self.repository.delete_sessions_for_user(user_id)
