@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { sapShadowSimulationApi } from '../../utils/api/sapShadowSimulationApi';
+import { useModalA11y } from '../../hooks/useModalA11y';
 import type {
   PilotOperatorBatchSummary,
   PilotOperatorBatchDetail,
@@ -34,6 +35,7 @@ export default function SapShadowSimulationModal({
   isOpen,
   onClose,
 }: SapShadowSimulationModalProps) {
+  const dialogRef = useModalA11y(isOpen, onClose);
   const { user, csrfToken: authCsrfToken } = useAuthStore();
   const [pilotEnabled, setPilotEnabled] = useState<boolean>(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
@@ -221,8 +223,9 @@ export default function SapShadowSimulationModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto"
       data-testid="sap-shadow-simulation-modal"
+      role="presentation"
     >
-      <div className="relative w-full max-w-3xl bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col overflow-hidden text-slate-100 max-h-[90vh]">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="sap-shadow-simulation-title" tabIndex={-1} className="relative w-full max-w-3xl bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col overflow-hidden text-slate-100 max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90 shrink-0">
           <div className="flex items-center space-x-3">
@@ -231,11 +234,11 @@ export default function SapShadowSimulationModal({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-white">
+                <h2 id="sap-shadow-simulation-title" className="text-lg font-bold text-white">
                   Simulasi Label
                 </h2>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">
-                  Simulasi SAP DEV
+                  Simulasi Data DEV
                 </span>
                 {user && (
                   <span
@@ -326,7 +329,7 @@ export default function SapShadowSimulationModal({
                     data-testid="btn-open-import-json"
                   >
                     <Upload className="w-3.5 h-3.5" />
-                    Impor JSON dari SAP
+                    Impor JSON Data
                   </button>
                   <button
                     onClick={loadBatches}
@@ -350,7 +353,7 @@ export default function SapShadowSimulationModal({
                     <div className="flex items-center gap-2">
                       <Upload className="w-4 h-4 text-amber-400" />
                       <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                        Impor Berkas Raw SAP Snapshot v2 (.json)
+                        Impor Berkas Raw Data Snapshot v2 (.json)
                       </h4>
                     </div>
                     <button
@@ -506,7 +509,7 @@ export default function SapShadowSimulationModal({
                     Belum Ada Batch Simulasi Label
                   </h4>
                   <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                    Sistem siap menerima batch simulasi. Jalankan tcode label pada SAP DEV (misalnya <code>ZLABEL</code> atau <code>ZMMR_LABEL_JSON</code>) atau gunakan tombol &apos;Impor JSON dari SAP&apos; di atas. Batch simulasi akan otomatis muncul di sini.
+                    Sistem siap menerima batch simulasi. Jalankan tcode label pada SAP DEV (misalnya <code>ZLABEL</code> atau <code>ZMMR_LABEL_JSON</code>) atau gunakan tombol &apos;Impor JSON Data&apos; di atas. Batch simulasi akan otomatis muncul di sini.
                   </p>
                 </div>
               ) : (
@@ -775,7 +778,7 @@ export default function SapShadowSimulationModal({
         {/* Modal Footer */}
         <div className="px-6 py-4 border-t border-slate-800 bg-slate-900/90 flex items-center justify-between shrink-0">
           <span className="text-xs text-slate-500">
-            Thermal Label Studio — Simulasi Label Terpadu (Uji Mandiri SAP & Bukti PDF)
+            Thermal Label Studio — Simulasi Label Terpadu (Uji Mandiri & Bukti PDF)
           </span>
           <button
             onClick={onClose}

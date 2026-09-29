@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { authApi } from '../utils/api/authApi';
 import type { UserProfile } from '../types/auth';
+import { clearEditorDraft } from '../utils/editorDraftRecovery';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -79,7 +80,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
-    const { csrfToken } = get();
+    const { csrfToken, user } = get();
     set({ isLoading: true });
     try {
       if (csrfToken) {
@@ -88,6 +89,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       // Best-effort logout cleanup
     } finally {
+      if (user?.id) clearEditorDraft(user.id);
       set({
         isAuthenticated: false,
         user: null,

@@ -11,4 +11,5 @@ python-barcode>=0.16.1
 qrcode>=8.0
 reportlab>=4.0.0
 pypdf>=5.0.0
+minio>=7.2.0,<8.0
 pywin32>=306; platform_system == "Windows"

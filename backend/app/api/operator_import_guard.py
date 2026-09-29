@@ -13,7 +13,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from ..config import is_local_simulation_only
+from ..config import is_legacy_direct_print_enabled
 from ..services.pilot_session_service import pilot_session_service
 
 logger = logging.getLogger("operator_import_guard")
@@ -73,7 +73,7 @@ class OperatorImportGuardMiddleware:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         path = scope.get("path", "")
-        if scope["type"] == "http" and is_local_simulation_only() and (
+        if scope["type"] == "http" and not is_legacy_direct_print_enabled() and (
             path == "/api/v1/print"
             or path.startswith("/api/v1/print/")
             or path == "/api/v1/sap/print"

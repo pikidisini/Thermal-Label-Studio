@@ -11,10 +11,74 @@ import { INDUSTRIAL_SYMBOLS, getSymbolSvg } from '../src/utils/industrialSymbols
 import { adaptSapContract } from '../src/utils/sapContractAdapter.ts';
 import { sapShadowSimulationApi } from '../src/utils/api/sapShadowSimulationApi.ts';
 import { shouldShowLabelSimulation } from '../src/utils/simulationCapabilities.ts';
+import { useHistoryStore } from '../src/store/useHistoryStore.ts';
+import { parseLocalSapJson } from '../src/utils/localSapJsonParser.ts';
+import { resolveSapTokenDisplayValue } from '../src/utils/sapTokenValue.ts';
+import { validatePreviewPayload } from '../src/utils/barcodePreview.ts';
+import { useContractStore } from '../src/store/useContractStore.ts';
+import { parseEditorDraft, editorDraftKey, EDITOR_DRAFT_VERSION } from '../src/utils/editorDraftRecovery.ts';
+
+test('F3.20 editor draft validation is versioned and user scoped', () => {
+  const valid = JSON.stringify({ version: EDITOR_DRAFT_VERSION, userId: 'u-1', savedAt: Date.now(), templateId: 't', widthMm: 200, heightMm: 80, viewMode: 'design', canvas: { objects: [] } });
+  assert.equal(parseEditorDraft(valid, 'u-1')?.userId, 'u-1');
+  assert.equal(editorDraftKey('u-1'), 'thermal-label-studio:editor-draft:u-1');
+  assert.equal(parseEditorDraft('{bad', 'u-1'), null);
+  assert.equal(parseEditorDraft(valid, 'u-2'), null);
+  assert.equal(parseEditorDraft(valid.replace('"widthMm":200', '"widthMm":-1'), 'u-1'), null);
+  assert.equal(parseEditorDraft(valid.replace('"objects":[]', '"objects":{}'), 'u-1'), null);
+  const malformedV2 = valid.replace('"objects":[]', '"objects":[{"isTable":true,"tableVersion":2,"tableSpec":{"version":2}}]');
+  assert.equal(parseEditorDraft(malformedV2, 'u-1'), null);
+  assert.equal(parseEditorDraft(' '.repeat(5 * 1024 * 1024 + 1), 'u-1'), null);
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const frontendRoot = path.resolve(__dirname, '..');
+
+test('F3.15 shared preview validation rejects unsafe payloads and accepts valid values', () => {
+  assert.equal(validatePreviewPayload('ean13', '4006381333931'), null);
+  assert.match(validatePreviewPayload('ean13', '4006381333932'), /check digit/i);
+  assert.match(validatePreviewPayload('code39', 'abc'), /Code 39/);
+  assert.equal(validatePreviewPayload('code39', 'ABC-39'), null);
+  assert.equal(validatePreviewPayload('code128', 'Label 01'), null);
+  assert.match(validatePreviewPayload('qrcode', ''), /QR/);
+});
+
+test('F3.15 token edits target nested fields/codes and custom preview fields', () => {
+  useContractStore.setState({ jsonData: { fields: { brand: 'A' }, codes: { batch_barcode: '1' } }, tokenMap: { brand: 'A', batch_barcode: '1' } });
+  useContractStore.getState().updateTokenValue('batch_barcode', '2');
+  assert.equal(useContractStore.getState().jsonData.codes.batch_barcode, '2');
+  assert.equal(useContractStore.getState().jsonData.fields.brand, 'A');
+  useContractStore.getState().updateTokenValue('custom_note', 'uji');
+  assert.equal(useContractStore.getState().jsonData.fields.custom_note, 'uji');
+});
+
+test('F3.15 inspector exposes binding controls for initially unbound objects', () => {
+  const source = fs.readFileSync(path.join(frontendRoot, 'src/components/layout/inspector/ObjectPropertyForm.tsx'), 'utf8');
+  assert.match(source, /selectedObject\.type === 'i-text' \|\| selectedObject\.isBarcode/);
+  assert.match(source, /data-testid="inspector-sap-token-name"/);
+  assert.match(source, /data-testid="inspector-input-token-value"/);
+});
+
+test('F3.16 preserves raw-v2 token provenance and scopes custom tokens to the active contract', () => {
+  const parsed = parseLocalSapJson({
+    contract_schema_version: '2.0-raw',
+    items: [{ item_sequence: 1, characteristics: [{ name: 'ZZBRAND', value: 'A' }], business_context: { customer_name: 'C', plant: '1100' } }],
+  });
+  const item = parsed.items[0];
+  assert.equal(item.tokenCategories?.ZZBRAND, 'characteristic');
+  assert.equal(item.tokenCategories?.customer_name, 'customer');
+  assert.equal(item.tokenCategories?.plant, undefined);
+  assert.equal(Object.prototype.hasOwnProperty.call(item.contract, 'tokenCategories'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(item.contract, 'token_categories'), false);
+
+  useContractStore.setState({ activeContractKey: 'goods_receipt', customTokens: new Set(['goods_receipt:my_note']) });
+  useContractStore.getState().setLocalImportedContract(item.contract, item.tokenMap, { format: 'raw-v2', fileName: 'fixture.json', itemSequence: 1, itemCount: 1 });
+  assert.equal(useContractStore.getState().customTokens.size, 0);
+  useContractStore.getState().setSampleContracts({ standard: item.contract });
+  useContractStore.getState().switchContract('standard');
+  assert.equal(useContractStore.getState().customTokens.size, 0);
+});
 
 test('Frontend Build Artifacts Integrity', async (t) => {
   await t.test('dist/index.html exists and contains mount root', () => {
@@ -342,6 +406,64 @@ test('SAP contract adapter keeps raw contract and exposes scalar UI tokens', () 
   assert.equal(String(tokenMap.brand).includes('[object Object]'), false);
 });
 
+test('local SAP v1.1 parser preserves null and empty scalar values', () => {
+  const parsed = parseLocalSapJson({
+    contract_version: '1.1',
+    source: { system: 'LOCAL' },
+    fields: { material: null, description: '' },
+    codes: {},
+  });
+  assert.equal(parsed.format, 'v1.1');
+  assert.equal(parsed.items[0].tokenMap.material, null);
+  assert.equal(parsed.items[0].tokenMap.description, '');
+});
+
+test('local raw v2 parser creates one exploration contract per item without derived values', () => {
+  const parsed = parseLocalSapJson({
+    contract_schema_version: '2.0-raw',
+    items: [
+      { item_sequence: 2, label_code: 'N001', characteristics: [{ name: 'MATNR', value: 'A' }], business_context: { plant: '1000' } },
+      { item_sequence: 1, characteristics: [{ name: 'LOT/NO', value: '' }], business_context: {} },
+    ],
+  });
+  assert.deepEqual(parsed.items.map((item) => item.itemSequence), [1, 2]);
+  assert.equal(parsed.items[0].tokenMap['LOT/NO'], '');
+  assert.equal(parsed.items[1].tokenMap.plant, '1000');
+  assert.equal(parsed.items[1].tokenMap.barcode, undefined);
+});
+
+test('local raw v2 parser rejects duplicate sequences, names, and non-scalar values', () => {
+  assert.throws(() => parseLocalSapJson({ contract_schema_version: '2.0-raw', items: [
+    { item_sequence: 1, characteristics: [{ name: 'A', value: 1 }, { name: 'A', value: 2 }] },
+    { item_sequence: 1, characteristics: [] },
+  ] }), /duplikat/i);
+  assert.throws(() => parseLocalSapJson({ contract_schema_version: '2.0-raw', items: [
+    { item_sequence: 1, characteristics: [{ name: 'A', value: { nested: true } }] },
+  ] }), /scalar/i);
+});
+
+test('local raw v2 synthetic fixture skips nested provenance with a warning', () => {
+  const fixture = JSON.parse(fs.readFileSync('../docs/tasks/B2B2K/fixtures/raw_sap_snapshot_v2_n001_synthetic.json', 'utf8'));
+  const parsed = parseLocalSapJson(fixture);
+  assert.equal(parsed.items.length, 3);
+  assert.ok(parsed.warnings.some((warning) => warning.includes('production_date_provenance')));
+  assert.equal(parsed.items[0].tokenMap.production_date_provenance, undefined);
+});
+
+test('local raw v2 parser rejects case-insensitive characteristic/context collisions', () => {
+  assert.throws(() => parseLocalSapJson({ contract_schema_version: '2.0-raw', items: [
+    { item_sequence: 1, characteristics: [{ name: 'MATNR', value: 'A' }], business_context: { matnr: 'B' } },
+  ] }), /bertabrakan/i);
+});
+
+test('dynamic SAP text display updates preserve absent, null, and empty semantics', () => {
+  assert.equal(resolveSapTokenDisplayValue('SYN-MAT-0001', 'material_number'), 'SYN-MAT-0001');
+  assert.equal(resolveSapTokenDisplayValue('SYN-MAT-0002', 'material_number'), 'SYN-MAT-0002');
+  assert.equal(resolveSapTokenDisplayValue(null, 'customer_text'), 'NULL');
+  assert.equal(resolveSapTokenDisplayValue('', 'customer_text'), '');
+  assert.equal(resolveSapTokenDisplayValue(undefined, 'missing_field'), '{{missing_field}}');
+});
+
 test('SAP sample_roll contract maps source aliases without flattening objects', () => {
   const samplePath = path.resolve(frontendRoot, '..', 'data_samples', 'sample_roll.json');
   const sample = JSON.parse(fs.readFileSync(samplePath, 'utf8'));
@@ -440,30 +562,21 @@ test('Custom Canvas Dimensions & Calculations', async (t) => {
 
 test('History Stack (Undo / Redo) and Viewport Calculations', async (t) => {
   await t.test('undo stack records and reverts state snapshots', () => {
-    const undoStack = [];
-    const redoStack = [];
-
-    // Action 1: Add element A
-    undoStack.push(JSON.stringify({ objects: [{ id: 'A' }] }));
-    assert.equal(undoStack.length, 1);
-
-    // Action 2: Add element B
-    undoStack.push(JSON.stringify({ objects: [{ id: 'A' }, { id: 'B' }] }));
-    assert.equal(undoStack.length, 2);
-
-    // Undo action 2
-    const current = undoStack.pop();
-    redoStack.push(current);
-    const restored = JSON.parse(undoStack[undoStack.length - 1]);
-    assert.equal(restored.objects.length, 1);
-    assert.equal(restored.objects[0].id, 'A');
-
-    // Redo action 2
-    const next = redoStack.pop();
-    undoStack.push(next);
-    const redone = JSON.parse(undoStack[undoStack.length - 1]);
-    assert.equal(redone.objects.length, 2);
-    assert.equal(redone.objects[1].id, 'B');
+    const history = useHistoryStore.getState();
+    try {
+      history.clearHistory();
+      history.pushState(JSON.stringify({ objects: [{ id: 'A' }] }));
+      history.pushState(JSON.stringify({ objects: [{ id: 'A' }, { id: 'B' }] }));
+      assert.deepEqual(JSON.parse(useHistoryStore.getState().undo()), { objects: [{ id: 'A' }] });
+      assert.deepEqual(JSON.parse(useHistoryStore.getState().redo()), { objects: [{ id: 'A' }, { id: 'B' }] });
+      assert.deepEqual(JSON.parse(useHistoryStore.getState().undo()), { objects: [{ id: 'A' }] });
+      assert.equal(useHistoryStore.getState().canRedo, true);
+      useHistoryStore.getState().pushState(JSON.stringify({ objects: [{ id: 'C' }] }));
+      assert.equal(useHistoryStore.getState().canRedo, false, 'new state invalidates redo');
+      assert.equal(useHistoryStore.getState().redo(), undefined);
+    } finally {
+      useHistoryStore.getState().clearHistory();
+    }
   });
 
   await t.test('smooth zoom clamping adheres to minimum and maximum boundaries', () => {

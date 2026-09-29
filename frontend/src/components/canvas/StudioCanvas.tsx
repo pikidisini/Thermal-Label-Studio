@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import type { fabric } from 'fabric';
 import { useStudioStore } from '../../store/useStudioStore';
 import { useTemplateStore } from '../../store/useTemplateStore';
@@ -83,6 +83,26 @@ export function StudioCanvas({
     pxPerMm,
     setSelectedObject,
   });
+
+  // Ruler geometry depends on the committed CSS transform and dimensions of
+  // the label sheet. Redraw after React applies zoom, pan, or template size
+  // changes so the ruler does not retain the previous canvas position.
+  useLayoutEffect(() => {
+    const fabricCanvas = canvasRef.current;
+    if (fabricCanvas) {
+      fabricCanvas.setDimensions({
+        width: canvasWidthPx * zoom,
+        height: canvasHeightPx * zoom,
+      });
+      fabricCanvas.setZoom(zoom);
+      fabricCanvas.calcOffset();
+      fabricCanvas.requestRenderAll();
+    }
+  }, [canvasRef, canvasWidthPx, canvasHeightPx, zoom, labelWidthMm, labelHeightMm]);
+
+  useLayoutEffect(() => {
+    drawRulers();
+  }, [drawRulers, zoom, panOffset.x, panOffset.y, labelWidthMm, labelHeightMm]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();

@@ -7,10 +7,15 @@ import { safeDemoApi } from './api/safeDemoApi';
 export const apiClient = {
   // Template Services
   listTemplates: templatesApi.listTemplates,
+  listTemplatesStrict: templatesApi.listTemplatesStrict,
   getTemplate: templatesApi.getTemplate,
+  getTemplateStrict: templatesApi.getTemplateStrict,
   saveTemplate: templatesApi.saveTemplate,
   deleteTemplate: templatesApi.deleteTemplate,
   uploadTemplate: templatesApi.uploadTemplate,
+  listTemplateFolders: templatesApi.listFolders,
+  createTemplateFolder: templatesApi.createFolder,
+  moveTemplate: templatesApi.moveTemplate,
 
   // Rendering & Inspection Services
   renderSimulation: renderApi.renderSimulation,

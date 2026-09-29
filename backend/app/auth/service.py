@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import logging
+import hashlib
 import os
 from pathlib import Path
 import secrets
@@ -63,12 +64,19 @@ class AuthService:
         self._lockouts: Dict[str, LockoutState] = {}
 
     def _get_rate_limit_key(self, client_ip: str, username: str) -> str:
-        return f"{client_ip.strip().lower()}:{username.strip().lower()}"
+        raw = f"{client_ip.strip().lower()}:{username.strip().lower()}".encode("utf-8")
+        return hashlib.sha256(raw).hexdigest()
 
     def check_lockout(self, client_ip: str, username: str, now: Optional[datetime] = None) -> bool:
         """Returns True if the client is currently locked out."""
         curr_time = now or datetime.now(timezone.utc)
         key = self._get_rate_limit_key(client_ip, username)
+        if isinstance(self.repository, SqliteAuthRepository):
+            try:
+                return self.repository.check_login_lockout(key, curr_time)
+            except Exception:
+                logger.exception("Auth lockout state unavailable; failing closed")
+                return True
         with self._lock:
             state = self._lockouts.get(key)
             if not state:
@@ -80,14 +88,21 @@ class AuthService:
                 return False
             return False
 
-    def _record_failure(self, client_ip: str, username: str, now: Optional[datetime] = None) -> None:
+    def _record_failure(self, client_ip: str, username: str, now: Optional[datetime] = None) -> bool:
         curr_time = now or datetime.now(timezone.utc)
         key = self._get_rate_limit_key(client_ip, username)
+        if isinstance(self.repository, SqliteAuthRepository):
+            try:
+                self.repository.record_login_failure(key, curr_time, MAX_LOGIN_FAILURES, LOCKOUT_DURATION_SECONDS)
+            except Exception:
+                logger.exception("Auth lockout update failed; failing closed")
+                return False
+            return True
         with self._lock:
             state = self._lockouts.get(key)
             if not state or (curr_time - state.first_failure_at).total_seconds() > LOCKOUT_DURATION_SECONDS:
                 self._lockouts[key] = LockoutState(failure_count=1, first_failure_at=curr_time)
-                return
+                return True
 
             state.failure_count += 1
             if state.failure_count >= MAX_LOGIN_FAILURES:
@@ -98,11 +113,20 @@ class AuthService:
                     client_ip,
                     LOCKOUT_DURATION_SECONDS,
                 )
+            return True
 
-    def _record_success(self, client_ip: str, username: str) -> None:
+    def _record_success(self, client_ip: str, username: str) -> bool:
         key = self._get_rate_limit_key(client_ip, username)
+        if isinstance(self.repository, SqliteAuthRepository):
+            try:
+                self.repository.clear_login_lockout(key)
+            except Exception:
+                logger.exception("Auth lockout clear failed; retaining fail-closed state")
+                return False
+            return True
         with self._lock:
             self._lockouts.pop(key, None)
+        return True
 
     def authenticate(
         self,
@@ -133,11 +157,13 @@ class AuthService:
         password_valid = verify_password(password, hash_to_verify)
 
         if not user or not password_valid or not user.is_active:
-            self._record_failure(client_ip, clean_user, curr_time)
+            if not self._record_failure(client_ip, clean_user, curr_time):
+                return None, "INVALID_CREDENTIALS"
             return None, "INVALID_CREDENTIALS"
 
         # 4. Success: clear failure counters
-        self._record_success(client_ip, clean_user)
+        if not self._record_success(client_ip, clean_user):
+            return None, "INVALID_CREDENTIALS"
 
         # 5. Generate secure session token and CSRF token
         raw_session_id = generate_secure_token(32)  # 64 hex chars

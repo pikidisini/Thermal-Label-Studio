@@ -5,8 +5,10 @@ API Routes for Dispatching Raw Commands to Physical Thermal Printers.
 from __future__ import annotations
 
 from typing import List
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
+from ..auth.dependencies import require_role, verify_csrf_token
+from .legacy_print_guard import require_legacy_direct_print_enabled
 from ..models.schemas import (
     PrintBatchRequest,
     PrintBatchResponse,
@@ -19,13 +21,27 @@ from ..services.print_service import PrintService
 router = APIRouter(prefix="/print", tags=["Printing"])
 
 
-@router.get("/printers", response_model=List[str], summary="List installed Windows spooler printers")
+@router.get(
+    "/printers",
+    response_model=List[str],
+    dependencies=[Depends(require_legacy_direct_print_enabled), Depends(require_role("IT"))],
+    summary="List installed Windows spooler printers",
+)
 def list_printers() -> List[str]:
     """Lists local and network printers registered in the host Windows Print Spooler."""
     return PrintService.list_available_printers()
 
 
-@router.post("/tcp", response_model=PrintResponse, summary="Send raw label commands to Network Printer via TCP")
+@router.post(
+    "/tcp",
+    response_model=PrintResponse,
+    dependencies=[
+        Depends(require_legacy_direct_print_enabled),
+        Depends(require_role("IT")),
+        Depends(verify_csrf_token),
+    ],
+    summary="Send raw label commands to Network Printer via TCP",
+)
 def print_tcp(req: PrintTcpRequest) -> PrintResponse:
     """
     Sends raw thermal commands (ZPL / TSPL / IPL) directly to a network printer IP via raw TCP socket (Port 9100).
@@ -40,7 +56,16 @@ def print_tcp(req: PrintTcpRequest) -> PrintResponse:
         )
 
 
-@router.post("/spooler", response_model=PrintResponse, summary="Send raw label commands to Windows Print Spooler")
+@router.post(
+    "/spooler",
+    response_model=PrintResponse,
+    dependencies=[
+        Depends(require_legacy_direct_print_enabled),
+        Depends(require_role("IT")),
+        Depends(verify_csrf_token),
+    ],
+    summary="Send raw label commands to Windows Print Spooler",
+)
 def print_spooler(req: PrintSpoolerRequest) -> PrintResponse:
     """
     Sends raw thermal commands directly to a local or mapped Windows Printer Spooler queue using RAW datatype.
@@ -64,7 +89,16 @@ def print_spooler(req: PrintSpoolerRequest) -> PrintResponse:
         )
 
 
-@router.post("/batch", response_model=PrintBatchResponse, summary="Execute mass batch label printing")
+@router.post(
+    "/batch",
+    response_model=PrintBatchResponse,
+    dependencies=[
+        Depends(require_legacy_direct_print_enabled),
+        Depends(require_role("IT")),
+        Depends(verify_csrf_token),
+    ],
+    summary="Execute mass batch label printing",
+)
 def print_batch(req: PrintBatchRequest) -> PrintBatchResponse:
     """
     Dispatches a multi-label batch print job with copies count, auto-increment serial rules,
@@ -82,4 +116,3 @@ def print_batch(req: PrintBatchRequest) -> PrintBatchResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Batch printing error: {str(e)}",
         )
-

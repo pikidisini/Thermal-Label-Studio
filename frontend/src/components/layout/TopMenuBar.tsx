@@ -22,6 +22,13 @@ interface TopMenuBarProps {
   onOpenSapSimulation?: () => void;
   isSapShadowSimulationEnabled?: boolean;
   onOpenLabelSimulation?: () => void;
+  onImportTemplateSvg: () => void;
+  onImportJson: () => void;
+  onExportTemplateSvg: () => void;
+  onExportRenderedSvg: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  onShowAbout: () => void;
 }
 
 
@@ -30,8 +37,24 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { LogOut } from 'lucide-react';
 
 /** Row 1 — 40px brand bar */
-function BrandRow() {
+function BrandRow(props: Pick<TopMenuBarProps, 'onImportTemplateSvg' | 'onImportJson' | 'onExportTemplateSvg' | 'onExportRenderedSvg' | 'onUndo' | 'onRedo' | 'setViewMode' | 'viewMode' | 'onOpenShortcuts' | 'onShowAbout'>) {
   const { user, logout } = useAuthStore();
+  const [openMenu, setOpenMenu] = React.useState<string | null>(null);
+  React.useEffect(() => { const close = () => setOpenMenu(null); const key = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); }; document.addEventListener('click', close); document.addEventListener('keydown', key); return () => { document.removeEventListener('click', close); document.removeEventListener('keydown', key); }; }, []);
+  const menus: Record<string, Array<{ label: string; action: () => void }>> = {
+    File: [
+      { label: 'Upload template SVG', action: props.onImportTemplateSvg },
+      { label: 'Upload data JSON', action: props.onImportJson },
+      { label: 'Download template SVG', action: props.onExportTemplateSvg },
+      { label: 'Download SVG hasil data', action: props.onExportRenderedSvg },
+    ],
+    Edit: [{ label: 'Undo', action: props.onUndo }, { label: 'Redo', action: props.onRedo }],
+    View: [
+      { label: 'Design', action: () => props.setViewMode('design') },
+      { label: 'Preview', action: () => props.setViewMode('preview') },
+    ],
+    Help: [{ label: 'Keyboard shortcuts', action: props.onOpenShortcuts }, { label: 'About Thermal Label Studio', action: props.onShowAbout }],
+  };
 
   return (
     <div
@@ -47,9 +70,6 @@ function BrandRow() {
           <span className="font-mono font-bold text-xs text-on-surface tracking-tight hidden sm:inline">
             Thermal Label Studio
           </span>
-          <span data-testid="topbar-version-badge" className="text-[9px] px-1 py-0.5 bg-primary/20 text-primary font-mono font-semibold tracking-widest">
-            v1.1
-          </span>
         </div>
 
         {/* Separator */}
@@ -57,14 +77,13 @@ function BrandRow() {
 
         {/* Menu items */}
         <div data-testid="topbar-menu-items" className="flex items-center gap-0.5">
-          {['File', 'Edit', 'View', 'Help'].map((item) => (
-            <button
-              key={item}
-              data-testid={`topbar-menu-btn-${item.toLowerCase()}`}
-              className="text-[11px] text-on-surface-variant hover:text-on-surface px-1.5 py-0.5 transition-colors font-medium"
-            >
-              {item}
-            </button>
+          {Object.keys(menus).map((item) => (
+            <div key={item} className="relative" onClick={(event) => event.stopPropagation()}>
+              <button type="button" aria-haspopup="menu" data-testid={`topbar-menu-btn-${item.toLowerCase()}`} aria-expanded={openMenu === item} onClick={() => setOpenMenu(openMenu === item ? null : item)} className="text-[11px] text-on-surface-variant hover:text-on-surface px-1.5 py-0.5 transition-colors font-medium">{item}</button>
+              {openMenu === item && <div role="menu" data-testid={`topbar-menu-${item.toLowerCase()}`} className="absolute left-0 top-full z-50 mt-1 min-w-44 border border-outline-variant bg-surface-container-lowest py-1 shadow-xl">
+                {menus[item].map((entry) => <button type="button" key={entry.label} onClick={() => { setOpenMenu(null); entry.action(); }} className="block w-full px-3 py-1.5 text-left text-[11px] text-on-surface-variant hover:bg-surface-container hover:text-on-surface">{entry.label}</button>)}
+              </div>}
+            </div>
           ))}
         </div>
       </div>
@@ -120,12 +139,12 @@ export function TopMenuBar({
   isSafeDemoEnabled,
   onOpenSapSimulation,
   isSapShadowSimulationEnabled,
-  onOpenLabelSimulation,
+  onOpenLabelSimulation, onImportTemplateSvg, onImportJson, onExportTemplateSvg, onExportRenderedSvg, onUndo, onRedo, onShowAbout,
 }: TopMenuBarProps) {
   return (
-    <header data-testid="container-top-menubar" className="flex flex-col select-none z-20 shadow-md">
+    <header data-testid="container-top-menubar" className="relative flex flex-col select-none z-40 shadow-md">
       {/* Row 1 — Brand / application menu */}
-      <BrandRow />
+      <BrandRow {...{ onImportTemplateSvg, onImportJson, onExportTemplateSvg, onExportRenderedSvg, onUndo, onRedo, setViewMode, viewMode, onOpenShortcuts, onShowAbout }} />
 
       {/* Row 2 — 36px HUD / workspace toolbar */}
       <div

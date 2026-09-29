@@ -104,7 +104,7 @@ export function TopBarActions({
         <button
           data-testid="btn-label-simulation"
           onClick={onOpenLabelSimulation || onOpenSapSimulation}
-          title="Simulasi Label (Uji Mandiri SAP & Bukti PDF)"
+          title="Simulasi Label (Uji Mandiri & Bukti PDF)"
           className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium transition-all bg-amber-950/50 text-amber-300 border border-amber-500/40 hover:bg-amber-900/60 hover:border-amber-400 rounded-sm"
         >
           <span className="material-symbols-outlined" style={{ fontSize: 14 }}>picture_as_pdf</span>

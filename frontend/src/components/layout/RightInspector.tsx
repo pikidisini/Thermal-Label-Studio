@@ -14,6 +14,8 @@ interface RightInspectorProps {
   onSendBackward: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  onGroup: () => void;
+  onUngroup: () => void;
   labelWidthMm?: number;
   labelHeightMm?: number;
   pxPerMm?: number;
@@ -34,6 +36,8 @@ export function RightInspector({
   onSendBackward,
   onDuplicate,
   onDelete,
+  onGroup,
+  onUngroup,
   labelWidthMm = 200,
   labelHeightMm = 80,
   pxPerMm = 4,
@@ -105,6 +109,8 @@ export function RightInspector({
             onSendBackward={onSendBackward}
             onDuplicate={onDuplicate}
             onDelete={onDelete}
+            onGroup={onGroup}
+            onUngroup={onUngroup}
             onSelectLayer={handleSelectLayer}
           />
         )}

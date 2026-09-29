@@ -16,6 +16,7 @@ export function StatusBar() {
       return `SHEET: ${labelWidthMm} \u00d7 ${labelHeightMm} mm  (${dotsW} \u00d7 ${dotsH} px @ 203 DPI)`;
     }
     const obj = selectedObject as any;
+    if (obj.isTable === true && obj.tableVersion === 2) return 'TARGET: TABLE';
     if (obj.isBarcode) {
       const typeStr = typeof obj.barcodeType === 'string' ? obj.barcodeType : 'code128';
       const valStr = typeof obj.barcodeValue === 'string' ? obj.barcodeValue : '';

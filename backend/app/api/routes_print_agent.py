@@ -29,6 +29,7 @@ from ..print_jobs.artifact_storage import (
     DurableFilesystemArtifactStorage,
     TemporaryArtifactStorage,
 )
+from ..storage.minio import MinioArtifactStorage, minio_enabled
 from ..print_jobs.models import Emulation, PrintJob, PrintJobStatus, PrinterLanguage, PrinterProfile
 from ..print_jobs.repository import (
     ClaimConflictError,
@@ -282,7 +283,9 @@ def build_print_agent_dependencies(
     temporary_directory: tempfile.TemporaryDirectory[str] | None = None
     resolved_storage = artifact_storage
     if resolved_storage is None:
-        if resolved_settings.enabled and resolved_settings.repository_backend == "postgresql":
+        if minio_enabled():
+            resolved_storage = MinioArtifactStorage(retention=DEFAULT_RETENTION)
+        elif resolved_settings.enabled and resolved_settings.repository_backend == "postgresql":
             if not resolved_settings.artifact_root:
                 raise RuntimeError("PRINT_AGENT_ARTIFACT_ROOT is required for PostgreSQL mode")
             resolved_storage = DurableFilesystemArtifactStorage(

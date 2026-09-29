@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sqlite3
 from typing import List, Optional
@@ -135,6 +135,51 @@ class SqliteAuthRepository(AuthRepository):
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires_at ON auth_sessions(expires_at);
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS auth_login_lockouts (
+                    key_hash TEXT PRIMARY KEY,
+                    failure_count INTEGER NOT NULL,
+                    first_failure_at TEXT NOT NULL,
+                    locked_until TEXT
+                );
+            """)
+
+    def check_login_lockout(self, key_hash: str, now: datetime) -> bool:
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT failure_count, first_failure_at, locked_until FROM auth_login_lockouts WHERE key_hash = ?",
+                (key_hash,),
+            ).fetchone()
+            if not row:
+                return False
+            locked_until = row["locked_until"]
+            if locked_until and now < datetime.fromisoformat(locked_until):
+                return True
+            # Leave expired rows in place; the next atomic failure update
+            # replaces them without a read/delete race.
+            return False
+
+    def record_login_failure(self, key_hash: str, now: datetime, max_failures: int = 5, duration_seconds: int = 300) -> None:
+        with self._get_connection() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT failure_count, first_failure_at FROM auth_login_lockouts WHERE key_hash = ?",
+                (key_hash,),
+            ).fetchone()
+            if not row or (now - datetime.fromisoformat(row["first_failure_at"])).total_seconds() > duration_seconds:
+                count, first = 1, now
+            else:
+                count, first = int(row["failure_count"]) + 1, datetime.fromisoformat(row["first_failure_at"])
+            locked = now + timedelta(seconds=duration_seconds) if count >= max_failures else None
+            conn.execute(
+                "INSERT INTO auth_login_lockouts(key_hash, failure_count, first_failure_at, locked_until) VALUES(?,?,?,?) "
+                "ON CONFLICT(key_hash) DO UPDATE SET failure_count=excluded.failure_count, first_failure_at=excluded.first_failure_at, locked_until=excluded.locked_until",
+                (key_hash, count, first.isoformat(), locked.isoformat() if locked else None),
+            )
+
+    def clear_login_lockout(self, key_hash: str) -> None:
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM auth_login_lockouts WHERE key_hash = ?", (key_hash,))
 
     @staticmethod
     def _row_to_user(row: sqlite3.Row) -> User:

@@ -35,6 +35,7 @@ from .config import (
     APP_VERSION,
     CORS_ORIGINS,
     FRONTEND_DIR,
+    is_legacy_direct_print_enabled,
     is_safe_demo_enabled,
     is_sap_shadow_simulation_enabled,
 )
@@ -113,6 +114,7 @@ def health_check():
 
 
 @app.get("/api/status", tags=["System"])
+@app.get("/api/v1/status", tags=["System"])
 def api_status():
     """API status endpoint providing endpoints summary and link to docs."""
     return {
@@ -121,6 +123,7 @@ def api_status():
         "version": APP_VERSION,
         "docs_url": "/docs",
         "safe_demo_mode": is_safe_demo_enabled(),
+        "legacy_direct_print_enabled": is_legacy_direct_print_enabled(),
         "sap_shadow_simulation_enabled": is_sap_shadow_simulation_enabled(),
         "endpoints": {
             "templates": "/api/v1/templates",

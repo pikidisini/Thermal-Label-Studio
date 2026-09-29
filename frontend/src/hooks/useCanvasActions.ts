@@ -43,9 +43,7 @@ export function useCanvasActions(
   const tableActions = useTableActions({
     canvasRef,
     pxPerMm,
-    triggerRenderSimulation,
     syncSelection,
-    saveCanvasHistory,
     getStrategicPlacement,
   });
 

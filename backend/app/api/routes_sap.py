@@ -6,12 +6,14 @@ Receives print requests from an SAP integration producer.
 from __future__ import annotations
 
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
+from ..auth.dependencies import require_role, verify_csrf_token
 from ..config import APP_VERSION
 from ..models.schemas import SapPrinterTarget, SapPrintRequest, SapPrintResponse
 from ..services.sap_service import SapService
 from ..services.template_service import TemplateService
+from .legacy_print_guard import require_legacy_direct_print_enabled
 
 router = APIRouter(prefix="/sap", tags=["SAP Integration"])
 
@@ -31,7 +33,16 @@ def sap_ping():
     }
 
 
-@router.post("/print", response_model=SapPrintResponse, summary="Headless SAP Print Dispatch")
+@router.post(
+    "/print",
+    response_model=SapPrintResponse,
+    dependencies=[
+        Depends(require_legacy_direct_print_enabled),
+        Depends(require_role("IT")),
+        Depends(verify_csrf_token),
+    ],
+    summary="Administrative SAP Print Compatibility Bridge",
+)
 def sap_print(
     req: SapPrintRequest,
     request: Request,

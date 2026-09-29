@@ -34,6 +34,7 @@ pipeline {
                     cd frontend
                     npm ci
                     npm run build
+                    npm run typecheck:core
                     npm test
                     npm exec tsc -- --noEmit
                 '''

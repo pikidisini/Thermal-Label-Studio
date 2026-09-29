@@ -152,6 +152,8 @@ class TemplateSummary(BaseModel):
     is_builtin: bool
     width_mm: Optional[float] = None
     height_mm: Optional[float] = None
+    folder_id: Optional[str] = None
+    folder_path: Optional[str] = None
 
 
 class TemplateDetail(BaseModel):
@@ -174,6 +176,23 @@ class SaveTemplateRequest(BaseModel):
     svg_content: str = Field(..., description="Raw SVG string content")
     width_mm: Optional[float] = Field(default=200.0, description="Physical width in mm")
     height_mm: Optional[float] = Field(default=80.0, description="Physical height in mm")
+    folder_id: Optional[str] = None
+
+
+class TemplateFolder(BaseModel):
+    id: str
+    name: str
+    path: str
+    parent_id: Optional[str] = None
+
+
+class CreateTemplateFolderRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=80)
+    parent_id: Optional[str] = None
+
+
+class MoveTemplateRequest(BaseModel):
+    folder_id: Optional[str] = None
 
 
 class ValidationRequest(BaseModel):

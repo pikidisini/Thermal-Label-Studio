@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const authDbPath = path.resolve(__dirname, '../backend/data/auth_e2e.db');
+const e2eTemplateDir = path.resolve(__dirname, `../tmp/f331-e2e-templates-${process.pid}`);
 
 export default defineConfig({
   testDir: './tests',
@@ -38,6 +39,8 @@ export default defineConfig({
         SAFE_DEMO_MODE: 'true',
         LOCAL_SIMULATION_ONLY: 'true',
         AUTH_DB_PATH: authDbPath,
+        CUSTOM_TEMPLATES_DIR: e2eTemplateDir,
+        STORAGE_BACKEND: 'filesystem',
       },
     },
 

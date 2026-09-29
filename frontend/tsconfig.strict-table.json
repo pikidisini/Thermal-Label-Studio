@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true
+  },
+  "include": [
+    "src/features/table/model/tableModelV2.ts",
+    "src/features/table/canvas/tableRenderer.ts",
+    "src/utils/fabricSvgImporter.ts",
+    "src/components/layout/toolbox/TableGridPicker.tsx",
+    "src/features/table/editor/attachTableFrameEditor.ts",
+    "src/features/table/editor/TableFrameInspector.tsx"
+  ]
+}

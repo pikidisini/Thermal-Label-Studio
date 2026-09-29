@@ -121,6 +121,12 @@ Semua endpoint berada di bawah `/api/v1` kecuali health check.
 
 Swagger di `/docs` adalah referensi endpoint aktual; authorization dan CSRF tetap berlaku pada endpoint mutasi.
 
+Jalur legacy physical print (`/api/v1/print/*` dan `/api/v1/sap/print`) dinonaktifkan secara default melalui
+`LEGACY_DIRECT_PRINT_ENABLED=false`. Deployment lokal juga selalu menetapkan `LOCAL_SIMULATION_ONLY=true`, sehingga
+jalur tersebut mengembalikan 404 dan tidak menyediakan akses ke TCP 9100 atau Windows Spooler. Untuk uji kompatibilitas
+administratif terisolasi, aktifkan flag legacy pada deployment yang tidak simulation-only dan gunakan sesi pengguna IT
+serta token CSRF; opt-in ini bukan persetujuan production atau pengganti registry/print-agent production.
+
 ## Menjalankan test
 
 Dari folder `web_app/`:

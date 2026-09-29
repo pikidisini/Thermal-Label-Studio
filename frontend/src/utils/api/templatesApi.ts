@@ -2,6 +2,8 @@ import { API_BASE, FALLBACK_TEMPLATES, FALLBACK_SVGS } from './apiConfig';
 import { getCsrfHeaders } from './csrfHelper';
 
 export const templatesApi = {
+  async listTemplatesStrict() { const res = await fetch(`${API_BASE}/templates`, { credentials:'same-origin' }); if (!res.ok) throw new Error('Gagal memuat template server'); return {templates: await res.json()}; },
+  async getTemplateStrict(templateId: string) { const res = await fetch(`${API_BASE}/templates/${encodeURIComponent(templateId)}`, { credentials:'same-origin' }); if (!res.ok) throw new Error('Gagal memuat template'); return res.json(); },
   async listTemplates() {
     try {
       const res = await fetch(`${API_BASE}/templates`, {
@@ -101,5 +103,8 @@ export const templatesApi = {
       throw new Error(err.detail || 'Failed to upload template');
     }
     return res.json();
-  }
+  },
+  async listFolders() { const res = await fetch(`${API_BASE}/templates/folders`, { credentials: 'same-origin' }); if (!res.ok) throw new Error('Failed to load folders'); return res.json(); },
+  async createFolder(name: string, parentId?: string) { const res = await fetch(`${API_BASE}/templates/folders`, { method: 'POST', credentials: 'same-origin', headers: {'Content-Type':'application/json', ...getCsrfHeaders()}, body: JSON.stringify({name, parent_id: parentId || null}) }); if (!res.ok) throw new Error((await res.json().catch(()=>({detail:'Failed to create folder'}))).detail); return res.json(); },
+  async moveTemplate(templateId: string, folderId?: string) { const res = await fetch(`${API_BASE}/templates/${encodeURIComponent(templateId)}/move`, { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json', ...getCsrfHeaders()}, body:JSON.stringify({folder_id: folderId || null}) }); if (!res.ok) throw new Error('Failed to move template'); return res.json(); }
 };

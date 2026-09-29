@@ -11,6 +11,7 @@ import { CANVAS_SERIALIZE_PROPS } from '../types/fabric-custom';
 import { adaptSapContract } from '../utils/sapContractAdapter';
 import type { JsonObject } from '../types/api';
 import type { RawSapContract } from '../utils/sapContractAdapter';
+import { resolveSapTokenDisplayValue } from '../utils/sapTokenValue';
 
 export function useTemplateManager(
   canvasRef: React.MutableRefObject<fabric.Canvas | null>,
@@ -31,13 +32,15 @@ export function useTemplateManager(
   } = useTemplateStore();
 
   const { viewMode, setZoom, setSelectedObject, triggerFit } = useStudioStore();
-  const { setSampleContracts, setJsonData, setTokenMap, updateUsedTokensFromCanvas } = useContractStore();
+  const { setSampleContracts, setJsonData, setTokenMap, tokenMap, updateUsedTokensFromCanvas } = useContractStore();
   const { clearHistory, pushState } = useHistoryStore();
 
   const pendingSvgRef = useRef<{ svg: string; wMm: number; hMm: number } | null>(null);
+  const templateRequestRef = useRef(0);
+  const initializedRef = useRef(false);
 
   const loadSvgIntoCanvas = useCallback(
-    (svgString: string, widthMm: number, heightMm: number) => {
+    (svgString: string, widthMm: number, heightMm: number, isCurrent: () => boolean = () => true, onCommitted: () => void = () => undefined) => {
       if (!canvasRef.current) {
         pendingSvgRef.current = { svg: svgString, wMm: widthMm, hMm: heightMm };
         return;
@@ -47,15 +50,8 @@ export function useTemplateManager(
       const targetHeightPx = heightMm * pxPerMm;
       const currentZoom = calculateAutoFitZoom(widthMm, heightMm, viewMode);
 
-      canvas.setDimensions({
-        width: targetWidthPx * currentZoom,
-        height: targetHeightPx * currentZoom,
-      });
-      canvas.setZoom(currentZoom);
-      canvas.clear();
-      canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
-
       importSvgIntoFabricCanvas(canvas, svgString, targetWidthPx, targetHeightPx, () => {
+        if (!isCurrent()) return;
         updateUsedTokensFromCanvas(canvas);
         try {
           clearHistory();
@@ -66,24 +62,44 @@ export function useTemplateManager(
         }
         triggerRenderSimulation();
         triggerFit();
-      });
-    },
-    [canvasRef, pxPerMm, calculateAutoFitZoom, viewMode, updateUsedTokensFromCanvas, clearHistory, pushState, triggerRenderSimulation, triggerFit]
+        onCommitted();
+      }, isCurrent, () => {
+        canvas.setDimensions({
+          width: targetWidthPx * currentZoom,
+          height: targetHeightPx * currentZoom,
+        });
+        canvas.setZoom(currentZoom);
+        canvas.clear();
+        canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
+      }, (field) => {
+        if (!Object.prototype.hasOwnProperty.call(tokenMap, field)) return undefined;
+        return resolveSapTokenDisplayValue(tokenMap[field], field);
+      }, (message) => window.alert(`SVG tidak dapat diimpor: ${message}`));
+    }, [canvasRef, pxPerMm, calculateAutoFitZoom, viewMode, tokenMap, updateUsedTokensFromCanvas, clearHistory, pushState, triggerRenderSimulation, triggerFit]
   );
 
   const loadTemplateById = useCallback(
     async (templateId: string) => {
+      const requestId = ++templateRequestRef.current;
       try {
-        setSelectedObject(null);
-        setActiveTemplateId(templateId);
         const data = await apiClient.getTemplate(templateId);
+        if (requestId !== templateRequestRef.current) return;
         const svg = data?.raw_svg || data?.svg_content;
         if (svg) {
           const wMm = data.width_mm || 200;
           const hMm = data.height_mm || 80;
-          setDimensions(wMm, hMm);
-          setZoom(calculateAutoFitZoom(wMm, hMm, viewMode));
-          loadSvgIntoCanvas(svg, wMm, hMm);
+          loadSvgIntoCanvas(
+            svg,
+            wMm,
+            hMm,
+            () => requestId === templateRequestRef.current,
+            () => {
+              setSelectedObject(null);
+              setDimensions(wMm, hMm);
+              setZoom(calculateAutoFitZoom(wMm, hMm, viewMode));
+              setActiveTemplateId(templateId);
+            }
+          );
         }
       } catch (err) {
         console.error('Failed to load template:', err);
@@ -92,7 +108,9 @@ export function useTemplateManager(
     [setSelectedObject, setActiveTemplateId, setDimensions, setZoom, calculateAutoFitZoom, viewMode, loadSvgIntoCanvas]
   );
 
-  const initData = useCallback(async () => {
+  const initData = useCallback(async (skipInitialTemplateLoad = false) => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     try {
       const tList = await apiClient.listTemplates();
       setTemplates(tList.templates || []);
@@ -112,13 +130,14 @@ export function useTemplateManager(
         setTokenMap(adapted.tokenMap);
       }
 
-      if (tList.templates && tList.templates.length > 0) {
-        loadTemplateById(tList.templates[0].id);
+      if (!skipInitialTemplateLoad && tList.templates && tList.templates.length > 0) {
+        if (!activeTemplateId) loadTemplateById(tList.templates[0].id);
       }
     } catch (err) {
+      initializedRef.current = false;
       console.error('Initialization error:', err);
     }
-  }, [setTemplates, setSampleContracts, setJsonData, setTokenMap, loadTemplateById]);
+  }, [activeTemplateId, setTemplates, setSampleContracts, setJsonData, setTokenMap, loadTemplateById]);
 
   const handleSelectDimensionPreset = useCallback(
     (wMm: number, hMm: number) => {

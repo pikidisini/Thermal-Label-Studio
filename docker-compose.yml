@@ -8,11 +8,14 @@ services:
       dockerfile: Dockerfile
     container_name: label-thermal-studio
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./backend/data:/app/backend/data
       - ./assets/templates:/app/assets/templates
     environment:
       - PYTHONUNBUFFERED=1
       - DEFAULT_DPI=203.2
+      - LOCAL_SIMULATION_ONLY=true
+      - LEGACY_DIRECT_PRINT_ENABLED=false
+      - SAP_SHADOW_SIMULATION_ENABLED=true
     restart: unless-stopped
