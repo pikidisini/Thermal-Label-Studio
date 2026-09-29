@@ -12,15 +12,17 @@ export const CanvasRuler = forwardRef<HTMLCanvasElement, CanvasRulerProps>(
           ref={ref}
           height={20}
           className="absolute top-0 left-6 right-0 h-5 z-20 pointer-events-none"
+          style={{ width: 'calc(100% - 24px)' }}
         />
       );
     }
 
     return (
-      <canvas
-        ref={ref}
-        width={24}
-        className="absolute top-5 left-0 bottom-0 w-6 z-20 pointer-events-none"
+        <canvas
+          ref={ref}
+          width={24}
+          className="absolute top-5 left-0 bottom-0 w-6 z-20 pointer-events-none"
+          style={{ height: 'calc(100% - 20px)' }}
       />
     );
   }

@@ -27,6 +27,8 @@ export function useThermalSimulation(
   const isDirtyRef = useRef<boolean>(true);
   const previewUrlRef = useRef<string | null>(null);
   const thermalUrlRef = useRef<string | null>(null);
+  const requestGenerationRef = useRef(0);
+  const mountedRef = useRef(true);
 
   const replaceObjectUrl = useCallback((urlRef: React.MutableRefObject<string | null>, blob: Blob, setter: (url: string) => void) => {
     if (urlRef.current) URL.revokeObjectURL(urlRef.current);
@@ -36,16 +38,18 @@ export function useThermalSimulation(
   }, []);
 
   const triggerRenderSimulation = useCallback((force = false) => {
+    const generation = ++requestGenerationRef.current;
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
     const currentMode = useStudioStore.getState().viewMode;
 
     // In Design mode, avoid firing expensive rasterizer HTTP calls unless explicitly forced
     if (currentMode !== 'preview' && !force) {
       isDirtyRef.current = true;
+      if (mountedRef.current) setIsRendering(false);
       return;
-    }
-
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
     }
 
     debounceTimerRef.current = setTimeout(async () => {
@@ -62,18 +66,19 @@ export function useThermalSimulation(
           apiClient.inspectSvgTokens(svgStr).catch(() => null),
         ]);
 
+        if (!mountedRef.current || generation !== requestGenerationRef.current) return;
         replaceObjectUrl(previewUrlRef, previewBlob, setPreviewImage);
         replaceObjectUrl(thermalUrlRef, thermalBlob, setThermalImage);
-        if (inspRes) {
+        if (inspRes && generation === requestGenerationRef.current) {
           setInspectionData(inspRes);
         }
         isDirtyRef.current = false;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Preview rendering failed.';
-        setRenderError(message);
+        if (mountedRef.current && generation === requestGenerationRef.current) setRenderError(message);
         console.warn('Simulation render notice:', message);
       } finally {
-        setIsRendering(false);
+        if (mountedRef.current && generation === requestGenerationRef.current) setIsRendering(false);
       }
     }, 250);
   }, [
@@ -92,10 +97,15 @@ export function useThermalSimulation(
     replaceObjectUrl,
   ]);
 
-  useEffect(() => () => {
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
-    if (thermalUrlRef.current) URL.revokeObjectURL(thermalUrlRef.current);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      requestGenerationRef.current += 1;
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+      if (thermalUrlRef.current) URL.revokeObjectURL(thermalUrlRef.current);
+    };
   }, []);
 
   return { triggerRenderSimulation, isDirtyRef };

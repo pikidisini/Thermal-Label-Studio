@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { fabric } from 'fabric';
 import { barcodeGenerators } from '../../utils/barcodeGenerators';
+import { resolveSapTokenDisplayValue } from '../../utils/sapTokenValue';
 
 interface UseBarcodeActionsProps {
   canvasRef: React.MutableRefObject<fabric.Canvas | null>;
@@ -22,7 +23,7 @@ export function useBarcodeActions({
   jsonData,
 }: UseBarcodeActionsProps) {
   const handleAddBarcode = useCallback(
-    (type: any = 'code128', customValue?: any) => {
+    (type: any = 'code128', customValue?: any, onCreated?: (object: fabric.Image) => void) => {
       if (!canvasRef.current) return;
       const barcodeType = typeof type === 'string' ? type : 'code128';
       const initialValue = typeof customValue === 'string' ? customValue : '12345678';
@@ -48,10 +49,11 @@ export function useBarcodeActions({
             isBarcode: true,
             barcodeType: barcodeType,
             barcodeValue: initialValue,
-            dataBarcode: typeof customValue === 'string' ? customValue : undefined,
+            payloadTemplate: initialValue,
           } as any);
 
           canvasRef.current.add(img);
+          onCreated?.(img);
           canvasRef.current.setActiveObject(img);
           syncSelection(img);
           saveCanvasHistory();
@@ -64,7 +66,7 @@ export function useBarcodeActions({
   );
 
   const handleAddQrCode = useCallback(
-    async (customValue?: any) => {
+    async (customValue?: any, onCreated?: (object: fabric.Image) => void) => {
       if (!canvasRef.current) return;
       const initialValue = typeof customValue === 'string' ? customValue : 'https://enterprise.sap.com/material';
       const dataUrl = await barcodeGenerators.generateQrDataUrl(initialValue);
@@ -81,10 +83,11 @@ export function useBarcodeActions({
             isBarcode: true,
             barcodeType: 'qrcode',
             barcodeValue: initialValue,
-            dataQr: typeof customValue === 'string' ? customValue : undefined,
+            payloadTemplate: initialValue,
           } as any);
 
           canvasRef.current.add(img);
+          onCreated?.(img);
           canvasRef.current.setActiveObject(img);
           syncSelection(img);
           saveCanvasHistory();
@@ -99,24 +102,22 @@ export function useBarcodeActions({
   const handleAddSapToken = useCallback(
     (tokenKey: string, asType: 'text' | 'barcode' | 'qr' = 'text') => {
       if (!canvasRef.current) return;
-      const resolvedValue = jsonData[tokenKey] || `{{${tokenKey}}}`;
+      const resolvedValue = resolveSapTokenDisplayValue(jsonData[tokenKey], tokenKey);
+      if (asType !== 'text' && (!resolvedValue || resolvedValue === `{{${tokenKey}}}` || /^(ABSENT|NULL|EMPTY)\b/.test(resolvedValue))) return;
 
       if (asType === 'barcode') {
-        handleAddBarcode('code128', resolvedValue);
-        const active = canvasRef.current.getActiveObject();
-        if (active) {
+        handleAddBarcode('code128', resolvedValue, (active) => {
           (active as any).dataBarcode = tokenKey;
+          (active as any).payloadTemplate = `{{${tokenKey}}}`;
           (active as any).isDynamic = true;
           syncSelection(active);
-        }
+        });
       } else if (asType === 'qr') {
-        handleAddQrCode(resolvedValue).then(() => {
-          const active = canvasRef.current?.getActiveObject();
-          if (active) {
+        handleAddQrCode(resolvedValue, (active) => {
             (active as any).dataQr = tokenKey;
+            (active as any).payloadTemplate = `{{${tokenKey}}}`;
             (active as any).isDynamic = true;
             syncSelection(active);
-          }
         });
       } else {
         const { leftPx, topPx } = getStrategicPlacement(40, 10, 'top-left');

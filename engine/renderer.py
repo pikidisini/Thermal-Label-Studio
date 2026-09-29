@@ -36,6 +36,10 @@ class OrphanTokenError(RendererError):
 
 # Regex pattern to identify double curly-brace placeholders, e.g., {{brand}} or {{ batch_text }}
 PLACEHOLDER_PATTERN = re.compile(r"\{\{\s*([a-zA-Z0-9_\-]+)\s*\}\}")
+DATA_PLACEHOLDER_PATTERN = re.compile(
+    r"(?P<open><text\b(?P<attrs>[^>]*?(?<![A-Za-z0-9_-])data-placeholder\s*=\s*[\"'](?P<token>[A-Za-z0-9_-]+)[\"'][^>]*)>)(?P<body>[\s\S]*?)(?P<close></text>)",
+    re.IGNORECASE,
+)
 
 
 def load_json_contract(source: Union[str, Path, dict]) -> Dict[str, Any]:
@@ -115,7 +119,31 @@ def inject_data(svg_content: str, contract_data: Dict[str, Any]) -> str:
         # If token is not in replacements, leave it unchanged for fail-fast checker
         return match.group(0)
 
-    return PLACEHOLDER_PATTERN.sub(_replace_match, svg_content)
+    rendered = PLACEHOLDER_PATTERN.sub(_replace_match, svg_content)
+
+    def _replace_bound_text(match: re.Match) -> str:
+        token_name = match.group("token")
+        if token_name not in replacements:
+            return match.group(0)
+        value = replacements[token_name].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        body = match.group("body")
+        # Preserve tspan geometry/style while replacing only its text content.
+        if re.search(r"<tspan\b", body, re.IGNORECASE):
+            first = True
+            def _replace_tspan(tspan: re.Match) -> str:
+                nonlocal first
+                text = value if first else ""
+                first = False
+                return tspan.group("start") + text + tspan.group("end")
+            body = re.sub(r"(?P<start><tspan\b[^>]*>)[\s\S]*?(?P<end></tspan>)", _replace_tspan, body, flags=re.IGNORECASE)
+        else:
+            body = value
+        # Binding metadata is template-only. Removing it prevents a successful
+        # rendered artifact from being mistaken for an unresolved binding.
+        attrs = re.sub(r"\sdata-placeholder\s*=\s*([\"'])" + re.escape(token_name) + r"\1", "", match.group("attrs"), flags=re.IGNORECASE)
+        return "<text" + attrs + ">" + body + "</text>"
+
+    return DATA_PLACEHOLDER_PATTERN.sub(_replace_bound_text, rendered)
 
 
 def validate_no_orphan_tokens(svg_content: str) -> None:
@@ -124,6 +152,7 @@ def validate_no_orphan_tokens(svg_content: str) -> None:
     Raises OrphanTokenError if any are found.
     """
     matches = PLACEHOLDER_PATTERN.findall(svg_content)
+    matches.extend(m.group("token") for m in DATA_PLACEHOLDER_PATTERN.finditer(svg_content))
     if matches:
         # Deduplicate while preserving order
         unique_orphans: List[str] = list(dict.fromkeys(matches))

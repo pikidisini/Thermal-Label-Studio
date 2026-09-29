@@ -60,6 +60,17 @@ test('renderApi monochrome preview uses the same binary endpoint', async () => {
   }
 });
 
+test('renderApi SVG preview sends svg type and propagates backend errors', async () => {
+  const originalFetch = global.fetch;
+  let request;
+  global.fetch = async (url, options) => { request = { url, body: JSON.parse(options.body) }; return mockResponse({ ok: false, body: { detail: 'SVG render unavailable' } }); };
+  try {
+    await assert.rejects(() => renderApi.renderSvg(svg, data, { widthMm: 50, heightMm: 25 }), /SVG render unavailable/);
+    assert.equal(request.url, '/api/v1/render/preview');
+    assert.equal(request.body.preview_type, 'svg');
+  } finally { global.fetch = originalFetch; }
+});
+
 test('renderApi export sends one selected format and custom dimensions', async () => {
   const originalFetch = global.fetch;
   let request;

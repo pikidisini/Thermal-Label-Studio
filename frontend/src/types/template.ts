@@ -27,6 +27,8 @@ export interface TemplateMetadata {
   is_builtin?: boolean;
   createdAt?: string;
   updatedAt?: string;
+  folder_id?: string;
+  folder_path?: string;
 }
 
 export interface LabelTemplate extends TemplateMetadata {

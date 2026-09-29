@@ -6,6 +6,9 @@ Supports Code128-B (via python-barcode) and QR Code 2D Matrix (via qrcode).
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+import base64
+import json
+import re
 from typing import Any, Dict, List, Optional
 
 from barcode import Code128
@@ -190,6 +193,27 @@ def inject_barcodes_and_qr(
                     payload = f"MAT:{mat};BAT:{bat};ROL:{rol}"
         return str(payload) if payload else ""
 
+    def resolve_payload_spec(raw: str) -> Optional[str]:
+        """Decode bounded editor metadata without exposing {{tokens}} to inject_data."""
+        try:
+            decoded = base64.b64decode(raw.encode("ascii"), validate=True).decode("utf-8")
+            spec = json.loads(decoded)
+            template = spec.get("template") if isinstance(spec, dict) and spec.get("version") == 1 else None
+            if not isinstance(template, str) or len(template) > 4096:
+                return None
+            names = re.findall(r"\{\{\s*([A-Za-z0-9_-]+)\s*\}\}", template)
+            if re.sub(r"\{\{\s*[A-Za-z0-9_-]+\s*\}\}", "", template).find("{{") >= 0:
+                return None
+            resolved = template
+            for name in names:
+                value = codes.get(name, fields.get(name, contract_data.get(name, "")))
+                if value is None or value == "" or isinstance(value, (dict, list, tuple, set)):
+                    return ""
+                resolved = re.sub(r"\{\{\s*" + re.escape(name) + r"\s*\}\}", str(value), resolved)
+            return resolved
+        except (ValueError, UnicodeError, json.JSONDecodeError):
+            return None
+
     def process_element(parent: ET.Element) -> None:
         children = list(parent)
         for i, child in enumerate(children):
@@ -204,6 +228,8 @@ def inject_barcodes_and_qr(
                 or child.attrib.get("dataQr")
                 or child.attrib.get("dataqr")
             )
+            payload_spec = child.attrib.get("data-payload-spec")
+            barcode_type = (child.attrib.get("data-barcode-type") or "code128").lower()
             elem_id = child.attrib.get("id") or ""
             label = (
                 child.attrib.get("{http://www.inkscape.org/namespaces/inkscape}label")
@@ -214,12 +240,14 @@ def inject_barcodes_and_qr(
             # Check if this element or its group matches barcode/QR rules
             is_qr = (
                 bool(qr_key)
+                or (child.attrib.get("data-is-barcode") == "true" and child.attrib.get("data-barcode-type", "").lower() == "qrcode")
                 or elem_id == "rect_batch_barcode-8"
                 or "qr" in elem_id.lower()
                 or "qr" in label.lower()
             )
             is_barcode = (
                 bool(barcode_key)
+                or (child.attrib.get("data-is-barcode") == "true" and not is_qr)
                 or "batch_barcode" in elem_id
                 or ("barcode" in elem_id.lower() and not is_qr)
                 or ("barcode" in label.lower() and not is_qr)
@@ -231,9 +259,26 @@ def inject_barcodes_and_qr(
                 is_qr = True
 
             if is_barcode:
+                if payload_spec and barcode_type != "code128":
+                    if not fail_closed_empty_codes:
+                        raise ValueError(f"Composite 1D payload is only supported for Code128, got {barcode_type}")
+                    parent.remove(child)
+                    continue
                 key = barcode_key or "batch_barcode"
-                code_val = resolve_barcode_val(key)
-                if not code_val and barcode_key and not fail_closed_empty_codes:
+                code_val = resolve_payload_spec(payload_spec) if payload_spec else resolve_barcode_val(key)
+                if not isinstance(code_val, str):
+                    code_val = ""
+                if payload_spec and not code_val:
+                    if not fail_closed_empty_codes:
+                        raise ValueError("Barcode payload metadata is missing or unresolved")
+                    parent.remove(child)
+                    continue
+                if "\n" in code_val or "\r" in code_val or len(code_val) > 4096 or not re.fullmatch(r"[\x20-\x7e]+", code_val):
+                    if not fail_closed_empty_codes:
+                        raise ValueError("1D barcode payload must be one printable line")
+                    parent.remove(child)
+                    continue
+                if not code_val and not payload_spec and barcode_key and not fail_closed_empty_codes:
                     code_val = barcode_key
                 if code_val:
                     if tag in ("rect", "image"):
@@ -261,6 +306,8 @@ def inject_barcodes_and_qr(
                                 inner_target = sub
                                 break
                         if inner_target is not None:
+                            if payload_spec:
+                                code_val = resolve_payload_spec(payload_spec) or ""
                             x = float(inner_target.attrib.get("x", 0))
                             y = float(inner_target.attrib.get("y", 0))
                             w = float(inner_target.attrib.get("width", 0))
@@ -279,8 +326,20 @@ def inject_barcodes_and_qr(
 
             elif is_qr:
                 key = qr_key or "qr_payload"
-                payload = resolve_qr_val(key)
-                if not payload and qr_key and not fail_closed_empty_codes:
+                payload = resolve_payload_spec(payload_spec) if payload_spec else resolve_qr_val(key)
+                if not isinstance(payload, str):
+                    payload = ""
+                if payload_spec and not payload:
+                    if not fail_closed_empty_codes:
+                        raise ValueError("QR payload metadata is missing or unresolved")
+                    parent.remove(child)
+                    continue
+                if len(payload) > 2048:
+                    if not fail_closed_empty_codes:
+                        raise ValueError("QR payload exceeds 2048 characters")
+                    parent.remove(child)
+                    continue
+                if not payload and not payload_spec and qr_key and not fail_closed_empty_codes:
                     payload = qr_key
                 if payload:
                     if tag in ("rect", "image"):
@@ -308,6 +367,8 @@ def inject_barcodes_and_qr(
                                 inner_target = sub
                                 break
                         if inner_target is not None:
+                            if payload_spec:
+                                payload = resolve_payload_spec(payload_spec) or ""
                             x = float(inner_target.attrib.get("x", 0))
                             y = float(inner_target.attrib.get("y", 0))
                             w = float(inner_target.attrib.get("width", 0))

@@ -96,6 +96,14 @@ class SVGInspectionEngine:
                 if target_id:
                     add_binding(f"fields.{data_field}", target_id)
 
+            # Template-only binding that keeps literal display text readable.
+            data_placeholder = elem.get("data-placeholder")
+            if data_placeholder:
+                target_id = self._find_queryable_id(elem, parent_map, ns)
+                if target_id:
+                    add_binding(f"fields.{data_placeholder}", target_id)
+                    add_binding(f"codes.{data_placeholder}", target_id)
+
             # data-code attribute
             data_code = elem.get("data-code")
             if data_code:

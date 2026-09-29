@@ -1,20 +1,21 @@
 import { API_BASE } from './apiConfig';
+import { getCsrfHeaders } from './csrfHelper';
 
 export const printApi = {
   async listSpoolerPrinters() {
-    try {
-      const res = await fetch(`${API_BASE}/print/printers`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          return { printers: data, default_printer: data[0] || '' };
-        }
-        return data;
-      }
-    } catch (e) {
-      console.warn('Backend print spooler service unreachable');
+    const res = await fetch(`${API_BASE}/print/printers`, { credentials: 'same-origin' });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Hardware printer capability is unavailable' }));
+      throw new Error(err.detail || 'Hardware printer capability is unavailable');
     }
-    return { printers: ['ZDesigner ZT230-200dpi (Mock)', 'ZDesigner ZD420-203dpi (Mock)', 'Microsoft Print to PDF'], default_printer: 'ZDesigner ZT230-200dpi (Mock)' };
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      return { printers: data, default_printer: data[0] || '' };
+    }
+    if (data && Array.isArray(data.printers)) {
+      return data;
+    }
+    throw new Error('Hardware printer capability response is invalid');
   },
 
   async printDirect(dispatchModeOrPayload: any, maybePayload?: any) {
@@ -38,7 +39,8 @@ export const printApi = {
 
     const res = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
+      credentials: 'same-origin',
       body: JSON.stringify(bodyPayload)
     });
     if (!res.ok) {
@@ -62,7 +64,8 @@ export const printApi = {
   }) {
     const res = await fetch(`${API_BASE}/print/batch`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
+      credentials: 'same-origin',
       body: JSON.stringify(payload)
     });
     if (!res.ok) {

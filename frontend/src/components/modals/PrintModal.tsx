@@ -5,6 +5,10 @@ import { SpoolerTab } from './print/SpoolerTab';
 import { FileExportTab } from './print/FileExportTab';
 import { useTemplateStore } from '../../store/useTemplateStore';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useEffect } from 'react';
+import { useAuthStore } from '../../store/useAuthStore';
+import { API_BASE } from '../../utils/api/apiConfig';
+import { useModalA11y } from '../../hooks/useModalA11y';
 
 interface PrintModalProps {
   isOpen: boolean;
@@ -21,19 +25,55 @@ export function PrintModal({
   jsonData,
   dpi,
 }: PrintModalProps) {
-  const [activeTab, setActiveTab] = useState<'tcp' | 'spooler' | 'export'>('tcp');
+  const [activeTab, setActiveTab] = useState<'tcp' | 'spooler' | 'export'>('export');
+  const [legacyHardwareEnabled, setLegacyHardwareEnabled] = useState(false);
   const { labelWidthMm, labelHeightMm } = useTemplateStore();
   const { previewImage } = useSimulationStore();
+  const { user } = useAuthStore();
+  const canUseHardware = user?.role === 'IT' && legacyHardwareEnabled;
+  const dialogRef = useModalA11y(isOpen, onClose);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setLegacyHardwareEnabled(false);
+      setActiveTab('export');
+      return;
+    }
+    let active = true;
+    setLegacyHardwareEnabled(false);
+    setActiveTab('export');
+    fetch(`${API_BASE}/status`, { credentials: 'same-origin' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((status) => {
+        if (active) setLegacyHardwareEnabled(status?.legacy_direct_print_enabled === true);
+      })
+      .catch(() => {
+        if (active) setLegacyHardwareEnabled(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!canUseHardware && activeTab !== 'export') setActiveTab('export');
+  }, [activeTab, canUseHardware]);
 
   if (!isOpen) return null;
 
   return (
     <div
       data-testid="print-modal-container"
+      role="presentation"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in"
     >
       <div
         data-testid="print-modal-dialog"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="print-modal-title"
+        tabIndex={-1}
         className="w-full max-w-4xl bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
       >
         {/* Header */}
@@ -46,7 +86,7 @@ export function PrintModal({
               <Printer size={18} />
             </div>
             <div>
-              <h2 data-testid="print-modal-title" className="text-sm font-bold text-white tracking-tight">
+              <h2 id="print-modal-title" data-testid="print-modal-title" className="text-sm font-bold text-white tracking-tight">
                 Print &amp; Hardware Spooler
               </h2>
               <p className="text-[11px] text-slate-400">
@@ -68,7 +108,7 @@ export function PrintModal({
           data-testid="print-modal-tabs"
           className="flex border-b border-slate-800 bg-slate-950/30 px-6 gap-2"
         >
-          <button
+          {canUseHardware && <button
             data-testid="tab-btn-print-tcp"
             onClick={() => setActiveTab('tcp')}
             className={`flex items-center gap-2 py-3 px-3 text-xs font-semibold border-b-2 transition-colors ${
@@ -79,8 +119,8 @@ export function PrintModal({
           >
             <Network size={14} />
             <span>Direct TCP/IP Socket</span>
-          </button>
-          <button
+          </button>}
+          {canUseHardware && <button
             data-testid="tab-btn-print-spooler"
             onClick={() => setActiveTab('spooler')}
             className={`flex items-center gap-2 py-3 px-3 text-xs font-semibold border-b-2 transition-colors ${
@@ -91,7 +131,7 @@ export function PrintModal({
           >
             <Printer size={14} />
             <span>Windows Spooler (Win32)</span>
-          </button>
+          </button>}
           <button
             data-testid="tab-btn-print-export"
             onClick={() => setActiveTab('export')}
@@ -109,10 +149,10 @@ export function PrintModal({
         {/* Modal Body: Left Tab Content + Right Live Preview */}
         <div data-testid="print-modal-body" className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
           <div data-testid="container-print-tab-content">
-            {activeTab === 'tcp' && (
+            {canUseHardware && activeTab === 'tcp' && (
               <DirectTcpTab svgContent={svgContent} jsonData={jsonData} dpi={dpi} />
             )}
-            {activeTab === 'spooler' && (
+            {canUseHardware && activeTab === 'spooler' && (
               <SpoolerTab svgContent={svgContent} jsonData={jsonData} dpi={dpi} />
             )}
             {activeTab === 'export' && (

@@ -4,6 +4,13 @@ Tests for Mass Batch Label Printing Service & Endpoints.
 
 from unittest.mock import patch
 from fastapi.testclient import TestClient
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def enable_legacy_print_for_positive_route_tests(monkeypatch):
+    monkeypatch.setenv("LEGACY_DIRECT_PRINT_ENABLED", "true")
+    monkeypatch.delenv("LOCAL_SIMULATION_ONLY", raising=False)
 
 
 SAMPLE_BATCH_DATA = {
@@ -25,7 +32,7 @@ SAMPLE_BATCH_DATA = {
 SAMPLE_BATCH_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm"><text>{{material_number}}</text></svg>'
 
 
-def test_batch_print_dry_run_auto_increment(client: TestClient):
+def test_batch_print_dry_run_auto_increment(it_client: TestClient):
     """Test batch print with auto-increment counter on roll_no."""
     req_body = {
         "method": "raw_tcp",
@@ -41,7 +48,7 @@ def test_batch_print_dry_run_auto_increment(client: TestClient):
         "dry_run": True,
     }
 
-    resp = client.post("/api/v1/print/batch", json=req_body)
+    resp = it_client.post("/api/v1/print/batch", json=req_body)
     assert resp.status_code == 200
     data = resp.json()
     assert data["success"] is True
@@ -50,7 +57,7 @@ def test_batch_print_dry_run_auto_increment(client: TestClient):
     assert "dry-run" in data["message"].lower()
 
 
-def test_batch_print_records_array(client: TestClient):
+def test_batch_print_records_array(it_client: TestClient):
     """Test batch print with explicit records array (e.g. from CSV)."""
     rec1 = dict(SAMPLE_BATCH_DATA)
     rec2 = dict(SAMPLE_BATCH_DATA)
@@ -63,14 +70,14 @@ def test_batch_print_records_array(client: TestClient):
         "dry_run": True,
     }
 
-    resp = client.post("/api/v1/print/batch", json=req_body)
+    resp = it_client.post("/api/v1/print/batch", json=req_body)
     assert resp.status_code == 200
     data = resp.json()
     assert data["success"] is True
     assert data["total_labels"] == 2
 
 
-def test_batch_print_tcp_mocked(client: TestClient):
+def test_batch_print_tcp_mocked(it_client: TestClient):
     """Test batch print dispatched to TCP socket."""
     with patch("app.services.print_service.send_tcp_raw") as mock_tcp:
         mock_tcp.return_value = 8192
@@ -85,7 +92,7 @@ def test_batch_print_tcp_mocked(client: TestClient):
             "dry_run": False,
         }
 
-        resp = client.post("/api/v1/print/batch", json=req_body)
+        resp = it_client.post("/api/v1/print/batch", json=req_body)
         assert resp.status_code == 200
         data = resp.json()
         assert data["success"] is True
@@ -95,7 +102,7 @@ def test_batch_print_tcp_mocked(client: TestClient):
         assert mock_tcp.called
 
 
-def test_batch_print_spooler_mocked(client: TestClient):
+def test_batch_print_spooler_mocked(it_client: TestClient):
     """Test batch print dispatched to Windows Spooler."""
     with patch("app.services.print_service.send_windows_spooler_raw") as mock_spooler:
         mock_spooler.return_value = 4096
@@ -109,7 +116,7 @@ def test_batch_print_spooler_mocked(client: TestClient):
             "dry_run": False,
         }
 
-        resp = client.post("/api/v1/print/batch", json=req_body)
+        resp = it_client.post("/api/v1/print/batch", json=req_body)
         assert resp.status_code == 200
         data = resp.json()
         assert data["success"] is True

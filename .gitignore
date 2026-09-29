@@ -24,6 +24,10 @@ backend/data/out/*
 !backend/data/out/.gitkeep
 backend/data/*.db*
 backend/data/*.sqlite*
+backend/data/minio-*/
+backend/data/minio-runtime.env
+backend/data/backup-*.zip
+backend/data/pytest-*/
 
 # Executables & Binary Assets
 engine/bin/*.exe

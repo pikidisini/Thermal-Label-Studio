@@ -17,7 +17,7 @@ interface LeftToolboxProps {
   onAddBox: () => void;
   onAddLine: () => void;
   onAddCircle: () => void;
-  onAddTable: () => void;
+  onAddTable: (rows: number, columns: number, placement: 'drag' | 'center') => void;
   onAddIsoSymbol: (key: string) => void;
   onUploadImage: (e: React.ChangeEvent<HTMLInputElement>) => void;
   sampleContracts?: Record<string, RawSapContract>;
@@ -25,7 +25,19 @@ interface LeftToolboxProps {
   onSelectContract?: (key: string) => void;
   jsonData?: FlatSapTokenMap;
   onAddSapToken?: (token: string, asType: 'text' | 'barcode' | 'qr') => void;
+  onUpdateToken?: (token: string, value: string) => void;
+  onAddCustomToken?: (token: string, value: string) => void;
   usedTokens?: Set<string>;
+  localImport?: { format: 'v1.1' | 'raw-v2'; fileName: string; itemSequence: number; itemCount: number } | null;
+  onLocalJsonImport?: (file: File) => Promise<void>;
+  onSelectLocalItem?: (sequence: number) => void;
+  localItemSequences?: number[];
+  localImportError?: string | null;
+  localImportWarning?: string | null;
+  onEnterPreview?: () => void;
+  tokenCategories?: Record<string, 'customer' | 'characteristic'>;
+  customTokens?: Set<string>;
+  onMarkCustomToken?: (key: string) => void;
 }
 
 export function LeftToolbox({
@@ -39,7 +51,19 @@ export function LeftToolbox({
   onSelectContract = () => {},
   jsonData = {},
   onAddSapToken = () => {},
+  onUpdateToken,
+  onAddCustomToken,
   usedTokens = new Set(),
+  localImport = null,
+  onLocalJsonImport,
+  onSelectLocalItem,
+  localItemSequences = [],
+  localImportError = null,
+  localImportWarning = null,
+  onEnterPreview,
+  tokenCategories,
+  customTokens,
+  onMarkCustomToken,
 }: LeftToolboxProps) {
   const [openPanel, setOpenPanel] = useState<Panel>('tools');
 
@@ -69,7 +93,7 @@ export function LeftToolbox({
         />
         <DockButton
           icon="database"
-          label="SAP Data Tokens"
+          label="Data Tokens"
           active={openPanel === 'sap'}
           onClick={() => togglePanel('sap')}
           testId="dock-btn-sap"
@@ -109,7 +133,7 @@ export function LeftToolbox({
             ) : (
               <>
                 <span data-testid="toolbox-flyout-title" className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-widest">
-                  {openPanel === 'symbols' ? 'Symbols' : 'SAP Tokens'}
+                  {openPanel === 'symbols' ? 'Symbols' : 'Data Tokens'}
                 </span>
                 <button
                   data-testid="btn-close-toolbox-flyout"
@@ -150,7 +174,19 @@ export function LeftToolbox({
                 onSelectContract={onSelectContract}
                 jsonData={jsonData}
                 onAddSapToken={onAddSapToken}
+                onUpdateToken={onUpdateToken}
+                onAddCustomToken={onAddCustomToken}
                 usedTokens={usedTokens}
+                localImport={localImport}
+                onLocalJsonImport={onLocalJsonImport}
+                onSelectLocalItem={onSelectLocalItem}
+                localItemSequences={localItemSequences}
+                localImportError={localImportError}
+                localImportWarning={localImportWarning}
+                onEnterPreview={onEnterPreview}
+                tokenCategories={tokenCategories}
+                customTokens={customTokens}
+                onMarkCustomToken={onMarkCustomToken}
               />
             )}
           </div>

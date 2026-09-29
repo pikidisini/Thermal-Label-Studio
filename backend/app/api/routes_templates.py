@@ -10,7 +10,7 @@ from typing import Optional
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile, status
 
 from ..auth.dependencies import get_current_user, verify_csrf_token
-from ..models.schemas import RawSvgRequest, SaveTemplateRequest, TemplateDetail, TemplateSummary
+from ..models.schemas import RawSvgRequest, SaveTemplateRequest, TemplateDetail, TemplateSummary, TemplateFolder, CreateTemplateFolderRequest, MoveTemplateRequest
 from ..services.template_service import TemplateService
 
 router = APIRouter(prefix="/templates", tags=["Templates"], dependencies=[Depends(get_current_user)])
@@ -21,6 +21,15 @@ def list_templates() -> List[TemplateSummary]:
     """Returns a list of all available built-in and uploaded SVG label templates."""
     return TemplateService.list_templates()
 
+@router.get("/folders", response_model=List[TemplateFolder], summary="List template folders")
+def list_folders() -> List[TemplateFolder]:
+    return TemplateService.list_folders()
+
+@router.post("/folders", response_model=TemplateFolder, dependencies=[Depends(verify_csrf_token)])
+def create_folder(req: CreateTemplateFolderRequest) -> TemplateFolder:
+    try: return TemplateService.create_folder(req.name, req.parent_id)
+    except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+
 
 @router.post("", response_model=TemplateDetail, dependencies=[Depends(verify_csrf_token)], summary="Save or create a custom SVG template")
 def save_template(req: SaveTemplateRequest) -> TemplateDetail:
@@ -30,7 +39,15 @@ def save_template(req: SaveTemplateRequest) -> TemplateDetail:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Provided content is not a valid SVG document.",
         )
-    return TemplateService.save_custom_template(req.template_id, req.svg_content)
+    try: return TemplateService.save_custom_template(req.template_id, req.svg_content, req.folder_id)
+    except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+@router.post("/{template_id}/move", dependencies=[Depends(verify_csrf_token)])
+def move_template(template_id: str, req: MoveTemplateRequest):
+    try: moved = TemplateService.move_template(template_id, req.folder_id)
+    except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not moved: raise HTTPException(status_code=404, detail="Custom template not found")
+    return {"status": "success"}
 
 
 @router.get("/{template_id}", response_model=TemplateDetail, summary="Get template details and tokens")

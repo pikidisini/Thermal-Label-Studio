@@ -21,7 +21,7 @@ if str(WEB_APP_DIR) not in sys.path:
 
 # Directories
 BUILTIN_TEMPLATES_DIR = PROJECT_ROOT / "assets" / "templates"
-CUSTOM_TEMPLATES_DIR = BACKEND_DIR / "data" / "templates"
+CUSTOM_TEMPLATES_DIR = Path(os.getenv("CUSTOM_TEMPLATES_DIR", str(BACKEND_DIR / "data" / "templates"))).expanduser().resolve()
 DATA_SAMPLES_DIR = PROJECT_ROOT / "data_samples"
 STORAGE_OUT_DIR = BACKEND_DIR / "data" / "out"
 FRONTEND_DIR = (WEB_APP_DIR / "frontend" / "dist") if (WEB_APP_DIR / "frontend" / "dist" / "index.html").exists() else (WEB_APP_DIR / "frontend")
@@ -41,6 +41,16 @@ APP_VERSION = "1.1.0"
 # Server & CORS
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))
+
+# Object storage is opt-in.  Existing deployments stay filesystem-backed.
+STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "filesystem").strip().lower()
+
+# The filesystem simulation store is intentionally single-process.  Keep the
+# render slot bounded so synchronous raster/PDF work cannot monopolise an
+# event loop or create an unbounded number of concurrent renders. Keep this
+# at one until durable per-batch claims exist; increasing it would
+# allow duplicate work against the filesystem store. This is not a queue.
+SIMULATION_MAX_CONCURRENCY = 1
 
 DEFAULT_CORS_ORIGINS: List[str] = [
     "http://localhost:3000",
@@ -80,6 +90,17 @@ SAFE_DEMO_MODE = is_safe_demo_enabled()
 def is_local_simulation_only() -> bool:
     """Disable legacy physical dispatch routes in local simulation deployments."""
     return os.getenv("LOCAL_SIMULATION_ONLY", "false").strip().lower() == "true"
+
+
+def is_legacy_direct_print_enabled() -> bool:
+    """Return the effective opt-in state for legacy physical print routes.
+
+    The legacy bridge is disabled by default and remains unavailable for a
+    local simulation deployment even when an operator accidentally sets both
+    environment variables to enabled.
+    """
+    enabled = os.getenv("LEGACY_DIRECT_PRINT_ENABLED", "false").strip().lower() in ("true", "1", "yes")
+    return enabled and not is_local_simulation_only()
 
 
 def is_sap_shadow_simulation_enabled() -> bool:

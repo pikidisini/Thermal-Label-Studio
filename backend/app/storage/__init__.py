@@ -1,0 +1,1 @@
+"""Optional object-storage adapters."""

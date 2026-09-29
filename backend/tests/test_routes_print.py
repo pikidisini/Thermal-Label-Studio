@@ -4,18 +4,25 @@ Tests for Printing Dispatch Routes.
 
 from unittest.mock import patch
 from fastapi.testclient import TestClient
+import pytest
 
 
-def test_list_printers(client: TestClient):
+@pytest.fixture(autouse=True)
+def enable_legacy_print_for_positive_route_tests(monkeypatch):
+    monkeypatch.setenv("LEGACY_DIRECT_PRINT_ENABLED", "true")
+    monkeypatch.delenv("LOCAL_SIMULATION_ONLY", raising=False)
+
+
+def test_list_printers(it_client: TestClient):
     with patch("app.services.print_service.list_windows_printers") as mock_list:
         mock_list.return_value = ["ZDesigner ZT411", "TSC TE200"]
-        resp = client.get("/api/v1/print/printers")
+        resp = it_client.get("/api/v1/print/printers")
         assert resp.status_code == 200
         printers = resp.json()
         assert "ZDesigner ZT411" in printers
 
 
-def test_print_tcp_mocked(client: TestClient, sample_payload: dict, sample_custom_svg: str):
+def test_print_tcp_mocked(it_client: TestClient, sample_payload: dict, sample_custom_svg: str):
     with patch("app.services.print_service.send_tcp_raw") as mock_sender:
         mock_sender.return_value = 1234
 
@@ -26,7 +33,7 @@ def test_print_tcp_mocked(client: TestClient, sample_payload: dict, sample_custo
             "data": sample_payload,
             "template_svg": sample_custom_svg
         }
-        resp = client.post("/api/v1/print/tcp", json=req_body)
+        resp = it_client.post("/api/v1/print/tcp", json=req_body)
         assert resp.status_code == 200
         res = resp.json()
         assert res["success"] is True
@@ -35,7 +42,7 @@ def test_print_tcp_mocked(client: TestClient, sample_payload: dict, sample_custo
         assert mock_sender.called
 
 
-def test_print_spooler_mocked(client: TestClient, sample_payload: dict, sample_custom_svg: str):
+def test_print_spooler_mocked(it_client: TestClient, sample_payload: dict, sample_custom_svg: str):
     with patch("app.services.print_service.send_windows_spooler_raw") as mock_spooler:
         mock_spooler.return_value = 5678
 
@@ -45,7 +52,7 @@ def test_print_spooler_mocked(client: TestClient, sample_payload: dict, sample_c
             "data": sample_payload,
             "template_svg": sample_custom_svg
         }
-        resp = client.post("/api/v1/print/spooler", json=req_body)
+        resp = it_client.post("/api/v1/print/spooler", json=req_body)
         assert resp.status_code == 200
         res = resp.json()
         assert res["success"] is True

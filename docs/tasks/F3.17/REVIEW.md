@@ -1,0 +1,9 @@
+# F3.17 Review
+
+Status: accepted for local design exploration. The File, Edit, View, and Help menus now perform actions; local JSON and SVG uploads work; and template SVG and data-rendered SVG download as separate files.
+
+Reviewer checked the scoped code diff, `git diff --check`, frontend tests (96/96 pass), and production build. Browser checks covered menu actions, JSON import, vector SVG import, rejection of an SVG event handler without losing canvas state, and a valid embedded-PNG SVG after fixing the single-object Fabric importer. The PNG import displayed on canvas and changed dimensions from 200 x 80 mm to 20 x 20 mm. Downloaded SVG files were verified on disk; the rendered file contained a substituted `SYN-MAT-0001` value without its unresolved placeholder.
+
+Limit: browser transfer of the repository's 1.59 MiB sample template did not complete through the test tool, so that large-file import is unverified. This review does not cover printer output or production deployment. Existing unrelated working-tree changes remain untouched.
+
+Placeholder roundtrip follow-up (2026-09-25): accepted for local design exploration. The user's older `thermal-template (1).svg` contains only `PFO-30`, with no `material_number` binding; that association cannot be inferred from the file. The updated exporter emits a literal `{{material_number}}` plus `data-field="material_number"` when Add Text has an explicit inspector binding, while an unbound Add Text remains static. It omits Fabric's DOCTYPE so its output passes the local SVG importer. Browser review confirmed template download, data-rendered SVG download with `SR01PFO3000810`, and re-import preserving the binding while displaying the resolved preview value. Core typecheck, production build, 96/96 frontend tests, and scoped diff check passed. Previously downloaded files need to be recreated from a bound text element; they are not rewritten.

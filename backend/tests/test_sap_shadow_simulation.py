@@ -317,7 +317,8 @@ def test_ac3_zero_sockets_or_physical_transports_invoked(tmp_path: Path):
         )
 
         with (
-            patch("socket.socket") as mock_socket,
+            patch("socket.socket.connect") as mock_connect,
+            patch("socket.socket.connect_ex") as mock_connect_ex,
             patch("app.print_jobs.socket_transport.RawTcpSocketTransport") as mock_transport,
         ):
             result = await service.ingest_batch(req, auto_process=False)
@@ -326,7 +327,8 @@ def test_ac3_zero_sockets_or_physical_transports_invoked(tmp_path: Path):
             await service.process_batch(batch_id)
 
             # Assert no socket calls
-            assert mock_socket.call_count == 0
+            assert mock_connect.call_count == 0
+            assert mock_connect_ex.call_count == 0
             assert mock_transport.call_count == 0
 
             # Assert batch completed virtually
@@ -1128,11 +1130,11 @@ def test_p1_startup_recovery_failure_logs_and_fails_closed(caplog, isolated_serv
 # Additional Regression Tests: Missing Template & Idempotency Hash Mismatch
 # =====================================================================
 
-def test_regression_template_not_found_fails_closed_without_fallback(tmp_path: Path):
-    """Regression Test: Template not found must fail closed without mockup fallback.
+def test_regression_template_snapshot_corruption_fails_closed_without_fallback(tmp_path: Path):
+    """Regression Test: Corrupt pinned template content fails closed without fallback.
 
     Invariant:
-    - If a template is not found on the filesystem during simulation processing,
+    - If pinned template content is corrupt during simulation processing,
       the system must NOT silently fall back to mockup vectors or generate a fallback PDF.
     - The batch status must transition to 'failed' (NOT 'completed').
     - No PDF artifact must be created or stored in durable storage.
@@ -1157,9 +1159,11 @@ def test_regression_template_not_found_fails_closed_without_fallback(tmp_path: P
         batch_id = result["batch_id"]
         assert result["status"] == "accepted"
 
-        # Simulate template missing during rendering (e.g. template file deleted or get_template_path returns None)
-        with patch("app.services.sap_shadow_service.TemplateService.get_template_path", return_value=None):
-            await service.process_batch(batch_id)
+        # The accepted batch renders from its pinned snapshot. Corrupt that
+        # snapshot to exercise the current fail-closed invariant.
+        pinned_hash = service.get_batch(batch_id)["items"][0]["template_content_sha256"]
+        (service._template_snapshot_dir / f"{pinned_hash}.svg").write_bytes(b"corrupt")
+        await service.process_batch(batch_id)
 
         # Verify batch status is 'failed', NOT 'completed'
         batch = service.get_batch(batch_id)

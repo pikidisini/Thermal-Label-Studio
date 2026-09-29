@@ -1,6 +1,8 @@
-﻿import React from 'react';
+import React from 'react';
 import { PropField } from './PropField';
 import { getSAPTypeLabel } from '../../../types/sap-contract';
+import { TableFrameInspector } from '../../../features/table/editor/TableFrameInspector';
+import { LineInspector } from '../../../features/line/ui/LineInspector';
 
 interface ObjectPropertyFormProps {
   selectedObject: any;
@@ -17,6 +19,9 @@ const BARCODE_TYPES = [
 ];
 
 export function ObjectPropertyForm({ selectedObject, pxPerMm, jsonData, onUpdateProperty }: ObjectPropertyFormProps) {
+  const initialToken = (selectedObject?.dataField || selectedObject?.dataBarcode || selectedObject?.dataQr) as string | undefined;
+  const [tokenDraft, setTokenDraft] = React.useState(initialToken || '');
+  React.useEffect(() => setTokenDraft(initialToken || ''), [initialToken]);
   if (!selectedObject) {
     return (
       <div data-testid="container-inspector-empty-state" className="p-6 flex flex-col items-center gap-2 text-center">
@@ -35,7 +40,7 @@ export function ObjectPropertyForm({ selectedObject, pxPerMm, jsonData, onUpdate
   const angle    = Math.round(selectedObject.angle || 0);
   const strokeMm = ((selectedObject.strokeWidth || 0) / pxPerMm).toFixed(1);
 
-  const sapField       = selectedObject.dataField as string | undefined;
+  const sapField       = initialToken;
   const sapTypeLabel   = sapField ? getSAPTypeLabel(sapField) : '';
   const sapSampleValue = sapField ? jsonData[sapField] : null;
 
@@ -57,9 +62,12 @@ export function ObjectPropertyForm({ selectedObject, pxPerMm, jsonData, onUpdate
         <PropField badge="H" label="Height (mm)" value={heightMm} testId="inspector-h" readOnly />
         <PropField badge="∠" label="Rotation (°)" value={angle} testId="inspector-rotation" step={1}
           onChange={(v) => onUpdateProperty('angle', Number(v))} />
-        <PropField badge="S" label="Stroke (mm)" value={strokeMm} testId="inspector-stroke" step={0.1}
-          onChange={(v) => onUpdateProperty('strokeWidthMm', v)} />
+        {!(selectedObject.isTable === true && selectedObject.tableVersion === 2) && <PropField badge="S" label="Stroke (mm)" value={strokeMm} testId="inspector-stroke" step={0.1}
+          onChange={(v) => onUpdateProperty('strokeWidthMm', v)} />}
       </div>
+
+      {selectedObject.isTable && selectedObject.tableVersion === 2 && <TableFrameInspector selectedObject={selectedObject} pxPerMm={pxPerMm} onUpdateProperty={onUpdateProperty} />}
+      {selectedObject.type === 'line' && <LineInspector selectedObject={selectedObject} pxPerMm={pxPerMm} onUpdateProperty={onUpdateProperty} />}
 
       {/* Barcode config */}
       {selectedObject.isBarcode && (
@@ -81,39 +89,50 @@ export function ObjectPropertyForm({ selectedObject, pxPerMm, jsonData, onUpdate
           </div>
           <div>
             <label className="block text-[9px] font-semibold text-on-surface-variant uppercase tracking-widest mb-1">Value Payload</label>
-            <input
+            <textarea
               data-testid="inspector-input-barcode-payload"
-              type="text"
-              value={selectedObject.barcodeValue || ''}
-              onChange={(e) => onUpdateProperty('barcodeValue', e.target.value)}
+              value={typeof selectedObject.payloadTemplate === 'string' ? selectedObject.payloadTemplate : (selectedObject.barcodeValue || '')}
+              onChange={(e) => onUpdateProperty('payloadTemplate', e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && selectedObject.barcodeType !== 'qrcode') e.preventDefault(); }}
+              rows={selectedObject.barcodeType === 'qrcode' ? 4 : 2}
               className="w-full bg-surface-container border border-outline-variant px-2 py-1.5 text-[11px] text-on-surface font-mono focus:outline-none focus:border-primary"
             />
+            {selectedObject.barcodeType === 'qrcode' ? (
+              <p className="text-[9px] text-on-surface-variant leading-relaxed">Contoh: <code>batch : &#123;&#123;batch_number&#125;&#125;{`\n`}roll : &#123;&#123;roll_no&#125;&#125;</code>. Enter membuat baris baru.</p>
+            ) : (
+              <p className="text-[9px] text-on-surface-variant leading-relaxed">Komposisi token memakai Code 128 dan satu baris, contoh: <code>BATCH-&#123;&#123;batch_number&#125;&#125;-&#123;&#123;roll_no&#125;&#125;</code>.</p>
+            )}
           </div>
         </div>
       )}
 
-      {/* SAP dynamic binding */}
-      {sapField && (
+      {/* Dynamic binding */}
+      {(sapField || selectedObject.type === 'i-text' || selectedObject.isBarcode) && (
         <div data-testid="container-inspector-sap-binding" className="space-y-1 border-t border-outline-variant pt-3">
           <div className="flex items-center gap-1.5 mb-2">
             <span className="material-symbols-outlined text-tertiary" style={{ fontSize: 13 }}>link</span>
-            <span className="font-semibold text-tertiary text-[11px]">SAP Dynamic Binding</span>
+            <span className="font-semibold text-tertiary text-[11px]">Dynamic Binding</span>
             {sapTypeLabel && (
               <span data-testid="inspector-sap-type-badge" className="ml-auto font-mono text-[9px] px-1 py-0.5 bg-tertiary/10 text-tertiary border border-tertiary/30">
                 {sapTypeLabel}
               </span>
             )}
           </div>
-          <div data-testid="inspector-sap-binding-card" className="bg-surface-container-lowest border border-tertiary/25 p-2 space-y-1">
+            <div data-testid="inspector-sap-binding-card" className="bg-surface-container-lowest border border-tertiary/25 p-2 space-y-1">
             <div className="flex items-center gap-1">
               <span className="text-[9px] text-on-surface-variant uppercase tracking-widest">Token</span>
-              <span data-testid="inspector-sap-token-name" className="font-mono text-[11px] text-tertiary font-bold ml-1">{`{{${sapField}}}`}</span>
+              <input data-testid="inspector-sap-token-name" aria-label="Token placeholder" value={tokenDraft} onChange={(e) => setTokenDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { if (/^[A-Za-z0-9_-]+$/.test(tokenDraft.trim())) onUpdateProperty(selectedObject.isBarcode ? (selectedObject.barcodeType === 'qrcode' ? 'dataQr' : 'dataBarcode') : 'dataField', tokenDraft.trim()); } }} className="min-w-0 flex-1 bg-surface-container border border-outline-variant px-1 text-[11px] text-tertiary font-mono" />
+              <button type="button" onClick={() => { if (/^[A-Za-z0-9_-]+$/.test(tokenDraft.trim())) onUpdateProperty(selectedObject.isBarcode ? (selectedObject.barcodeType === 'qrcode' ? 'dataQr' : 'dataBarcode') : 'dataField', tokenDraft.trim()); }} className="border border-tertiary px-1 text-[9px] text-tertiary">Apply</button>
             </div>
             {sapSampleValue != null && (
               <div data-testid="inspector-sap-sample-val" className="font-mono text-[10px] text-on-surface-variant truncate">
                 Val: <span className="text-on-surface">{String(sapSampleValue)}</span>
               </div>
             )}
+            <label className="block text-[9px] text-on-surface-variant uppercase tracking-widest">Nilai preview elemen</label>
+            <input data-testid="inspector-input-token-value" aria-label="Nilai preview token" value={selectedObject.text || selectedObject.barcodeValue || ''} onChange={(e) => onUpdateProperty(selectedObject.isBarcode ? 'barcodeValue' : 'text', e.target.value)} className="w-full bg-surface-container border border-outline-variant px-1.5 py-1 text-[10px] text-on-surface font-mono" />
+            {selectedObject.validationError && <div role="alert" className="text-[10px] text-secondary">{selectedObject.validationError}</div>}
+            {selectedObject.previewOverride && sapField && <button type="button" onClick={() => onUpdateProperty('previewOverride', false)} className="border border-outline-variant px-2 py-1 text-[9px] text-on-surface-variant">Reset nilai preview</button>}
           </div>
         </div>
       )}

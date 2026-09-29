@@ -5,8 +5,12 @@ import { useTemplateStore } from '../store/useTemplateStore';
 import { useContractStore } from '../store/useContractStore';
 import { useHistoryStore } from '../store/useHistoryStore';
 import { CANVAS_SERIALIZE_PROPS } from '../types/fabric-custom';
-import { applySnappingAndGuides } from './canvas/useSnapGuides';
+import { snapMovingObject } from '../features/snapping/canvas/fabricSnapping';
+import { createSmartGuideOverlay } from '../features/snapping/ui/smartGuideOverlay';
 import { attachDrawingToolListeners } from './canvas/useDrawingTools';
+import { parseTableModel, resizeTable } from '../features/table/model/tableModelV2';
+import { makeTableGroupV2 } from '../features/table/canvas/tableRenderer';
+import { attachTableFrameEditor } from '../features/table/editor/attachTableFrameEditor';
 
 interface UseFabricCanvasProps {
   canvasElRef: React.RefObject<HTMLCanvasElement | null>;
@@ -30,6 +34,8 @@ export function useFabricCanvas({
   triggerRenderSimulation,
   drawRulers,
 }: UseFabricCanvasProps) {
+  const onCanvasReadyRef = useRef(onCanvasReady);
+  onCanvasReadyRef.current = onCanvasReady;
   const {
     zoom,
     activeTool,
@@ -60,6 +66,7 @@ export function useFabricCanvas({
     drawRulers,
     updateUsedTokensFromCanvas,
     pushState,
+    isTablePlacementGesture: false,
   });
 
   optionsRef.current = {
@@ -78,7 +85,16 @@ export function useFabricCanvas({
     drawRulers,
     updateUsedTokensFromCanvas,
     pushState,
+    isTablePlacementGesture: optionsRef.current.isTablePlacementGesture,
   };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const cursor = activeTool === 'table' || activeTool === 'line' ? 'crosshair' : 'default';
+    canvas.upperCanvasEl.style.cursor = cursor;
+    canvas.lowerCanvasEl.style.cursor = cursor;
+  }, [activeTool, canvasRef]);
 
   useEffect(() => {
     if (!canvasElRef.current) return;
@@ -96,6 +112,8 @@ export function useFabricCanvas({
       stopContextMenu: true,
     });
     fabricCanvas.setZoom(zoom);
+    fabricCanvas.lowerCanvasEl.tabIndex = 0;
+    fabricCanvas.upperCanvasEl.tabIndex = 0;
 
     fabric.Object.prototype.set({
       borderColor: '#3b82f6',
@@ -142,12 +160,43 @@ export function useFabricCanvas({
         dataField: obj.dataField,
         isGhsSymbol: obj.isGhsSymbol,
         isDynamic: obj.isDynamic,
+        previewOverride: obj.previewOverride,
+        validationError: obj.validationError,
       } as any);
       optionsRef.current.updateUsedTokensFromCanvas(fabricCanvas);
     };
 
-    const handleCanvasModified = () => {
-      if (!optionsRef.current.isLocked) {
+    const tableTransformSnapshots = new WeakMap<object, any>();
+    fabricCanvas.on('before:transform', (event: any) => {
+      const target: any = event?.transform?.target;
+      if (target?.isTable === true && target.tableVersion === 2) tableTransformSnapshots.set(target, { left: target.left, top: target.top, scaleX: target.scaleX, scaleY: target.scaleY, angle: target.angle, flipX: target.flipX, flipY: target.flipY });
+    });
+    const handleCanvasModified = (event?: any) => {
+      if (optionsRef.current.isTablePlacementGesture) return;
+      const modified: any = event?.target;
+      if (modified?.isTable === true && modified.tableVersion === 2 && !useStudioStore.getState().tableEditMode && (Math.abs(Number(modified.scaleX || 1) - 1) > 1e-6 || Math.abs(Number(modified.scaleY || 1) - 1) > 1e-6)) {
+        const model = parseTableModel(modified.tableSpec);
+        if (model) {
+          const width = model.columnWidthsMm.reduce((sum, value) => sum + value, 0) * Math.abs(Number(modified.scaleX || 1));
+          const height = model.rowHeightsMm.reduce((sum, value) => sum + value, 0) * Math.abs(Number(modified.scaleY || 1));
+          const resized = resizeTable(model, width, height);
+          if (!resized) {
+            const original = tableTransformSnapshots.get(modified);
+            if (original) { modified.set(original); modified.setCoords(); tableTransformSnapshots.delete(modified); }
+            fabricCanvas.requestRenderAll(); syncSelection(modified); optionsRef.current.triggerRenderSimulation?.(); return;
+          }
+          const index = fabricCanvas.getObjects().indexOf(modified);
+          const replacement: any = makeTableGroupV2(resized, optionsRef.current.pxPerMm, { left: modified.left || 0, top: modified.top || 0 });
+          replacement.set({ angle: modified.angle || 0, flipX: !!modified.flipX || Number(modified.scaleX) < 0, flipY: !!modified.flipY || Number(modified.scaleY) < 0, opacity: modified.opacity ?? 1, visible: modified.visible !== false, selectable: modified.selectable !== false, evented: modified.evented !== false, lockMovementX: !!modified.lockMovementX, lockMovementY: !!modified.lockMovementY, lockRotation: !!modified.lockRotation, lockScalingX: !!modified.lockScalingX, lockScalingY: !!modified.lockScalingY, id: modified.id });
+          const history = useHistoryStore.getState(); history.lockHistory();
+          try { fabricCanvas.remove(modified); fabricCanvas.insertAt(replacement, Math.max(0, index), false); fabricCanvas.setActiveObject(replacement); }
+          finally { history.unlockHistory(); }
+          replacement.setCoords(); syncSelection(replacement);
+          tableTransformSnapshots.delete(modified);
+        }
+      }
+      if (!useHistoryStore.getState().isLocked) {
+        if (event?.target?.isLineDrawingPreview) return;
         try {
           const json = fabricCanvas.toJSON(CANVAS_SERIALIZE_PROPS as any);
           optionsRef.current.pushState(JSON.stringify(json));
@@ -161,25 +210,21 @@ export function useFabricCanvas({
       optionsRef.current.triggerRenderSimulation?.();
     };
 
-    fabricCanvas.on('selection:created', (e) => syncSelection(e.selected ? e.selected[0] : null));
-    fabricCanvas.on('selection:updated', (e) => syncSelection(e.selected ? e.selected[0] : null));
-    fabricCanvas.on('selection:cleared', () => syncSelection(null));
+    fabricCanvas.on('selection:created', (e) => { const obj = e.selected ? e.selected[0] : null; syncSelection(obj); });
+    fabricCanvas.on('selection:updated', (e) => { const obj = e.selected ? e.selected[0] : null; syncSelection(obj); });
+    fabricCanvas.on('selection:cleared', () => { syncSelection(null); });
     fabricCanvas.on('object:modified', handleCanvasModified);
     fabricCanvas.on('object:added', handleCanvasModified);
     fabricCanvas.on('object:removed', handleCanvasModified);
-
+    const cleanupTableFrameEditor = attachTableFrameEditor({ fabricCanvas, getPxPerMm: () => optionsRef.current.pxPerMm, syncSelection, onCommit: () => { optionsRef.current.pushState(JSON.stringify(fabricCanvas.toJSON(CANVAS_SERIALIZE_PROPS as any))); optionsRef.current.triggerRenderSimulation?.(); } });
+    const movingGuideOverlay = canvasContainerRef.current ? createSmartGuideOverlay(canvasContainerRef.current, fabricCanvas) : null;
     fabricCanvas.on('object:moving', (e) => {
       if (!e.target) return;
-      applySnappingAndGuides({
-        obj: e.target,
-        isSnapEnabled: optionsRef.current.isSnapEnabled,
-        areGuidesEnabled: optionsRef.current.areGuidesEnabled,
-        gridSizeMm: optionsRef.current.gridSizeMm,
-        pxPerMm: optionsRef.current.pxPerMm,
-        labelWidthMm: optionsRef.current.labelWidthMm,
-        labelHeightMm: optionsRef.current.labelHeightMm,
-      });
+      const pxPerMm = optionsRef.current.pxPerMm || 1;
+      const result = snapMovingObject(fabricCanvas, e.target, { enabled: Boolean(optionsRef.current.isSnapEnabled), tolerance: 8 / (fabricCanvas.getZoom() || 1), gridStep: (optionsRef.current.gridSizeMm || 2.5) * pxPerMm, labelWidth: optionsRef.current.labelWidthMm * pxPerMm, labelHeight: optionsRef.current.labelHeightMm * pxPerMm, margin: 5 * pxPerMm });
+      if (optionsRef.current.areGuidesEnabled) movingGuideOverlay?.show(result.guides); else movingGuideOverlay?.clear();
     });
+    fabricCanvas.on('object:modified', () => movingGuideOverlay?.clear());
 
     fabricCanvas.on('mouse:move', (opt) => {
       const ptr = fabricCanvas.getPointer(opt.e);
@@ -192,7 +237,7 @@ export function useFabricCanvas({
       }
     });
 
-    attachDrawingToolListeners({
+    const cleanupDrawingTools = attachDrawingToolListeners({
       fabricCanvas,
       canvasContainerRef,
       optionsRef,
@@ -200,11 +245,19 @@ export function useFabricCanvas({
     });
 
     canvasRef.current = fabricCanvas;
-    onCanvasReady?.(fabricCanvas);
+    let disposed = false;
+    queueMicrotask(() => {
+      if (!disposed && canvasRef.current === fabricCanvas) onCanvasReadyRef.current?.(fabricCanvas);
+    });
 
     return () => {
+      disposed = true;
+      cleanupTableFrameEditor();
+
+      cleanupDrawingTools();
+      movingGuideOverlay?.destroy();
       fabricCanvas.dispose();
       canvasRef.current = null;
     };
-  }, [canvasElRef, canvasRef, onCanvasReady]);
+  }, [canvasElRef, canvasRef]);
 }

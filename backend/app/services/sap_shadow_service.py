@@ -15,6 +15,7 @@ Implements the virtual simulation pipeline replicating SAP ZLABEL / ZMM_LABEL_JS
 from __future__ import annotations
 
 import asyncio
+import copy
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -33,11 +34,13 @@ from ..models.raw_sap_snapshot_v2 import SapSourceMetadata
 if TYPE_CHECKING:
     from ..models.raw_sap_snapshot_v2 import RawSapBatchSnapshotV2
 
-from ..config import STORAGE_OUT_DIR
+from ..config import SIMULATION_MAX_CONCURRENCY, STORAGE_OUT_DIR
+from ..application.simulation_queries import list_recent_batches, summarize_batch
 from ..print_jobs.artifact_storage import (
     ArtifactStorage,
     DurableFilesystemArtifactStorage,
 )
+from ..storage.minio import MinioArtifactStorage, minio_enabled
 from ..services.pdf_evidence_service import PdfEvidenceService
 from ..services.template_service import TemplateService
 
@@ -346,13 +349,15 @@ class SapShadowService:
             self.artifact_storage = artifact_storage
         else:
             storage_dir = base_dir / "simulation_artifacts"
-            self.artifact_storage = DurableFilesystemArtifactStorage(storage_dir)
+            self.artifact_storage = MinioArtifactStorage() if minio_enabled() else DurableFilesystemArtifactStorage(storage_dir)
 
         # Durable file store directories
         self._batch_store_dir = base_dir / "simulation_batches" / "records"
         self._idempotency_store_dir = base_dir / "simulation_batches" / "idempotency"
+        self._template_snapshot_dir = base_dir / "simulation_templates" / "sha256"
         self._batch_store_dir.mkdir(parents=True, exist_ok=True)
         self._idempotency_store_dir.mkdir(parents=True, exist_ok=True)
+        self._template_snapshot_dir.mkdir(parents=True, exist_ok=True)
 
         # In-memory hot cache
         self._batches: Dict[str, Dict[str, Any]] = {}
@@ -360,6 +365,10 @@ class SapShadowService:
         self._batch_payload_hashes: Dict[str, str] = {}  # batch_id -> raw_contract_sha256
         self._lock = asyncio.Lock()
         self._background_tasks: Set[asyncio.Task[Any]] = set()
+        # One process owns this semaphore.  It bounds synchronous render work
+        # for this process only; it is deliberately not presented as a
+        # multi-worker queue or a durable lease.
+        self._render_slots = asyncio.Semaphore(SIMULATION_MAX_CONCURRENCY)
 
     # ------------------------------------------------------------------
     # Durable Persistence Layer (Filesystem + Optional PostgreSQL)
@@ -368,6 +377,23 @@ class SapShadowService:
     def _get_idempotency_filename(self, idempotency_key: str) -> str:
         """Deterministically generates collision-resistant SHA-256 filename for idempotency key."""
         return hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest() + ".json"
+
+    def _pin_template(self, template_id: str) -> Dict[str, str]:
+        """Copy the current server-resolved SVG into a content-addressed snapshot."""
+        clean_id = template_id.replace(".svg", "")
+        template_path = TemplateService.get_template_path(clean_id)
+        if not template_path or not template_path.is_file():
+            raise ValueError(f"Template '{template_id}' not found.")
+        content_bytes = template_path.read_bytes()
+        digest = hashlib.sha256(content_bytes).hexdigest()
+        snapshot = self._template_snapshot_dir / f"{digest}.svg"
+        if snapshot.exists() and hashlib.sha256(snapshot.read_bytes()).hexdigest() != digest:
+            raise SimulationPersistenceError(f"Pinned template snapshot '{digest}' failed integrity validation.")
+        if not snapshot.exists():
+            temp = self._template_snapshot_dir / f"{digest}.{uuid.uuid4().hex}.tmp"
+            temp.write_bytes(content_bytes)
+            os.replace(temp, snapshot)
+        return {"template_content_sha256": digest, "template_snapshot_ref": digest}
 
     def _sanitize_filename_key(self, key: str) -> str:
         """Compatibility helper returning SHA-256 digest hex (stem of filename)."""
@@ -583,6 +609,7 @@ class SapShadowService:
                     "template_version_id": item.template_version_id,
                     "canonical_item_data": item_dict,
                     "copies": item.copies,
+                    **self._pin_template(item.template_version_id),
                     "item_data_sha256": item_hash,
                     "status": "accepted",
                 })
@@ -815,6 +842,7 @@ class SapShadowService:
                     "item_id": str(uuid.uuid4()),
                     "item_sequence": it.item_sequence,
                     "template_version_id": tmpl_id,
+                    **self._pin_template(tmpl_id),
                     "canonical_item_data": item_dict,
                     "copies": it.copies,
                     "item_data_sha256": item_hash,
@@ -905,16 +933,32 @@ class SapShadowService:
         }
 
     async def process_batch(self, batch_id: str) -> None:
+        """Run one render under the bounded single-process render gate.
+
+        The implementation below is synchronous file/renderer/PDF work.  It
+        is moved to a worker thread so status/auth endpoints retain event-loop
+        time while the bounded semaphore prevents unbounded local renders.
+        Durable cross-process uniqueness, leasing, and restart recovery still
+        require a shared repository and are intentionally out of scope here.
+        """
+        async with self._render_slots:
+            await asyncio.to_thread(self._process_batch_blocking, batch_id)
+
+    def _process_batch_blocking(self, batch_id: str) -> None:
         """Executes simulation pipeline for batch: renders items with engine and produces PDF evidence."""
         record = self.get_batch(batch_id)
         if not record:
             return
         if record.get("status") == "completed" and record.get("artifact"):
             return
+        # Render-time mutations stay private; readers retain the last
+        # published snapshot until this worker reaches a persistence point.
+        record = copy.deepcopy(record)
 
         try:
             record["status"] = "processing"
             self._save_batch_to_disk(record)
+            self._batches[batch_id] = copy.deepcopy(record)
             virtual_profile = record["virtual_profile"]
 
             dpi = float(virtual_profile.get("dpi", 203.2))
@@ -929,15 +973,18 @@ class SapShadowService:
                 item["status"] = "rendering"
 
                 # P1-1: Real rendering pipeline execution
-                clean_id = item["template_version_id"].replace(".svg", "")
-                tmpl_path = TemplateService.get_template_path(clean_id)
-
-                if not tmpl_path or not tmpl_path.is_file():
-                    raise FileNotFoundError(
-                        f"Template '{item['template_version_id']}' not found on filesystem. Mockup fallback is forbidden."
+                snapshot_hash = item.get("template_content_sha256")
+                if not snapshot_hash or not re.fullmatch(r"[0-9a-f]{64}", str(snapshot_hash)):
+                    raise ValueError(
+                        f"Batch '{batch_id}' has no pinned template content for '{item['template_version_id']}'; reproducibility is unavailable."
                     )
-
-                svg_template_content = tmpl_path.read_text(encoding="utf-8")
+                snapshot_path = self._template_snapshot_dir / f"{snapshot_hash}.svg"
+                if not snapshot_path.is_file():
+                    raise FileNotFoundError(f"Pinned template content '{snapshot_hash}' is missing.")
+                snapshot_bytes = snapshot_path.read_bytes()
+                if hashlib.sha256(snapshot_bytes).hexdigest() != snapshot_hash:
+                    raise ValueError(f"Pinned template content '{snapshot_hash}' failed integrity validation.")
+                svg_template_content = snapshot_bytes.decode("utf-8")
                 canonical_model = SapCanonicalItemData(**item["canonical_item_data"])
                 contract_data = normalize_canonical_for_engine(canonical_model)
 
@@ -1013,12 +1060,14 @@ class SapShadowService:
 
             # Persist finalized batch state to disk
             self._save_batch_to_disk(record)
+            self._batches[batch_id] = record
 
         except Exception as exc:
             logger.error("Error executing SAP shadow simulation batch %s: %s", batch_id, type(exc).__name__, exc_info=True)
             record["status"] = "failed"
             record["error"] = "Simulasi batch SAP mengalami kegagalan teknis saat render evidence."
             self._save_batch_to_disk(record)
+            self._batches[batch_id] = record
 
     def get_batch(self, batch_id: str) -> Optional[Dict[str, Any]]:
         """Retrieves simulation batch status and details from memory or durable disk."""
@@ -1042,43 +1091,7 @@ class SapShadowService:
 
     def _to_summary(self, record: Dict[str, Any]) -> Dict[str, Any]:
         """Converts internal batch record to sanitized public summary (data minimization)."""
-        sanitized_items = [
-            {
-                "item_id": it.get("item_id"),
-                "item_sequence": it.get("item_sequence"),
-                "template_version_id": it.get("template_version_id"),
-                "copies": it.get("copies", 1),
-                "status": it.get("status"),
-                "missing_fields": list(it.get("missing_fields", [])),
-                "warning_count": int(it.get("warning_count", 0)),
-                "warnings": list(it.get("warnings", [])),
-            }
-            for it in record.get("items", [])
-        ]
-        summary = {
-            "batch_id": record.get("batch_id"),
-            "producer_namespace": record.get("producer_namespace"),
-            "request_id": record.get("request_id"),
-            "printer_id": record.get("printer_id"),
-            "virtual_profile": record.get("virtual_profile"),
-            "contract_type": record.get("contract_type", "canonical"),
-            "status": record.get("status"),
-            "total_items": record.get("total_items"),
-            "completed_items": record.get("completed_items", 0),
-            "items": sanitized_items,
-            "created_at": record.get("created_at"),
-            "completed_at": record.get("completed_at"),
-            "artifact": record.get("artifact"),
-            "error": record.get("error"),
-            "simulation_tolerant": bool(record.get("simulation_tolerant", False)),
-            "warning_count": int(record.get("warning_count", 0)),
-            "warnings": [warning for it in record.get("items", []) for warning in it.get("warnings", [])],
-        }
-        if "label_code" in record:
-            summary["label_code"] = record["label_code"]
-        if "profile_version" in record:
-            summary["profile_version"] = record["profile_version"]
-        return summary
+        return summarize_batch(record)
 
     def get_batch_summary(self, batch_id: str) -> Optional[Dict[str, Any]]:
         """Retrieves sanitized summary of simulation batch omitting raw data."""
@@ -1089,30 +1102,18 @@ class SapShadowService:
 
     def list_batches(self, limit: int = 50) -> List[Dict[str, Any]]:
         """Lists recent simulation batches sorted by created_at descending (sanitized summaries)."""
-        batches: List[Dict[str, Any]] = []
-        seen_ids = set()
+        def records():
+            yield from self._batches.values()
+            if not self._batch_store_dir.is_dir():
+                return
+            for path in self._batch_store_dir.glob("*.json"):
+                if path.stem in self._batches:
+                    continue
+                record = self._load_batch_from_disk(path.stem)
+                if record and record.get("status") not in ("persistence_aborted", "persistence_failed"):
+                    yield record
 
-        # In-memory hot records
-        for b_id, rec in self._batches.items():
-            seen_ids.add(b_id)
-            batches.append(rec)
-
-        # Records from durable disk store
-        if self._batch_store_dir.is_dir():
-            for p in self._batch_store_dir.glob("*.json"):
-                b_id = p.stem
-                if b_id not in seen_ids:
-                    seen_ids.add(b_id)
-                    rec = self._load_batch_from_disk(b_id)
-                    if rec and rec.get("status") not in ("persistence_aborted", "persistence_failed"):
-                        batches.append(rec)
-
-        # Sort descending by created_at
-        def _get_sort_key(b: Dict[str, Any]) -> str:
-            return str(b.get("created_at") or "")
-
-        batches.sort(key=_get_sort_key, reverse=True)
-        return [self._to_summary(b) for b in batches[:limit]]
+        return list_recent_batches(records(), limit=limit, summarize=self._to_summary)
 
     def get_evidence_pdf(self, batch_id: str) -> bytes:
         """Retrieves verified evidence PDF bytes from durable storage."""

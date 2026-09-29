@@ -191,7 +191,7 @@ export function ThermalPreviewDeck({
                 </span>
                 <span className="text-outline">|</span>
                 <span className="text-secondary">
-                  Barcodes/QR: {inspectionData.barcode_fields.length + inspectionData.qr_fields.length}
+                  Code slots (SVG inspection): {inspectionData.barcode_fields.length + inspectionData.qr_fields.length}
                 </span>
               </div>
               <span className="text-outline text-[10px]">Engine: Thermal Rasterizer v2.0</span>

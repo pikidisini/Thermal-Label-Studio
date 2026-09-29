@@ -1,5 +1,35 @@
 # AI Handoff — Thermal Label Studio
 
+## F3.34 — Snapping & Smart Guides, 2026-09-29
+
+- Status: IN_PROGRESS. Writer/executor is implementing the frontend-only typed snapping engine and DOM-only guide overlay; root performs independent review.
+- Scope excludes tables, backend, SAP, printer, MinIO, deployment, and auth. Existing worktree changes are preserved.
+
+## F3.23 — MinIO local cutover, 2026-09-26
+
+- User authorized immediate migration of custom SVG templates and print artifacts. Local source inventory was 0 custom SVGs and 11 valid artifact pairs. A non-destructive backup is at `backend/data/backup-f3-23-20260926-074819.zip`; source files remain intact.
+- `thermal-minio-f323` was built from official MinIO source release `RELEASE.2025-10-15T17-29-55Z`, listens only on 127.0.0.1 ports 9000/9001, uses `backend/data/minio-server`, and has Docker `unless-stopped` restart policy. Ignored `backend/data/minio-runtime.env` contains the local runtime config; do not print or commit it.
+- The migration applied 11 pairs; idempotent rerun found 11 already present and copied 0. All 11 read through the MinIO adapter matched source bytes. Bucket contains 22 artifact objects. Local app port 8765 was restarted in MinIO mode and returned HTTP 200 for `/` and `/openapi.json`.
+- Focused tests: 24 passed, 2 deprecation warnings. Temporary port 8767 app smoke succeeded and was stopped. Full suite, authenticated browser flow, SAP, printer, Jenkins, production DB: NOT RUN. No commit/push/PR.
+- Advisor findings and production limits are in `docs/tasks/F3.23/{RESULT,REVIEW}.md`. In particular, the old-library migration utility still lacks nested `.folder` marker creation; current source contains no custom SVGs. The app's local 8765 Python process must be started manually after a host reboot; MinIO container restarts with Docker.
+
+## Implementasi F3.4 — 2026-09-24 (historical checkpoint berhenti setelah A02)
+
+- Branch `codex/f3-4-architecture-safety-foundation`, baseline `b30e7a6`; perubahan implementasi dan catatan audit masih uncommitted. Jangan commit/push/deploy tanpa tugas lanjutan.
+- A01 membatasi TTL cleanup pada direktori job ephemeral yang dikenali dan melindungi data simulasi durable/link. A02 menonaktifkan legacy direct print secara default, mengharuskan IT + CSRF bila opt-in, dan mengunci Compose lokal pada simulation-only/loopback. UI mengikuti kapabilitas server.
+- Gate aktual: backend 497 passed/22 skipped; frontend 85 passed; TypeScript check dan build PASS; `git diff --check` PASS. PostgreSQL, symlink Windows nyata, E2E browser, SAP, dan printer fisik NOT RUN. Detail dan batasannya: `docs/tasks/F3.4/{TASK_CONTRACT,RESULT,REVIEW}.md`.
+- Pengguna meminta berhenti setelah A02. Tidak ada fase arsitektur atau visual berikutnya yang diotorisasi dalam tugas ini.
+
+## Audit arsitektur — 2026-09-24 (tanpa perubahan implementasi)
+
+- Provider/writer: Codex utama; pendamping read-only GPT-6 Sol dan GPT-5.6 Luna. Workspace Windows, repository `web_app`, baseline `main` `b30e7a6`, bersih sebelum audit; fetch berhasil dan sesuai `origin/main` saat diperiksa.
+- Target dikonfirmasi: satu aplikasi pada server perusahaan, banyak printer, beberapa designer. Rekomendasi: modular monolith dengan ports/adapters, render worker terpisah, bounded dispatcher concurrency, revision template dan optimistic concurrency.
+- Laporan dan bukti: `docs/tasks/ARCHITECTURE_AUDIT_20260924/{TASK_CONTRACT,RESULT,REVIEW}.md`.
+- Temuan prioritas: cleanup generic dapat menghapus direktori durable simulasi (reproduksi sintetis); legacy TCP endpoint mencapai service tanpa login saat `LOCAL_SIMULATION_ONLY=false` (mock-only, tanpa send). Belum diperbaiki.
+- Verifikasi aktual: backend 492 passed/21 skipped/2 warnings dengan path temporary pendek; frontend 85 passed; tsc noEmit dan Vite build PASS. `strict` aktual false. E2E/PostgreSQL/load/physical printer NOT RUN; browser hanya halaman login.
+- Working tree akhir berisi dokumentasi audit dan penunjuk ini saja; tidak ada perubahan source/config, commit/push/PR/merge/deployment. SAP, printer fisik, TCP 9100, Spooler, dan database production tidak diakses.
+- Tindak lanjut: patch A01/A02 terlebih dahulu; verifikasi ulang baseline sebelum implementasi. Ini rekomendasi audit, bukan acceptance production.
+
 ## Snapshot aktif — Simulasi tetap berjalan saat data SAP display hilang
 
 - Tanggal: 2026-09-24. Branch: `codex/simulation-missing-fields-warning`, dibuat dari `origin/main` `792eff8`.
@@ -935,3 +965,58 @@ Langkah berikutnya:
 ## Prompt lanjutan yang direkomendasikan
 
 > Lanjutkan dari `docs/AI_HANDOFF.md`. Baca `AGENTS.md`, `docs/PROJECT_STATUS.md`, dan `docs/DECISIONS.md`; periksa git status, branch, dan commit baseline; jangan mengubah repository POC desktop. Kerjakan hanya scope berikut: [isi task]. Jangan menimpa perubahan lokal. Sebelum selesai, jalankan verifikasi yang relevan dan perbarui handoff dengan provider, perangkat, file yang diubah, serta hasil aktual.
+## Snapshot aktif — Architecture hardening A03-A11 (2026-09-24)
+
+- Branch `codex/f3-4-architecture-safety-foundation`; A01/A02 dan A03-A11 increment yang dikerjakan pada rangkaian ini masih **uncommitted**. F3.3 login adalah baseline branch, bukan perubahan baru pada rangkaian ini.
+- Increment Results dan review index ada di `docs/tasks/F3.5/` sampai `docs/tasks/F3.13/` dan `docs/tasks/ARCHITECTURE_AUDIT_20260924/REVIEW.md`. Status keseluruhan masih partial/pending final review; jangan menganggap production-ready.
+- A03-A06 memperkeras backend simulation/auth; A07-A10 memperkeras frontend race/accessibility/typing/testing; A11 memperkeras reproducible frontend Docker install/status documentation. Remaining durable queues, approval registries, strict migration, E2E/PostgreSQL/runtime gates, SAP, printer, and deployment remain unverified or deferred as documented.
+- No commit, push, merge, deployment, physical printer, live SAP, or production database access was performed in this handoff.
+## Active increment — F3.14 local SAP JSON exploration
+
+- Scope: browser-only local JSON parsing into the existing SAP token drawer and visual preview path.
+- Supports v1.1 contracts and raw v2 item snapshots with bounded scalar validation; data remains in memory.
+- Raw values preserve null and empty string; unsupported field names stay visible but insertion is disabled.
+- No canvas replacement, automatic server batch upload, production profile/rule derivation, printer, SAP, or production DB call.
+- Writer evidence: `npm run typecheck:core` PASS; parser tests added; full frontend gates pending reviewer rerun.
+
+## Active increment — F3.21 barcode/QR composition (2026-09-26)
+
+- Branch `codex/f3-4-architecture-safety-foundation`; seluruh perubahan pada working tree tetap uncommitted dan pekerjaan terdahulu dipertahankan.
+- Barcode 1D di editor tidak menampilkan caption. Payload QR/Code128 dapat berisi literal dan beberapa `{{token}}`; QR mendukung beberapa baris. SVG menyimpan `data-payload-spec` dan dapat diimpor kembali sebagai objek editable.
+- Review dan bukti tes ada di `docs/tasks/F3.21/RESULT.md` serta `REVIEW.md`: 102 frontend tes dan 39 backend tes terpilih PASS, typecheck/build PASS, browser ekspor-impor PASS.
+- Komposisi 1D backend hanya Code128; produksi profile berpersetujuan, printer, SAP, dan deployment tidak termasuk verifikasi ini. `git fetch origin` BLOCKED oleh izin `.git/FETCH_HEAD` sandbox.
+
+## Active increment — F3.22 template explorer (2026-09-26)
+
+- Dropdown template diganti modal explorer dengan pencarian, folder/subfolder server, preview SVG terpisah dari canvas, dan pemindahan template custom. ID template tetap stabil setelah dipindah; built-in read-only.
+- Kontrak, hasil, dan review ada di `docs/tasks/F3.22/`. Backend tes terpilih 15 PASS; frontend 102 PASS; typecheck/build PASS. `git fetch origin` tetap BLOCKED oleh izin `.git/FETCH_HEAD`.
+- Frontend baru terlihat pada port 8765. Atas izin pengguna, backend lokal port 8765 dimulai ulang; OpenAPI runtime kini memuat route folder dan move. Sesi login browser lama mendapat 401 setelah restart, jadi pengguna perlu login ulang untuk mencoba daftar folder. Instance uji 8766 sudah dihentikan.
+- Perubahan tetap uncommitted. Tidak ada printer, SAP, push, PR, atau deployment production. Loader Open template lama masih menangkap error/fallback lokal; rincian di `REVIEW.md`.
+
+## Active increment — F3.30 table feature boundary (2026-09-26)
+
+- Table model, Fabric renderer, replacement commands, geometry, inline editor, resize overlay, and table inspector now live under `frontend/src/features/table/`; compatibility re-export preserves the legacy model import path.
+- Final reviewer evidence: full TypeScript PASS, npm test 110/110 PASS, table Playwright 6/6 PASS, and Vite build PASS with 1855 modules.
+- Range selection and floating-menu orchestration remain in `useFabricCanvas.ts` for a later refinement. Changes remain uncommitted; no printer, SAP, push, PR, or production deployment was performed.
+
+## F3.31 — kerangka tabel dengan merge (2026-09-26)
+
+- Status: automated implementation gates complete for local review; manual UAT remains for the user.
+- Sumber kontrak: `docs/tasks/F3.31/TASK_CONTRACT.md`, urutan T01–T07 di `IMPLEMENTATION_PLAN.md`, acceptance AC01–AC18 dan UAT di `TEST_MATRIX.md`.
+- Tabel baru hanya kerangka garis; merge/split wajib. Tidak ada isi sel, font, placeholder atau formula. Pengguna akan membuat ulang template; migrasi tabel lama tidak diperlukan, dan tidak ada izin menghapus template/data server.
+- F3.31 menggantikan target behavior tabel berisi konten pada rencana lama. Feature boundary F3.30 tetap digunakan. Catatan F3.30 di atas bersifat historis: kode aktual sudah memiliki `features/table/editor/attachTableRangeSelection.ts`.
+- Writer aktual: gpt-6-luna medium setelah writer Luna 5.6 medium mencapai usage limit dan peralihan dilaporkan. Sol/root read-only reviewer; Astra tidak digunakan.
+- Bukti final dicatat di `docs/tasks/F3.31/RESULT.md` dan `REVIEW.md`: independent final reviewer reran and passed TypeScript/full + strict-core + strict-table (`noImplicitAny` enabled), npm test 122/122, build, table Playwright 21/21, backend renderer + PNG + PDF 2/2, dan `git diff --check`. Strict-table uses cached `@types/fabric@^5.3.11` plus app-runtime Fabric API declarations. Manual UAT and production readiness remain unassessed; no commit/push/deploy. Browser save/load memakai filesystem disposable dan auth DB terisolasi.
+- Visual artifact: `tmp/f331-table-edit-options.png`. Manual UAT checklist belum dijalankan; fetch remote tidak diperlukan untuk task ini dan tidak dilakukan.
+
+## F3.32 — garis dan toolbox tabel (2026-09-29)
+
+- Pembuatan tabel disembunyikan dari toolbox; dukungan import/edit tabel lama dipertahankan. Fitur garis memiliki ownership `frontend/src/features/line/{model,canvas,editor,ui}` dengan gambar click-drag, preview/cancel lifecycle, endpoint numerik, warna, ketebalan mm, dan solid/dashed/dotted.
+- Bukti final: npm test 122/122 PASS, build PASS 1856 modules, full TypeScript PASS, focused browser 9 PASS dan 19 SKIPPED untuk kasus lama berbasis picker, serta `git diff --check` PASS. `git fetch` BLOCKED oleh permission `.git/FETCH_HEAD`.
+- Manual UAT template lama masih diperlukan; visual endpoint handles belum termasuk. Perubahan tetap uncommitted; tidak ada commit, push, printer, SAP, production, atau deployment.
+
+## F3.33 — explicit anchor line editing (2026-09-29)
+
+- Writer menambahkan snap sudut/endpoint dengan transform Fabric, explicit anchor continuation, blank-click inert behavior, preview tanpa selection overlay, pemulihan editability garis, serta HUD instruksi dan ketebalan mm sebelum menggambar.
+- Reviewer gates PASS: TypeScript, frontend unit 122/122, Vite build 1857 modules, focused Playwright 10/10 including anchor zoom position/size coverage, diff check, dan live localhost health 200 with asset `index-0fyo_WGH.js`.
+- Perubahan tetap uncommitted; tidak ada commit, push, printer, SAP, MinIO, atau deployment.

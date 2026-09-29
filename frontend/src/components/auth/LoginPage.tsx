@@ -54,7 +54,7 @@ export const LoginPage: React.FC = () => {
         {/* Login Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+            <label htmlFor="login-username" className="block text-xs font-semibold text-slate-300 mb-1.5">
               Nama Pengguna
             </label>
             <div className="relative">
@@ -62,7 +62,7 @@ export const LoginPage: React.FC = () => {
                 <User className="w-4 h-4" />
               </div>
               <input
-                data-testid="input-username"
+              id="login-username" data-testid="input-username"
                 type="text"
                 value={username}
                 onChange={(e) => {
@@ -80,7 +80,7 @@ export const LoginPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+            <label htmlFor="login-password" className="block text-xs font-semibold text-slate-300 mb-1.5">
               Kata Sandi
             </label>
             <div className="relative">
@@ -88,7 +88,7 @@ export const LoginPage: React.FC = () => {
                 <Lock className="w-4 h-4" />
               </div>
               <input
-                data-testid="input-password"
+              id="login-password" data-testid="input-password"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => {
@@ -103,9 +103,9 @@ export const LoginPage: React.FC = () => {
               />
               <button
                 type="button"
+                aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-200 transition-colors"
-                tabIndex={-1}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>

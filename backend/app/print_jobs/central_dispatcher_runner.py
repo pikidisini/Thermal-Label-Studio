@@ -177,10 +177,8 @@ def main(argv: list[str] | None = None) -> int:
         repository.verify_schema()
         logger.info("Database schema verified successfully against PostgreSQL baseline.")
 
-        artifact_storage = DurableFilesystemArtifactStorage(
-            config.artifact_root,
-            retention=DEFAULT_RETENTION,
-        )
+        from ..storage.minio import MinioArtifactStorage, minio_enabled
+        artifact_storage = (MinioArtifactStorage(retention=DEFAULT_RETENTION) if minio_enabled() else DurableFilesystemArtifactStorage(config.artifact_root, retention=DEFAULT_RETENTION))
 
         if config.transport_mode == "tcp":
             if not config.print_dispatch_enabled:

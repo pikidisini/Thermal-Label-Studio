@@ -1,0 +1,3 @@
+# F3.30 Review
+
+The feature boundary is now substantive: model implementation, Fabric renderer, replacement command, geometry helpers, inline editor lifecycle, complete `TableInspector`, `createTableResizeOverlay`, and `attachTableRangeSelection` are separate modules. Browser coverage passes 6/6; the complete frontend test suite passes 110/110; production build passes with 1856 modules; and full TypeScript passes. Range selection has been extracted from the canvas hook without changing behavior. Remaining refinement is the imperative floating-menu migration to React plus other minor hook extractions.

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import type { ViewMode, ActiveTool, ActiveTab, CursorPosition } from '../types/label';
 import type { ExtendedFabricObject } from '../types/fabric-custom';
+import type { SelectionPropsDto } from '../types/selection';
+import type { EdgeTarget, TableRange } from '../features/table/model/tableModelV2';
 
 interface StudioState {
   zoom: number;
@@ -11,9 +13,13 @@ interface StudioState {
   areGuidesEnabled: boolean;
   cursorPos: CursorPosition;
   selectedObject: ExtendedFabricObject | null;
-  selectedObjectProps: Record<string, any> | null;
+  selectedObjectProps: SelectionPropsDto | null;
   fitTrigger: number;
   reset100Trigger: number;
+  pendingTableSize: { rows: number; columns: number } | null;
+  tableEditMode: boolean;
+  tableEditSelection: { tableId: string | undefined; range: TableRange } | null;
+  tableSelectedEdge: { tableId: string | undefined; target: EdgeTarget } | null;
 
   // Actions
   setZoom: (zoom: number | ((prev: number) => number)) => void;
@@ -26,9 +32,13 @@ interface StudioState {
   toggleGuides: () => void;
   setCursorPos: (pos: CursorPosition) => void;
   setSelectedObject: (obj: ExtendedFabricObject | null) => void;
-  setSelectedObjectProps: (props: Record<string, any> | null) => void;
+  setSelectedObjectProps: (props: SelectionPropsDto | null) => void;
   triggerFit: () => void;
   triggerReset100: () => void;
+  setPendingTableSize: (size: { rows: number; columns: number } | null) => void;
+  setTableEditMode: (enabled: boolean) => void;
+  setTableEditSelection: (selection: { tableId: string | undefined; range: TableRange } | null) => void;
+  setTableSelectedEdge: (selection: { tableId: string | undefined; target: EdgeTarget } | null) => void;
 }
 
 export const useStudioStore = create<StudioState>((set) => ({
@@ -43,6 +53,10 @@ export const useStudioStore = create<StudioState>((set) => ({
   selectedObjectProps: null,
   fitTrigger: 0,
   reset100Trigger: 0,
+  pendingTableSize: null,
+  tableEditMode: false,
+  tableEditSelection: null,
+  tableSelectedEdge: null,
 
   setZoom: (zoom) =>
     set((state) => ({
@@ -72,4 +86,8 @@ export const useStudioStore = create<StudioState>((set) => ({
   setSelectedObjectProps: (selectedObjectProps) => set({ selectedObjectProps }),
   triggerFit: () => set((state) => ({ fitTrigger: state.fitTrigger + 1 })),
   triggerReset100: () => set((state) => ({ reset100Trigger: state.reset100Trigger + 1 })),
+  setPendingTableSize: (pendingTableSize) => set({ pendingTableSize }),
+  setTableEditMode: (tableEditMode) => set({ tableEditMode }),
+  setTableEditSelection: (tableEditSelection) => set({ tableEditSelection }),
+  setTableSelectedEdge: (tableSelectedEdge) => set({ tableSelectedEdge }),
 }));

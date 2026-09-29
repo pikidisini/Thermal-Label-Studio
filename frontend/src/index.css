@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-studio-darkest text-gray-200 antialiased font-sans select-none overflow-hidden m-0 p-0 h-screen w-screen;
+    @apply bg-studio-darkest text-gray-200 antialiased font-sans overflow-hidden m-0 p-0 h-screen w-screen;
   }
 }
 

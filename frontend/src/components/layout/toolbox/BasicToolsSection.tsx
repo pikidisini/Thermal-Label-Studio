@@ -11,7 +11,7 @@ interface BasicToolsSectionProps {
   onAddBox: () => void;
   onAddLine: () => void;
   onAddCircle: () => void;
-  onAddTable: () => void;
+  onAddTable: (rows: number, columns: number, placement: 'drag' | 'center') => void;
   onUploadImage: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
@@ -41,9 +41,8 @@ export function BasicToolsSection({
     { id: 'barcode', label: '1D Barcode (B)',  icon: 'barcode',         action: onAddBarcode,                  testId: 'btn-add-barcode'  },
     { id: 'qrcode',  label: '2D QR Code',     icon: 'qr_code_2',       action: onAddQrCode,                   testId: 'btn-add-qrcode'   },
     { id: 'rect',    label: 'Rectangle (R)',   icon: 'crop_square',     action: onAddBox,                      testId: 'btn-add-rect'     },
-    { id: 'line',    label: 'Line Divider',    icon: 'horizontal_rule', action: onAddLine,                     testId: 'btn-add-line'     },
+    { id: 'line',    label: 'Gambar garis · Shift 45° · Esc selesai · Alt garis baru',    icon: 'horizontal_rule', action: () => setActiveTool('line'),    testId: 'btn-add-line'     },
     { id: 'circle',  label: 'Circle (C)',      icon: 'circle',          action: onAddCircle,                   testId: 'btn-add-circle'   },
-    { id: 'table',   label: 'Table Grid',      icon: 'table',           action: onAddTable,                    testId: 'btn-add-table'    },
   ];
 
   return (

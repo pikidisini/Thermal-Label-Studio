@@ -33,6 +33,15 @@ async function getErrorMessage(response: Response, fallback: string): Promise<st
 }
 
 export const renderApi = {
+  async renderSvg(svgContent: string, jsonData: JsonObject = {}, options: RenderOptions = {}): Promise<Blob> {
+    const res = await fetch(`${API_BASE}/render/preview`, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
+      body: JSON.stringify(buildPreviewRequest(svgContent, jsonData, { ...options, previewType: 'svg' })),
+    });
+    if (!res.ok) throw new Error(await getErrorMessage(res, 'SVG hasil parse gagal dibuat'));
+    return res.blob();
+  },
   async renderSimulation(svgContent: string, jsonData: JsonObject = {}, options: RenderOptions = {}): Promise<Blob> {
     const res = await fetch(`${API_BASE}/render/preview`, {
       method: 'POST',

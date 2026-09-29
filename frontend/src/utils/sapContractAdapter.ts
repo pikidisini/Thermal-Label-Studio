@@ -7,6 +7,7 @@ export interface RawSapContract extends JsonObject {
   source: JsonObject;
   fields: JsonObject;
   codes: JsonObject;
+  /** Kategori berasal dari section JSON yang tervalidasi; bukan tebakan nama. */
 }
 
 export type FlatSapTokenMap = Record<string, string | number | boolean | null>;

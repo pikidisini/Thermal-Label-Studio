@@ -128,6 +128,7 @@ class SapService:
 
         if svg_content:
             template_tokens = set(re.findall(r"\{\{\s*([a-zA-Z0-9_\-]+)\s*\}\}", svg_content))
+            template_tokens.update(re.findall(r'(?<![A-Za-z0-9_-])data-placeholder=["\']([a-zA-Z0-9_\-]+)["\']', svg_content))
             available_values = {**contract_data["fields"], **contract_data.get("codes", {})}
             missing_tokens = [
                 tok for tok in sorted(template_tokens)

@@ -8,6 +8,8 @@ interface LayersTabProps {
   onSendBackward: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  onGroup: () => void;
+  onUngroup: () => void;
   onSelectLayer: (obj: any) => void;
 }
 
@@ -66,7 +68,7 @@ function LayerActionBtn({ icon, title, testId, onClick, disabled, danger }: {
 
 export function LayersTab({
   objectsList, selectedObject, canvasRef,
-  onBringForward, onSendBackward, onDuplicate, onDelete, onSelectLayer,
+  onBringForward, onSendBackward, onDuplicate, onDelete, onGroup, onUngroup, onSelectLayer,
 }: LayersTabProps) {
   const noSel = !selectedObject;
 
@@ -99,6 +101,8 @@ export function LayersTab({
           <LayerActionBtn icon="flip_to_front"  title="Bring Forward" testId="layers-btn-bring-forward" onClick={onBringForward} disabled={noSel} />
           <LayerActionBtn icon="flip_to_back"   title="Send Backward" testId="layers-btn-send-backward" onClick={onSendBackward} disabled={noSel} />
           <LayerActionBtn icon="content_copy"   title="Duplicate"     testId="layers-btn-duplicate"     onClick={onDuplicate}    disabled={noSel} />
+          <LayerActionBtn icon="group_work" title="Group selection" testId="layers-btn-group" onClick={onGroup} disabled={selectedObject?.type !== 'activeSelection'} />
+          <LayerActionBtn icon="ungroup" title={selectedObject?.isTable ? 'Tables stay grouped' : 'Ungroup'} testId="layers-btn-ungroup" onClick={onUngroup} disabled={selectedObject?.type !== 'group' || !!selectedObject?.isTable} />
           <LayerActionBtn icon="delete"         title="Delete"        testId="layers-btn-delete"        onClick={onDelete}        disabled={noSel} danger />
         </div>
       </div>
@@ -118,8 +122,8 @@ export function LayersTab({
             const isLocked   = !!obj.lockMovementX;
 
             return (
+              <React.Fragment key={obj.id || idx}>
               <div
-                key={obj.id || idx}
                 data-testid={`layer-item-${idx}`}
                 onClick={() => onSelectLayer(obj)}
                 className={`flex items-center gap-2 px-2 py-1.5 cursor-pointer text-xs transition-colors ${
@@ -129,12 +133,12 @@ export function LayersTab({
                 }`}
               >
                 <span className={`material-symbols-outlined shrink-0 ${getObjColor(obj)}`} style={{ fontSize: 15 }}>
-                  {getObjIcon(obj)}
+                  {obj.isTable ? 'table_chart' : getObjIcon(obj)}
                 </span>
 
                 <div className="flex-1 min-w-0 flex items-center gap-1.5">
                   <span className={`truncate font-mono text-[11px] ${isHidden ? 'opacity-40' : ''} ${isSelected ? 'text-on-surface' : 'text-on-surface-variant'}`}>
-                    {getObjName(obj)}
+                    {obj.isTable ? 'Table' : getObjName(obj)}
                   </span>
                   {isSapBound && (
                     <span data-testid={`layer-item-bound-badge-${idx}`} className="shrink-0 text-[8px] px-1 py-0.5 bg-tertiary/15 text-tertiary font-semibold">
@@ -142,6 +146,7 @@ export function LayersTab({
                     </span>
                   )}
                 </div>
+
 
                 <div data-testid={`layer-item-controls-${idx}`} className="flex items-center gap-0 opacity-50 hover:opacity-100">
                   <button
@@ -166,6 +171,7 @@ export function LayersTab({
                   </button>
                 </div>
               </div>
+              </React.Fragment>
             );
           })
         )}

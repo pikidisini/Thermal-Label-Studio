@@ -2,9 +2,13 @@
 
 Dokumen ini adalah ringkasan kondisi proyek aktif untuk manusia dan AI.
 
+## Snapshot aktif — 2026-09-25 / F3.4 sampai F3.13
+
+Branch kerja aktif adalah `codex/f3-4-architecture-safety-foundation`. A01-A02 dan increment A03-A11 masih **uncommitted** pada branch ini. F3.3 login sudah termasuk baseline branch dan bukan perubahan uncommitted pada rangkaian ini. Reviewer gates: backend **510 passed, 22 skipped, 2 deprecation warnings**; frontend **85 passed**; `npm run typecheck:core`, `npm exec tsc -- --noEmit`, `npm run build`, dan `git diff --check`: PASS. A03 membatasi render simulasi single-process; A04 mengekstrak query summary/list; A05 mem-pin content SVG; A06 membagi lockout SQLite; A07 memperkeras latest-request-wins; A08 menambah strict core gate; A09 memperbaiki keyboard/dialog accessibility; A10 mengganti fake history test dengan store production; A11 memperkeras npm lockfile install/status docs. PostgreSQL, Playwright/browser keyboard, physical printer, SAP live, production DB, Docker image build, dan `git fetch origin` (blocked oleh permission `.git/FETCH_HEAD`) belum dijalankan/tersedia. Tidak ada production-readiness claim.
+
 ## Status proyek
 
-Snapshot aktif (2026-09-24): Fase 3.2 telah merged ke `main` melalui PR #26 (`98a5983`). Fase 3.3 direncanakan pada branch `codex/f3-3-app-login`: login aplikasi satu kali untuk akun PPIC/IT, lalu Simulasi Label memakai sesi aplikasi yang sama tanpa form login operator pilot. Rancangan berada di `docs/architecture/application_authentication_plan.md`; kontrak kerja berada di `docs/tasks/F3.3/TASK_CONTRACT.md`. Implementasi dan test F3.3 belum dijalankan. Snapshot lama di bawah adalah riwayat pada saat ditulis.
+Riwayat historis (2026-09-24, sebelum branch architecture-hardening): Fase 3.2 telah merged ke `main` melalui PR #26 (`98a5983`) dan Fase 3.3 masih tercatat sebagai rencana pada snapshot saat itu. Pernyataan bahwa implementasi/test F3.3 belum dijalankan hanya berlaku pada snapshot historis tersebut, bukan status branch aktif sekarang. Lihat snapshot aktif di atas.
 
 Snapshot aktif (2026-09-24): Fase 3.2 menyiapkan Jenkins self-hosted lokal di branch `codex/f3-2-jenkins-local-simulation` dari `main` `04bb368`. Container Jenkins sudah berjalan hanya pada `127.0.0.1:8081`; pipeline dan aplikasi simulasi live belum aktif sampai wizard admin, credential, job SCM, review, dan merge selesai. Backend `440 passed, 21 skipped`; frontend `74 passed`; app Docker smoke test PASS. Detail dan batas verifikasi ada di `docs/tasks/F3.2/RESULT.md`. Snapshot F3.1 di bawah adalah riwayat, bukan status Git terkini.
 
@@ -86,3 +90,10 @@ Kode atau konsep dari POC boleh digunakan sebagai referensi, tetapi harus diband
 ## Catatan verifikasi
 
 Status test, deployment, keamanan, dan production readiness harus selalu diverifikasi dari kondisi aktual. Jangan menggunakan badge, dokumentasi lama, atau pernyataan sebelumnya sebagai bukti eksekusi terbaru.
+
+## Active increment — F3.31 kerangka tabel dengan merge (2026-09-26)
+
+- Status: automated implementation gates complete for local review; manual UAT remains for the user.
+- Writer aktual gpt-6-luna medium setelah Luna 5.6 medium mencapai usage limit dan peralihan dilaporkan. Sol/root read-only reviewer; Astra tidak digunakan.
+- Gates: full TypeScript + strict-core PASS, npm test 122/122 PASS, Vite build PASS, table Playwright 21/21 PASS, backend merged table SVG/PNG/PDF 2/2 PASS. Acceptance mapping ada di `docs/tasks/F3.31/RESULT.md`.
+- Server browser test menggunakan filesystem disposable dan auth database terpisah. Tidak ada commit, push, deployment, printer, SAP, atau akses production storage.
