@@ -1,0 +1,9 @@
+export { StudioCanvas } from './ui/StudioCanvas';
+export { CanvasViewport } from './ui/CanvasViewport';
+export { CanvasRuler } from './ruler/CanvasRuler';
+export { useRulers } from './ruler/useRulers';
+export { getMajorStepMm } from './ruler/rulerScale';
+export { useFabricCanvas } from './editor/useFabricCanvas';
+export { useAutoFitZoom } from './editor/useAutoFitZoom';
+export { useWheelZoom } from './editor/useWheelZoom';
+export { useTouchpadGestures } from './editor/useTouchpadGestures';

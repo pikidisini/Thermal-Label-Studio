@@ -6,17 +6,23 @@ import { fileURLToPath } from 'node:url';
 
 import { apiClient } from '../src/utils/apiClient.ts';
 import { renderApi } from '../src/utils/api/renderApi.ts';
-import { barcodeGenerators } from '../src/utils/barcodeGenerators.ts';
-import { INDUSTRIAL_SYMBOLS, getSymbolSvg } from '../src/utils/industrialSymbols.ts';
-import { adaptSapContract } from '../src/utils/sapContractAdapter.ts';
+import { barcodeGenerators } from '../src/features/barcode/model/barcodeGenerators.ts';
+import { qrGenerator } from '../src/features/qr/model/qrGenerator.ts';
+import { adaptSapContract, resolveSapTokenDisplayValue } from '../src/features/data-tokens/index.ts';
 import { sapShadowSimulationApi } from '../src/utils/api/sapShadowSimulationApi.ts';
 import { shouldShowLabelSimulation } from '../src/utils/simulationCapabilities.ts';
 import { useHistoryStore } from '../src/store/useHistoryStore.ts';
-import { parseLocalSapJson } from '../src/utils/localSapJsonParser.ts';
-import { resolveSapTokenDisplayValue } from '../src/utils/sapTokenValue.ts';
-import { validatePreviewPayload } from '../src/utils/barcodePreview.ts';
+import { parseLocalSapJson } from '../src/features/data-tokens/index.ts';
+import { validatePreviewPayload } from '../src/features/barcode/model/barcodePreview.ts';
 import { useContractStore } from '../src/store/useContractStore.ts';
 import { parseEditorDraft, editorDraftKey, EDITOR_DRAFT_VERSION } from '../src/utils/editorDraftRecovery.ts';
+import { getMajorStepMm } from '../src/features/canvas/ruler/rulerScale.ts';
+
+test('F3.35 ruler chooses a readable major interval from the 1/2/5 scale', () => {
+  assert.equal(getMajorStepMm(4), 20);
+  assert.equal(getMajorStepMm(16), 5);
+  assert.equal(getMajorStepMm(0), 50000);
+});
 
 test('F3.20 editor draft validation is versioned and user scoped', () => {
   const valid = JSON.stringify({ version: EDITOR_DRAFT_VERSION, userId: 'u-1', savedAt: Date.now(), templateId: 't', widthMm: 200, heightMm: 80, viewMode: 'design', canvas: { objects: [] } });
@@ -26,8 +32,8 @@ test('F3.20 editor draft validation is versioned and user scoped', () => {
   assert.equal(parseEditorDraft(valid, 'u-2'), null);
   assert.equal(parseEditorDraft(valid.replace('"widthMm":200', '"widthMm":-1'), 'u-1'), null);
   assert.equal(parseEditorDraft(valid.replace('"objects":[]', '"objects":{}'), 'u-1'), null);
-  const malformedV2 = valid.replace('"objects":[]', '"objects":[{"isTable":true,"tableVersion":2,"tableSpec":{"version":2}}]');
-  assert.equal(parseEditorDraft(malformedV2, 'u-1'), null);
+  const legacyMetadata = valid.replace('"objects":[]', '"objects":[{"type":"group","legacyMetadata":{"version":2}}]');
+  assert.ok(parseEditorDraft(legacyMetadata, 'u-1'));
   assert.equal(parseEditorDraft(' '.repeat(5 * 1024 * 1024 + 1), 'u-1'), null);
 });
 
@@ -102,7 +108,7 @@ test('Frontend Build Artifacts Integrity', async (t) => {
 
 test('Barcode and QR Generators', async (t) => {
   await t.test('generateQrSvg creates valid SVG XML string', async () => {
-    const svg = await barcodeGenerators.generateQrSvg('MAT:RM-001;BAT:B001');
+    const svg = await qrGenerator.generateQrSvg('MAT:RM-001;BAT:B001');
     assert.ok(svg, 'Generated QR SVG must not be null');
     assert.ok(typeof svg === 'string', 'QR SVG must be a string');
     assert.ok(svg.includes('<svg'), 'QR SVG must contain <svg tag');
@@ -505,31 +511,6 @@ test('SAP raw contract is retained when sent to preview API', async () => {
   }
 });
 
-test('Industrial Standard Vector Symbols Library', async (t) => {
-  await t.test('All GHS and ISO symbols are defined with valid SVG paths', () => {
-    const symbolKeys = Object.keys(INDUSTRIAL_SYMBOLS);
-    assert.ok(symbolKeys.length >= 10, 'Must have at least 10 industrial symbols');
-
-    const ghs = symbolKeys.filter(k => INDUSTRIAL_SYMBOLS[k].category === 'GHS Hazard');
-    const iso = symbolKeys.filter(k => INDUSTRIAL_SYMBOLS[k].category === 'ISO 7000 Packaging');
-    assert.ok(ghs.length >= 6, 'Must have at least 6 GHS hazard pictograms');
-    assert.ok(iso.length >= 4, 'Must have at least 4 ISO packaging symbols');
-
-    for (const key of symbolKeys) {
-      const sym = INDUSTRIAL_SYMBOLS[key];
-      assert.ok(sym.name, `${key} must have a name`);
-      assert.ok(sym.svg.includes('<svg'), `${key} SVG must start with <svg`);
-      assert.ok(sym.svg.includes('</svg>'), `${key} SVG must end with </svg>`);
-    }
-  });
-
-  await t.test('getSymbolSvg scales width and height properly', () => {
-    const svg = getSymbolSvg('ghs_flammable', 25, 25);
-    assert.ok(svg.includes('width="25mm"'));
-    assert.ok(svg.includes('height="25mm"'));
-  });
-});
-
 test('Custom Canvas Dimensions & Calculations', async (t) => {
   await t.test('calculates accurate pixel dots for custom dimensions at 203.2 DPI', () => {
     // 75mm x 35mm custom die-cut roll
@@ -836,11 +817,11 @@ test('Fitur 1 - Studio Canvas & Visual Label Designer Test Suite', async (t) => 
     assert.equal(canvasObjects.length, 2);
     assert.equal(activeObject.id, 'barcode_1');
 
-    // 3. Add Industrial Symbol (Fragile)
-    addObject({ id: 'symbol_1', type: 'path', symbolId: 'fragile', category: 'ISO 7000 Packaging' });
+    // 3. Add a global graphic embedded in this template.
+    addObject({ id: 'graphic_1', type: 'image', graphicAssetId: 'company-logo', graphicAssetVersion: 2, graphicEmbeddedSrc: 'data:image/svg+xml;base64,PHN2Zy8+' });
     assert.equal(canvasObjects.length, 3, 'Canvas must have 3 active objects');
-    assert.equal(activeObject.id, 'symbol_1', 'Last added object must be active selection');
-    assert.equal(inspectorProperty.symbolId, 'fragile', 'RightInspector displays active object properties');
+    assert.equal(activeObject.id, 'graphic_1', 'Last added object must be active selection');
+    assert.equal(inspectorProperty.graphicAssetId, 'company-logo', 'RightInspector retains global graphic identity');
   });
 
   await t.test('TC-CANVAS-03: Drag, Snap to Grid & Guidelines', () => {
@@ -925,7 +906,7 @@ test('Fitur 1 - Studio Canvas & Visual Label Designer Test Suite', async (t) => 
 });
 
 test('Fitur 2 - Vector Toolbox Tools & Token Bindings Suite', async (t) => {
-  await t.test('All 8 toolbox element creators construct valid Fabric object structures', () => {
+  await t.test('Tool creators and legacy Fabric shapes retain valid object structures', () => {
     const pxPerMm = 4;
 
     // 1. Text
@@ -943,7 +924,7 @@ test('Fitur 2 - Vector Toolbox Tools & Token Bindings Suite', async (t) => {
     assert.equal(qrObj.isBarcode, true);
     assert.equal(qrObj.barcodeType, 'qrcode');
 
-    // 4. Rectangle (Box)
+    // 4. Legacy Rectangle import/template compatibility
     const rectObj = { type: 'rect', width: 40 * pxPerMm, height: 25 * pxPerMm, fill: 'transparent', stroke: '#000000' };
     assert.equal(rectObj.type, 'rect');
     assert.equal(rectObj.fill, 'transparent');
@@ -952,18 +933,10 @@ test('Fitur 2 - Vector Toolbox Tools & Token Bindings Suite', async (t) => {
     const lineObj = { type: 'line', stroke: '#000000', strokeWidth: 0.5 * pxPerMm };
     assert.equal(lineObj.type, 'line');
 
-    // 6. Circle
+    // 6. Legacy Circle import/template compatibility
     const circleObj = { type: 'circle', radius: 12 * pxPerMm, fill: 'transparent', stroke: '#000000' };
     assert.equal(circleObj.type, 'circle');
 
-    // 7. Table Grid (Group)
-    const tableObj = { type: 'group', isTable: true, width: 100 * pxPerMm, height: 30 * pxPerMm };
-    assert.equal(tableObj.type, 'group');
-
-    // 8. Industrial Symbol (GHS / ISO)
-    const symbolObj = { type: 'group', isGhsSymbol: true, symbolId: 'fragile' };
-    assert.equal(symbolObj.isGhsSymbol, true);
-    assert.equal(symbolObj.symbolId, 'fragile');
   });
 
   await t.test('Token binding extractor tracks and binds SAP tokens', () => {

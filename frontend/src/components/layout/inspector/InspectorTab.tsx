@@ -1,4 +1,5 @@
-﻿import React from 'react';
+import React from 'react';
+import { Button } from '../../../shared/ui';
 
 interface InspectorTabProps {
   id: string;
@@ -10,17 +11,17 @@ interface InspectorTabProps {
 
 export function InspectorTab({ id, icon, label, active, onClick }: InspectorTabProps) {
   return (
-    <button
+    <Button
       data-testid={`inspector-tab-btn-${id}`}
       onClick={onClick}
-      className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[11px] font-semibold border-b-2 transition-colors ${
+      className={`flex flex-1 items-center justify-center gap-1.5 border-x-0 border-t-0 border-b-2 py-2 text-[11px] font-semibold transition-colors ${
         active
-          ? 'border-primary text-primary bg-primary/5'
-          : 'border-transparent text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
+          ? 'border-primary bg-primary-container text-on-primary-container'
+          : 'border-transparent text-on-surface-variant hover:border-transparent hover:bg-surface-container-high hover:text-on-surface'
       }`}
     >
       <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{icon}</span>
       <span>{label}</span>
-    </button>
+    </Button>
   );
 }

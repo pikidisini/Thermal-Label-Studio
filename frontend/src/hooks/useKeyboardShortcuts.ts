@@ -148,7 +148,6 @@ export function useKeyboardShortcuts({
         const keyMap: Record<string, ActiveTool> = {
           v: 'select',
           t: 'text',
-          r: 'rect',
           b: 'barcode',
           q: 'qrcode',
         };

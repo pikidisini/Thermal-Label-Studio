@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Keyboard, Command, MousePointer, Move, ZoomIn, Undo, Redo, Copy, Trash2 } from 'lucide-react';
+import { Button, Dialog, DialogFooter, DialogHeader, IconButton } from '../../shared/ui';
 
 const SHORTCUT_GROUPS = [
   {
@@ -9,9 +10,7 @@ const SHORTCUT_GROUPS = [
       { keys: ['T'], desc: 'Text Tool (Click or Drag to define box)' },
       { keys: ['B'], desc: '1D Barcode Tool (Click or Drag to define size)' },
       { keys: ['M'], desc: '2D QR / DataMatrix Tool (Click or Drag to define size)' },
-      { keys: ['R'], desc: 'Rectangle Frame Tool (Click or Drag to define size)' },
       { keys: ['L'], desc: 'Separator Line Tool (Click or Drag endpoints, Shift snaps)' },
-      { keys: ['C'], desc: 'Circle / Badge Tool (Click or Drag to define radius)' },
       { keys: ['G'], desc: 'Manifest Table Grid Tool (Click or Drag to define size)' },
       { keys: ['Esc'], desc: 'Cancel active tool & return to Select [V]' },
     ]
@@ -55,48 +54,49 @@ export default function ShortcutHelpModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs animate-fadeIn select-none p-4">
-      <div className="bg-studio-darkest border border-studio-border rounded-xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[85vh]">
+    <div className="fixed inset-0 z-[var(--ui-layer-modal)] flex items-center justify-center bg-black/75 backdrop-blur-xs animate-fadeIn select-none p-4">
+      <Dialog className="w-full max-w-xl overflow-hidden flex flex-col max-h-[85vh]">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-studio-border flex items-center justify-between bg-studio-darker">
+        <DialogHeader className="px-5 py-4 flex items-center justify-between bg-surface-container-high">
           <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+            <div className="w-8 h-8 bg-primary-container/10 border border-primary-container flex items-center justify-center text-primary">
               <Keyboard className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-white">Keyboard & Mouse Shortcuts</h2>
-              <p className="text-xs text-gray-400">
+              <h2 className="text-sm font-semibold text-on-surface">Keyboard & Mouse Shortcuts</h2>
+              <p className="text-xs text-on-surface-variant">
                 Professional CAD / Vector workflows (Photoshop, Inkscape, Illustrator style)
               </p>
             </div>
           </div>
-          <button
+          <IconButton
             onClick={onClose}
-            className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-studio-hover transition"
+            className="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition"
+            label="Close keyboard shortcuts"
           >
             <X className="w-4 h-4" />
-          </button>
-        </div>
+          </IconButton>
+        </DialogHeader>
 
         {/* Content */}
         <div className="p-5 space-y-5 overflow-y-auto">
           {SHORTCUT_GROUPS.map((grp, idx) => (
             <div key={idx} className="space-y-2">
-              <h3 className="text-xs font-semibold text-amber-400 uppercase tracking-wider font-mono">
+              <h3 className="text-xs font-semibold text-secondary uppercase tracking-wider font-mono">
                 {grp.category}
               </h3>
-              <div className="bg-studio-panel/50 border border-studio-border rounded-lg divide-y divide-studio-border/60">
+              <div className="bg-surface-container border border-outline-variant divide-y divide-outline-variant/60">
                 {grp.items.map((item, i) => (
                   <div key={i} className="px-3.5 py-2 flex items-center justify-between text-xs">
-                    <span className="text-gray-300">{item.desc}</span>
+                    <span className="text-on-surface">{item.desc}</span>
                     <div className="flex items-center space-x-1 shrink-0 ml-3">
                       {item.keys.map((k, ki) => (
                         <span
                           key={ki}
                           className={`${
                             k === '+' || k === '/'
-                              ? 'text-gray-500 text-[10px]'
-                              : 'px-1.5 py-0.5 rounded bg-studio-darker border border-gray-600 text-gray-200 font-mono text-[11px] shadow-xs'
+                              ? 'text-outline text-[10px]'
+                              : 'px-1.5 py-0.5 bg-surface-container-lowest border border-outline-variant text-on-surface font-mono text-[11px] shadow-xs'
                           }`}
                         >
                           {k}
@@ -111,16 +111,17 @@ export default function ShortcutHelpModal({ isOpen, onClose }) {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-studio-border bg-studio-darker flex items-center justify-between text-xs text-gray-400">
-          <span>Press <kbd className="px-1 py-0.5 rounded bg-studio-panel border border-gray-600 font-mono text-[10px] text-white">?</kbd> to toggle this dialog anytime</span>
-          <button
+        <DialogFooter className="px-5 py-3 bg-surface-container-high flex items-center justify-between text-xs text-on-surface-variant">
+          <span>Press <kbd className="px-1 py-0.5 bg-surface-container border border-outline-variant font-mono text-[10px] text-on-surface">?</kbd> to toggle this dialog anytime</span>
+          <Button
             onClick={onClose}
-            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-md font-medium transition text-xs"
+            tone="primary"
+            className="px-4 py-1.5 font-medium transition text-xs"
           >
             Got it
-          </button>
-        </div>
-      </div>
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }

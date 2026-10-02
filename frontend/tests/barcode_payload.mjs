@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { resolvePayloadTemplate } from '../src/utils/barcodePayload.ts';
+import { resolvePayloadTemplate } from '../src/features/barcode/model/barcodePayload.ts';
 
 test('payload resolver composes literal and tokens', () => {
   const result = resolvePayloadTemplate('batch : {{batch}}\nroll : {{roll}}', { batch: 'B1', roll: 'R2' }, 'qrcode');

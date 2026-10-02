@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { ActiveTool } from '../../types/label';
 import { BasicToolsSection } from './toolbox/BasicToolsSection';
-import { IndustrialSymbolsSection } from './toolbox/IndustrialSymbolsSection';
-import { SapTokenSection } from './toolbox/SapTokenSection';
+import { GraphicsSection } from '../../features/graphics';
+import type { GraphicAsset } from '../../features/graphics';
+import { SapTokenSection } from '../../features/data-tokens';
 import { DockButton } from './toolbox/DockButton';
-import type { FlatSapTokenMap, RawSapContract } from '../../utils/sapContractAdapter';
+import { IconButton } from '../../shared/ui';
+import type { FlatSapTokenMap, RawSapContract } from '../../features/data-tokens';
 
-type Panel = 'tools' | 'symbols' | 'sap' | null;
+type Panel = 'tools' | 'graphics' | 'sap' | null;
 
 interface LeftToolboxProps {
   activeTool: ActiveTool;
@@ -14,11 +16,8 @@ interface LeftToolboxProps {
   onAddText: () => void;
   onAddBarcode: () => void;
   onAddQrCode: () => void;
-  onAddBox: () => void;
   onAddLine: () => void;
-  onAddCircle: () => void;
-  onAddTable: (rows: number, columns: number, placement: 'drag' | 'center') => void;
-  onAddIsoSymbol: (key: string) => void;
+  onAddGraphic: (asset: GraphicAsset) => void;
   onUploadImage: (e: React.ChangeEvent<HTMLInputElement>) => void;
   sampleContracts?: Record<string, RawSapContract>;
   activeContractKey?: string;
@@ -44,8 +43,8 @@ export function LeftToolbox({
   activeTool,
   setActiveTool,
   onAddText, onAddBarcode, onAddQrCode,
-  onAddBox, onAddLine, onAddCircle, onAddTable,
-  onAddIsoSymbol, onUploadImage,
+  onAddLine,
+  onAddGraphic, onUploadImage,
   sampleContracts = {},
   activeContractKey = 'goods_receipt',
   onSelectContract = () => {},
@@ -71,7 +70,7 @@ export function LeftToolbox({
     setOpenPanel((prev) => (prev === panel ? null : panel));
 
   return (
-    <div data-testid="container-left-toolbox" className="flex h-full select-none z-10">
+    <div data-testid="container-left-toolbox" className="relative z-[var(--ui-layer-chrome)] flex h-full select-none">
       {/* 48px Icon Dock */}
       <aside
         data-testid="container-toolbox-dock"
@@ -81,20 +80,23 @@ export function LeftToolbox({
           icon="gesture"
           label="Design Tools"
           active={openPanel === 'tools'}
+          showTooltip={!openPanel}
           onClick={() => togglePanel('tools')}
           testId="dock-btn-tools"
         />
         <DockButton
-          icon="warning"
-          label="Industrial Symbols"
-          active={openPanel === 'symbols'}
-          onClick={() => togglePanel('symbols')}
-          testId="dock-btn-symbols"
+          icon="image"
+          label="Graphics"
+          active={openPanel === 'graphics'}
+          showTooltip={!openPanel}
+          onClick={() => togglePanel('graphics')}
+          testId="dock-btn-graphics"
         />
         <DockButton
           icon="database"
           label="Data Tokens"
           active={openPanel === 'sap'}
+          showTooltip={!openPanel}
           onClick={() => togglePanel('sap')}
           testId="dock-btn-sap"
         />
@@ -120,30 +122,28 @@ export function LeftToolbox({
                 <span data-testid="toolbox-flyout-title" className="sr-only">
                   Design Tools
                 </span>
-                <button
+                <IconButton
                   data-testid="btn-close-toolbox-flyout"
                   onClick={() => setOpenPanel(null)}
-                  className="w-full h-full flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors"
-                  title="Close Design Tools"
-                  aria-label="Close panel"
+                  label="Close panel"
+                  className="h-full w-full border-transparent text-on-surface-variant hover:border-transparent hover:bg-surface-container-high hover:text-on-surface"
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_left</span>
-                </button>
+                </IconButton>
               </>
             ) : (
               <>
                 <span data-testid="toolbox-flyout-title" className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-widest">
-                  {openPanel === 'symbols' ? 'Symbols' : 'Data Tokens'}
+                  {openPanel === 'graphics' ? 'Graphics' : 'Data Tokens'}
                 </span>
-                <button
+                <IconButton
                   data-testid="btn-close-toolbox-flyout"
                   onClick={() => setOpenPanel(null)}
-                  className="text-on-surface-variant hover:text-on-surface p-0.5 transition-colors"
-                  title="Close panel"
-                  aria-label="Close panel"
+                  label="Close panel"
+                  className="h-auto w-auto border-transparent p-0.5 text-on-surface-variant hover:border-transparent hover:bg-surface-container-high hover:text-on-surface"
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_left</span>
-                </button>
+                </IconButton>
               </>
             )}
           </div>
@@ -157,15 +157,12 @@ export function LeftToolbox({
                 onAddText={onAddText}
                 onAddBarcode={onAddBarcode}
                 onAddQrCode={onAddQrCode}
-                onAddBox={onAddBox}
                 onAddLine={onAddLine}
-                onAddCircle={onAddCircle}
-                onAddTable={onAddTable}
                 onUploadImage={onUploadImage}
               />
             )}
-            {openPanel === 'symbols' && (
-              <IndustrialSymbolsSection onAddIsoSymbol={onAddIsoSymbol} />
+            {openPanel === 'graphics' && (
+              <GraphicsSection onAdd={onAddGraphic} />
             )}
             {openPanel === 'sap' && (
               <SapTokenSection

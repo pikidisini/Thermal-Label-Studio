@@ -57,7 +57,6 @@ test.describe('F3.32 line feature', () => {
   });
 
   test('hides table creation and line button only activates tool', async ({ page }) => {
-    await expect(page.getByTestId('btn-add-table')).toHaveCount(0);
     await page.getByTestId('btn-add-line').click();
     await expect(page.getByTestId('btn-add-line')).toHaveClass(/bg|active/);
     await expect(page.getByTestId('line-inspector')).toHaveCount(0);
@@ -85,13 +84,13 @@ test.describe('F3.32 line feature', () => {
     await expect(page.getByTestId('line-inspector')).toHaveCount(0);
     await page.getByTestId('btn-add-line').click();
     await page.mouse.move(sheet.x + 340, sheet.y + 250); await page.mouse.down();
-    await page.getByTestId('btn-add-rect').click();
+    await page.getByTestId('btn-tool-select').click();
     await expect(page.getByTestId('line-inspector')).toHaveCount(0);
   });
 
   test('line styles and SVG export preserve dashed stroke', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const { fabric } = await import('/src/features/table/canvas/fabricInterop.ts');
+      const { fabric } = await import('fabric');
       const { exportFabricToSvg } = await import('/src/utils/fabricSvgExporter.ts');
       const canvas = new fabric.Canvas(document.createElement('canvas'), { width: 200, height: 100 });
       canvas.add(new fabric.Line([10, 10, 100, 40], { stroke: '#336699', strokeWidth: 2, strokeDashArray: [8, 5] }));
@@ -222,7 +221,7 @@ test.describe('F3.32 line feature', () => {
 
   test('F3.33 transformed endpoint snap uses rendered coordinates', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const { fabric } = await import('/src/features/table/canvas/fabricInterop.ts');
+      const { fabric } = await import('fabric');
       const { snapToLineEndpoint } = await import('/src/features/line/editor/lineGeometry.ts');
       const canvas = new fabric.Canvas(document.createElement('canvas'), { width: 400, height: 300 });
       const line = new fabric.Line([10, 20, 110, 20], { left: 120, top: 80, angle: 30, scaleX: 1.4, scaleY: 0.8 });

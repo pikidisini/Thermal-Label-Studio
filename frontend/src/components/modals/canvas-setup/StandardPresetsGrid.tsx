@@ -33,7 +33,7 @@ export function StandardPresetsGrid({
               onClick={() => onSelectPreset(p.widthMm, p.heightMm)}
               className={`flex flex-col items-center justify-center gap-1 p-2 h-[64px] transition-all relative border ${
                 isSelected
-                  ? 'bg-surface-variant border-primary-container text-primary-container shadow-inner'
+                  ? 'bg-surface-container-high border-primary-container text-primary-container shadow-inner'
                   : 'bg-surface border-outline-variant text-on-surface-variant hover:border-outline hover:text-on-surface hover:bg-surface-bright/30'
               }`}
             >

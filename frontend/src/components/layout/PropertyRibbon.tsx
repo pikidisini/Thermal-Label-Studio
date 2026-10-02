@@ -1,10 +1,11 @@
 ﻿import React from 'react';
 import { useStudioStore } from '../../store/useStudioStore';
-import { TextFormatControls } from './ribbon/TextFormatControls';
-import { BarcodePropertyControls } from './ribbon/BarcodePropertyControls';
+import { TextFormatControls } from '../../features/text';
+import { BarcodePropertyControls } from '../../features/barcode';
 import { GeometryFormatControls } from './ribbon/GeometryFormatControls';
 import { CoordinateBadge } from './ribbon/CoordinateBadge';
 import { RibbonDivider } from './ribbon/RibbonDivider';
+import { Button } from '../../shared/ui';
 
 interface PropertyRibbonProps {
   selectedObject: any;
@@ -20,40 +21,40 @@ interface PropertyRibbonProps {
 function SnapToggle() {
   const { isSnapEnabled, toggleSnap } = useStudioStore();
   return (
-    <button
+    <Button
       data-testid="ribbon-toggle-snap"
       onClick={toggleSnap}
       title="Toggle Grid Snapping (S)"
       aria-label="Toggle Grid Snapping"
       className={`flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium transition-colors ${
         isSnapEnabled
-          ? 'bg-primary/15 text-primary border border-primary/30'
-          : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
+          ? 'border-primary-container bg-primary-container text-on-primary-container'
+          : 'border-transparent text-on-surface-variant hover:border-transparent hover:bg-surface-container-high hover:text-on-surface'
       }`}
     >
       <span className="material-symbols-outlined" style={{ fontSize: 13 }}>grid_on</span>
       <span>Snap</span>
-    </button>
+    </Button>
   );
 }
 
 function GuidesToggle() {
   const { areGuidesEnabled, toggleGuides } = useStudioStore();
   return (
-    <button
+    <Button
       data-testid="ribbon-toggle-guides"
       onClick={toggleGuides}
       title="Toggle Smart Guides (G)"
       aria-label="Toggle Smart Guides"
       className={`flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium transition-colors ${
         areGuidesEnabled
-          ? 'bg-tertiary/15 text-tertiary border border-tertiary/30'
-          : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
+          ? 'border-tertiary-container bg-tertiary-container text-on-tertiary'
+          : 'border-transparent text-on-surface-variant hover:border-transparent hover:bg-surface-container-high hover:text-on-surface'
       }`}
     >
       <span className="material-symbols-outlined" style={{ fontSize: 13 }}>straighten</span>
       <span>Guides</span>
-    </button>
+    </Button>
   );
 }
 
@@ -72,7 +73,7 @@ export function PropertyRibbon({
   return (
     <div
       data-testid="container-property-ribbon"
-      className="h-9 bg-surface-container-low border-b border-outline-variant px-3 flex items-center justify-between text-xs select-none z-10"
+      className="relative z-[var(--ui-layer-chrome)] h-9 bg-surface-container-low border-b border-outline-variant px-3 flex items-center justify-between text-xs select-none"
     >
       {/* Left: type chip + property controls */}
       <div data-testid="container-ribbon-left-section" className="flex items-center gap-0">

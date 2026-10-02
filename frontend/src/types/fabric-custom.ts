@@ -17,10 +17,7 @@ export const CANVAS_SERIALIZE_PROPS = [
   'barcodeType',
   'barcodeValue',
   'payloadTemplate',
-  'isTable',
   'isEditorGroup',
-  'tableVersion',
-  'tableSpec',
   'selectable',
   'evented'
 ] as const;
@@ -55,10 +52,7 @@ export interface CustomFabricProps {
   payloadTemplate?: string;
   previewOverride?: boolean;
   validationError?: string;
-  isTable?: boolean;
   isEditorGroup?: boolean;
-  tableVersion?: number;
-  tableSpec?: unknown;
 }
 
 export type ExtendedFabricObject = fabric.Object & CustomFabricProps;

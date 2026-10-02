@@ -6,6 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const authDbPath = path.resolve(__dirname, '../backend/data/auth_e2e.db');
 const e2eTemplateDir = path.resolve(__dirname, `../tmp/f331-e2e-templates-${process.pid}`);
+const reuseExistingServer = process.env.E2E_REUSE_EXISTING === 'true';
 
 export default defineConfig({
   testDir: './tests',
@@ -32,7 +33,7 @@ export default defineConfig({
       command: 'python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000',
       cwd: '..',
       url: 'http://127.0.0.1:8000/api/v1/health',
-      reuseExistingServer: false,
+      reuseExistingServer,
       timeout: 30000,
       env: {
         ...process.env,
@@ -47,7 +48,7 @@ export default defineConfig({
     {
       command: 'npm.cmd run dev -- --host 127.0.0.1 --port 5173 --strictPort',
       url: 'http://127.0.0.1:5173',
-      reuseExistingServer: false,
+      reuseExistingServer,
       timeout: 30000,
     },
   ],
@@ -63,6 +64,14 @@ export default defineConfig({
         storageState: './.auth/user.json',
       },
       dependencies: ['setup'],
+    },
+    {
+      name: 'chromium-no-auth',
+      testMatch: /layering\.spec\.js/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: { cookies: [], origins: [] },
+      },
     },
   ],
 });

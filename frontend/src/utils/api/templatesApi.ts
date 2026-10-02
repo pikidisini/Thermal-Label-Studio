@@ -1,5 +1,12 @@
-import { API_BASE, FALLBACK_TEMPLATES, FALLBACK_SVGS } from './apiConfig';
-import { getCsrfHeaders } from './csrfHelper';
+import { getCsrfHeaders } from '../../features/auth';
+import { API_BASE } from '../../shared/api';
+
+const FALLBACK_TEMPLATES = [
+  { id: 'label_roll_80x200', name: 'Label Roll 80X200', filename: 'label_roll_80x200.svg', is_builtin: true, width_mm: 80, height_mm: 200 },
+];
+
+// There is no fabricated SVG fallback: a failed backend integration stays visible.
+const FALLBACK_SVGS: Record<string, string> = {};
 
 export const templatesApi = {
   async listTemplatesStrict() { const res = await fetch(`${API_BASE}/templates`, { credentials:'same-origin' }); if (!res.ok) throw new Error('Gagal memuat template server'); return {templates: await res.json()}; },

@@ -56,15 +56,6 @@ test.describe('Fitur 1 - Studio Canvas & Visual Label Designer', () => {
     await expect(btnAddBarcode).toBeVisible();
     await btnAddBarcode.click();
 
-    // 3. Add Industrial Symbol (GHS / Fragile)
-    const btnSymbolsTab = page.locator('button:has-text("Symbols")').first();
-    if (await btnSymbolsTab.isVisible()) {
-      await btnSymbolsTab.click();
-    }
-    const btnAddSymbol = page.locator('[data-testid^="btn-symbol-"]').first();
-    await expect(btnAddSymbol).toBeVisible();
-    await btnAddSymbol.click();
-
     // Verify active selection is reflected in Right Inspector coordinate inspector
     const inspectorX = page.locator('[data-testid="inspector-x"]').first();
     const inspectorLabel = page.getByText('Transform Inspector').first();

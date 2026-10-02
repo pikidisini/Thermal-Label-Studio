@@ -1,6 +1,7 @@
 import React from 'react';
 import { ViewMode } from '../../../types/label';
 import { shouldShowLabelSimulation } from '../../../utils/simulationCapabilities';
+import { Button, IconButton } from '../../../shared/ui';
 
 interface TopBarActionsProps {
   viewMode: ViewMode;
@@ -39,19 +40,18 @@ interface IconBtnProps {
 
 function IconBtn({ icon, title, onClick, testId, danger }: IconBtnProps) {
   return (
-    <button
+    <IconButton
       onClick={onClick}
       data-testid={testId}
-      title={title}
-      aria-label={title}
-      className={`p-1.5 transition-colors ${
+      label={title}
+      className={`h-auto w-auto border-transparent p-1.5 transition-colors ${
         danger
           ? 'text-on-surface-variant hover:text-tertiary hover:bg-tertiary/10'
           : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
       }`}
     >
       <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{icon}</span>
-    </button>
+    </IconButton>
   );
 }
 
@@ -99,31 +99,32 @@ export function TopBarActions({
       <IconBtn icon="help_outline" title="Keyboard Shortcuts"   onClick={onOpenShortcuts}                   testId="btn-shortcuts-help" />
       <IconBtn icon="monitoring"   title="AI Diagnostics"       onClick={onOpenDiagnostics}                 testId="btn-ai-diagnostics" />
 
-      {/* Unified Simulasi Label Button (Fase 3.1: Paling banyak satu tombol simulasi) */}
+      {/* Unified label simulation button: show at most one simulation entry point. */}
       {shouldShowLabelSimulation({ isSapShadowSimulationEnabled, isSafeDemoEnabled }) && (
-        <button
+        <Button
           data-testid="btn-label-simulation"
           onClick={onOpenLabelSimulation || onOpenSapSimulation}
-          title="Simulasi Label (Uji Mandiri & Bukti PDF)"
-          className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium transition-all bg-amber-950/50 text-amber-300 border border-amber-500/40 hover:bg-amber-900/60 hover:border-amber-400 rounded-sm"
+          title="Label Simulation (Self-Test and PDF Evidence)"
+          className="flex items-center gap-1 border-secondary bg-secondary-container px-2 py-1 text-[11px] font-medium text-on-secondary transition-colors hover:bg-secondary hover:text-on-secondary"
         >
           <span className="material-symbols-outlined" style={{ fontSize: 14 }}>picture_as_pdf</span>
-          <span className="hidden sm:inline">Simulasi Label</span>
-        </button>
+          <span className="hidden sm:inline">Label Simulation</span>
+        </Button>
       )}
 
       <div className="w-px h-4 bg-outline-variant mx-1" />
 
 
       {/* Primary CTA */}
-      <button
+      <Button
         data-testid="btn-topbar-print"
         onClick={onOpenPrint}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-surface text-xs font-semibold shadow-md transition-all hover:bg-primary-fixed ml-1"
+        tone="primary"
+        className="ml-1 flex items-center gap-1.5 border-primary-container bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary shadow-md transition-colors hover:bg-primary-fixed"
       >
         <span className="material-symbols-outlined" style={{ fontSize: 14 }}>print</span>
         <span>Print</span>
-      </button>
+      </Button>
     </div>
   );
 }

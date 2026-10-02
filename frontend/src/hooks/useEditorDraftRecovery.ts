@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { fabric } from 'fabric';
 import { parseEditorDraft, serializeEditorDraft, editorDraftKey, clearEditorDraft, type EditorDraft } from '../utils/editorDraftRecovery';
 import { useHistoryStore } from '../store/useHistoryStore';
-import { rehydrateTableV2Objects } from '../features/table/canvas/tableRenderer';
 
 export function useEditorDraftRecovery(userId: string | null, canvasRef: React.MutableRefObject<fabric.Canvas | null>, meta: { templateId: string; widthMm: number; heightMm: number; viewMode: 'design' | 'preview' }) {
   const restoredRef = useRef(false);
@@ -38,9 +37,11 @@ export function useEditorDraftRecovery(userId: string | null, canvasRef: React.M
       useHistoryStore.getState().lockHistory();
       try {
         canvas.loadFromJSON(draft.canvas, () => {
-          try { rehydrateTableV2Objects(canvas, 4); canvas.renderAll(); }
-          finally { hydratingRef.current = false; useHistoryStore.getState().unlockHistory(); }
-          setStatus('restored'); onComplete?.(draft);
+          canvas.renderAll();
+          setStatus('restored');
+          onComplete?.(draft);
+          hydratingRef.current = false;
+          useHistoryStore.getState().unlockHistory();
         });
       } catch (error) {
         hydratingRef.current = false;

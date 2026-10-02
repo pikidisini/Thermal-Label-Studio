@@ -8,10 +8,7 @@ interface BasicToolsSectionProps {
   onAddText: () => void;
   onAddBarcode: () => void;
   onAddQrCode: () => void;
-  onAddBox: () => void;
   onAddLine: () => void;
-  onAddCircle: () => void;
-  onAddTable: (rows: number, columns: number, placement: 'drag' | 'center') => void;
   onUploadImage: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
@@ -29,10 +26,7 @@ export function BasicToolsSection({
   onAddText,
   onAddBarcode,
   onAddQrCode,
-  onAddBox,
   onAddLine,
-  onAddCircle,
-  onAddTable,
   onUploadImage,
 }: BasicToolsSectionProps) {
   const tools: ToolDef[] = [
@@ -40,9 +34,7 @@ export function BasicToolsSection({
     { id: 'text',    label: 'Add Text (T)',    icon: 'title',           action: onAddText,                     testId: 'btn-add-text'     },
     { id: 'barcode', label: '1D Barcode (B)',  icon: 'barcode',         action: onAddBarcode,                  testId: 'btn-add-barcode'  },
     { id: 'qrcode',  label: '2D QR Code',     icon: 'qr_code_2',       action: onAddQrCode,                   testId: 'btn-add-qrcode'   },
-    { id: 'rect',    label: 'Rectangle (R)',   icon: 'crop_square',     action: onAddBox,                      testId: 'btn-add-rect'     },
-    { id: 'line',    label: 'Gambar garis · Shift 45° · Esc selesai · Alt garis baru',    icon: 'horizontal_rule', action: () => setActiveTool('line'),    testId: 'btn-add-line'     },
-    { id: 'circle',  label: 'Circle (C)',      icon: 'circle',          action: onAddCircle,                   testId: 'btn-add-circle'   },
+    { id: 'line',    label: 'Draw line · Shift 45° · Esc finish · Alt new line',          icon: 'horizontal_rule', action: () => setActiveTool('line'),    testId: 'btn-add-line'     },
   ];
 
   return (
@@ -69,7 +61,7 @@ export function BasicToolsSection({
         title="Upload Image / Logo"
       >
         <span className="material-symbols-outlined" style={{ fontSize: 22 }}>image</span>
-        <span className="absolute left-full ml-2 px-2 py-1 bg-surface-container-highest text-on-surface text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 border border-outline-variant">
+        <span className="absolute left-full ml-2 px-2 py-1 bg-surface-container-highest text-on-surface text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[var(--ui-layer-tooltip)] border border-outline-variant">
           Upload Image / Logo
         </span>
         <input

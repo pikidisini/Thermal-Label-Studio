@@ -36,7 +36,7 @@ export function CustomDimensionForm({
       <div className="flex items-center gap-2">
         {/* Width */}
         <div className="flex flex-1 h-[30px] bg-surface border border-outline-variant focus-within:border-primary-container transition-colors">
-          <div className="w-[32px] bg-surface-variant flex items-center justify-center border-r border-outline-variant select-none">
+          <div className="w-[32px] bg-surface-container-high flex items-center justify-center border-r border-outline-variant select-none">
             <span className="text-[10px] font-semibold text-outline">W</span>
           </div>
           <input
@@ -59,14 +59,14 @@ export function CustomDimensionForm({
           type="button"
           onClick={onSwapOrientation}
           title="Swap Dimensions"
-          className="w-[30px] h-[30px] flex items-center justify-center bg-surface-variant border border-outline-variant text-on-surface hover:text-primary-container hover:border-primary-container transition-colors shrink-0"
+          className="w-[30px] h-[30px] flex items-center justify-center bg-surface-container-high border border-outline-variant text-on-surface hover:text-primary-container hover:border-primary-container transition-colors shrink-0"
         >
           <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
         </button>
 
         {/* Height */}
         <div className="flex flex-1 h-[30px] bg-surface border border-outline-variant focus-within:border-primary-container transition-colors">
-          <div className="w-[32px] bg-surface-variant flex items-center justify-center border-r border-outline-variant select-none">
+          <div className="w-[32px] bg-surface-container-high flex items-center justify-center border-r border-outline-variant select-none">
             <span className="text-[10px] font-semibold text-outline">H</span>
           </div>
           <input

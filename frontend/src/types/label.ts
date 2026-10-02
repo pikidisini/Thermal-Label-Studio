@@ -5,9 +5,7 @@ export type ActiveTool =
   | 'text'
   | 'barcode'
   | 'qrcode'
-  | 'rect'
   | 'line'
-  | 'table'
   | 'symbol'
   | 'image';
 

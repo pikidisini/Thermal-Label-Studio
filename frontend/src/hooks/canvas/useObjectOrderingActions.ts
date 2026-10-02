@@ -1,15 +1,10 @@
 import { useCallback, useRef } from 'react';
 import { fabric } from 'fabric';
-import { barcodeGenerators } from '../../utils/barcodeGenerators';
-import { resolveSapTokenDisplayValue } from '../../utils/sapTokenValue';
+import { resolveSapTokenDisplayValue } from '../../features/data-tokens';
 import { useContractStore } from '../../store/useContractStore';
-import { generatePreviewDataUrl, validatePreviewPayload } from '../../utils/barcodePreview';
-import { resolvePayloadTemplate } from '../../utils/barcodePayload';
-import { makeTableGroupV2 } from '../../features/table/canvas/tableRenderer';
-import { parseTableModel } from '../../features/table/model/tableModelV2';
+import { generatePreviewDataUrl, resolvePayloadTemplate, validatePreviewPayload } from '../../features/barcode';
 import { useHistoryStore } from '../../store/useHistoryStore';
-import { LINE_STYLE_DASH, clampLineWidthMm } from '../../features/line/model/lineModel';
-import { updateLineEndpoint } from '../../features/line/editor/lineGeometry';
+import { applyLinePropertyUpdate, clampLineWidthMm } from '../../features/line';
 
 interface UseObjectOrderingActionsProps {
   canvasRef: React.MutableRefObject<fabric.Canvas | null>;
@@ -34,20 +29,6 @@ export function useObjectOrderingActions({
       if (!canvasRef.current) return;
       const active = canvasRef.current.getActiveObject() as any;
       if (!active) return;
-
-      if (property === 'tableV2Model' && active.isTable && active.tableVersion === 2) {
-        const model = parseTableModel(value);
-        if (!model) return;
-        const canvas = canvasRef.current;
-        const index = canvas.getObjects().indexOf(active);
-        const replacement = makeTableGroupV2(model, pxPerMm, { left: active.left || 0, top: active.top || 0 }) as any;
-        replacement.set({ angle: active.angle || 0, scaleX: active.scaleX || 1, scaleY: active.scaleY || 1, flipX: !!active.flipX, flipY: !!active.flipY, opacity: active.opacity ?? 1, visible: active.visible !== false, selectable: active.selectable !== false, evented: active.evented !== false, lockMovementX: !!active.lockMovementX, lockMovementY: !!active.lockMovementY, lockRotation: !!active.lockRotation, lockScalingX: !!active.lockScalingX, lockScalingY: !!active.lockScalingY, id: active.id });
-        replacement.__tableEditOriginals = active.__tableEditOriginals;
-        const history = useHistoryStore.getState(); history.lockHistory();
-        try { canvas.remove(active); canvas.insertAt(replacement, Math.max(0, index), false); canvas.setActiveObject(replacement); }
-        finally { history.unlockHistory(); }
-        replacement.setCoords(); syncSelection(replacement); saveCanvasHistory(); canvas.renderAll(); triggerRenderSimulation?.(); return;
-      }
 
       const binding = property === 'dataField' || property === 'dataBarcode' || property === 'dataQr';
       const bindingProp = binding ? property : '';
@@ -97,12 +78,9 @@ export function useObjectOrderingActions({
         active.set('top', Number(value) * pxPerMm);
       } else if (property === 'fontSizePt') {
         active.set('fontSize', (Number(value) * pxPerMm) / 2.834);
-      } else if ((property === 'x1' || property === 'y1' || property === 'x2' || property === 'y2') && active.type === 'line') {
-        updateLineEndpoint(active, property, Number(value));
+      } else if (applyLinePropertyUpdate(active, property, value, pxPerMm)) {
       } else if (property === 'strokeWidthMm') {
         active.set('strokeWidth', clampLineWidthMm(Number(value)) * pxPerMm);
-      } else if (property === 'lineStyle' && active.type === 'line') {
-        active.set('strokeDashArray', LINE_STYLE_DASH[value as keyof typeof LINE_STYLE_DASH]);
       } else {
         active.set(property, value);
         if (property === 'text' || property === 'barcodeValue') active.previewOverride = true;
@@ -144,7 +122,6 @@ export function useObjectOrderingActions({
 
     active.clone((cloned: fabric.Object) => {
       if (!canvasRef.current) return;
-      if ((active as any).isTable && (active as any).tableVersion === 2) (cloned as any).id = `table-v2-${typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
       cloned.set({
         left: (active.left || 0) + 10 * pxPerMm,
         top: (active.top || 0) + 10 * pxPerMm,
@@ -180,14 +157,14 @@ export function useObjectOrderingActions({
     const canvas = canvasRef.current; const active = canvas?.getActiveObject() as any;
     if (!canvas || !active || active.type !== 'activeSelection') return;
     const members = active.getObjects() as any[];
-    if (members.length < 2 || members.length > 50 || members.some(o => o.isTable)) return;
+    if (members.length < 2 || members.length > 50) return;
     const grouped = active.toGroup() as any; grouped.isEditorGroup = true; canvas.setActiveObject(grouped); syncSelection(grouped);
     saveCanvasHistory(); canvas.renderAll(); triggerRenderSimulation?.();
   }, [canvasRef, syncSelection, saveCanvasHistory, triggerRenderSimulation]);
 
   const handleUngroup = useCallback(() => {
     const canvas = canvasRef.current; const active = canvas?.getActiveObject() as any;
-    if (!canvas || !active || active.type !== 'group' || active.isTable || typeof active.toActiveSelection !== 'function') return;
+    if (!canvas || !active || active.type !== 'group' || typeof active.toActiveSelection !== 'function') return;
     const selection = active.toActiveSelection(); canvas.setActiveObject(selection); syncSelection(selection);
     saveCanvasHistory(); canvas.renderAll(); triggerRenderSimulation?.();
   }, [canvasRef, syncSelection, saveCanvasHistory, triggerRenderSimulation]);

@@ -1,6 +1,5 @@
 import type { fabric } from 'fabric';
 import { CANVAS_SERIALIZE_PROPS } from '../types/fabric-custom';
-import { parseTableModel } from '../features/table/model/tableModelV2';
 
 export const EDITOR_DRAFT_VERSION = 1;
 export const EDITOR_DRAFT_PREFIX = 'thermal-label-studio:editor-draft:';
@@ -25,7 +24,7 @@ export function serializeEditorDraft(canvas: fabric.Canvas, input: Omit<EditorDr
   const serialized = canvas.toJSON(CANVAS_SERIALIZE_PROPS as any) as unknown as { objects?: Array<Record<string, unknown>> };
   if (Array.isArray(serialized.objects)) serialized.objects = serialized.objects.filter((_object, index) => {
     const live = liveObjects[index] as any;
-    return live?.isLineDrawingPreview !== true && live?.isTablePlacementPreview !== true;
+    return live?.isLineDrawingPreview !== true;
   });
   return JSON.stringify({
     ...input,
@@ -49,7 +48,6 @@ export function parseEditorDraft(raw: string | null, userId: string): EditorDraf
       for (const item of objects) {
         if (!item || typeof item !== 'object') return null;
         const object = item as Record<string, unknown>;
-        if (object.isTable === true && object.tableVersion === 2 && !parseTableModel(object.tableSpec)) return null;
       }
     }
     return value as EditorDraft;

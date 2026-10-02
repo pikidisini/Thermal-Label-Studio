@@ -22,12 +22,14 @@ if str(WEB_APP_DIR) not in sys.path:
 # Directories
 BUILTIN_TEMPLATES_DIR = PROJECT_ROOT / "assets" / "templates"
 CUSTOM_TEMPLATES_DIR = Path(os.getenv("CUSTOM_TEMPLATES_DIR", str(BACKEND_DIR / "data" / "templates"))).expanduser().resolve()
+GRAPHICS_LIBRARY_DIR = Path(os.getenv("GRAPHICS_LIBRARY_DIR", str(BACKEND_DIR / "data" / "graphics"))).expanduser().resolve()
 DATA_SAMPLES_DIR = PROJECT_ROOT / "data_samples"
 STORAGE_OUT_DIR = BACKEND_DIR / "data" / "out"
 FRONTEND_DIR = (WEB_APP_DIR / "frontend" / "dist") if (WEB_APP_DIR / "frontend" / "dist" / "index.html").exists() else (WEB_APP_DIR / "frontend")
 
 # Ensure directories exist
 CUSTOM_TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
+GRAPHICS_LIBRARY_DIR.mkdir(parents=True, exist_ok=True)
 STORAGE_OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Application Settings

@@ -1,4 +1,4 @@
-import { fabric } from '../features/table/canvas/fabricInterop';
+import { fabric } from 'fabric';
 
 /**
  * Fabric.js to Standard Millimeter SVG Exporter
@@ -83,7 +83,7 @@ export function exportFabricToSvg(canvas, labelWidthMm, labelHeightMm, pxPerMm =
     // attached to the correct element without changing the live object text.
     const serializers: Array<{ object: any; toSVG: Function }> = [];
     const allObjects: any[] = [];
-    const visit = (object: any) => { if (!object) return; allObjects.push(object); if (object.isTable && typeof object.getObjects === 'function') object.getObjects().forEach(visit); };
+    const visit = (object: any) => { if (object) allObjects.push(object); };
     canvas.getObjects().forEach(visit);
     allObjects.forEach((object: any) => {
       if (!object || typeof object.toSVG !== 'function') return;
@@ -116,22 +116,13 @@ export function exportFabricToSvg(canvas, labelWidthMm, labelHeightMm, pxPerMm =
           attrs.push(`data-payload-spec="${encodePayloadSpec(this.payloadTemplate)}"`);
         }
         if (this.isBarcode) attrs.push('data-is-barcode="true"');
-        if (this.isTable && this.tableSpec) {
-          const bytes = new TextEncoder().encode(JSON.stringify(this.tableSpec)); let binary = '';
-          bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
-          const encoded = btoa(binary);
-          markup = markup.replace(/(<g\b[^>]*)(>)/i, `$1 data-table-spec="${encoded}"$2`);
-        }
         if (this.isEditorGroup) markup = markup.replace(/(<g\b[^>]*)(>)/i, '$1 data-editor-group="true"$2');
+        if (this.graphicAssetId && this.graphicAssetVersion) attrs.push(`data-graphic-asset-id="${escapeXmlAttribute(this.graphicAssetId)}" data-graphic-asset-version="${escapeXmlAttribute(this.graphicAssetVersion)}"`);
         if (attrs.length && !field) markup = markup.replace(/(<(?:g|image|rect|path|svg)\b[^>]*)(>)/i, `$1 ${attrs.join(' ')}$2`);
         return markup;
       };
     });
 
-    const v2Tables = canvas.getObjects().flatMap((object: any, index: number) => {
-      if (!object?.isTable || object.tableVersion !== 2 || !object.tableSpec || typeof object.getObjects !== 'function') return [];
-      return [{ index, model: object.tableSpec, pxPerMm, left: object.left || 0, top: object.top || 0, scaleX: object.scaleX || 1, scaleY: object.scaleY || 1, angle: object.angle || 0, flipX: !!object.flipX, flipY: !!object.flipY, opacity: object.opacity ?? 1, id: object.id || null }];
-    });
     let svgStr: string;
     try {
       svgStr = canvas.toSVG({
@@ -185,16 +176,6 @@ export function exportFabricToSvg(canvas, labelWidthMm, labelHeightMm, pxPerMm =
     svgStr = svgStr.replace(/barcodeType="([^"]+)"/g, 'data-barcode-type="$1"');
     svgStr = svgStr.replace(/isDynamic="([^"]+)"/g, 'data-is-dynamic="$1"');
     svgStr = svgStr.replace(/isBarcode="([^"]+)"/g, 'data-is-barcode="$1"');
-
-    // Fabric drops groups whose only child is excluded from export. Keep a
-    // bounded, non-rendering metadata record so an all-hidden table remains
-    // editable after SVG import without adding invisible print geometry.
-    if (v2Tables.length) {
-      const state = JSON.stringify({ version: 1, tables: v2Tables });
-      if (state.length > 1_000_000) throw new Error('Terlalu banyak metadata tabel v2 untuk ekspor SVG yang aman.');
-      const metadata = btoa(unescape(encodeURIComponent(state)));
-      svgStr = svgStr.replace(/<\/svg>\s*$/i, `<metadata id="thermal-table-v2-state">${metadata}</metadata></svg>`);
-    }
 
     return svgStr;
   } catch (err) {

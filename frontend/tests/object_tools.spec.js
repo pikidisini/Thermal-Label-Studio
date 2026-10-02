@@ -36,56 +36,14 @@ test.describe('Fitur 2 - Toolbox Vector Elements & Token Insertion Tests', () =>
     await expect(page.getByText('Transform Inspector')).toBeVisible();
   });
 
-  // TC-TOOL-02: Insertion of Geometric Primitives & Manifest Table (Box, Line, Circle, Table)
-  test('TC-TOOL-02: Insert Geometric Primitives (Box, Line, Circle, Table)', async ({ page }) => {
-    // 1. Insert Box Frame (Rect)
-    const btnRect = page.locator('[data-testid="btn-add-rect"]').first();
-    await expect(btnRect).toBeVisible();
-    await btnRect.click();
-
-    // 2. Insert Separator Line
+  // TC-TOOL-02: The remaining line tool stays available; Rect/Circle are legacy import-only.
+  test('TC-TOOL-02: Insert separator line without Rect/Circle creation tools', async ({ page }) => {
     const btnLine = page.locator('[data-testid="btn-add-line"]').first();
     await expect(btnLine).toBeVisible();
     await btnLine.click();
 
-    // 3. Insert Circle / Badge
-    const btnCircle = page.locator('[data-testid="btn-add-circle"]').first();
-    await expect(btnCircle).toBeVisible();
-    await btnCircle.click();
-
-    // 4. Insert Manifest Table Grid
-    const btnTable = page.locator('[data-testid="btn-add-table"]').first();
-    await expect(btnTable).toBeVisible();
-    await btnTable.click();
-
-    // Verify Coordinate inputs in Inspector
-    const inspectorX = page.locator('[data-testid="inspector-x"]').first();
-    await expect(inspectorX).toBeVisible();
-    await expect(page.getByText('Transform Inspector')).toBeVisible();
-  });
-
-  // TC-TOOL-03: Industrial Hazard Pictograms & ISO Symbols
-  test('TC-TOOL-03: Insert Industrial Symbols & GHS Hazard Pictograms', async ({ page }) => {
-    // 1. Add Default ISO Symbol (Fragile)
-    await page.getByTestId('dock-btn-symbols').click();
-    const btnSymbol = page.locator('[data-testid^="btn-symbol-"]').first();
-    await expect(btnSymbol).toBeVisible();
-    await btnSymbol.click();
-
-    // 2. Add GHS Flammable from Drawer
-    const btnGhsFlammable = page.locator('button:has-text("FLAM")').first();
-    if (await btnGhsFlammable.isVisible()) {
-      await btnGhsFlammable.click();
-    }
-
-    // 3. Add GHS Toxic from Drawer
-    const btnGhsToxic = page.locator('button:has-text("TOXIC")').first();
-    if (await btnGhsToxic.isVisible()) {
-      await btnGhsToxic.click();
-    }
-
-    // Verify Transform Inspector is active
-    await expect(page.getByText('Transform Inspector')).toBeVisible();
+    await expect(page.getByTestId('btn-add-rect')).toHaveCount(0);
+    await expect(page.getByTestId('btn-add-circle')).toHaveCount(0);
   });
 
   // TC-TOOL-04: SAP Token Drawer Insertion (+Text, +Bar, +QR)

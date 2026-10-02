@@ -4,6 +4,7 @@ interface DockButtonProps {
   icon: string;
   label: string;
   active?: boolean;
+  showTooltip?: boolean;
   onClick: () => void;
   testId?: string;
 }
@@ -12,7 +13,7 @@ interface DockButtonProps {
  * 48px icon-only dock button with tooltip.
  * Active state: left accent bar + primary icon tint.
  */
-export function DockButton({ icon, label, active = false, onClick, testId }: DockButtonProps) {
+export function DockButton({ icon, label, active = false, showTooltip = true, onClick, testId }: DockButtonProps) {
   return (
     <button
       onClick={onClick}
@@ -31,10 +32,13 @@ export function DockButton({ icon, label, active = false, onClick, testId }: Doc
       )}
       <span className="material-symbols-outlined" style={{ fontSize: 22 }}>{icon}</span>
 
-      {/* Tooltip on hover */}
-      <span className="absolute left-full ml-2 px-2 py-1 bg-surface-container-highest text-on-surface text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 border border-outline-variant">
-        {label}
-      </span>
+      {/* A flyout already identifies the active tool area, so an additional
+          dock tooltip would overlap its header and the nearby ruler. */}
+      {showTooltip && (
+        <span className="absolute left-full ml-2 px-2 py-1 bg-surface-container-highest text-on-surface text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[var(--ui-layer-tooltip)] border border-outline-variant">
+          {label}
+        </span>
+      )}
     </button>
   );
 }
