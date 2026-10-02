@@ -1,197 +1,143 @@
 # Thermal Label Studio
 
-Thermal Label Studio adalah aplikasi web untuk mendesain template label SVG, mengisi data dari SAP, menampilkan preview, membuat bukti PDF simulasi, dan menyiapkan pipeline pencetakan thermal label.
+Thermal Label Studio is a local-first web application for designing SVG label templates, binding SAP data, reviewing thermal output, and producing controlled simulation evidence.
 
-> Status saat ini: aplikasi dapat digunakan untuk pengembangan dan simulasi lokal. Jalur printer fisik, deployment production, HTTPS intranet, backup, observability, dan prosedur operasional pabrik masih memerlukan verifikasi tersendiri.
+> **Development status:** the application supports local development and controlled simulation. Passing local checks does not prove production readiness, SAP production integration, or permission to print to physical devices.
 
-## Yang dapat dilakukan sekarang
+## Current capabilities
 
-- Mendesain dan mengedit template label SVG melalui studio web.
-- Menggunakan placeholder seperti `{{batch_text}}` pada template.
-- Memuat data raw SAP dalam format JSON v2 melalui menu **Simulasi Label**.
-- Melanjutkan simulasi walaupun sebagian field SAP tidak tersedia; nilai yang hilang ditampilkan sebagai `--` dan warning ditampilkan per item/field.
-- Membuat bukti hasil simulasi berupa PDF ber-watermark tanpa mengirim data ke printer fisik.
-- Menguji rendering, barcode/QR, validasi template, serta lifecycle print job menggunakan transport virtual/mock.
-- Menggunakan akun aplikasi berperan `PPIC` atau `IT` untuk akses UI dan endpoint yang dilindungi.
-- Menjalankan deployment simulasi lokal secara otomatis melalui Jenkins self-hosted.
+- Design SVG label templates on a Fabric-based canvas with millimetre dimensions, rulers, zoom, pan, Snap, and guides.
+- Add and edit text, 1D barcodes, QR codes, straight lines, standalone uploaded images, and global graphic-library assets.
+- Bind supported elements to SAP data tokens and preview data from local SAP JSON imports.
+- Save and open templates, inspect layers and properties, and export supported label formats through the protected application flows.
+- Run label simulation and generate watermarked PDF evidence without sending data to a physical printer.
+- Use authenticated PPIC and IT sessions for protected UI and API flows.
 
-## Batas keamanan penting
+### Unsupported feature
 
-Mode simulasi lokal bukan jalur produksi. Pada deployment simulasi:
+The Table design feature is retired and unsupported. It has no toolbox entry, editor mode, runtime implementation, or migration path. There are no official legacy templates that require Table compatibility.
 
-- JSON SAP lokal hanya diproses untuk simulasi dan pembuatan PDF.
-- Barcode/QR yang tidak memiliki sumber data tidak dibuat.
-- Jalur machine-to-machine dan production tetap memvalidasi field secara strict/fail-closed.
-- Jangan mengaktifkan akses LAN, TCP port 9100, Windows Spooler, atau printer fisik sebelum desain deployment dan verifikasi keamanan disetujui.
-- Jangan menyimpan password, token, credential, atau file `.env` ke Git.
+## Frontend architecture
 
-## Struktur utama
+The frontend uses a feature-first structure under `frontend/src/features/`.
 
 ```text
-web_app/
-├── backend/                 # FastAPI, service domain, auth, dan test pytest
-├── frontend/                # React + Vite + TypeScript strict
-├── engine/                  # Renderer SVG, rasterizer, barcode/QR, encoder
-├── assets/templates/        # Template SVG kanonikal dan aset label
-├── docs/architecture/       # Rancangan fitur dan arsitektur
-├── docs/contracts/          # Kontrak data dan print job
-├── docs/database/           # DDL/proposal persistence PostgreSQL
-├── docs/deployment/         # Runbook Docker, Jenkins, dan deployment pilot
-├── docs/tasks/              # Task contract, result, dan review per fase
-├── docker-compose.yml       # Aplikasi lokal sederhana
-├── docker-compose.pilot.yml # App + PostgreSQL + dispatcher pilot
-├── Dockerfile               # Build frontend dan runtime FastAPI
-└── Jenkinsfile              # Gate test dan deployment simulasi lokal
+frontend/src/
+├── features/
+│   ├── barcode/          # Barcode creation and payload rules
+│   ├── canvas/           # Canvas lifecycle, viewport, ruler, and navigation
+│   ├── data-tokens/      # SAP contracts, local JSON parsing, and token UI
+│   ├── graphics/         # Global graphic library and update workflow
+│   ├── images/           # Standalone template image uploads
+│   ├── line/             # Line creation, editing, anchors, and snapping
+│   ├── qr/               # QR generation and placement
+│   ├── snapping/         # Grid, guide, endpoint, and object snapping
+│   ├── templates/        # Template browsing and persistence workflow
+│   └── text/             # Text creation and formatting
+├── shared/               # Shared UI primitives, overlay layers, and API config
+├── components/           # Studio composition and layout
+├── hooks/                # Cross-feature editor orchestration only
+├── store/                # Client state
+└── utils/                # Non-feature utility boundaries
 ```
 
-Dokumen konteks yang perlu dibaca sebelum mengubah proyek:
+Feature public barrels are the default import boundary. Canvas lifecycle and viewport behavior belong to `features/canvas`; the studio-level action hook coordinates the remaining feature actions without owning their internal implementations.
 
-- `AGENTS.md` — aturan kerja dan quality gate.
-- `docs/PROJECT_STATUS.md` — status proyek terbaru.
-- `docs/DECISIONS.md` — keputusan arsitektur yang sudah disetujui.
-- `docs/AI_HANDOFF.md` — handoff lintas perangkat/provider.
-- `docs/QUALITY_GATE.md` — test, security, dan Definition of Done.
-- `docs/architecture/` — rencana dan rancangan fitur.
+## Run locally
 
-## Menjalankan aplikasi dengan Docker
+### Frontend development server — port 8765
 
-Pastikan Docker Desktop sudah berjalan, lalu dari folder `web_app/` jalankan:
+Start the backend separately, then run the Vite development server from `web_app/frontend`:
 
-```bash
+```powershell
+npm.cmd install
+npm.cmd run dev -- --host 127.0.0.1 --port 8765
+```
+
+Open <http://127.0.0.1:8765>. The development server proxies `/api` requests to the backend at `http://127.0.0.1:8000`.
+
+### Docker application — port 8000
+
+From `web_app/`, start the local simulation application:
+
+```powershell
 docker compose up -d --build
 ```
 
-Buka:
+Open:
 
-- UI: <http://127.0.0.1:8000>
+- Application: <http://127.0.0.1:8000>
 - Health check: <http://127.0.0.1:8000/api/v1/health>
-- Swagger API: <http://127.0.0.1:8000/docs>
+- OpenAPI documentation: <http://127.0.0.1:8000/docs>
 - ReDoc: <http://127.0.0.1:8000/redoc>
 
-Untuk melihat log dan menghentikan aplikasi:
+Useful Docker commands:
 
-```bash
+```powershell
 docker compose logs -f label-thermal-studio
 docker compose stop
 ```
 
-Data aplikasi lokal berada pada bind mount `backend/data`. Jangan menghapus data atau volume tanpa backup dan persetujuan.
+Local application data is bind-mounted at `backend/data`. Do not delete local data or volumes without a confirmed backup and authorization.
 
-## Login aplikasi lokal
+## Login and local data
 
-Login aplikasi menggunakan akun `PPIC` atau `IT`; tidak ada password universal yang disimpan di README.
+The application uses PPIC and IT accounts. Do not store passwords, tokens, credentials, or `.env` content in this repository or this README.
 
-Jika akun awal belum ada, buat akun melalui CLI di dalam container yang sedang berjalan. Contoh:
+To create a local account in a running container, use the administrative CLI and enter the password interactively:
 
-```bash
+```powershell
 docker exec -it label-thermal-studio python -m app.cli.user_admin create-user --username ppic_operator --role PPIC
 ```
 
-CLI akan meminta password secara interaktif. Jangan menaruh password pada command history, source code, atau file yang di-commit.
+Local SAP JSON imports are intended for SAP DEV/SANDBOX simulation. The simulator may show `--` and a warning for missing fields in text output; it must not fabricate values or generate Barcode/QR content from missing data.
 
-## Alur simulasi SAP lokal
+## Validation
 
-1. Login ke aplikasi.
-2. Buka **Simulasi Label**.
-3. Pilih **Impor JSON dari SAP**.
-4. Pilih file JSON hasil ekspor `ZMMR_LABEL_JSON` dari SAP DEV/SANDBOX.
-5. Aplikasi memvalidasi struktur JSON, menyimpan raw snapshot, menjalankan aturan layout, dan membuat bukti PDF.
-6. Jika ada data kosong, simulasi tetap selesai; warning menampilkan field yang hilang dan label menggunakan `--`.
-7. Periksa urutan item, warning, preview, serta PDF sebelum menyimpulkan layout sudah sesuai.
+Run frontend checks from `web_app/frontend`:
 
-Data JSON simulasi tetap dianggap data bisnis. Jangan mengunggah data produksi ke laptop atau environment yang belum disetujui.
-
-## Endpoint API utama
-
-Semua endpoint berada di bawah `/api/v1` kecuali health check.
-
-| Area | Endpoint utama | Keterangan |
-|---|---|---|
-| Auth | `/api/v1/auth/login`, `/api/v1/auth/me`, `/api/v1/auth/logout` | Login dan sesi aplikasi |
-| Health | `/api/v1/health`, `/health` | Probe kesehatan aplikasi |
-| Template | `/api/v1/templates` | Daftar, simpan, upload, dan hapus template |
-| Render | `/api/v1/render`, `/api/v1/render/preview` | Render label dan preview |
-| Inspect | `/api/v1/inspect/validate` | Validasi JSON terhadap template |
-| Simulasi | `/api/v1/simulation/operator/import-json` | Impor JSON SAP lokal untuk simulasi |
-| Simulasi | `/api/v1/simulation/sap-batches` | Daftar batch simulasi |
-| Simulasi | `/api/v1/simulation/sap-batches/{batch_id}` | Detail batch dan warning |
-| Safe Demo | `/api/v1/safe-demo/batch` | Jalur simulasi virtual/regression |
-| Print | `/api/v1/print/*` | Jalur printer; jangan gunakan pada deployment simulasi |
-| Print Agent | `/api/v1/print-agent/*` | Lifecycle agent dan delivery job |
-
-Swagger di `/docs` adalah referensi endpoint aktual; authorization dan CSRF tetap berlaku pada endpoint mutasi.
-
-Jalur legacy physical print (`/api/v1/print/*` dan `/api/v1/sap/print`) dinonaktifkan secara default melalui
-`LEGACY_DIRECT_PRINT_ENABLED=false`. Deployment lokal juga selalu menetapkan `LOCAL_SIMULATION_ONLY=true`, sehingga
-jalur tersebut mengembalikan 404 dan tidak menyediakan akses ke TCP 9100 atau Windows Spooler. Untuk uji kompatibilitas
-administratif terisolasi, aktifkan flag legacy pada deployment yang tidak simulation-only dan gunakan sesi pengguna IT
-serta token CSRF; opt-in ini bukan persetujuan production atau pengganti registry/print-agent production.
-
-## Menjalankan test
-
-Dari folder `web_app/`:
-
-```bash
-# Backend
-python -m pytest backend/tests -q -p no:cacheprovider
-
-# Frontend unit test
-cd frontend
+```powershell
 npm.cmd test
-
-# TypeScript dan production build
 npm.cmd exec tsc -- --noEmit
 npm.cmd run build
-
-# Playwright E2E
 npm.cmd run test:e2e
 ```
 
-Jika pytest Windows gagal mengakses folder temporary, jalankan dari terminal dengan izin temporary yang sesuai atau gunakan environment/container test yang terisolasi. Catat status tersebut sebagai `NOT RUN` bila belum berhasil diverifikasi.
+Run backend tests from `web_app/`:
 
-## Jenkins lokal
-
-Jenkins self-hosted digunakan untuk menguji dan menerapkan perubahan `main` ke aplikasi simulasi lokal; GitHub Actions tidak digunakan.
-
-Runbook lengkap: `docs/deployment/jenkins_local_simulation.md`.
-
-Ringkasan:
-
-```bash
-docker compose -f ops/jenkins/compose.yml up -d --build
+```powershell
+python -m pytest backend/tests -q -p no:cacheprovider
 ```
 
-Buka Jenkins di <http://127.0.0.1:8081>. Job utama membaca branch `main`, menjalankan gate backend/frontend/build image, lalu mengganti container simulasi hanya jika semua gate lulus. Deployment Jenkins tetap lokal pada laptop dan tidak sama dengan deployment pilot pabrik.
+Use `git diff --check` before committing. Report checks as **PASS**, **FAIL**, **BLOCKED**, or **NOT RUN** according to actual evidence. A browser smoke test, production integration, and physical-print verification remain separate activities.
 
-Untuk status container:
+## Safety and hardware boundaries
 
-```bash
-docker ps
-docker logs --tail 100 thermal-label-jenkins-local
-```
+Local simulation is not a production print path.
 
-## Pilot dan production
+- `LOCAL_SIMULATION_ONLY=true` keeps the Docker deployment simulation-only.
+- `LEGACY_DIRECT_PRINT_ENABLED=false` keeps legacy physical-print routes disabled by default.
+- Do not enable LAN access, TCP port 9100, Windows Spooler access, or a physical printer without explicit infrastructure and security approval.
+- Production and machine-to-machine paths remain strict and fail closed; local import tolerance must not weaken them.
+- Do not use SAP production data in unapproved local environments.
 
-`docker-compose.pilot.yml` adalah rancangan deployment pilot yang memisahkan aplikasi, PostgreSQL, dan central dispatcher. Konfigurasi tersebut bukan alasan untuk langsung mengirim ke printer. Sebelum pilot nyata diperlukan setidaknya:
+## Documentation
 
-- persetujuan IT/infrastruktur dan keamanan jaringan;
-- verifikasi endpoint dari server Linux ke printer;
-- konfigurasi media/printer dan SOP operator;
-- backup, retention, monitoring, rollback, dan load test;
-- keputusan eksplisit untuk mengaktifkan transport fisik.
+Read these documents before making architectural or operational changes:
 
-Dokumen DDL PostgreSQL masih menjadi desain yang harus dikelola melalui migration/repository layer sebelum dianggap production-ready.
+- [AGENTS.md](AGENTS.md) — repository rules, security boundaries, and validation expectations.
+- [Project status](docs/PROJECT_STATUS.md) — current project status and known limits.
+- [Architecture decisions](docs/DECISIONS.md) — approved architecture decisions.
+- [AI handoff](docs/AI_HANDOFF.md) — cross-session implementation history.
+- [Quality gates](docs/QUALITY_GATE.md) — validation and Definition of Done guidance.
+- [Architecture](docs/architecture/) — feature and system design references.
+- [Task evidence](docs/tasks/) — task contracts, results, and reviews.
+- [Local Jenkins simulation runbook](docs/deployment/jenkins_local_simulation.md) — localhost-only Jenkins workflow.
 
-## Workflow pengembangan
+## Development workflow
 
-- Gunakan GitHub sebagai source of truth.
-- Satu branch hanya memiliki satu writer aktif.
-- Gunakan branch `codex/...` untuk perubahan fitur.
-- Untuk pekerjaan integrasi, simpan `TASK_CONTRACT.md`, `RESULT.md`, dan `REVIEW.md` di `docs/tasks/<TASK_ID>/`.
-- Jalankan test relevan sebelum commit.
-- Jangan commit `.env`, credential, screenshot, report generated, `frontend/dist/`, `test-results/`, atau file sementara.
-- Jangan mengubah repository POC di luar `web_app/` kecuali diminta secara eksplisit.
-
-## Status klaim
-
-Kelulusan test lokal atau disposable PostgreSQL hanya membuktikan cakupan yang diuji. Itu tidak otomatis berarti aplikasi sudah production-ready, sudah terhubung SAP, atau sudah aman mengirim ke printer fisik.
+- Keep one active writer per branch and use `codex/...` branches for Codex work unless a different branch is explicitly requested.
+- Preserve unrelated working-tree changes.
+- Use task contracts, results, and reviews for cross-module work.
+- Do not commit generated frontend output, screenshots, reports, `test-results/`, Playwright artifacts, `.env`, or credentials.
+- A local test or build pass is evidence only for the scope that ran; it is not production approval.
