@@ -24,6 +24,7 @@ from .api import (
     sap_router,
     simulation_router,
     templates_router,
+    graphics_router,
 )
 from .api.routes_print_agent import (
     cleanup_print_agent_state,
@@ -97,6 +98,7 @@ app.add_middleware(
 # Mount API Routers under /api/v1
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(templates_router, prefix="/api/v1")
+app.include_router(graphics_router, prefix="/api/v1")
 app.include_router(render_router, prefix="/api/v1")
 app.include_router(print_router, prefix="/api/v1")
 app.include_router(inspect_router, prefix="/api/v1")
@@ -127,6 +129,7 @@ def api_status():
         "sap_shadow_simulation_enabled": is_sap_shadow_simulation_enabled(),
         "endpoints": {
             "templates": "/api/v1/templates",
+            "graphics": "/api/v1/graphics",
             "render": "/api/v1/render",
             "preview": "/api/v1/render/preview",
             "print_tcp": "/api/v1/print/tcp",

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuthStore } from './store/useAuthStore';
-import { LoginPage } from './components/auth/LoginPage';
+import { LoginPage } from './features/auth';
 import { AuthenticatedStudio } from './components/studio/AuthenticatedStudio';
 
 export default function App() {

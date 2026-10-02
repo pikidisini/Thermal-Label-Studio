@@ -935,6 +935,8 @@ Langkah berikutnya: Berhenti pada B2B2A.1 setelah quality gate dokumentasi. Menu
 
 ## Pekerjaan berikutnya
 
+- [ ] F3.37: implementasi Graphics Library, Utilities → Graphic Update Center, dan bulk update tersedia secara lokal; lihat `docs/tasks/F3.37/RESULT.md` untuk batas deploy. Endpoint belum tersedia pada container aplikasi lama sampai build/deploy dilakukan.
+
 - [ ] Perbarui bagian ini setelah setiap milestone implementasi.
 - [ ] Catat acceptance criteria dan test yang benar-benar dijalankan.
 - [ ] Catat blocker, asumsi, dan keputusan baru di `DECISIONS.md`.
@@ -1020,3 +1022,170 @@ Langkah berikutnya:
 - Writer menambahkan snap sudut/endpoint dengan transform Fabric, explicit anchor continuation, blank-click inert behavior, preview tanpa selection overlay, pemulihan editability garis, serta HUD instruksi dan ketebalan mm sebelum menggambar.
 - Reviewer gates PASS: TypeScript, frontend unit 122/122, Vite build 1857 modules, focused Playwright 10/10 including anchor zoom position/size coverage, diff check, dan live localhost health 200 with asset `index-0fyo_WGH.js`.
 - Perubahan tetap uncommitted; tidak ada commit, push, printer, SAP, MinIO, atau deployment.
+## F3.35 — Canvas dan ruler feature boundary (2026-09-29)
+
+- Status writer: implementation complete, awaiting independent reviewer.
+- Ownership aktual dipindahkan ke `frontend/src/features/canvas/`: UI di `ui/`, Fabric dan viewport gesture di `editor/`, dan visual ruler di `ruler/`.
+- `features/snapping` tidak berubah dan tetap feature independen; ruler hanya membaca viewport/koordinat, bukan menentukan kandidat snap.
+- `AuthenticatedStudio` mengimpor `StudioCanvas` dari public API feature. Tidak ada test ID yang diubah.
+- Tambahkan test murni `getMajorStepMm` agar interval 1/2/5 ruler teruji tanpa DOM/canvas.
+- Perubahan teks yang sudah ada pada working tree dipertahankan. Tidak ada commit, push, atau deployment.
+
+## F3.36 — Frontend layering dan overlay (2026-10-01)
+
+- Status writer: implementation complete, awaiting independent reviewer.
+- Kontrak shared `frontend/src/shared/ui/layers/` mendefinisikan tier canvas, chrome, flyout, tooltip, modal, dan toast; komponen yang diaudit tidak lagi memakai angka layer lokal.
+- Menu font dan topbar memakai `AnchoredOverlay` yang dipasang ke `document.body`; table grid picker juga memakai portal root. Ketiganya tidak terperangkap stacking context ribbon/chrome atau `overflow` parent saat Data Tokens/flyout toolbox terbuka.
+- Koreksi review memastikan trigger font dianggap interaksi internal sehingga klik kedua menutup menu, dan mempertahankan overlay internal canvas tabel di luar scope.
+- Writer gates PASS setelah koreksi: TypeScript penuh, strict-core, frontend unit 129/129 (termasuk 3 test F3.36), Vite build 1.868 modul, dan `git diff --check`. `git fetch origin` BLOCKED oleh permission `.git/FETCH_HEAD`; browser UAT visual masih diperlukan.
+- Browser gate F3.36 PASS: focused Playwright `chromium-no-auth` 2/2 membuktikan menu File serta font picker membuka root overlay dan klik trigger kedua menutupnya. Rute auth/status/templates dimock di browser test; tidak menggunakan sesi pengguna.
+- Perubahan lokal F3.35 text/canvas/shape dipertahankan. Tidak ada commit, push, printer, SAP, atau deployment.
+
+## F3.38 — Frontend feature-first foundation (Graphics) (2026-10-01)
+
+- Status: writer implementation in progress; scope dan acceptance ada di `docs/tasks/F3.38/TASK_CONTRACT.md`.
+- Ownership Graphics dipindahkan ke `frontend/src/features/graphics/{api,hooks,model,ui}` dan diekspos lewat public barrel. Shell layout hanya memakai public API feature.
+- `API_BASE` generik berada di `frontend/src/shared/api`; `frontend/src/utils/api/apiConfig.ts` mempertahankan re-export kompatibel untuk API lama.
+- Canvas, Line, Text, Snapping, Barcode/QR, Templates, dan Table tidak direfaktor dalam tahap ini. Tidak ada commit, push, deploy, atau service restart.
+
+## F3.39 — Feature ownership Line dan Snapping (2026-10-01)
+
+- Status: writer implementation in progress; scope dan acceptance ada di `docs/tasks/F3.39/TASK_CONTRACT.md`.
+- Line dan Snapping sedang diberi public barrel dan caller lintas-feature dipindahkan dari deep import ke public API.
+- Lifecycle gabungan `useDrawingTools` tetap adapter canvas karena juga menangani Text, Barcode, dan Table; behavior Line/Snapping tidak diubah.
+- Tidak ada commit, push, deploy, atau service restart.
+
+## F3.40 — Text feature ownership (2026-10-01)
+
+- Status: writer implementation in progress; lihat `docs/tasks/F3.40/TASK_CONTRACT.md`.
+- Aksi Text, model font, dan UI format dipusatkan di `features/text`; helper overlay tetap di shared UI.
+- Tidak ada perubahan behavior text, font picker, dynamic binding, SVG exporter, atau feature lain.
+- Tidak ada commit, push, deploy, atau service restart.
+
+## F3.41 — Barcode dan QR feature ownership (2026-10-01)
+
+- Status: implementasi writer selesai, menunggu review acceptance. Lihat `docs/tasks/F3.41/TASK_CONTRACT.md` dan `RESULT.md`.
+- Barcode memiliki generator/payload/preview/action/property UI sendiri; QR memiliki generator serta `useQrActions` sendiri. `useCanvasActions` hanya mengagregasi public API feature.
+- Barcode tetap tanpa human-readable text; payload komposit/literal, QR multiline, dynamic bindings, metadata SVG, dan test ID dipertahankan.
+- Tidak ada perubahan behavior, backend, commit, push, deploy, atau service restart.
+
+## F3.42 — Batch ownership Templates, Simulation, dan Print UI (2026-10-01)
+
+- Status: implementasi writer selesai, menunggu review acceptance. Kontrak dan hasil ada di `docs/tasks/F3.42/`.
+- Template lifecycle, Template Explorer selector, dan save modal berada di `features/templates`; thermal simulation, Safe Demo, SAP shadow flow/API berada di `features/simulation`; Print modal serta tabs berada di `features/print`.
+- Shell/layout tetap generik. Transport `renderApi`/`printApi`/`apiClient` sengaja tidak dipindahkan karena merupakan API lintas-domain dan boundary hardware/export.
+- Tidak ada perubahan UI, endpoint/backend, security, commit, push, deployment, atau restart service.
+
+## F3.43 — Data Tokens, Diagnostics, dan Auth UI ownership (2026-10-01)
+
+- Status: implementasi writer selesai, menunggu review acceptance. Detail ada di `docs/tasks/F3.43/`.
+- Data Tokens/SAP local JSON, diagnostics recorder/report/modal, serta Login UI/Auth API sudah memiliki feature public barrel. Store Zustand tetap shared agar state/session server behavior tidak berubah.
+- Canvas Setup ditahan pada modal shell karena mengorkestrasi lifecycle Template dan Canvas, bukan owner Canvas tunggal.
+- Tidak ada perubahan UI, endpoint/backend/security, Docker, commit, push, deployment, atau restart service.
+
+## F3.44 — Shared UI foundation (2026-10-01)
+
+- Status: writer implementation selesai, menunggu review acceptance. Lihat `docs/tasks/F3.44/`.
+- `shared/ui` sekarang memiliki primitive publik dan token semantic yang mempertahankan dark industrial editor. Tidak ada redesign atau migrasi dialog berisiko.
+- Tidak ada perubahan UI flow, endpoint/backend/auth/store/Docker, commit, push, deployment, atau restart service.
+
+## F3.45 — Controlled shared UI migration (2026-10-01)
+
+- Status: writer implementation selesai, menunggu review. Login dan Canvas Setup memakai shared UI primitives tanpa perubahan callback/test ID/lifecycle.
+- Hierarchy diselaraskan ke dark industrial baseline; editor dan dialog lain tidak disentuh.
+- Tidak ada perubahan endpoint/backend/auth behavior/store/Docker, commit, push, deployment, atau restart.
+- Reviewer correction: Login decorative/direct colors removed in favor of semantic industrial tokens; Canvas Setup undefined `surface-variant` styles replaced with configured surface classes. Tsc/build/diff check PASS.
+- Final correction: Login now uses configured `bg-surface-container`/`bg-surface-container-high` utilities and `text-tertiary`; no CSS-variable-only Tailwind class remains. Tsc/build/diff PASS.
+
+## F3.46 — Controlled Templates UI migration (2026-10-01)
+
+- Status: writer implementation complete, awaiting review. Template Explorer and Save Template consume shared UI primitives while preserving folder/search/preview/open/move/save flows.
+- White SVG preview remains intentional label content; no backend, Canvas, endpoint, auth/store, Git lifecycle, or deployment change.
+
+## F3.47 — Controlled Print and Export UI migration (2026-10-01)
+
+- Status: writer implementation complete, awaiting review. Print modal and all scoped tabs use shared primitives; gate/transport behavior remains unchanged.
+- No printer, spooler, or port action was invoked. No backend/security/Git lifecycle change.
+
+## F3.48 — Frontend test environment diagnosis (2026-10-01)
+
+- Status: diagnosis complete, awaiting review. `canvas@2.11.2` remains installed as Fabric's optional dependency but its native `canvas.node` binary is absent under Node v24.18.0 (ABI 137); no install, lockfile, or runtime mutation was performed.
+- The full frontend runner no longer reproduces a Canvas module-load failure despite the absent optional binary. It now passes 138/138 after only updating stale test contracts: the Login assertion uses the current English copy and `test_frontend.mjs` imports `parseLocalSapJson` through the Data Tokens public barrel.
+- F3.48 tsc, Vite build, and diff check pass. No commit, push, deploy, restart, package installation, printer/spooler/port activity, or backend/auth behavior change.
+
+## F3.49 — Controlled Label Simulation UI migration (2026-10-01)
+
+- Status: writer implementation complete, awaiting review. `SapShadowSimulationModal` and `SafeDemoModal` consume shared Dialog, header/footer, button, icon-button, and badge primitives with configured dark-industrial semantic tokens.
+- Simulation API calls, form/callback/state behavior, test IDs, import/download actions, and the fail-closed no-printer/no-spooler boundary are retained. No simulation, printer, spooler, port, or external service action was invoked.
+- Writer validation: TypeScript PASS, frontend unit/structural suite PASS 139/139, Vite build PASS (1,894 modules; existing Fabric advisory only), and diff check PASS.
+- Reviewer correction applied: all user-visible copy in both Label Simulation and Safe Demo modals is English. Simulation APIs, state, test IDs, and no-printer/no-spooler behavior are unchanged.
+
+## F3.50 — Controlled Diagnostics and Shortcut Help UI migration (2026-10-01)
+
+- Status: writer implementation complete, awaiting review. AI Diagnostics and Keyboard Shortcut Help now use shared Dialog/header/footer/button/icon-button primitives and configured semantic dark-industrial tokens.
+- Diagnostics report generation, Copy/Download/refresh actions, shortcut semantics, callbacks, and modal overlay layering remain unchanged. All user-visible diagnostics copy is English.
+- Writer validation: TypeScript PASS, frontend unit/structural suite PASS 140/140, Vite build PASS (1,894 modules; existing Fabric advisory only), and diff check PASS.
+
+## F3.51 — Controlled Top Menu and Status Bar UI migration (2026-10-01)
+
+- Status: writer implementation complete, awaiting review. `TopMenuBar`, direct `TopBarActions`, and `StatusBar` use shared Button, IconButton, and Badge primitives with configured dark-industrial semantic token utilities.
+- Menu click-away/Escape closing, menu/action callbacks, test IDs, auth/logout/session behavior, simulation visibility, status calculations, zoom control behavior, and chrome layering are retained. All touched user-visible copy is English.
+- Writer validation: TypeScript PASS, focused structural coverage PASS (15/15), full frontend suite PASS (141/141), Vite build PASS (1,894 modules; existing Fabric advisory only), and diff check PASS. The auth-flow assertion now follows the required English `Sign out` copy.
+- The existing server-rendered `useLayoutEffect` advisory from `features/canvas/ui/StudioCanvas.tsx` remains non-failing and out of scope. No backend, auth/store semantic, Docker, hardware, database, dependency, Git lifecycle, service, or external action change.
+
+## F3.52 — Controlled Property Ribbon and Left Toolbox UI migration (2026-10-01)
+
+- Status: writer implementation complete, awaiting review. Property Ribbon, direct geometry controls, and Left Toolbox close controls use shared Button/IconButton primitives with configured dark-industrial semantic utilities.
+- Tool modes and callbacks, test IDs, feature boundaries, Fabric behavior, Snap/Guides state, dynamic ribbon values, and flyout/tooltip layering are unchanged. The Line label is now English; Table, Rectangle, and Circle controls remain hidden or disconnected.
+- Writer validation: TypeScript PASS, focused structural coverage PASS (16/16), full frontend suite PASS (142/142), Vite build PASS (1,894 modules; existing Fabric advisory only), and diff check PASS.
+- The existing server-rendered `useLayoutEffect` advisory from `features/canvas/ui/StudioCanvas.tsx` remains non-failing and out of scope. No backend, auth/store semantic, Docker, hardware, database, dependency, Git lifecycle, service, or external action change.
+
+## F3.53 — Controlled Right Inspector, Layers, and Align UI migration (2026-10-02)
+
+- Status: writer implementation complete, awaiting review. Inspector tabs, layer actions, visibility/lock controls, alignment controls, and dynamic-binding actions use shared Button, IconButton, and Badge primitives with configured semantic dark-industrial utilities.
+- Transform/property calculations, Fabric selection/rendering, layer operations, alignment callbacks, dynamic token binding, test IDs, ARIA labels, panel switching, and feature boundaries are unchanged. Touched copy is English; Table cell content/formulas and Rectangle/Circle controls remain hidden.
+- Writer validation: TypeScript PASS, focused structural coverage PASS (17/17), full frontend suite PASS (143/143), Vite build PASS (1,894 modules; existing Fabric advisory only), and diff check PASS.
+- The existing server-rendered `useLayoutEffect` advisory from `features/canvas/ui/StudioCanvas.tsx` remains non-failing and out of scope. No backend, auth/store semantic, Docker, hardware, database, dependency, Git lifecycle, service, or external action change.
+
+## F3.54 — Template Explorer global modal layering repair (2026-10-02)
+
+- Status: writer implementation complete, awaiting review. Template Explorer now uses a `document.body` React portal with the global `--ui-layer-modal` tier, so it can cover chrome, ribbon, inspector, and toolbox instead of being trapped under the Top Menu stacking context.
+- Trigger, click-outside/Escape close behavior, folder/search/preview/move/select/open flows, API calls, callbacks, ARIA, and session behavior are unchanged. Touched fallback and ARIA copy is English.
+- Writer validation: TypeScript PASS, focused structural coverage PASS (18/18), full frontend suite PASS (144/144), Vite build PASS (1,894 modules; existing Fabric advisory only), and diff check PASS.
+- The existing server-rendered `useLayoutEffect` advisory from `features/canvas/ui/StudioCanvas.tsx` remains non-failing and unrelated. No backend, auth/store semantic, Docker, hardware, database, dependency, Git lifecycle, other modal, browser, service, or external action change.
+
+## F3.55 — Frontend Legacy Cleanup and Boundary Completion (2026-10-02)
+
+- Status: APPROVED — PARTIAL BY DESIGN after independent review. See `docs/tasks/F3.55/LEGACY_INVENTORY.md` and `REVIEW.md` for actual path/reference-count/category/owner/action evidence and validation across utils, hooks, and components.
+- Only two zero-consumer aliases were deleted: the Local JSON parser compatibility re-export and deprecated `ThermalPreviewSplit` preview alias. Data Tokens public API, Canvas aggregation, shared transport, and legacy Table paths are retained.
+- Result is deliberately PARTIAL: every other candidate has active or uncertain feature/test consumers, including held Table interoperability. Writer validation: TypeScript PASS, structural coverage PASS (19/19), full frontend suite PASS (145/145), Vite build PASS (1,894 modules; existing Fabric chunking advisory), and diff check PASS. The existing non-failing `useLayoutEffect` SSR advisory remains out of scope. No behavior, backend/API/auth/store/canvas/table/UI flow/dependency/Git lifecycle change.
+
+## F3.56 — Data Tokens Boundary Completion (2026-10-02)
+
+- Status: APPROVED after independent review. The Contract Zustand store and frontend tests now use the public `features/data-tokens` barrel for SAP contract adaptation and display-value resolution.
+- The two zero-consumer legacy compatibility re-exports (`utils/sapContractAdapter.ts` and `utils/sapTokenValue.ts`) were removed after an exact source/test import check. Data Tokens parsing and adaptation semantics were not changed.
+- `git fetch origin` is BLOCKED by Windows permission denial opening `.git/FETCH_HEAD`; no remote status was inferred. Writer validation: frontend suite PASS 146/146, TypeScript PASS, Vite build PASS (1,893 modules; existing Fabric chunking advisory), and diff check PASS. No backend/API/auth/store semantic, Canvas/Table/UI flow, dependency, Docker, hardware, Git lifecycle, deployment, or service change.
+
+## F3.57 — Canvas Composition Boundary (2026-10-02)
+
+- Status: APPROVED — IMPLEMENTED BY DOCUMENTED RETENTION after independent review. The caller and ownership inventory is in `docs/tasks/F3.57/COMPOSITION_INVENTORY.md` and reviewer evidence is in `docs/tasks/F3.57/REVIEW.md`.
+- Canvas lifecycle and viewport remain owned by `features/canvas`; `AuthenticatedStudio` already consumes `StudioCanvas` through its public barrel. `useCanvasActions`, drawing listeners, and placement helper remain explicit cross-tool orchestration adapters because they coordinate Line, Text, Barcode, QR, Graphics, Image, ordering, and held Table behavior.
+- No unsafe relocation or deletion was made. Writer validation: frontend suite PASS 147/147, TypeScript PASS, Vite build PASS (1,893 modules; existing Fabric chunking advisory), and diff check PASS. `git fetch origin` remains BLOCKED by `.git/FETCH_HEAD` permission denial. The existing non-failing SSR `useLayoutEffect` advisory is out of scope. No backend/API/auth/store/canvas rendering/tool/keyboard/mouse/touch/Table/UI/dependency/Git lifecycle change.
+
+## F3.58 — Shared API and Transport Boundary (2026-10-02)
+
+- Status: APPROVED after independent review. `API_BASE` is now consumed from `shared/api`; Auth owns and publicly exposes CSRF header/token helpers through `features/auth`. Reviewer evidence is in `docs/tasks/F3.58/REVIEW.md`.
+- Zero-consumer compatibility adapters `utils/api/apiConfig.ts` and `utils/api/csrfHelper.ts` were deleted after migration. Templates, Render, Print, SAP endpoint modules and the cross-domain `apiClient` facade are deliberately retained; their endpoint, credentials, header, error, fallback, and fail-closed behavior is unchanged.
+- Writer validation: frontend suite PASS 148/148, TypeScript PASS, Vite build PASS (1,891 modules; existing Fabric chunking advisory), and diff check PASS. `git fetch origin` remains BLOCKED by `.git/FETCH_HEAD` permission denial. The existing non-failing SSR `useLayoutEffect` advisory is out of scope. No network/render/export/print/spooler/hardware operation, backend/API contract/auth/store/UI/Canvas/Table/dependency/Git lifecycle change.
+
+## F3.59 — Legacy Table Retirement and Removal (2026-10-02)
+
+- Status: APPROVED after independent review. The user authorized full frontend retirement because Table is unused and no official legacy templates exist. The exact pre-removal and post-removal inventory is in `docs/tasks/F3.59/TABLE_RETIREMENT_INVENTORY.md`; reviewer evidence is in `docs/tasks/F3.59/REVIEW.md`.
+- The `features/table` implementation, legacy adapters, toolbox entry point, Table active-tool state, drawing/listener/inspector/ordering branches, Table-specific SVG and draft behavior, and dedicated tests were removed. Text, Line, Barcode, QR, Graphics, Image, and generic Canvas orchestration remain.
+- Generic Fabric draft/SVG paths no longer interpret retired custom metadata; unknown legacy metadata is handled by the ordinary generic object path without a fake Table fallback. Writer validation: frontend suite PASS 129/129, TypeScript PASS, Vite build PASS (1,885 modules; existing Fabric dynamic/static import advisory), and diff check PASS. The known non-failing SSR `useLayoutEffect` advisory remains. No backend/API/auth/transport, network/render/export/print/spooler/hardware, dependency, Docker, Git lifecycle, or deployment action occurred.
+
+## F3.60 — Fabric Import Consistency and SSR-safe Canvas Effect (2026-10-02)
+
+- Status: APPROVED after independent review. The Fabric import inventory found QR as the only editor runtime path using a dynamic Fabric import. QR now statically imports the already-core Canvas dependency while retaining its generator and image callback behavior; the model-only Barcode preview path avoids loading the hook barrel in Node tests. Reviewer evidence is in `docs/tasks/F3.60/REVIEW.md`.
+- `shared/ui/useIsomorphicLayoutEffect.ts` uses `useLayoutEffect` only in a real browser document and `useEffect` in SSR/Node. Studio Canvas and the shared Anchored Overlay use it, preserving browser layout timing while eliminating server-render warnings.
+- Writer validation: frontend suite PASS 130/130 with the prior Studio Canvas SSR warning absent; TypeScript PASS; Vite build PASS (1,886 modules) with the prior Fabric dynamic/static import advisory absent; diff check PASS. Existing CRLF conversion notices only. No backend/API/auth/store/Canvas tool or visual behavior/Table/UI flow/dependency/Git lifecycle/Docker/network/printer/spooler/hardware action occurred.

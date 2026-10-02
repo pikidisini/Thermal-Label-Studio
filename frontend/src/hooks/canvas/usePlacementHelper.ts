@@ -45,7 +45,6 @@ export function usePlacementHelper(
         dataQr: obj.dataQr,
         dataBarcode: obj.dataBarcode,
         dataField: obj.dataField,
-        isGhsSymbol: obj.isGhsSymbol,
         isDynamic: obj.isDynamic,
       } as any);
       if (canvasRef.current) {

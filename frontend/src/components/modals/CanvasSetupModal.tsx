@@ -4,6 +4,7 @@ import { StandardPresetsGrid } from './canvas-setup/StandardPresetsGrid';
 import { CustomDimensionForm } from './canvas-setup/CustomDimensionForm';
 import { MatrixGeometryHud } from './canvas-setup/MatrixGeometryHud';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { Button, Dialog, DialogBody, DialogFooter, DialogHeader, Field, IconButton } from '../../shared/ui';
 
 interface CanvasSetupModalProps {
   isOpen: boolean;
@@ -71,14 +72,14 @@ export function CanvasSetupModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[var(--ui-layer-modal)] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
       {/* MODAL CONTAINER - 0px border radius, Stitch CAD layout */}
-      <div
+      <Dialog
         data-testid="canvas-setup-modal"
-        className="bg-surface-container-low border border-outline-variant shadow-[0_4px_24px_rgba(0,0,0,0.8)] w-[820px] max-w-full flex flex-col animate-in fade-in zoom-in-95 duration-150"
+        className="bg-surface-container-low shadow-[0_4px_24px_rgba(0,0,0,0.8)] w-[820px] max-w-full flex flex-col animate-in fade-in zoom-in-95 duration-150"
       >
         {/* 1. HEADER */}
-        <div className="flex items-center justify-between p-4 border-b border-outline-variant bg-surface-container-highest">
+        <DialogHeader className="flex items-center justify-between bg-surface-container-highest">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-secondary flex items-center justify-center text-background">
               <span className="material-symbols-outlined text-[18px]">
@@ -94,24 +95,21 @@ export function CanvasSetupModal({
               </p>
             </div>
           </div>
-          <button
+          <IconButton
             onClick={onClose}
-            className="text-outline hover:text-on-surface p-1 transition-colors"
-            title="Close modal"
+            label="Close dialog"
+            className="text-outline hover:text-on-surface"
           >
             <X size={18} />
-          </button>
-        </div>
+          </IconButton>
+        </DialogHeader>
 
         {/* MODAL BODY - TWO COLUMNS */}
         <div className="flex flex-col md:flex-row flex-1 min-h-[420px]">
           {/* LEFT COLUMN: CONFIGURATION */}
           <div className="flex-1 p-4 flex flex-col gap-4 border-b md:border-b-0 md:border-r border-outline-variant overflow-y-auto">
             {/* Template Name */}
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-semibold text-outline uppercase tracking-wider">
-                Template Name
-              </label>
+            <Field label="Template Name" className="flex flex-col gap-1">
               <input
                 type="text"
                 value={templateName}
@@ -119,7 +117,7 @@ export function CanvasSetupModal({
                 placeholder="Untitled-Label-01"
                 className="h-[28px] bg-surface border border-outline-variant text-on-surface font-mono text-xs px-2 focus:border-primary-container focus:outline-none w-full placeholder-on-surface-variant transition-colors"
               />
-            </div>
+            </Field>
 
             {/* Quick Die-Cut Presets */}
             <StandardPresetsGrid
@@ -159,8 +157,8 @@ export function CanvasSetupModal({
                       onClick={() => setDpi(item.value)}
                       className={`flex-1 font-mono text-[10px] flex items-center justify-center transition-colors border-r last:border-r-0 border-outline-variant ${
                         isActive
-                          ? 'bg-surface-variant text-on-surface font-semibold border-t-2 border-t-primary-container'
-                          : 'text-outline hover:text-on-surface hover:bg-surface-variant/40'
+                          ? 'bg-surface-container-high text-on-surface font-semibold border-t-2 border-t-primary-container'
+                          : 'text-outline hover:text-on-surface hover:bg-surface-container-high/40'
                       }`}
                     >
                       {item.label}
@@ -184,25 +182,25 @@ export function CanvasSetupModal({
         </div>
 
         {/* 7. FOOTER */}
-        <div className="h-[48px] bg-surface-container-highest border-t border-outline-variant flex items-center justify-end px-4 gap-2">
-          <button
+        <DialogFooter className="h-[48px] bg-surface-container-highest flex items-center justify-end gap-2">
+          <Button
             type="button"
             onClick={onClose}
-            className="h-[28px] px-3 bg-surface-container-low border border-outline-variant text-outline text-xs hover:border-outline hover:text-on-surface transition-colors flex items-center justify-center"
+            className="h-[28px] px-3 text-outline text-xs flex items-center justify-center"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={handleApply}
             data-testid="btn-apply-dimensions"
-            className="h-[28px] px-4 bg-tertiary text-background text-xs font-semibold hover:bg-tertiary-fixed transition-colors flex items-center justify-center gap-1 shadow-sm"
+            tone="success" className="h-[28px] px-4 text-background text-xs font-semibold flex items-center justify-center gap-1 shadow-sm"
           >
             <Check size={14} />
             <span>{mode === 'new' ? 'Create Template' : 'Apply Dimensions'}</span>
-          </button>
-        </div>
-      </div>
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }

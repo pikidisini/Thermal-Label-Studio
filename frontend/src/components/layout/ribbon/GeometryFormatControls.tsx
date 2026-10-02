@@ -1,5 +1,6 @@
 import React from 'react';
 import { RibbonDivider } from './RibbonDivider';
+import { IconButton } from '../../../shared/ui';
 
 interface GeometryFormatControlsProps {
   selectedObject: any;
@@ -15,19 +16,18 @@ function ActionBtn({
   icon, title, onClick, testId, danger,
 }: { icon: string; title: string; onClick: () => void; testId: string; danger?: boolean }) {
   return (
-    <button
+    <IconButton
       data-testid={testId}
       onClick={onClick}
-      title={title}
-      aria-label={title}
-      className={`p-1 transition-colors ${
+      label={title}
+      className={`h-auto w-auto border-transparent p-1 transition-colors ${
         danger
-          ? 'text-on-surface-variant hover:text-secondary hover:bg-secondary/10'
-          : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
+          ? 'text-on-surface-variant hover:border-secondary-container hover:bg-surface-container-high hover:text-secondary'
+          : 'text-on-surface-variant hover:border-transparent hover:bg-surface-container-high hover:text-on-surface'
       }`}
     >
       <span className="material-symbols-outlined" style={{ fontSize: 15 }}>{icon}</span>
-    </button>
+    </IconButton>
   );
 }
 

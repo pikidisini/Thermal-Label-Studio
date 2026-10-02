@@ -75,7 +75,7 @@ test('App Component Lifecycle: loading -> login -> authenticated studio -> logou
     assert.ok(html.includes('data-testid="login-page"'), 'Must render login page');
     assert.ok(html.includes('Thermal Label Studio'), 'Must render login heading');
     assert.ok(html.includes('data-testid="btn-login"'), 'Must render login button');
-    assert.ok(html.includes('Masuk ke Studio'), 'Must render login button text');
+    assert.ok(html.includes('Sign in to Studio'), 'Must render the current login button text');
     assert.ok(!html.includes('data-testid="app-auth-loading"'), 'Must not render loading container');
     assert.ok(!html.includes('data-testid="app-root-container"'), 'Must not render studio container');
   });
@@ -93,7 +93,7 @@ test('App Component Lifecycle: loading -> login -> authenticated studio -> logou
     assert.ok(html.includes('data-testid="container-app-workspace-body"'), 'Must render studio workspace body');
     assert.ok(html.includes('ppic_operator'), 'Must display username in TopMenuBar');
     assert.ok(html.includes('PPIC'), 'Must display PPIC role badge in TopMenuBar');
-    assert.ok(html.includes('Keluar'), 'Must display global logout button');
+    assert.ok(html.includes('Sign out'), 'Must display global logout button');
     assert.ok(!html.includes('data-testid="login-page"'), 'Must not render login page');
   });
 

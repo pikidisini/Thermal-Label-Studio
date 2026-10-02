@@ -1,11 +1,14 @@
+import { useCallback } from 'react';
 import type { fabric } from 'fabric';
 import { useStudioStore } from '../store/useStudioStore';
 import { useContractStore } from '../store/useContractStore';
 import { usePlacementHelper } from './canvas/usePlacementHelper';
-import { useShapeActions } from './canvas/useShapeActions';
-import { useBarcodeActions } from './canvas/useBarcodeActions';
-import { useTableActions } from './canvas/useTableActions';
-import { useSymbolActions } from './canvas/useSymbolActions';
+import { useLineActions } from '../features/line';
+import { useTextActions } from '../features/text';
+import { useBarcodeActions, useBarcodeTokenActions } from '../features/barcode';
+import { useQrActions } from '../features/qr';
+import { useGraphicActions } from '../features/graphics';
+import { useImageActions } from '../features/images';
 import { useObjectOrderingActions } from './canvas/useObjectOrderingActions';
 
 export function useCanvasActions(
@@ -21,7 +24,15 @@ export function useCanvasActions(
     pxPerMm
   );
 
-  const shapeActions = useShapeActions({
+  const lineActions = useLineActions({
+    canvasRef,
+    pxPerMm,
+    triggerRenderSimulation,
+    syncSelection,
+    saveCanvasHistory,
+    getStrategicPlacement,
+  });
+  const textActions = useTextActions({
     canvasRef,
     pxPerMm,
     triggerRenderSimulation,
@@ -37,25 +48,39 @@ export function useCanvasActions(
     syncSelection,
     saveCanvasHistory,
     getStrategicPlacement,
-    jsonData: tokenMap,
+  });
+  const qrActions = useQrActions({ canvasRef, triggerRenderSimulation, syncSelection, saveCanvasHistory, getStrategicPlacement });
+  const tokenActions = useBarcodeTokenActions({
+    canvasRef, pxPerMm, triggerRenderSimulation, syncSelection, saveCanvasHistory, getStrategicPlacement,
+    jsonData: tokenMap, handleAddBarcode: barcodeActions.handleAddBarcode, handleAddQrCode: qrActions.handleAddQrCode,
   });
 
-  const tableActions = useTableActions({
-    canvasRef,
-    pxPerMm,
-    syncSelection,
-    getStrategicPlacement,
-  });
 
-  const symbolActions = useSymbolActions({
+  const graphicActions = useGraphicActions({
     canvasRef,
     pxPerMm,
     triggerRenderSimulation,
     syncSelection,
     saveCanvasHistory,
     getStrategicPlacement,
-    handleAddSapToken: barcodeActions.handleAddSapToken,
   });
+
+  const imageActions = useImageActions({
+    canvasRef,
+    pxPerMm,
+    triggerRenderSimulation,
+    syncSelection,
+    saveCanvasHistory,
+    getStrategicPlacement,
+  });
+
+  const handleDropElement = useCallback((data: unknown) => {
+    if (!data || typeof data !== 'object') return;
+    const candidate = data as { type?: unknown; token?: unknown; asType?: unknown };
+    if (candidate.type !== 'sap-token' || typeof candidate.token !== 'string') return;
+    const type = candidate.asType === 'barcode' || candidate.asType === 'qr' ? candidate.asType : 'text';
+    tokenActions.handleAddSapToken(candidate.token, type);
+  }, [tokenActions]);
 
   const orderingActions = useObjectOrderingActions({
     canvasRef,
@@ -67,11 +92,15 @@ export function useCanvasActions(
   });
 
   return {
-    ...shapeActions,
+    ...lineActions,
+    ...textActions,
     ...barcodeActions,
-    ...tableActions,
-    ...symbolActions,
+    ...qrActions,
+    ...tokenActions,
+    ...graphicActions,
+    ...imageActions,
     ...orderingActions,
+    handleDropElement,
     syncSelection,
     saveCanvasHistory,
     getStrategicPlacement,

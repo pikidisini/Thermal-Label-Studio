@@ -1,0 +1,10 @@
+export { useLineActions } from './hooks/useLineActions';
+export { LineInspector } from './ui/LineInspector';
+export { createLinePreview, updateLinePreview, isMeaningfulLine, finalizeLine } from './canvas/lineDrawingController';
+export { createLineAnchorOverlay } from './ui/lineAnchorOverlay';
+export type { AnchorOverlayApi } from './ui/lineAnchorOverlay';
+export { snapLineEnd, updateLineEndpoint, lineEndpointCanvas, lineEndpointMm } from './editor/lineGeometry';
+export type { LineEndpoint, LinePoint } from './editor/lineGeometry';
+export { applyLinePropertyUpdate } from './canvas/linePropertyUpdate';
+export { LINE_STYLE_DASH, clampLineWidthMm, lineStyleFromObject } from './model/lineModel';
+export type { LineStyle } from './model/lineModel';

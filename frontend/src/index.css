@@ -3,6 +3,34 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Semantic UI foundation: values retain the existing industrial editor palette. */
+    --ui-surface-canvas: #0d0e11;
+    --ui-surface-base: #121316;
+    --ui-surface-raised: #1f1f23;
+    --ui-surface-overlay: #292a2d;
+    --ui-text-primary: #e3e2e6;
+    --ui-text-secondary: #c2c6d6;
+    --ui-border-default: #424754;
+    --ui-primary: #adc6ff;
+    --ui-primary-container: #4d8eff;
+    --ui-success: #4edea3;
+    --ui-warning: #ffb95f;
+    --ui-danger: #f43f5e;
+    --ui-focus: #adc6ff;
+    --ui-space-1: 0.25rem;
+    --ui-space-2: 0.5rem;
+    --ui-space-3: 0.75rem;
+    --ui-space-4: 1rem;
+    --ui-radius-control: 0px;
+    --ui-layer-canvas: 0;
+    --ui-layer-chrome: 10;
+    --ui-layer-flyout: 20;
+    --ui-layer-tooltip: 30;
+    --ui-layer-modal: 40;
+    --ui-layer-toast: 50;
+  }
+
   body {
     @apply bg-studio-darkest text-gray-200 antialiased font-sans overflow-hidden m-0 p-0 h-screen w-screen;
   }

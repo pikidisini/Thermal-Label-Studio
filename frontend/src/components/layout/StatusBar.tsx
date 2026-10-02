@@ -2,6 +2,7 @@ import React from 'react';
 import { useStudioStore } from '../../store/useStudioStore';
 import { useTemplateStore } from '../../store/useTemplateStore';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { Button, IconButton } from '../../shared/ui';
 
 export function StatusBar() {
   const { cursorPos, selectedObject, zoom, setZoom, triggerFit, triggerReset100 } = useStudioStore();
@@ -16,7 +17,6 @@ export function StatusBar() {
       return `SHEET: ${labelWidthMm} \u00d7 ${labelHeightMm} mm  (${dotsW} \u00d7 ${dotsH} px @ 203 DPI)`;
     }
     const obj = selectedObject as any;
-    if (obj.isTable === true && obj.tableVersion === 2) return 'TARGET: TABLE';
     if (obj.isBarcode) {
       const typeStr = typeof obj.barcodeType === 'string' ? obj.barcodeType : 'code128';
       const valStr = typeof obj.barcodeValue === 'string' ? obj.barcodeValue : '';
@@ -31,7 +31,7 @@ export function StatusBar() {
   return (
     <footer
       data-testid="container-status-bar"
-      className="h-[24px] bg-surface-container-lowest border-t border-outline-variant px-3 flex items-center justify-between font-mono text-[10px] text-on-surface-variant select-none shrink-0 z-50"
+      className="h-[24px] bg-surface-container-lowest border-t border-outline-variant px-3 flex items-center justify-between font-mono text-[10px] text-on-surface-variant select-none shrink-0 z-[var(--ui-layer-chrome)]"
     >
       {/* Left: Cursor position + target summary */}
       <div data-testid="statusbar-left-section" className="flex items-center gap-3 overflow-hidden">
@@ -69,45 +69,42 @@ export function StatusBar() {
 
       {/* Right: Zoom controls */}
       <div data-testid="statusbar-zoom-controls" className="flex items-center gap-1 shrink-0">
-        <button
+        <IconButton
           data-testid="statusbar-btn-zoom-out"
           onClick={() => setZoom((z) => Math.max(0.2, Math.round((z - 0.1) * 10) / 10))}
-          className="hover:text-on-surface p-0.5 transition-colors"
-          title="Zoom Out (-)"
-          aria-label="Zoom Out"
+          label="Zoom Out (-)"
+          className="h-auto w-auto border-transparent p-0.5 text-on-surface-variant hover:border-transparent hover:bg-surface-container-high hover:text-on-surface"
         >
           <span className="material-symbols-outlined" style={{ fontSize: 12 }}>remove</span>
-        </button>
+        </IconButton>
 
-        <button
+        <Button
           data-testid="statusbar-btn-zoom-reset"
           onClick={triggerReset100}
-          className="text-on-surface hover:text-primary font-bold px-1.5 py-0.5 bg-surface-container border border-outline-variant transition-colors tabular-nums"
+          className="border-outline-variant bg-surface-container px-1.5 py-0.5 font-bold tabular-nums text-on-surface hover:bg-surface-container-high hover:text-primary"
           title="Reset Zoom to 100%"
           aria-label="Reset Zoom to 100%"
         >
           {Math.round(zoom * 100)}%
-        </button>
+        </Button>
 
-        <button
+        <IconButton
           data-testid="statusbar-btn-zoom-in"
           onClick={() => setZoom((z) => Math.min(3.0, Math.round((z + 0.1) * 10) / 10))}
-          className="hover:text-on-surface p-0.5 transition-colors"
-          title="Zoom In (+)"
-          aria-label="Zoom In"
+          label="Zoom In (+)"
+          className="h-auto w-auto border-transparent p-0.5 text-on-surface-variant hover:border-transparent hover:bg-surface-container-high hover:text-on-surface"
         >
           <span className="material-symbols-outlined" style={{ fontSize: 12 }}>add</span>
-        </button>
+        </IconButton>
 
-        <button
+        <IconButton
           data-testid="statusbar-btn-zoom-fit"
           onClick={triggerFit}
-          className="hover:text-primary p-0.5 text-primary transition-colors ml-1"
-          title="Fit Label to Viewport (F)"
-          aria-label="Fit Label to Viewport"
+          label="Fit Label to Viewport (F)"
+          className="ml-1 h-auto w-auto border-transparent p-0.5 text-primary hover:border-transparent hover:bg-surface-container-high"
         >
           <span className="material-symbols-outlined" style={{ fontSize: 12 }}>fit_screen</span>
-        </button>
+        </IconButton>
       </div>
     </footer>
   );

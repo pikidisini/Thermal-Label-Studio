@@ -10,16 +10,16 @@ import { useSimulationStore } from '../../store/useSimulationStore';
 
 // Custom Hooks
 import { useAutoFit } from '../../hooks/useAutoFit';
-import { useThermalSimulation } from '../../hooks/useThermalSimulation';
+import { useThermalSimulation, SafeDemoModal, SapShadowSimulationModal, safeDemoApi, sapShadowSimulationApi } from '../../features/simulation';
 import { useCanvasActions } from '../../hooks/useCanvasActions';
-import { useTemplateManager } from '../../hooks/useTemplateManager';
+import { useTemplateManager, SaveTemplateModal } from '../../features/templates';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 // Layout & Canvas Components
 import { TopMenuBar } from '../layout/TopMenuBar';
 import { PropertyRibbon } from '../layout/PropertyRibbon';
 import { LeftToolbox } from '../layout/LeftToolbox';
-import { StudioCanvas } from '../canvas/StudioCanvas';
+import { StudioCanvas } from '../../features/canvas';
 import { RightInspector } from '../layout/RightInspector';
 import { StatusBar } from '../layout/StatusBar';
 
@@ -28,26 +28,19 @@ const ThermalPreviewDeck = React.lazy(() => import('../layout/ThermalPreviewDeck
 
 // Modals
 import CanvasSetupModal from '../modals/CanvasSetupModal';
-import PrintModal from '../modals/PrintModal';
-import SaveTemplateModal from '../modals/SaveTemplateModal';
+import { PrintModal } from '../../features/print';
 import ShortcutHelpModal from '../modals/ShortcutHelpModal';
-import AiDiagnosticsModal from '../modals/AiDiagnosticsModal';
-import SafeDemoModal from '../modals/SafeDemoModal';
-import SapShadowSimulationModal from '../modals/SapShadowSimulationModal';
+import { AiDiagnosticsModal } from '../../features/diagnostics';
+import { GraphicUpdateCenterModal } from '../../features/graphics';
 
 // Utilities
 import { exportFabricToSvg } from '../../utils/fabricSvgExporter';
-import { safeDemoApi } from '../../utils/api/safeDemoApi';
-import { sapShadowSimulationApi } from '../../utils/api/sapShadowSimulationApi';
-import { resolveSapTokenDisplayValue } from '../../utils/sapTokenValue';
-import { readLocalSapJson } from '../../utils/localSapJsonParser';
-import { generatePreviewDataUrl, validatePreviewPayload } from '../../utils/barcodePreview';
-import { resolvePayloadTemplate } from '../../utils/barcodePayload';
+import { resolveSapTokenDisplayValue, readLocalSapJson } from '../../features/data-tokens';
+import { generatePreviewDataUrl, resolvePayloadTemplate, validatePreviewPayload } from '../../features/barcode';
 import { renderApi } from '../../utils/api/renderApi';
 import { validateLocalSvg } from '../../utils/validateLocalSvg';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useEditorDraftRecovery } from '../../hooks/useEditorDraftRecovery';
-import { rehydrateTableV2Objects } from '../../features/table/canvas/tableRenderer';
 
 export function AuthenticatedStudio() {
   const canvasRef = useRef<fabric.Canvas | null>(null);
@@ -83,6 +76,7 @@ export function AuthenticatedStudio() {
   const { sampleContracts, activeContractKey, jsonData, tokenMap, usedTokens, customTokens, switchContract, localImport, setLocalImportedContract, updateTokenValue, markCustomToken, updateUsedTokensFromCanvas } = useContractStore();
   const [localImportError, setLocalImportError] = React.useState<string | null>(null);
   const [localImportWarning, setLocalImportWarning] = React.useState<string | null>(null);
+  const [graphicUpdateOpen, setGraphicUpdateOpen] = React.useState(false);
   const [localItems, setLocalItems] = React.useState<Awaited<ReturnType<typeof readLocalSapJson>>['items']>([]);
   const [localFileName, setLocalFileName] = React.useState('');
   const boundImageRequests = React.useRef(new WeakMap<object, number>());
@@ -152,7 +146,7 @@ export function AuthenticatedStudio() {
     canvasReadyRef.current = canvas;
     setCanvasReady(true);
     restoreDraft(canvas);
-    const save = (event?: any) => { if (event?.target?.isTablePlacementPreview || event?.target?.isLineDrawingPreview || useHistoryStore.getState().isLocked) return; draftScheduleRef.current(); };
+    const save = (event?: any) => { if (event?.target?.isLineDrawingPreview || useHistoryStore.getState().isLocked) return; draftScheduleRef.current(); };
     canvas.on('object:added', save);
     canvas.on('object:modified', save);
     canvas.on('object:removed', save);
@@ -261,7 +255,6 @@ export function AuthenticatedStudio() {
       try {
         canvas.loadFromJSON(JSON.parse(jsonStr), () => {
           try {
-            rehydrateTableV2Objects(canvas, pxPerMm);
             const restored = priorId ? canvas.getObjects().find((item: any) => item.id === priorId) : canvas.getObjects()[priorIndex];
             if (restored) { canvas.setActiveObject(restored); actions.syncSelection(restored); }
             else { canvas.discardActiveObject(); actions.syncSelection(null); }
@@ -287,7 +280,6 @@ export function AuthenticatedStudio() {
       try {
         canvas.loadFromJSON(JSON.parse(jsonStr), () => {
           try {
-            rehydrateTableV2Objects(canvas, pxPerMm);
             const restored = priorId ? canvas.getObjects().find((item: any) => item.id === priorId) : canvas.getObjects()[priorIndex];
             if (restored) { canvas.setActiveObject(restored); actions.syncSelection(restored); }
             else { canvas.discardActiveObject(); actions.syncSelection(null); }
@@ -351,6 +343,7 @@ export function AuthenticatedStudio() {
         onUndo={handleUndo}
         onRedo={handleRedo}
         onShowAbout={() => window.alert('Thermal Label Studio v1.1')}
+        onOpenGraphicUpdateCenter={() => setGraphicUpdateOpen(true)}
       />
       <input ref={templateFileRef} type="file" accept=".svg,image/svg+xml" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ''; if (file) void handleTemplateUpload(file); }} />
       <input ref={jsonFileRef} type="file" accept=".json,application/json" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ''; if (file) void handleLocalJsonImport(file); }} />
@@ -376,11 +369,8 @@ export function AuthenticatedStudio() {
             onAddText={() => actions.handleAddText()}
             onAddBarcode={() => actions.handleAddBarcode('code128')}
             onAddQrCode={() => actions.handleAddQrCode()}
-            onAddBox={() => actions.handleAddBox()}
             onAddLine={() => actions.handleAddLine()}
-            onAddCircle={() => actions.handleAddCircle()}
-            onAddTable={(rows, columns, placement) => actions.handleAddTable(rows, columns, placement)}
-            onAddIsoSymbol={(k) => actions.handleAddIsoSymbol(k)}
+            onAddGraphic={(asset) => void actions.handleAddGraphic(asset)}
             onUploadImage={actions.handleUploadImage}
             sampleContracts={sampleContracts}
             activeContractKey={activeContractKey}
@@ -457,8 +447,8 @@ export function AuthenticatedStudio() {
       </div>
 
       <StatusBar />
-      {draft.status === 'restored' && <div data-testid="editor-draft-restored" className="absolute bottom-7 left-3 z-50 rounded bg-emerald-950/90 px-2 py-1 text-[10px] text-emerald-200">Draft sesi dipulihkan. JSON lokal perlu diunggah ulang untuk preview data yang sama.</div>}
-      {draft.status === 'quota' && <div data-testid="editor-draft-storage-warning" className="absolute bottom-7 left-3 z-50 rounded bg-amber-950/90 px-2 py-1 text-[10px] text-amber-200">Draft sesi tidak dapat disimpan di browser ini.</div>}
+      {draft.status === 'restored' && <div data-testid="editor-draft-restored" className="absolute bottom-7 left-3 z-[var(--ui-layer-toast)] rounded bg-emerald-950/90 px-2 py-1 text-[10px] text-emerald-200">Draft sesi dipulihkan. JSON lokal perlu diunggah ulang untuk preview data yang sama.</div>}
+      {draft.status === 'quota' && <div data-testid="editor-draft-storage-warning" className="absolute bottom-7 left-3 z-[var(--ui-layer-toast)] rounded bg-amber-950/90 px-2 py-1 text-[10px] text-amber-200">Draft sesi tidak dapat disimpan di browser ini.</div>}
 
       <PrintModal
         isOpen={isPrintModalOpen}
@@ -508,6 +498,7 @@ export function AuthenticatedStudio() {
         isOpen={isSapShadowSimulationModalOpen}
         onClose={() => setSapShadowSimulationModalOpen(false)}
       />
+      <GraphicUpdateCenterModal isOpen={graphicUpdateOpen} onClose={() => setGraphicUpdateOpen(false)} />
     </div>
   );
 }

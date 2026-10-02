@@ -1,5 +1,7 @@
 import { create } from 'zustand';
-import { authApi } from '../utils/api/authApi';
+// Store is the internal state dependency used by the auth public barrel's CSRF helper.
+// Importing the implementation avoids a barrel cycle while preserving auth behavior.
+import { authApi } from '../features/auth/api/authApi';
 import type { UserProfile } from '../types/auth';
 import { clearEditorDraft } from '../utils/editorDraftRecovery';
 

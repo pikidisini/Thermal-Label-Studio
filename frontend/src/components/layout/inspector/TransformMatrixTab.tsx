@@ -1,4 +1,5 @@
-﻿import React from 'react';
+import React from 'react';
+import { IconButton } from '../../../shared/ui';
 
 interface TransformMatrixTabProps {
   selectedObject: any;
@@ -29,16 +30,15 @@ interface AlignBtnProps {
 
 function AlignBtn({ icon, title, testId, disabled, onClick }: AlignBtnProps) {
   return (
-    <button
+    <IconButton
       data-testid={testId}
       onClick={onClick}
       disabled={disabled}
-      title={title}
-      aria-label={title}
-      className="flex items-center justify-center p-1.5 bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface disabled:opacity-30 disabled:cursor-not-allowed transition-colors border border-outline-variant"
+      label={title}
+      className="h-auto w-auto border-outline-variant bg-surface-container p-1.5 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface disabled:cursor-not-allowed disabled:opacity-30"
     >
       <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{icon}</span>
-    </button>
+    </IconButton>
   );
 }
 
@@ -101,12 +101,12 @@ export function TransformMatrixTab({
             const isActive = activeAnchor === anc;
             const isCenter = anc === 'center';
             return (
-              <button
+              <IconButton
                 key={anc}
                 data-testid={`anchor-btn-${anc}`}
                 onClick={() => setActiveAnchor(anc)}
-                title={anc.replace(/-/g, ' ')}
-                className={`w-6 h-6 flex items-center justify-center transition-all ${
+                label={anc.replace(/-/g, ' ')}
+                className={`h-6 w-6 border-transparent p-0 ${
                   isActive
                     ? 'bg-primary'
                     : 'bg-surface-container-high hover:bg-surface-container-highest'
@@ -118,7 +118,7 @@ export function TransformMatrixTab({
                 {isCenter && isActive && (
                   <span className="w-1.5 h-1.5 bg-surface block" />
                 )}
-              </button>
+              </IconButton>
             );
           })}
         </div>

@@ -71,7 +71,7 @@ export function RightInspector({
   return (
     <aside
       data-testid="container-right-inspector"
-      className="w-80 bg-surface-container-low border-l border-outline-variant flex flex-col h-full select-none z-10 shadow-xl"
+      className="w-80 bg-surface-container-low border-l border-outline-variant flex flex-col h-full select-none z-[var(--ui-layer-chrome)] shadow-xl"
     >
       {/* Tab bar */}
       <div

@@ -118,7 +118,7 @@ export function ThermalPreviewDeck({
       {/* 2. Dual Viewport Inspection Panels (Symmetric dark CAD backdrop) */}
       <div className="flex-1 flex overflow-hidden p-3 gap-3 bg-surface">
         {renderError && (
-          <div role="alert" className="absolute z-10 top-12 left-3 right-3 border border-secondary bg-surface-container-high px-3 py-2 text-xs text-secondary font-mono">
+          <div role="alert" className="absolute z-[var(--ui-layer-tooltip)] top-12 left-3 right-3 border border-secondary bg-surface-container-high px-3 py-2 text-xs text-secondary font-mono">
             Preview gagal: {renderError}
           </div>
         )}

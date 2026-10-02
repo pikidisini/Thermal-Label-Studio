@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { JsonObject } from '../types/api';
-import { adaptSapContract } from '../utils/sapContractAdapter';
-import type { FlatSapTokenMap, RawSapContract } from '../utils/sapContractAdapter';
+import { adaptSapContract } from '../features/data-tokens';
+import type { FlatSapTokenMap, RawSapContract } from '../features/data-tokens';
 
 interface ContractState {
   sampleContracts: Record<string, RawSapContract>;

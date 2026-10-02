@@ -1,5 +1,5 @@
-import { API_BASE } from './apiConfig';
-import { getCsrfHeaders } from './csrfHelper';
+import { getCsrfHeaders } from '../../features/auth';
+import { API_BASE } from '../../shared/api';
 import type {
   JsonObject,
   PreviewRequest,

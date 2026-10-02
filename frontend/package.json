@@ -8,7 +8,7 @@
     "build": "vite build",
     "typecheck:core": "tsc -p tsconfig.strict-core.json",
     "preview": "vite preview",
-    "test": "tsx --test tests/test_frontend.mjs tests/render_contract.mjs tests/test_auth.mjs tests/test_auth_flow.mjs tests/barcode_payload.mjs tests/table_spec.mjs tests/table_model_v2.mjs tests/snapping_engine.mjs",
+    "test": "tsx --test tests/test_frontend.mjs tests/render_contract.mjs tests/test_auth.mjs tests/test_auth_flow.mjs tests/barcode_payload.mjs tests/snapping_engine.mjs tests/ui_layers.mjs tests/graphics_feature_structure.mjs",
     "test:e2e": "playwright test",
     "test:ui": "playwright test --ui",
     "record": "playwright codegen http://localhost:8000 --viewport-size=1920,1080 --output=tests/e2e/user_session.spec.js",

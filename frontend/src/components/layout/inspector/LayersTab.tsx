@@ -1,4 +1,5 @@
-﻿import React from 'react';
+import React from 'react';
+import { Badge, IconButton } from '../../../shared/ui';
 
 interface LayersTabProps {
   objectsList: any[];
@@ -20,7 +21,6 @@ function getObjIcon(obj: any): string {
   if (obj.type === 'line')   return 'horizontal_rule';
   if (obj.type === 'circle') return 'circle';
   if (obj.type === 'image')  return 'image';
-  if (obj.isGhsSymbol)       return 'warning';
   return 'layers';
 }
 
@@ -29,7 +29,6 @@ function getObjColor(obj: any): string {
   if (obj.type === 'text' || obj.type === 'i-text') return 'text-secondary';
   if (obj.type === 'rect')   return 'text-primary';
   if (obj.type === 'circle') return 'text-secondary';
-  if (obj.isGhsSymbol)       return 'text-secondary';
   return 'text-on-surface-variant';
 }
 
@@ -50,19 +49,18 @@ function LayerActionBtn({ icon, title, testId, onClick, disabled, danger }: {
   icon: string; title: string; testId: string; onClick: () => void; disabled?: boolean; danger?: boolean;
 }) {
   return (
-    <button
+    <IconButton
       data-testid={testId}
       onClick={onClick}
       disabled={disabled}
-      title={title}
-      aria-label={title}
-      className={`p-1 transition-colors disabled:opacity-25 disabled:cursor-not-allowed ${
-        danger ? 'text-on-surface-variant hover:text-secondary hover:bg-secondary/10'
-               : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
+      label={title}
+      className={`h-auto w-auto border-transparent p-1 disabled:cursor-not-allowed disabled:opacity-25 ${
+        danger ? 'text-on-surface-variant hover:border-secondary-container hover:bg-surface-container-high hover:text-secondary'
+               : 'text-on-surface-variant hover:border-transparent hover:bg-surface-container-high hover:text-on-surface'
       }`}
     >
       <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{icon}</span>
-    </button>
+    </IconButton>
   );
 }
 
@@ -102,7 +100,7 @@ export function LayersTab({
           <LayerActionBtn icon="flip_to_back"   title="Send Backward" testId="layers-btn-send-backward" onClick={onSendBackward} disabled={noSel} />
           <LayerActionBtn icon="content_copy"   title="Duplicate"     testId="layers-btn-duplicate"     onClick={onDuplicate}    disabled={noSel} />
           <LayerActionBtn icon="group_work" title="Group selection" testId="layers-btn-group" onClick={onGroup} disabled={selectedObject?.type !== 'activeSelection'} />
-          <LayerActionBtn icon="ungroup" title={selectedObject?.isTable ? 'Tables stay grouped' : 'Ungroup'} testId="layers-btn-ungroup" onClick={onUngroup} disabled={selectedObject?.type !== 'group' || !!selectedObject?.isTable} />
+          <LayerActionBtn icon="ungroup" title="Ungroup" testId="layers-btn-ungroup" onClick={onUngroup} disabled={selectedObject?.type !== 'group'} />
           <LayerActionBtn icon="delete"         title="Delete"        testId="layers-btn-delete"        onClick={onDelete}        disabled={noSel} danger />
         </div>
       </div>
@@ -128,47 +126,47 @@ export function LayersTab({
                 onClick={() => onSelectLayer(obj)}
                 className={`flex items-center gap-2 px-2 py-1.5 cursor-pointer text-xs transition-colors ${
                   isSelected
-                    ? 'bg-primary/10 border-l-2 border-primary'
+                    ? 'border-l-2 border-primary bg-primary-container text-on-primary-container'
                     : 'hover:bg-surface-container-high border-l-2 border-transparent'
                 }`}
               >
                 <span className={`material-symbols-outlined shrink-0 ${getObjColor(obj)}`} style={{ fontSize: 15 }}>
-                  {obj.isTable ? 'table_chart' : getObjIcon(obj)}
+                  {getObjIcon(obj)}
                 </span>
 
                 <div className="flex-1 min-w-0 flex items-center gap-1.5">
                   <span className={`truncate font-mono text-[11px] ${isHidden ? 'opacity-40' : ''} ${isSelected ? 'text-on-surface' : 'text-on-surface-variant'}`}>
-                    {obj.isTable ? 'Table' : getObjName(obj)}
+                    {getObjName(obj)}
                   </span>
                   {isSapBound && (
-                    <span data-testid={`layer-item-bound-badge-${idx}`} className="shrink-0 text-[8px] px-1 py-0.5 bg-tertiary/15 text-tertiary font-semibold">
+                    <Badge data-testid={`layer-item-bound-badge-${idx}`} tone="success" className="shrink-0 px-1 text-[8px] font-semibold">
                       BOUND
-                    </span>
+                    </Badge>
                   )}
                 </div>
 
 
                 <div data-testid={`layer-item-controls-${idx}`} className="flex items-center gap-0 opacity-50 hover:opacity-100">
-                  <button
+                  <IconButton
                     data-testid={`layer-btn-visibility-${idx}`}
                     onClick={(e) => toggleVisibility(obj, e)}
-                    title={isHidden ? 'Show' : 'Hide'}
-                    className="p-0.5 text-on-surface-variant hover:text-on-surface"
+                    label={isHidden ? 'Show' : 'Hide'}
+                    className="h-auto w-auto border-transparent p-0.5 text-on-surface-variant hover:border-transparent hover:bg-surface-container-high hover:text-on-surface"
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: 13 }}>
                       {isHidden ? 'visibility_off' : 'visibility'}
                     </span>
-                  </button>
-                  <button
+                  </IconButton>
+                  <IconButton
                     data-testid={`layer-btn-lock-${idx}`}
                     onClick={(e) => toggleLock(obj, e)}
-                    title={isLocked ? 'Unlock' : 'Lock'}
-                    className={`p-0.5 ${isLocked ? 'text-secondary' : 'text-on-surface-variant hover:text-on-surface'}`}
+                    label={isLocked ? 'Unlock' : 'Lock'}
+                    className={`h-auto w-auto border-transparent p-0.5 ${isLocked ? 'text-secondary' : 'text-on-surface-variant hover:border-transparent hover:bg-surface-container-high hover:text-on-surface'}`}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: 13 }}>
                       {isLocked ? 'lock' : 'lock_open'}
                     </span>
-                  </button>
+                  </IconButton>
                 </div>
               </div>
               </React.Fragment>

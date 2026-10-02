@@ -2,7 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
-import { sessionRecorder } from './utils/sessionRecorder';
+import { sessionRecorder } from './features/diagnostics';
 
 // Initialize AI Diagnostics & Interaction Telemetry
 sessionRecorder.start();
