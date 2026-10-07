@@ -1,0 +1,77 @@
+name: thermal-label-studio
+services:
+  app:
+    image: thermal-label-studio:local
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        RESVG_SHA256: ${RESVG_SHA256:?An independently verified resvg v0.44.0 archive SHA256 is required}
+    ports:
+      - "127.0.0.1:${TLS_APP_PORT:-8002}:8000"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 512m
+    cpus: 1.0
+    stop_grace_period: 20s
+    restart: "no"
+    environment:
+      TLS_DATABASE_URL: postgresql://thermal_label:${TLS_DB_PASSWORD:?Set a local database password}@postgres:5432/thermal_label_studio
+      TLS_MINIO_ENDPOINT: minio:9000
+      TLS_MINIO_ACCESS_KEY: ${TLS_MINIO_ACCESS_KEY:?Set a local MinIO access key}
+      TLS_MINIO_SECRET_KEY: ${TLS_MINIO_SECRET_KEY:?Set a local MinIO secret key}
+      TLS_MINIO_BUCKET: thermal-label-layouts
+      TLS_MINIO_SECURE: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: thermal_label_studio
+      POSTGRES_USER: thermal_label
+      POSTGRES_PASSWORD: ${TLS_DB_PASSWORD:?Set a local database password}
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U thermal_label -d thermal_label_studio"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: "no"
+
+  minio:
+    image: thermal-minio-source:2025-10-15
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${TLS_MINIO_ACCESS_KEY:?Set a local MinIO access key}
+      MINIO_ROOT_PASSWORD: ${TLS_MINIO_SECRET_KEY:?Set a local MinIO secret key}
+    ports:
+      - "127.0.0.1:9002:9000"
+      - "127.0.0.1:9003:9001"
+    volumes:
+      - minio-data:/data
+    restart: "no"
+
+# Existing volume names deliberately preserved; no implicit replacement database.
+# Volumes must exist before an authorized start. For a new target, provision
+# named volumes separately and set TLS_POSTGRES_VOLUME/TLS_MINIO_VOLUME.
+volumes:
+  postgres-data:
+    external: true
+    name: ${TLS_POSTGRES_VOLUME:-thermal-label-studio-p8c_p8c-postgres}
+  minio-data:
+    external: true
+    name: ${TLS_MINIO_VOLUME:-thermal-label-studio-p8c_p8c-minio}

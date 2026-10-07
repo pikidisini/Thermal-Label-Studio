@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="1600" viewBox="0 0 640 1600">
+  <rect x="0" y="0" width="640" height="1600" fill="white" />
+  <rect x="32" y="32" width="576" height="8" fill="black" />
+  <text x="32" y="100" font-family="Arial" font-size="32" fill="black">BATCH</text>
+  <text x="32" y="145" font-family="Arial" font-size="32" fill="black" data-fact="batch" />
+  <text x="32" y="215" font-family="Arial" font-size="32" fill="black">MATERIAL</text>
+  <text x="32" y="260" font-family="Arial" font-size="32" fill="black" data-fact="material" />
+</svg>

@@ -1,0 +1,6 @@
+# Use once together with compose.yml; remove this override after bootstrap.
+services:
+  jenkins:
+    volumes:
+      - ./Initialize-LocalQuality.groovy:/var/jenkins_home/init.groovy.d/initialize-local-quality.groovy:ro
+      - ../sonarqube/.env.scan:/run/local-sonar.env:ro

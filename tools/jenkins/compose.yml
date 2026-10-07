@@ -1,0 +1,27 @@
+name: thermal-label-jenkins
+
+# Local Jenkins controller. It reuses the existing Jenkins home volume named in
+# .env; it never creates, removes, or migrates that volume.
+services:
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: thermal-label-jenkins:local
+    ports:
+      - "127.0.0.1:${JENKINS_HOST_PORT:-8081}:8080"
+    volumes:
+      - jenkins-home:/var/jenkins_home
+      # The current working tree is read-only. Jenkins jobs must use this path
+      # only after the user authorizes the exact snapshot they will analyze.
+      - ${TLS_WORKSPACE_PATH:-../..}:/workspace/thermal-label-studio:ro
+    environment:
+      JAVA_OPTS: -Djenkins.install.runSetupWizard=false -Xmx512m
+    restart: unless-stopped
+    mem_limit: 3g
+    cpus: 2.0
+
+volumes:
+  jenkins-home:
+    external: true
+    name: ${TLS_JENKINS_HOME_VOLUME:?Set the existing Jenkins home volume name in tools/jenkins/.env}

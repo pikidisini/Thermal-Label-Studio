@@ -1,0 +1,23 @@
+# Single Python dependency manifest for the application image and development.
+# Existing runtime pins are preserved. Test tools are included intentionally.
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn==0.52.4
+pydantic==2.13.5
+pydantic_core==2.46.5
+Pillow==12.3.0
+annotated-types==0.8.0
+typing-inspection==0.4.4
+typing_extensions==4.16.0
+anyio==4.15.1
+idna==3.18
+click==8.5.0
+h11==0.16.0
+annotated-doc==0.0.5
+psycopg[binary]==3.3.2
+minio==7.2.20
+
+# Local source validation.
+pytest==9.1.1
+httpx==0.28.1
+coverage==7.16.2

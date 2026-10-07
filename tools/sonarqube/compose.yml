@@ -1,0 +1,53 @@
+name: thermal-label-sonarqube
+
+# Local-only SonarQube stack.  It deliberately has no link to the application
+# PostgreSQL or MinIO services in ../../docker-compose.yml.
+services:
+  db:
+    image: postgres:17.11
+    environment:
+      POSTGRES_DB: sonar
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: ${SONAR_DB_PASSWORD:?Set SONAR_DB_PASSWORD in tools/sonarqube/.env}
+    volumes:
+      - sonarqube-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonar -d sonar"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  sonarqube:
+    image: sonarqube:26.9.0.129388-community
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${SONAR_HOST_PORT:-9004}:9000"
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://db:5432/sonar
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASSWORD:?Set SONAR_DB_PASSWORD in tools/sonarqube/.env}
+      # Keeps existing browser sessions valid across a container restart.
+      SONAR_AUTH_JWTBASE64HS256SECRET: ${SONAR_AUTH_JWTBASE64HS256SECRET:?Set a base64-encoded JWT secret in tools/sonarqube/.env}
+    volumes:
+      - sonarqube-data:/opt/sonarqube/data
+      - sonarqube-extensions:/opt/sonarqube/extensions
+      - sonarqube-logs:/opt/sonarqube/logs
+      - sonarqube-temp:/opt/sonarqube/temp
+    tmpfs:
+      - /tmp:size=256M,mode=1777
+    restart: unless-stopped
+
+volumes:
+  sonarqube-db:
+    name: thermal-label-sonarqube-db
+  sonarqube-data:
+    name: thermal-label-sonarqube-data
+  sonarqube-extensions:
+    name: thermal-label-sonarqube-extensions
+  sonarqube-logs:
+    name: thermal-label-sonarqube-logs
+  sonarqube-temp:
+    name: thermal-label-sonarqube-temp

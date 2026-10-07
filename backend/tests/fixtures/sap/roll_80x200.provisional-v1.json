@@ -1,0 +1,16 @@
+{
+  "schema": "sap-label-fixture",
+  "contract_version": 1,
+  "request_id": "external-fixture-001",
+  "correlation_id": "correlation-fixture-001",
+  "label_request": {
+    "label_code": "roll_80x200",
+    "mode": "simulation",
+    "items": [
+      {
+        "item_id": "fixture-1",
+        "facts": {"batch": "BATCH-001", "material": "MATERIAL-001"}
+      }
+    ]
+  }
+}

@@ -1,0 +1,56 @@
+# Node / Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+.npm
+.package-lock.json
+
+# Python / Backend
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.pytest_cache/
+.pytest-*/
+tmp/
+# Project-local disposable workspace; keep its safety instructions trackable.
+/.tmp/*
+!/.tmp/README.md
+output/
+.venv/
+.venv-jenkins/
+venv/
+env/
+ENV/
+# Retired local data directory; active persistence uses external Docker volumes.
+/backend/data/
+
+# Executables & Binary Assets
+engine/bin/*.exe
+!engine/bin/.gitkeep
+
+# IDE / Editor & Temp
+.history/
+.dontread/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.*
+!.env*.example
+# Local infrastructure inventory can contain container/volume identifiers.
+/tools/*.local.json
+
+# Generated test reports and results
+playwright-report/
+test-results/
+frontend/playwright-report/
+frontend/test-results/
+frontend/.auth/
+**/.last-run.json
+
+# Disposable pytest directories left by interrupted local runs.
+/pytest-cache-files-*/

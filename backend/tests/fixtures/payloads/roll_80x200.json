@@ -1,0 +1,10 @@
+{
+  "label_code": "roll_80x200",
+  "mode": "simulation",
+  "items": [
+    {
+      "item_id": "fixture-1",
+      "facts": {"batch": "BATCH-001", "material": "MATERIAL-001"}
+    }
+  ]
+}

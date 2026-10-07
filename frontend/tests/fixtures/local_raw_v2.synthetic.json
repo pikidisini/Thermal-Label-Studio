@@ -1,0 +1,8 @@
+{
+  "contract_schema_version": "2.0-raw",
+  "items": [
+    {"item_sequence": 1, "characteristics": [{"name": "MATNR", "value": "SYN-MAT-001"}], "business_context": {"production_date_provenance": {"kind": "synthetic-test"}}},
+    {"item_sequence": 2, "characteristics": [{"name": "MATNR", "value": "SYN-MAT-002"}], "business_context": {}},
+    {"item_sequence": 3, "characteristics": [{"name": "MATNR", "value": "SYN-MAT-003"}], "business_context": {}}
+  ]
+}

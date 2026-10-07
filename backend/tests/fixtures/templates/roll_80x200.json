@@ -1,0 +1,8 @@
+{
+  "label_code": "roll_80x200",
+  "version": "fixture-v1",
+  "width_mm": 80,
+  "height_mm": 200,
+  "dpi": 203.2,
+  "required_facts": ["batch", "material"]
+}
