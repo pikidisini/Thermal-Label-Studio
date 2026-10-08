@@ -5,6 +5,8 @@ from xml.etree import ElementTree as ET
 
 
 SVG_NS = "http://www.w3.org/2000/svg"
+XLINK_NS = "http://www.w3.org/1999/xlink"
+ET.register_namespace("xlink", XLINK_NS)
 MAX_SVG_BYTES = 512 * 1024
 DATA_IMAGE = re.compile(r"^data:image/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$")
 FORBIDDEN_ELEMENTS = {"script", "foreignObject", "animate", "animateMotion", "animateTransform", "set"}

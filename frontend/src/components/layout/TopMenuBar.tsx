@@ -1,3 +1,4 @@
+import { useTranslation } from '../../shared/i18n';
 import React from 'react';
 import { ViewMode } from '../../types/label';
 import { TemplateMetadata } from '../../types/template';
@@ -5,6 +6,7 @@ import { TemplateSelector } from '../../features/templates';
 import { TopBarActions } from './topbar/TopBarActions';
 import { AnchoredOverlay } from '../../shared/ui/layers';
 import { Button } from '../../shared/ui';
+import { PreferencesButton } from '../../features/preferences';
 
 interface TopMenuBarProps {
   templates: TemplateMetadata[];
@@ -31,7 +33,8 @@ interface TopMenuBarProps {
 
 
 /** Row 1 — 40px brand bar */
-function BrandRow(props: Readonly<Pick<TopMenuBarProps, 'onImportTemplateSvg' | 'onImportJson' | 'onExportTemplateSvg' | 'onUndo' | 'onRedo' | 'setViewMode' | 'viewMode' | 'onOpenShortcuts' | 'onShowAbout'>>) {
+function BrandRow(props: Readonly<Pick<TopMenuBarProps, 'onOpenCanvasSetup' | 'onOpenSave' | 'onImportTemplateSvg' | 'onImportJson' | 'onExportTemplateSvg' | 'onUndo' | 'onRedo' | 'setViewMode' | 'viewMode' | 'onOpenShortcuts' | 'onShowAbout' | 'onOpenLabelSimulation'>>) {
+  const t = useTranslation();
   const [openMenu, setOpenMenu] = React.useState<string | null>(null);
   const activeMenuTriggerRef = React.useRef<HTMLButtonElement>(null);
   const activeMenuOverlayRef = React.useRef<HTMLDivElement>(null);
@@ -47,8 +50,11 @@ function BrandRow(props: Readonly<Pick<TopMenuBarProps, 'onImportTemplateSvg' | 
     document.addEventListener('keydown', closeWithEscape);
     return () => { document.removeEventListener('mousedown', closeWhenClickingOutside); document.removeEventListener('keydown', closeWithEscape); };
   }, []);
-  const menus: Record<string, Array<{ label: string; action?: () => void; disabled?: boolean }>> = {
+  const menus: Record<string, Array<{ label: string; action?: () => void; disabled?: boolean; testId?: string }>> = {
     File: [
+      { label: 'New Template', action: () => props.onOpenCanvasSetup('new') },
+      { label: 'Save Template', action: props.onOpenSave },
+      { label: 'Template Properties', action: () => props.onOpenCanvasSetup('resize') },
       { label: 'Upload template SVG', action: props.onImportTemplateSvg },
       { label: 'Upload data JSON', action: props.onImportJson },
       { label: 'Download template SVG', action: props.onExportTemplateSvg },
@@ -59,7 +65,7 @@ function BrandRow(props: Readonly<Pick<TopMenuBarProps, 'onImportTemplateSvg' | 
       { label: 'Design', action: () => props.setViewMode('design') },
       { label: 'Preview', action: () => props.setViewMode('preview') },
     ],
-    Utilities: [{ label: 'Global graphics (planned)', disabled: true }, { label: 'Fixture simulation', action: () => { window.location.href = '/fixture-simulation'; } }],
+    Utilities: [{ label: 'Label Simulation', action: props.onOpenLabelSimulation, testId: 'btn-label-simulation' }, { label: 'Global graphics (planned)', disabled: true }, { label: 'Fixture simulation', action: () => { window.location.href = '/fixture-simulation'; } }],
     Help: [{ label: 'Keyboard shortcuts', action: props.onOpenShortcuts }, { label: 'About Thermal Label Studio', action: props.onShowAbout }],
   };
 
@@ -72,7 +78,7 @@ function BrandRow(props: Readonly<Pick<TopMenuBarProps, 'onImportTemplateSvg' | 
         {/* Wordmark */}
         <div data-testid="topbar-brand-logo" className="flex items-center gap-2">
           <div className="w-6 h-6 bg-primary flex items-center justify-center shadow-md">
-            <span className="material-symbols-outlined text-surface" style={{ fontSize: 15 }}>label</span>
+            <span className="material-symbols-outlined text-surface" style={{ fontSize: "var(--ui-icon-15)" }}>label</span>
           </div>
           <span className="font-mono font-bold text-xs text-on-surface tracking-tight hidden sm:inline">
             Thermal Label Studio
@@ -86,16 +92,15 @@ function BrandRow(props: Readonly<Pick<TopMenuBarProps, 'onImportTemplateSvg' | 
         <div data-testid="topbar-menu-items" className="flex items-center gap-0.5">
           {Object.keys(menus).map((item) => (
             <div key={item} className="relative">
-              <Button aria-haspopup="menu" data-testid={`topbar-menu-btn-${item.toLowerCase()}`} aria-expanded={openMenu === item} onClick={(event) => { activeMenuTriggerRef.current = event.currentTarget; setOpenMenu(openMenu === item ? null : item); }} className="border-transparent px-1.5 py-0.5 text-[11px] font-medium text-on-surface-variant hover:border-transparent hover:bg-surface-container hover:text-on-surface">{item}</Button>
-              {openMenu === item && <AnchoredOverlay anchorRef={activeMenuTriggerRef} overlayRef={activeMenuOverlayRef} testId={`topbar-menu-overlay-${item.toLowerCase()}`}><div role="menu" data-testid={`topbar-menu-${item.toLowerCase()}`} className="min-w-44 border border-outline-variant bg-surface-container-lowest py-1 shadow-xl">
-                {menus[item].map((entry) => <Button key={entry.label} role="menuitem" disabled={entry.disabled} title={entry.disabled ? "Planned feature; unavailable in this local checkpoint." : undefined} onClick={() => { setOpenMenu(null); entry.action?.(); }} className="block w-full border-transparent px-3 py-1.5 text-left text-[11px] text-on-surface-variant hover:border-transparent hover:bg-surface-container hover:text-on-surface">{entry.label}</Button>)}
+              <Button aria-haspopup="menu" data-testid={`topbar-menu-btn-${item.toLowerCase()}`} aria-expanded={openMenu === item} onClick={(event) => { activeMenuTriggerRef.current = event.currentTarget; setOpenMenu(openMenu === item ? null : item); }}  variant="toolbar">{t(item)}</Button>
+              {openMenu === item && <AnchoredOverlay anchorRef={activeMenuTriggerRef} overlayRef={activeMenuOverlayRef} testId={`topbar-menu-overlay-${item.toLowerCase()}`}><div role="menu" data-testid={`topbar-menu-${item.toLowerCase()}`} className="min-w-44 border border-outline-variant bg-surface-container-lowest py-1 shadow-xl" data-ui-surface="flyout">
+                {menus[item].map((entry, index) => <Button data-testid={entry.testId || `topbar-menuitem-${item.toLowerCase()}-${index}`} key={entry.label} role="menuitem" disabled={entry.disabled} title={entry.disabled ? t("Planned feature; unavailable in this local checkpoint.") : undefined} onClick={() => { setOpenMenu(null); entry.action?.(); }} className="block w-full text-left" variant="menu">{t(entry.label)}</Button>)}
               </div></AnchoredOverlay>}
             </div>
           ))}
         </div>
       </div>
-
-
+      <PreferencesButton />
     </div>
   );
 }
@@ -117,7 +122,7 @@ export function TopMenuBar({
   return (
     <header data-testid="container-top-menubar" className="relative flex flex-col select-none z-[var(--ui-layer-chrome)] shadow-md">
       {/* Row 1 — Brand / application menu */}
-      <BrandRow {...{ onImportTemplateSvg, onImportJson, onExportTemplateSvg, onUndo, onRedo, setViewMode, viewMode, onOpenShortcuts, onShowAbout }} />
+      <BrandRow {...{ onOpenCanvasSetup, onOpenSave, onImportTemplateSvg, onImportJson, onExportTemplateSvg, onUndo, onRedo, setViewMode, viewMode, onOpenShortcuts, onShowAbout, onOpenLabelSimulation }} />
 
       {/* Row 2 — 36px HUD / workspace toolbar */}
       <div
@@ -133,7 +138,6 @@ export function TopMenuBar({
         />
 
         <TopBarActions
-          onOpenLabelSimulation={onOpenLabelSimulation}
           viewMode={viewMode}
           setViewMode={setViewMode}
           onOpenCanvasSetup={onOpenCanvasSetup}

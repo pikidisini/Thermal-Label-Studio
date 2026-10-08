@@ -1,5 +1,21 @@
 # Development
 
+## Optional MCP tooling
+
+`tools/mcp/` provides a separate local STDIO inspection server for AI clients.
+It uses its own virtual environment and ignored local credentials, exposes only
+bounded table/column inspection and reads, and does not initialize storage.
+See [MCP setup and reader provisioning](../tools/mcp/README.md). Creating its
+dedicated database role is a separate authorized administrative action.
+The separate [MinIO MCP server](../tools/mcp/MINIO.md) reads layout object lists,
+metadata and bounded SVG text. It uses a dedicated reader policy and its own
+ignored `.env.minio`, with no bucket initialization or object writes.
+The [Jenkins MCP server](../tools/mcp/JENKINS.md) reads allowlisted job metadata,
+existing build status and opt-in bounded logs. Its dedicated account provisioning
+is a separate authorized admin action; server startup uses only the reader token.
+The [SonarQube MCP launcher](../tools/mcp/SONARQUBE.md) also lives under `tools/mcp/`.
+It uses the pinned SonarSource STDIO container and a separate ignored `.env.sonar`.
+
 ## Current source and launch
 
 Work from README.md, AGENTS.md and the five active contracts. Source lives in
@@ -32,7 +48,68 @@ Configured persistence initializes PostgreSQL schema/MinIO bucket on startup.
 Starting it is an external write action. Unconfigured layout endpoints return
 503 and storage drivers are not loaded. Source tests use fakes and synthetic data.
 
-## Source checks and generated results
+## Editing with live reload
+
+The Docker stack remains the standard packaged application. During source editing,
+use one local command from the repository root:
+
+```powershell
+python -B scripts/dev.py --check
+python -B scripts/dev.py
+```
+
+Install root requirements.txt into the selected Python environment and run `npm ci`
+in frontend once before using this command. The launcher installs nothing.
+It checks that ports 8000 and 5173 are free and never stops an existing service.
+Open http://127.0.0.1:5173/studio. Vite HMR updates frontend code; Uvicorn reload
+restarts the API when backend/app Python files change. Both bind loopback only.
+The frontend proxies /api, /health and /ready to the local API on port 8000.
+Ctrl+C stops both servers; if either exits, the launcher stops the other.
+
+By default the launcher uses existing authorized Compose storage for Save/Open.
+Use `--no-storage` explicitly to remove persistence settings from its child
+environment; layout save/open returns 503 in that case. Default startup
+(also selectable with `--compose-storage`) resolves root .env through Docker Compose
+and translates published loopback storage ports for the local backend. It requires
+existing PostgreSQL/MinIO services to be running and rejects a running Compose app
+to prevent competing application writers. It never prints the resolved credentials.
+
+After authorization for the existing storage target, stop the packaged app only,
+then use the storage-enabled editing command:
+
+```powershell
+docker compose stop app
+python -B scripts/dev.py --compose-storage
+```
+
+This leaves storage services and external volumes intact. With the local launcher
+stopped, return to packaged validation with `docker compose up --build -d app`.
+An installed `engine/bin/resvg.exe` is automatically selected by the launcher;
+TLS_RENDERER_PATH may override it. The binary and root .env remain ignored by Git.
+Preview/simulation still requires a native renderer: set TLS_RENDERER_PATH to an
+absolute path to your installed resvg executable. The Windows font default is
+C:/Windows/Fonts/arial.ttf; on Linux configure TLS_FIXTURE_FONT_PATH and
+TLS_FIXTURE_FONT_FAMILY=Liberation Sans. Renderer binaries are not supplied by
+this source repository. The packaged Linux renderer cannot run directly on Windows.
+
+To use existing, authorized PostgreSQL/MinIO services, set TLS_DATABASE_URL,
+TLS_MINIO_ENDPOINT, TLS_MINIO_ACCESS_KEY, TLS_MINIO_SECRET_KEY and TLS_MINIO_BUCKET
+in the current shell, then run `python -B scripts/dev.py --persistence`.
+For the standard Compose host ports use database host 127.0.0.1:5434 and MinIO
+endpoint 127.0.0.1:9002 rather than Docker service names. This opt-in permits
+startup schema/bucket initialization and subsequent UI storage writes. Select
+and authorize the named storage target first; never run competing application
+writers against operational storage. The launcher starts no Docker services,
+provisions no volumes and does not read or print credentials.
+
+Dependency edits require reinstalling the affected local manifest and restarting
+the launcher. Vite configuration changes may also require a restart. After the
+source iteration passes, use the standard authorized `docker compose up --build -d`
+and smoke-test http://127.0.0.1:8002/studio to validate packaging. Source reload
+does not validate the image. Playwright still starts no servers; E2E_BASE_URL
+may select http://127.0.0.1:5173 for an explicitly authorized development target.
+
+## Source validation
 
 From web_app:
 
@@ -162,3 +239,24 @@ Checkpoint release evidence must identify the reviewed source and list all
 unresolved quality findings. See the dated assessment in SONARQUBE.md. A new
 repository must preserve the active source, lockfile and reviewed contracts;
 archives, credentials, operational data and `.tmp` reports do not become source.
+
+## Sample dataset validation boundary
+
+Sample dataset schema/API source is implemented alongside layout persistence.
+Persistence-enabled startup also initializes the PostgreSQL sample dataset table.
+Do not restart or initialize operational storage for source tests; named-target
+authorization remains required. `test_studio_datasets.py` exercises validation,
+SQL/error paths and roundtrips through fakes, with no database or object-store
+operations. Saved-dataset browser checks use mocked endpoints. Dataset preview
+edits have no persistence API in this phase.
+
+## Browser preferences
+
+UI messages live in `frontend/src/shared/i18n`; English source messages are the
+translation keys and fallback. Preference controls/store belong to
+`features/preferences`, using `thermal-label-studio.preferences.v1` only.
+Keep test IDs and protocol keys independent of labels. Use semantic CSS tokens
+for editor surfaces; canvas and preview pixels keep their authored colors.
+
+
+Frontend visual controls use CSS custom properties in `frontend/src/index.css` as the single source for palette pairs, UI typography, compact/default sizes, spacing, borders, radius, shadows, backdrop and motion. Shared primitives expose semantic `tone`, `variant`, `selected` and disabled treatment; native feature controls use the same `data-ui-*` contract. Keep caller classes for layout and deliberate technical geometry. Use compact/stepper variants for narrow editor fields. Selected colors have paired foregrounds. Planned actions remain native-disabled and use the generic planned hover treatment. Focus-visible stays observable. Reduced motion applies only to marked controls, chrome animations and modal portals; authored SVG, Fabric objects and export pixels remain outside UI styling.

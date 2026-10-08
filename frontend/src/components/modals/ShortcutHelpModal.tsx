@@ -1,3 +1,4 @@
+import { translate as t, useTranslation } from "../../shared/i18n";
 import React from 'react';
 import { X, Keyboard, Command, MousePointer, Move, ZoomIn, Undo, Redo, Copy, Trash2 } from 'lucide-react';
 import { Button, Dialog, DialogFooter, DialogHeader, IconButton } from '../../shared/ui';
@@ -51,28 +52,27 @@ const SHORTCUT_GROUPS = [
 ];
 
 export default function ShortcutHelpModal({ isOpen, onClose }) {
+  useTranslation();
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[var(--ui-layer-modal)] flex items-center justify-center bg-black/75 backdrop-blur-xs animate-fadeIn select-none p-4">
+    <div className="fixed inset-0 z-[var(--ui-layer-modal)] flex items-center justify-center backdrop-blur-xs animate-fadeIn select-none p-4" data-ui-backdrop="true" data-ui-motion="true">
       <Dialog className="w-full max-w-xl overflow-hidden flex flex-col max-h-[85vh]">
         {/* Header */}
-        <DialogHeader className="px-5 py-4 flex items-center justify-between bg-surface-container-high">
+        <DialogHeader className="flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
             <div className="w-8 h-8 bg-primary-container/10 border border-primary-container flex items-center justify-center text-primary">
               <Keyboard className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-on-surface">Keyboard & Mouse Shortcuts</h2>
-              <p className="text-xs text-on-surface-variant">
-                Professional CAD / Vector workflows (Photoshop, Inkscape, Illustrator style)
-              </p>
+              <h2 className="text-sm font-semibold text-on-surface">{t("Keyboard & Mouse Shortcuts")}</h2>
+              <p className="text-xs text-on-surface-variant">{t("Professional CAD / Vector workflows (Photoshop, Inkscape, Illustrator style)")} </p>
             </div>
           </div>
           <IconButton
             onClick={onClose}
-            className="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition"
-            label="Close keyboard shortcuts"
+
+            label={t("Close keyboard shortcuts")}
           >
             <X className="w-4 h-4" />
           </IconButton>
@@ -83,12 +83,12 @@ export default function ShortcutHelpModal({ isOpen, onClose }) {
           {SHORTCUT_GROUPS.map((grp, idx) => (
             <div key={idx} className="space-y-2">
               <h3 className="text-xs font-semibold text-secondary uppercase tracking-wider font-mono">
-                {grp.category}
+                {t(grp.category)}
               </h3>
               <div className="bg-surface-container border border-outline-variant divide-y divide-outline-variant/60">
                 {grp.items.map((item, i) => (
                   <div key={i} className="px-3.5 py-2 flex items-center justify-between text-xs">
-                    <span className="text-on-surface">{item.desc}</span>
+                    <span className="text-on-surface">{t(item.desc)}</span>
                     <div className="flex items-center space-x-1 shrink-0 ml-3">
                       {item.keys.map((k, ki) => (
                         <span
@@ -111,15 +111,13 @@ export default function ShortcutHelpModal({ isOpen, onClose }) {
         </div>
 
         {/* Footer */}
-        <DialogFooter className="px-5 py-3 bg-surface-container-high flex items-center justify-between text-xs text-on-surface-variant">
-          <span>Press <kbd className="px-1 py-0.5 bg-surface-container border border-outline-variant font-mono text-[10px] text-on-surface">?</kbd> to toggle this dialog anytime</span>
+        <DialogFooter className="flex items-center justify-between">
+          <span>{t("Press")} <kbd className="px-1 py-0.5 bg-surface-container border border-outline-variant font-mono text-[10px] text-on-surface">?</kbd> {t("to toggle this dialog anytime")}</span>
           <Button
             onClick={onClose}
             tone="primary"
-            className="px-4 py-1.5 font-medium transition text-xs"
-          >
-            Got it
-          </Button>
+
+           variant="default">{t("Got it")} </Button>
         </DialogFooter>
       </Dialog>
     </div>

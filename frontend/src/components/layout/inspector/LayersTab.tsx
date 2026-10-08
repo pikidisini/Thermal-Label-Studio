@@ -1,3 +1,5 @@
+import { translate as t, useTranslation } from "../../../shared/i18n";
+import { useFieldLabel } from '../../../features/data-tokens';
 import React from 'react';
 import { Badge, IconButton } from '../../../shared/ui';
 
@@ -32,10 +34,10 @@ function getObjColor(obj: any): string {
   return 'text-on-surface-variant';
 }
 
-function getObjName(obj: any): string {
-  if (obj.dataField) return `{{${obj.dataField}}}`;
-  if (obj.dataBarcode) return `Bar: ${obj.dataBarcode}`;
-  if (obj.dataQr) return `QR: ${obj.dataQr}`;
+function getObjName(obj: any, fieldLabel: (key: string) => string): string {
+  if (obj.dataField) return fieldLabel(obj.dataField);
+  if (obj.dataBarcode) return `Bar: ${fieldLabel(obj.dataBarcode)}`;
+  if (obj.dataQr) return `QR: ${fieldLabel(obj.dataQr)}`;
   if (obj.text) return `"${obj.text.substring(0, 18)}"`;
   if (obj.isBarcode) return `Barcode (${obj.barcodeType || '1D'})`;
   if (obj.type === 'rect')   return 'Rectangle';
@@ -48,18 +50,16 @@ function getObjName(obj: any): string {
 function LayerActionBtn({ icon, title, testId, onClick, disabled, danger }: {
   icon: string; title: string; testId: string; onClick: () => void; disabled?: boolean; danger?: boolean;
 }) {
+  useTranslation();
   return (
     <IconButton
       data-testid={testId}
       onClick={onClick}
       disabled={disabled}
       label={title}
-      className={`h-auto w-auto border-transparent p-1 disabled:cursor-not-allowed disabled:opacity-25 ${
-        danger ? 'text-on-surface-variant hover:border-secondary-container hover:bg-surface-container-high hover:text-secondary'
-               : 'text-on-surface-variant hover:border-transparent hover:bg-surface-container-high hover:text-on-surface'
-      }`}
-    >
-      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{icon}</span>
+      className={`h-auto w-auto disabled:cursor-not-allowed`}
+     tone={danger ? 'danger' : 'neutral'}>
+      <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-14)" }}>{icon}</span>
     </IconButton>
   );
 }
@@ -68,6 +68,7 @@ export function LayersTab({
   objectsList, selectedObject, canvasRef,
   onBringForward, onSendBackward, onDuplicate, onDelete, onGroup, onUngroup, onSelectLayer,
 }: LayersTabProps) {
+  useTranslation();
   const noSel = !selectedObject;
 
   const toggleVisibility = (obj: any, e: React.MouseEvent) => {
@@ -85,6 +86,7 @@ export function LayersTab({
     canvasRef.current?.renderAll();
   };
 
+  const fieldLabel = useFieldLabel();
   return (
     <div data-testid="container-layers-tab" className="flex flex-col h-full">
       {/* Header with actions */}
@@ -92,16 +94,15 @@ export function LayersTab({
         data-testid="layers-tab-header"
         className="flex items-center justify-between px-2 py-1.5 border-b border-outline-variant bg-surface-container shrink-0"
       >
-        <span data-testid="layers-count-label" className="text-[11px] font-semibold text-on-surface">
-          Hierarchy Stack ({objectsList.length})
+        <span data-testid="layers-count-label" className="text-[11px] font-semibold text-on-surface">{t("Hierarchy Stack (")}{objectsList.length})
         </span>
         <div data-testid="layers-header-actions" className="flex items-center gap-0">
-          <LayerActionBtn icon="flip_to_front"  title="Bring Forward" testId="layers-btn-bring-forward" onClick={onBringForward} disabled={noSel} />
-          <LayerActionBtn icon="flip_to_back"   title="Send Backward" testId="layers-btn-send-backward" onClick={onSendBackward} disabled={noSel} />
-          <LayerActionBtn icon="content_copy"   title="Duplicate"     testId="layers-btn-duplicate"     onClick={onDuplicate}    disabled={noSel} />
-          <LayerActionBtn icon="group_work" title="Group selection" testId="layers-btn-group" onClick={onGroup} disabled={selectedObject?.type !== 'activeselection'} />
-          <LayerActionBtn icon="ungroup" title="Ungroup" testId="layers-btn-ungroup" onClick={onUngroup} disabled={selectedObject?.type !== 'group'} />
-          <LayerActionBtn icon="delete"         title="Delete"        testId="layers-btn-delete"        onClick={onDelete}        disabled={noSel} danger />
+          <LayerActionBtn icon="flip_to_front"  title={t("Bring Forward")} testId="layers-btn-bring-forward" onClick={onBringForward} disabled={noSel} />
+          <LayerActionBtn icon="flip_to_back"   title={t("Send Backward")} testId="layers-btn-send-backward" onClick={onSendBackward} disabled={noSel} />
+          <LayerActionBtn icon="content_copy"   title={t("Duplicate")}     testId="layers-btn-duplicate"     onClick={onDuplicate}    disabled={noSel} />
+          <LayerActionBtn icon="group_work" title={t("Group selection")} testId="layers-btn-group" onClick={onGroup} disabled={selectedObject?.type !== 'activeselection'} />
+          <LayerActionBtn icon="ungroup" title={t("Ungroup")} testId="layers-btn-ungroup" onClick={onUngroup} disabled={selectedObject?.type !== 'group'} />
+          <LayerActionBtn icon="delete"         title={t("Delete")}        testId="layers-btn-delete"        onClick={onDelete}        disabled={noSel} danger />
         </div>
       </div>
 
@@ -109,8 +110,8 @@ export function LayersTab({
       <div data-testid="container-layers-list" className="flex-1 overflow-y-auto divide-y divide-outline-variant/40">
         {objectsList.length === 0 ? (
           <div data-testid="layers-empty-state" className="p-6 flex flex-col items-center gap-2 text-center">
-            <span className="material-symbols-outlined text-outline" style={{ fontSize: 28 }}>layers_clear</span>
-            <p className="text-[11px] text-on-surface-variant">No vector elements on canvas</p>
+            <span className="material-symbols-outlined text-outline" style={{ fontSize: "var(--ui-icon-28)" }}>layers_clear</span>
+            <p className="text-[11px] text-on-surface-variant">{t("No vector elements on canvas")}</p>
           </div>
         ) : (
           objectsList.map((obj, idx) => {
@@ -132,48 +133,46 @@ export function LayersTab({
                 <button
                   type="button"
                   data-testid={`layer-select-${idx}`}
-                  aria-label={`Select ${getObjName(obj)}`}
+                  aria-label={`Select ${getObjName(obj, fieldLabel)}`}
                   aria-pressed={Boolean(isSelected)}
                   onClick={() => onSelectLayer(obj)}
                   className="flex flex-1 min-w-0 items-center gap-2 text-left"
-                >
-                <span className={`material-symbols-outlined shrink-0 ${getObjColor(obj)}`} style={{ fontSize: 15 }}>
+                 data-ui-control="button" data-variant="default"  data-selected={Boolean(isSelected)}>
+                <span className={`material-symbols-outlined shrink-0 ${getObjColor(obj)}`}>
                   {getObjIcon(obj)}
                 </span>
 
                 <span className="flex-1 min-w-0 flex items-center gap-1.5">
-                  <span className={`truncate font-mono text-[11px] ${isHidden ? 'opacity-40' : ''} ${isSelected ? 'text-on-surface' : 'text-on-surface-variant'}`}>
-                    {getObjName(obj)}
+                  <span className={`truncate font-mono ${isHidden ? "opacity-40" : ''} `}>
+                    {getObjName(obj, fieldLabel)}
                   </span>
                   {isSapBound && (
-                    <Badge data-testid={`layer-item-bound-badge-${idx}`} tone="success" className="shrink-0 px-1 text-[8px] font-semibold">
-                      BOUND
-                    </Badge>
+                    <Badge data-testid={`layer-item-bound-badge-${idx}`} tone="success" className="shrink-0">{t("BOUND")} </Badge>
                   )}
                 </span>
 
 
                 </button>
 
-                <div data-testid={`layer-item-controls-${idx}`} className="flex items-center gap-0 opacity-50 hover:opacity-100">
+                <div data-testid={`layer-item-controls-${idx}`} className="flex items-center gap-0">
                   <IconButton
                     data-testid={`layer-btn-visibility-${idx}`}
                     onClick={(e) => toggleVisibility(obj, e)}
-                    label={isHidden ? 'Show' : 'Hide'}
-                    className="h-auto w-auto border-transparent p-0.5 text-on-surface-variant hover:border-transparent hover:bg-surface-container-high hover:text-on-surface"
+                    label={isHidden ? t("Show") : t("Hide")}
+                    className="h-auto w-auto"
                   >
-                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>
-                      {isHidden ? 'visibility_off' : 'visibility'}
+                    <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-13)" }}>
+                      {isHidden ? "visibility_off" : "visibility"}
                     </span>
                   </IconButton>
                   <IconButton
                     data-testid={`layer-btn-lock-${idx}`}
                     onClick={(e) => toggleLock(obj, e)}
-                    label={isLocked ? 'Unlock' : 'Lock'}
-                    className={`h-auto w-auto border-transparent p-0.5 ${isLocked ? 'text-secondary' : 'text-on-surface-variant hover:border-transparent hover:bg-surface-container-high hover:text-on-surface'}`}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>
-                      {isLocked ? 'lock' : 'lock_open'}
+                    label={isLocked ? t("Unlock") : t("Lock")}
+
+                   selected={isLocked} tone="warning">
+                    <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-13)" }}>
+                      {isLocked ? "lock" : "lock_open"}
                     </span>
                   </IconButton>
                 </div>

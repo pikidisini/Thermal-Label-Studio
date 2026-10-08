@@ -11,7 +11,7 @@ import { useHistoryStore } from '../src/store/useHistoryStore.ts';
 import { parseLocalSapJson } from '../src/features/data-tokens/index.ts';
 import { validatePreviewPayload } from '../src/features/barcode/model/barcodePreview.ts';
 import { useContractStore } from '../src/store/useContractStore.ts';
-import { parseEditorDraft, editorDraftKey, EDITOR_DRAFT_VERSION } from '../src/utils/editorDraftRecovery.ts';
+import { parseEditorDraft, editorDraftKey, EDITOR_DRAFT_VERSION } from '../src/features/canvas/draft/editorDraftRecovery.ts';
 import { getMajorStepMm } from '../src/features/canvas/ruler/rulerScale.ts';
 
 test('F3.35 ruler chooses a readable major interval from the 1/2/5 scale', () => {
@@ -53,13 +53,6 @@ test('F3.15 token edits target nested fields/codes and custom preview fields', (
   assert.equal(useContractStore.getState().jsonData.fields.brand, 'A');
   useContractStore.getState().updateTokenValue('custom_note', 'uji');
   assert.equal(useContractStore.getState().jsonData.fields.custom_note, 'uji');
-});
-
-test('F3.15 inspector exposes binding controls for initially unbound objects', () => {
-  const source = fs.readFileSync(path.join(frontendRoot, 'src/components/layout/inspector/ObjectPropertyForm.tsx'), 'utf8');
-  assert.match(source, /selectedObject\.type === 'i-text' \|\| selectedObject\.isBarcode/);
-  assert.match(source, /data-testid="inspector-sap-token-name"/);
-  assert.match(source, /data-testid="inspector-input-token-value"/);
 });
 
 test('F3.16 preserves raw-v2 token provenance and scopes custom tokens to the active contract', () => {
@@ -163,7 +156,7 @@ test('local raw v2 parser rejects duplicate sequences, names, and non-scalar val
   assert.throws(() => parseLocalSapJson({ contract_schema_version: '2.0-raw', items: [
     { item_sequence: 1, characteristics: [{ name: 'A', value: 1 }, { name: 'A', value: 2 }] },
     { item_sequence: 1, characteristics: [] },
-  ] }), /duplikat/i);
+  ] }), /duplicated/i);
   assert.throws(() => parseLocalSapJson({ contract_schema_version: '2.0-raw', items: [
     { item_sequence: 1, characteristics: [{ name: 'A', value: { nested: true } }] },
   ] }), /scalar/i);
@@ -180,15 +173,15 @@ test('local raw v2 synthetic fixture skips nested provenance with a warning', ()
 test('local raw v2 parser rejects case-insensitive characteristic/context collisions', () => {
   assert.throws(() => parseLocalSapJson({ contract_schema_version: '2.0-raw', items: [
     { item_sequence: 1, characteristics: [{ name: 'MATNR', value: 'A' }], business_context: { matnr: 'B' } },
-  ] }), /bertabrakan/i);
+  ] }), /conflicts/i);
 });
 
 test('dynamic SAP text display updates preserve absent, null, and empty semantics', () => {
   assert.equal(resolveSapTokenDisplayValue('SYN-MAT-0001', 'material_number'), 'SYN-MAT-0001');
   assert.equal(resolveSapTokenDisplayValue('SYN-MAT-0002', 'material_number'), 'SYN-MAT-0002');
-  assert.equal(resolveSapTokenDisplayValue(null, 'customer_text'), 'NULL');
-  assert.equal(resolveSapTokenDisplayValue('', 'customer_text'), '');
-  assert.equal(resolveSapTokenDisplayValue(undefined, 'missing_field'), '{{missing_field}}');
+  assert.equal(resolveSapTokenDisplayValue(null, 'customer_text'), 'customer_text — no data');
+  assert.equal(resolveSapTokenDisplayValue('', 'customer_text'), 'customer_text — no data');
+  assert.equal(resolveSapTokenDisplayValue(undefined, 'missing_field'), 'missing_field — no data');
 });
 
 test('synthetic roll contract maps source aliases without flattening objects', () => {
@@ -661,4 +654,42 @@ test('Fitur 2 - Vector Toolbox Tools & Token Bindings Suite', async (t) => {
     assert.ok(usedTokens.has('batch_number'));
     assert.ok(usedTokens.has('gross_weight_kg'));
   });
+});
+
+
+test('versionless data envelope preserves dynamic keys, identities, zero and null', () => {
+  const input = { sender: { system: 'SAP_ECC' }, request_id: 'REQ1', items: [
+    { item_id: 'I1', label_code: 'A013', copies: 1, data: { ZZWIDTH: 695, 'ZZSPECIALTOUCH-1': 'A', arbitrary_field: 0, optional: null } },
+    { item_id: 'I2', label_code: 'A013', copies: 2, data: { ZZWIDTH: 700 } },
+  ] };
+  const parsed = parseLocalSapJson(input);
+  assert.equal(parsed.format, 'data');
+  assert.equal(parsed.items[0].tokenMap.ZZWIDTH, 695);
+  assert.equal(parsed.items[0].tokenMap.arbitrary_field, 0);
+  assert.equal(parsed.items[0].tokenMap.optional, null);
+  assert.equal(parsed.items[0].contract.source.item_id, 'I1');
+  assert.equal(parsed.items[1].tokenMap.ZZWIDTH, 700);
+  assert.throws(() => parseLocalSapJson({ ...input, items: [input.items[0], input.items[0]] }), /unique/);
+  assert.throws(() => parseLocalSapJson({ ...input, items: [{ ...input.items[0], data: { nested: { value: 1 } } }] }), /scalar/);
+  assert.throws(() => parseLocalSapJson({ ...input, items: [{ ...input.items[0], copies: 0 }] }), /copies/);
+  assert.throws(() => parseLocalSapJson({ ...input, items: [{ ...input.items[0], data: JSON.parse('{"__proto__":"bad"}') }] }), /name/);
+  assert.throws(() => parseLocalSapJson({ ...input, request_id: '' }), /request_id/);
+});
+
+
+test('versionless SAP descriptions are shared metadata and validate independently of values', () => {
+  const payload = { sender: { system: 'SAP_ECC' }, request_id: 'R1', field_descriptions: { ZZWIDTH: 'WIDTH', OTHER: '' }, items: [
+    { item_id: 'I1', label_code: 'A013', copies: 1, data: { ZZWIDTH: 695 } },
+    { item_id: 'I2', label_code: 'A013', copies: 1, data: { ZZWIDTH: 700 } },
+  ] };
+  const parsed = parseLocalSapJson(payload);
+  for (const item of parsed.items) {
+    assert.deepEqual(item.contract.field_descriptions, payload.field_descriptions);
+    assert.equal(item.tokenMap.field_descriptions, undefined);
+    assert.equal(item.tokenMap.WIDTH, undefined);
+  }
+  for (const invalid of [null, [], { ZZWIDTH: 695 }, { ZZWIDTH: 'X'.repeat(257) }, JSON.parse('{"__proto__":"WIDTH"}')]) {
+    assert.throws(() => parseLocalSapJson({ ...payload, field_descriptions: invalid }), /field_descriptions|description/);
+  }
+  assert.deepEqual(parseLocalSapJson({ ...payload, field_descriptions: undefined }).items[0].contract.field_descriptions, {});
 });

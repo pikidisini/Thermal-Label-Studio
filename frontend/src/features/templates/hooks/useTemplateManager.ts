@@ -1,12 +1,13 @@
+import { translate as t } from '../../../shared/i18n';
 import { useCallback, useRef } from 'react';
 import * as fabric from 'fabric';
 import { useTemplateStore } from '../../../store/useTemplateStore';
+import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useStudioStore } from '../../../store/useStudioStore';
 import { useContractStore } from '../../../store/useContractStore';
 import { useHistoryStore } from '../../../store/useHistoryStore';
 import { layoutApi } from '../api/layoutApi';
-import { exportFabricToSvg } from '../../../utils/fabricSvgExporter';
-import { importSvgIntoFabricCanvas } from '../../../utils/fabricSvgImporter';
+import { exportFabricToSvg, importSvgIntoFabricCanvas } from '../../canvas';
 import { CANVAS_SERIALIZE_PROPS } from '../../../types/fabric-custom';
 import { resolveSapTokenDisplayValue } from '../../data-tokens';
 
@@ -29,7 +30,7 @@ export function useTemplateManager(
   } = useTemplateStore();
 
   const { viewMode, setZoom, setSelectedObject, triggerFit } = useStudioStore();
-  const { tokenMap, updateUsedTokensFromCanvas } = useContractStore();
+  const { tokenMap, fieldDescriptions, updateUsedTokensFromCanvas } = useContractStore();
   const { clearHistory, pushState } = useHistoryStore();
 
   const pendingSvgRef = useRef<{ svg: string; wMm: number; hMm: number } | null>(null);
@@ -68,10 +69,9 @@ export function useTemplateManager(
         canvas.clear();
         canvas.backgroundColor = '#ffffff'; canvas.requestRenderAll();
       }, (field) => {
-        if (!Object.prototype.hasOwnProperty.call(tokenMap, field)) return undefined;
-        return resolveSapTokenDisplayValue(tokenMap[field], field);
-      }, (message) => window.alert(`SVG tidak dapat diimpor: ${message}`));
-    }, [canvasRef, pxPerMm, calculateAutoFitZoom, viewMode, tokenMap, updateUsedTokensFromCanvas, clearHistory, pushState, triggerRenderSimulation, triggerFit]
+        return resolveSapTokenDisplayValue(tokenMap[field], field, fieldDescriptions);
+      }, (message) => window.alert(t("SVG could not be imported: {error}", { error: t(message) })));
+    }, [canvasRef, pxPerMm, calculateAutoFitZoom, viewMode, tokenMap, fieldDescriptions, updateUsedTokensFromCanvas, clearHistory, pushState, triggerRenderSimulation, triggerFit]
   );
 
   const loadTemplateById = useCallback(
@@ -94,6 +94,8 @@ export function useTemplateManager(
               setDimensions(wMm, hMm);
               setZoom(calculateAutoFitZoom(wMm, hMm, viewMode));
               setActiveTemplateId(templateId);
+              useTemplateStore.getState().setTemplateTitle(data.title);
+              useSimulationStore.getState().setDpi(data.dpi);
             }
           );
         }
@@ -138,16 +140,19 @@ export function useTemplateManager(
         svg: svgStr,
         width_mm: labelWidthMm,
         height_mm: labelHeightMm,
-        dpi: 203.2,
+        dpi: useSimulationStore.getState().dpi,
       });
       const tList = { templates: (await layoutApi.list()).map((layout) => ({ id: layout.label_code, name: layout.title, width_mm: layout.width_mm, height_mm: layout.height_mm, updatedAt: layout.created_at })) };
       setTemplates(tList.templates || []);
       setActiveTemplateId(templateCode);
+      useTemplateStore.getState().setTemplateTitle(templateTitle || templateCode);
     },
     [canvasRef, labelWidthMm, labelHeightMm, pxPerMm, setTemplates, setActiveTemplateId]
   );
   const updateCanvasDimensions = useCallback(
     (wMm: number, hMm: number) => {
+      ++templateRequestRef.current;
+      pendingSvgRef.current = null;
       setDimensions(wMm, hMm);
       const currentZoom = calculateAutoFitZoom(wMm, hMm, viewMode);
       setZoom(currentZoom);
@@ -166,6 +171,8 @@ export function useTemplateManager(
 
   const createNewTemplate = useCallback(
     (wMm: number, hMm: number) => {
+      ++templateRequestRef.current;
+      pendingSvgRef.current = null;
       setDimensions(wMm, hMm);
       const currentZoom = calculateAutoFitZoom(wMm, hMm, viewMode);
       setZoom(currentZoom);
@@ -181,9 +188,13 @@ export function useTemplateManager(
         canvasRef.current.renderAll();
       }
       clearHistory();
+      if (canvasRef.current) pushState(JSON.stringify(canvasRef.current.toObject([...CANVAS_SERIALIZE_PROPS])));
+      setActiveTemplateId('');
+      updateUsedTokensFromCanvas(canvasRef.current);
+      triggerRenderSimulation();
       setSelectedObject(null);
     },
-    [setDimensions, calculateAutoFitZoom, viewMode, setZoom, canvasRef, pxPerMm, clearHistory, setSelectedObject]
+    [setDimensions, calculateAutoFitZoom, viewMode, setZoom, canvasRef, pxPerMm, clearHistory, pushState, setActiveTemplateId, updateUsedTokensFromCanvas, triggerRenderSimulation, setSelectedObject]
   );
 
   return {

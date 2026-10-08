@@ -21,7 +21,9 @@
   while Compose host ports must stay loopback-only.
 - Preserve existing user changes. Keep edits within the authorized task and
   implement the smallest complete slice.
-- Use English for product UI, technical contracts, and active documentation.
+- Product UI supports English (default) and Bahasa Indonesia through shared
+  dictionaries. Keep technical contracts and active documentation in English.
+  Never translate SAP/JSON keys, barcode payloads or authored label content.
 - Follow `SAP/API -> validate label_code -> resolve layout -> bind SVG -> raster
   bitmap -> simulation sink OR print transport`. Both outputs share the same
   processed bitmap and encoded payload; only the final sink differs.
@@ -55,6 +57,15 @@
   startup or legacy auth seeding belongs in Playwright. Storage-write tests need
   explicit named-target authorization and E2E_ALLOW_STORAGE_WRITES=true; they
   retain a unique synthetic layout. Archived specs are migration reference only.
+- For authorized source editing, scripts/dev.py coordinates loopback Vite HMR
+  and Uvicorn reload using the same manifests. It starts no containers and defaults
+  to existing authorized Compose storage. --no-storage disables persistence explicitly.
+  --persistence requires a named,
+  authorized storage target because startup initializes schema/bucket.
+  Default startup (also --compose-storage) resolves ignored root .env through Compose,
+  requires existing storage services and a stopped Compose app, and maps only
+  loopback storage ports. Do not print resolved secrets. Keep
+  Docker as the final packaged-runtime validation; live reload is not image evidence.
 - Use scripts/check_project.py for the local check plan; add
   --run-source-checks to execute backend/frontend tests, TypeScript and build.
   Use scripts/check_coverage.py for measured Python and unit/browser frontend
@@ -83,3 +94,6 @@
   retains prior history. Preserve backend/schema and the prepared job foundation.
   Do not include archives, credentials, operational data or generated reports.
   Publishing changes requires user authorization.
+
+
+Frontend visual controls use CSS custom properties in `frontend/src/index.css` as the single source for palette pairs, UI typography, compact/default sizes, spacing, borders, radius, shadows, backdrop and motion. Shared primitives expose semantic `tone`, `variant`, `selected` and disabled treatment; native feature controls use the same `data-ui-*` contract. Keep caller classes for layout and deliberate technical geometry. Use compact/stepper variants for narrow editor fields. Selected colors have paired foregrounds. Planned actions remain native-disabled and use the generic planned hover treatment. Focus-visible stays observable. Reduced motion applies only to marked controls, chrome animations and modal portals; authored SVG, Fabric objects and export pixels remain outside UI styling.

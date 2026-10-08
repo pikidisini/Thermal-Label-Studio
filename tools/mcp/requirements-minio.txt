@@ -1,0 +1,4 @@
+# Optional MinIO tooling; shared MCP environment, no application runtime changes.
+-r requirements.txt
+minio==7.2.20
+urllib3==2.6.3

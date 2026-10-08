@@ -29,12 +29,19 @@ export interface SaveLayoutInput {
 async function checked<T>(response: Response): Promise<T> {
   if (response.ok) return response.json() as Promise<T>;
   const body = await response.json().catch(() => null) as { detail?: { message?: string } } | null;
-  throw new Error(body?.detail?.message || 'Layout storage is unavailable.');
+  throw new Error(body?.detail?.message || (response.status === 404 ? 'Template no longer exists. Refresh the explorer.' : 'Layout storage is unavailable.'));
 }
 
 export const layoutApi = {
   list: () => fetch(`${API_BASE}/layouts`).then(checked<PersistedLayoutSummary[]>),
   get: (labelCode: string) => fetch(`${API_BASE}/layouts/${encodeURIComponent(labelCode)}`).then(checked<PersistedLayout>),
+  rename: (labelCode: string, title: string) => fetch(`${API_BASE}/layouts/${encodeURIComponent(labelCode)}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }),
+  }).then(checked<PersistedLayoutSummary>),
+  delete: async (labelCode: string) => {
+    const response = await fetch(`${API_BASE}/layouts/${encodeURIComponent(labelCode)}`, { method: 'DELETE' });
+    if (!response.ok) await checked<never>(response);
+  },
   save: (input: SaveLayoutInput) => fetch(`${API_BASE}/layouts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

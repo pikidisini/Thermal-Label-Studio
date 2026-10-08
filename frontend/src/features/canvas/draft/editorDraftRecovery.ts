@@ -1,5 +1,5 @@
 import type * as fabric from 'fabric';
-import { CANVAS_SERIALIZE_PROPS } from '../types/fabric-custom';
+import { CANVAS_SERIALIZE_PROPS } from '../../../types/fabric-custom';
 
 export const EDITOR_DRAFT_VERSION = 1;
 export const EDITOR_DRAFT_PREFIX = 'thermal-label-studio:editor-draft:';

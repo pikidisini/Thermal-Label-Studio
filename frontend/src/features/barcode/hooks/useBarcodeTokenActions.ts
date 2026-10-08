@@ -1,7 +1,8 @@
+import { useContractStore } from '../../../store/useContractStore';
 import { useCallback } from 'react';
 import * as fabric from 'fabric';
 import { createTextObject } from '../../text';
-import { resolveSapTokenDisplayValue } from '../../data-tokens';
+import { resolveSapTokenDisplayValue, hasFieldValue } from '../../data-tokens';
 
 export interface UseBarcodeTokenActionsProps {
   canvasRef: React.MutableRefObject<fabric.Canvas | null>;
@@ -20,11 +21,12 @@ export function useBarcodeTokenActions({
   canvasRef, pxPerMm, triggerRenderSimulation, syncSelection, saveCanvasHistory, getStrategicPlacement,
   jsonData, handleAddBarcode, handleAddQrCode,
 }: UseBarcodeTokenActionsProps) {
+  const descriptions = useContractStore((state) => state.fieldDescriptions);
   const handleAddSapToken = useCallback(
     (tokenKey: string, asType: 'text' | 'barcode' | 'qr' = 'text') => {
       if (!canvasRef.current) return;
-      const resolvedValue = resolveSapTokenDisplayValue(jsonData[tokenKey], tokenKey);
-      if (asType !== 'text' && (!resolvedValue || resolvedValue === `{{${tokenKey}}}` || /^(ABSENT|NULL|EMPTY)\b/.test(resolvedValue))) return;
+      const resolvedValue = resolveSapTokenDisplayValue(jsonData[tokenKey], tokenKey, descriptions);
+      if (asType !== 'text' && !hasFieldValue(jsonData[tokenKey])) return;
 
       if (asType === 'barcode') {
         handleAddBarcode('code128', resolvedValue, (active) => {
@@ -53,7 +55,7 @@ export function useBarcodeTokenActions({
         triggerRenderSimulation?.();
       }
     },
-    [canvasRef, jsonData, pxPerMm, getStrategicPlacement, handleAddBarcode, handleAddQrCode, syncSelection, saveCanvasHistory, triggerRenderSimulation]
+    [canvasRef, jsonData, descriptions, pxPerMm, getStrategicPlacement, handleAddBarcode, handleAddQrCode, syncSelection, saveCanvasHistory, triggerRenderSimulation]
   );
   return { handleAddSapToken };
 }

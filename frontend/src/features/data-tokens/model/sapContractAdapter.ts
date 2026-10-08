@@ -7,6 +7,7 @@ export interface RawSapContract extends JsonObject {
   source: JsonObject;
   fields: JsonObject;
   codes: JsonObject;
+  field_descriptions?: Record<string, string>;
   /** Kategori berasal dari section JSON yang tervalidasi; bukan tebakan nama. */
 }
 

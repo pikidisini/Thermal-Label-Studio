@@ -1,3 +1,4 @@
+import { translate as t, useTranslation } from "../../shared/i18n";
 import React, { useRef, useCallback } from 'react';
 import type * as fabric from 'fabric';
 
@@ -12,14 +13,14 @@ import { useSimulationStore } from '../../store/useSimulationStore';
 import { useAutoFit } from '../../hooks/useAutoFit';
 import { useThermalSimulation, EditorSimulationModal } from '../../features/simulation';
 import { useCanvasActions } from '../../hooks/useCanvasActions';
-import { useTemplateManager, SaveTemplateModal, layoutApi } from '../../features/templates';
+import { useTemplateManager, SaveTemplateModal, layoutApi, validateLocalSvg } from '../../features/templates';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 // Layout & Canvas Components
 import { TopMenuBar } from '../layout/TopMenuBar';
 import { PropertyRibbon } from '../layout/PropertyRibbon';
 import { LeftToolbox } from '../layout/LeftToolbox';
-import { StudioCanvas } from '../../features/canvas';
+import { StudioCanvas, exportFabricToSvg, useEditorDraftRecovery } from '../../features/canvas';
 import { RightInspector } from '../layout/RightInspector';
 import { StatusBar } from '../layout/StatusBar';
 
@@ -31,15 +32,14 @@ import CanvasSetupModal from '../modals/CanvasSetupModal';
 import ShortcutHelpModal from '../modals/ShortcutHelpModal';
 import { AiDiagnosticsModal } from '../../features/diagnostics';
 
-// Utilities
-import { exportFabricToSvg } from '../../utils/fabricSvgExporter';
-import { resolveSapTokenDisplayValue, readLocalSapJson } from '../../features/data-tokens';
+// Feature helpers
+import { resolveSapTokenDisplayValue, readLocalSapJson, readLocalSapJsonSource, parseLocalSapJson, studioDatasetApi, type StudioDatasetSummary } from '../../features/data-tokens';
 import { generatePreviewDataUrl, resolvePayloadTemplate, validatePreviewPayload } from '../../features/barcode';
-import { validateLocalSvg } from '../../utils/validateLocalSvg';
-import { useEditorDraftRecovery } from '../../hooks/useEditorDraftRecovery';
+import { bindingErrors } from '../../features/data-tokens/model/bindingValidation';
 
 
 export function Studio() {
+  useTranslation();
   const canvasRef = useRef<fabric.Canvas | null>(null);
   const pxPerMm = 4;
   const permitTokenHydration = React.useCallback(() => { restoredDraftRef.current = false; }, []);
@@ -61,7 +61,7 @@ export function Studio() {
     setDiagnosticsModalOpen,
   } = useTemplateStore();
 
-  const { sampleContracts, activeContractKey, jsonData, tokenMap, usedTokens, customTokens, switchContract, localImport, setLocalImportedContract, updateTokenValue, markCustomToken, updateUsedTokensFromCanvas } = useContractStore();
+  const { sampleContracts, activeContractKey, jsonData, tokenMap, fieldDescriptions, usedTokens, customTokens, switchContract, localImport, setLocalImportedContract, updateTokenValue, markCustomToken, updateUsedTokensFromCanvas } = useContractStore();
   const [localImportError, setLocalImportError] = React.useState<string | null>(null);
   const [localImportWarning, setLocalImportWarning] = React.useState<string | null>(null);
   const [editorSimulationOpen, setEditorSimulationOpen] = React.useState(false);
@@ -72,26 +72,58 @@ export function Studio() {
   const jsonFileRef = React.useRef<HTMLInputElement>(null);
 
 
-  const handleLocalJsonImport = React.useCallback(async (file: File) => {
-    permitTokenHydration();
+  const [savedDatasets, setSavedDatasets] = React.useState<StudioDatasetSummary[]>([]);
+  const [selectedDatasetId, setSelectedDatasetId] = React.useState('');
+  const [datasetStatus, setDatasetStatus] = React.useState('');
+  const datasetRequest = React.useRef(0);
+  const datasetListRequest = React.useRef(0);
+  const reloadDatasets = React.useCallback(async () => {
+    const revision = datasetRequest.current; const listOperation = ++datasetListRequest.current;
     try {
-      const parsed = await readLocalSapJson(file);
-      const first = parsed.items[0];
-      setLocalItems(parsed.items);
-      setLocalFileName(file.name);
-      setLocalImportError(null);
-      setLocalImportWarning(parsed.warnings.length ? parsed.warnings.join(' ') : null);
-      setLocalImportedContract(first.contract, first.tokenMap, {
-        format: parsed.format,
-        fileName: file.name,
-        itemSequence: first.itemSequence,
-        itemCount: parsed.items.length,
-      });
+      const list = await studioDatasetApi.list();
+      if (revision === datasetRequest.current && listOperation === datasetListRequest.current) setSavedDatasets(list);
+    } catch { if (revision === datasetRequest.current && listOperation === datasetListRequest.current) setDatasetStatus('Sample dataset storage is unavailable. Local exploration is available.'); }
+  }, []);
+  React.useEffect(() => { void reloadDatasets(); }, [reloadDatasets]);
+  const applyDataset = React.useCallback((parsed: Awaited<ReturnType<typeof readLocalSapJson>>, filename: string) => {
+    permitTokenHydration();
+    const first = parsed.items[0];
+    setLocalItems(parsed.items); setLocalFileName(filename); setLocalImportError(null);
+    setLocalImportWarning(parsed.warnings.length ? parsed.warnings.join(' ') : null);
+    setLocalImportedContract(first.contract, first.tokenMap, { format: parsed.format, fileName: filename, itemSequence: first.itemSequence, itemCount: parsed.items.length });
+  }, [permitTokenHydration, setLocalImportedContract]);
+  const handleLocalJsonImport = React.useCallback(async (file: File) => {
+    const operation = ++datasetRequest.current;
+    try {
+      const { source, parsed } = await readLocalSapJsonSource(file);
+      if (operation !== datasetRequest.current) return;
+      applyDataset(parsed, file.name); setSelectedDatasetId('');
+      if (parsed.format !== 'data') { setDatasetStatus('Unsaved - legacy JSON formats support local exploration only.'); return; }
+      setDatasetStatus('Saving sample dataset...');
+      try {
+        const saved = await studioDatasetApi.create(file.name.replace(/\.json$/i, '').slice(0, 160) || 'Sample dataset', file.name, source);
+        if (operation !== datasetRequest.current) return;
+        ++datasetListRequest.current;
+        setSavedDatasets((current) => [saved, ...current.filter((entry) => entry.id !== saved.id)]);
+        setSelectedDatasetId(saved.id); setDatasetStatus('Saved sample dataset');
+      } catch { if (operation === datasetRequest.current) setDatasetStatus('Unsaved - sample dataset could not be stored. Data is available for local preview.'); }
     } catch (error) {
-      setLocalImportError(error instanceof Error ? error.message : 'JSON lokal tidak dapat digunakan.');
-      setLocalImportWarning(null);
+      if (operation !== datasetRequest.current) return;
+      setLocalImportError(error instanceof Error ? error.message : 'JSON could not be used.');
+      setLocalImportWarning(null); setDatasetStatus('Import failed. Previously selected data is unchanged.');
     }
-  }, [setLocalImportedContract, permitTokenHydration]);
+  }, [applyDataset]);
+  const handleSavedDatasetSelect = React.useCallback(async (id: string) => {
+    const operation = ++datasetRequest.current;
+    if (!id) return;
+    setDatasetStatus('Opening sample dataset...');
+    try {
+      const saved = await studioDatasetApi.get(id);
+      const parsed = parseLocalSapJson(saved.payload);
+      if (operation !== datasetRequest.current) return;
+      applyDataset(parsed, saved.original_filename); setSelectedDatasetId(id); setDatasetStatus('Saved sample dataset');
+    } catch { if (operation === datasetRequest.current) setDatasetStatus('Sample dataset could not be opened. Refresh the list and try again.'); }
+  }, [applyDataset]);
 
   const handleLocalItemSelect = React.useCallback((sequence: number) => {
     permitTokenHydration();
@@ -178,26 +210,39 @@ export function Studio() {
     if (!canvas) return;
     if (restoredDraftRef.current) return;
     let changed = false;
-    canvas.getObjects().forEach((object: any) => {
+    const objects: any[] = [];
+    const visit = (object: any) => { objects.push(object); object.getObjects?.().forEach(visit); };
+    canvas.getObjects().forEach(visit);
+    objects.forEach((object: any) => {
+      if (!object.isBarcode && typeof object.payloadTemplate === 'string') {
+        if (object.previewOverride) return;
+        const resolved = resolvePayloadTemplate(object.payloadTemplate, tokenMap, 'text', fieldDescriptions);
+        if (object.text === (resolved.value ?? 'Text content — no data') && object.validationError === (resolved.error || undefined)) return;
+        object.set('text', resolved.value ?? 'Text content — no data');
+        object.validationError = resolved.error || undefined;
+        changed = true; return;
+      }
       if (!object.dataField || object.previewOverride || typeof object.set !== 'function') return;
-      const nextValue = resolveSapTokenDisplayValue(tokenMap[object.dataField], object.dataField);
+      const nextValue = resolveSapTokenDisplayValue(tokenMap[object.dataField], object.dataField, fieldDescriptions);
       if (object.text === nextValue) return;
       object.set('text', nextValue);
       changed = true;
     });
     if (changed) {
+      if (canvas.getActiveObject()) actions.syncSelection(canvas.getActiveObject());
       canvas.renderAll();
       actions.saveCanvasHistory();
       triggerRenderSimulation();
     }
-    canvas.getObjects().forEach((object: any) => {
+    objects.forEach((object: any) => {
+      if (!object.isBarcode) return;
       if (typeof object.payloadTemplate === 'string') {
         const request = (boundImageRequests.current.get(object) || 0) + 1;
         boundImageRequests.current.set(object, request);
         const type = object.barcodeType || 'code128';
-        const resolved = resolvePayloadTemplate(object.payloadTemplate, tokenMap, type);
+        const resolved = resolvePayloadTemplate(object.payloadTemplate, tokenMap, type, fieldDescriptions);
         if (resolved.error || resolved.value == null) {
-          object.validationError = resolved.error || 'Payload komposit tidak valid';
+          object.validationError = resolved.error || 'Composite payload is invalid';
           object.set('opacity', 0.45);
           actions.syncSelection(object);
           canvas.renderAll();
@@ -205,7 +250,7 @@ export function Studio() {
           return;
         }
         if (object.barcodeValue === resolved.value && !object.validationError) return;
-        const apply = (url: string | null) => { if (!url || request !== boundImageRequests.current.get(object) || !object._element) return; object.setSrc(url, () => { object.barcodeValue = resolved.value; object.previewOverride = false; object.validationError = undefined; object.set('opacity', 1); actions.syncSelection(object); canvas.renderAll(); triggerRenderSimulation(); }); };
+        const apply = (url: string | null) => { if (!url || request !== boundImageRequests.current.get(object) || !object._element) return; void object.setSrc(url).then(() => { object.barcodeValue = resolved.value; object.previewOverride = false; object.validationError = undefined; object.set('opacity', 1); actions.syncSelection(object); canvas.renderAll(); triggerRenderSimulation(); }); };
         void generatePreviewDataUrl(type, resolved.value).then(apply);
         return;
       }
@@ -217,12 +262,12 @@ export function Studio() {
       if (object.barcodeValue === value) return;
       const request = (boundImageRequests.current.get(object) || 0) + 1;
       boundImageRequests.current.set(object, request);
-      const apply = (url: string | null) => { if (!url || request !== boundImageRequests.current.get(object) || !object._element) return; object.setSrc(url, () => { object.barcodeValue = value; object.previewOverride = false; actions.syncSelection(object); canvas.renderAll(); triggerRenderSimulation(); }); };
+      const apply = (url: string | null) => { if (!url || request !== boundImageRequests.current.get(object) || !object._element) return; void object.setSrc(url).then(() => { object.barcodeValue = value; object.previewOverride = false; actions.syncSelection(object); canvas.renderAll(); triggerRenderSimulation(); }); };
       const type = object.dataQr ? 'qrcode' : object.barcodeType || 'code128';
       if (validatePreviewPayload(type, value)) return;
       void generatePreviewDataUrl(type, value).then(apply);
     });
-  }, [canvasRef, tokenMap, actions.saveCanvasHistory, actions.syncSelection, triggerRenderSimulation]);
+  }, [canvasRef, tokenMap, fieldDescriptions, actions.saveCanvasHistory, actions.syncSelection, triggerRenderSimulation]);
 
 
   React.useEffect(() => {
@@ -302,8 +347,8 @@ export function Studio() {
   const currentSvg = canvasRef.current ? exportFabricToSvg(canvasRef.current, labelWidthMm, labelHeightMm) : '';
   const downloadLocalFile = React.useCallback((content: BlobPart, filename: string, type: string) => { const url = URL.createObjectURL(new Blob([content], { type })); const link = document.createElement('a'); link.href = url; link.download = filename; link.style.display = 'none'; document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 60000); }, []);
   const handleTemplateUpload = React.useCallback(async (file: File) => {
-    if (!file.name.toLowerCase().endsWith('.svg') || file.size > 5 * 1024 * 1024) { window.alert('Template harus berupa SVG maksimal 5 MiB.'); return; }
-    const result = validateLocalSvg(await file.text(), labelWidthMm, labelHeightMm); if ('error' in result) { window.alert(`SVG ditolak: ${result.error}`); return; }
+    if (!file.name.toLowerCase().endsWith('.svg') || file.size> 5 * 1024 * 1024) { window.alert(t('Template must be an SVG of at most 5 MiB.')); return; }
+    const result = validateLocalSvg(await file.text(), labelWidthMm, labelHeightMm); if ('error' in result) { window.alert(t("SVG rejected: {error}", { error: t(result.error) })); return; }
     templateMgr.loadSvgIntoCanvas(result.svg, result.widthMm, result.heightMm, undefined, () => useTemplateStore.getState().setDimensions(result.widthMm, result.heightMm));
   }, [labelWidthMm, labelHeightMm, templateMgr]);
   const openTemplateUpload = React.useCallback(() => templateFileRef.current?.click(), []); const openJsonUpload = React.useCallback(() => jsonFileRef.current?.click(), []);
@@ -312,7 +357,7 @@ export function Studio() {
 
 
   return (
-    <div data-testid="app-root-container" className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 font-sans text-slate-100 antialiased">
+    <div data-testid="app-root-container" className="flex flex-col h-screen w-screen overflow-hidden bg-surface font-sans text-on-surface antialiased" data-ui-root="true">
       <TopMenuBar
         templates={templates}
         activeTemplateId={activeTemplateId}
@@ -322,8 +367,7 @@ export function Studio() {
         viewMode={viewMode}
         setViewMode={useStudioStore.getState().setViewMode}
         onOpenCanvasSetup={(mode) => {
-          useTemplateStore.getState().setCanvasModalMode(mode);
-          setCanvasModalOpen(true);
+          setCanvasModalOpen(true, mode);
         }}
         onOpenSave={() => setSaveModalOpen(true)}
         onOpenShortcuts={() => setShortcutModalOpen(true)}
@@ -380,6 +424,11 @@ export function Studio() {
             usedTokens={usedTokens}
             localImport={localImport}
             onLocalJsonImport={handleLocalJsonImport}
+            savedDatasets={savedDatasets}
+            selectedDatasetId={selectedDatasetId}
+            onSelectSavedDataset={handleSavedDatasetSelect}
+            onReloadDatasets={reloadDatasets}
+            datasetStatus={datasetStatus}
             onSelectLocalItem={handleLocalItemSelect}
               localItemSequences={localItems.map((item) => item.itemSequence)}
               tokenCategories={localItems.find((item) => item.itemSequence === localImport?.itemSequence)?.tokenCategories}
@@ -391,7 +440,7 @@ export function Studio() {
           />
         )}
 
-        <div data-testid="container-cad-canvas-wrapper" className="flex-1 flex flex-col overflow-hidden relative" style={{ display: viewMode === 'preview' ? 'none' : 'flex' }}>
+        <div data-testid="container-cad-canvas-wrapper" className="flex-1 flex flex-col overflow-hidden relative" style={{ display: viewMode === 'preview' ? "none" : "flex" }}>
           <StudioCanvas
             canvasRef={canvasRef}
             onCanvasReady={handleCanvasReady}
@@ -423,11 +472,9 @@ export function Studio() {
           <div className="flex-1 flex flex-col overflow-hidden relative">
             <React.Suspense
               fallback={
-                <div className="flex-1 bg-surface-dim flex items-center justify-center font-mono text-xs text-outline">
-                  Loading Thermal Inspection Deck...
-                </div>
+                <div className="flex-1 bg-surface-dim flex items-center justify-center font-mono text-xs text-outline">{t("Loading Thermal Inspection Deck...")} </div>
               }
-            >
+>
               <ThermalPreviewDeck
                 onRefresh={() => triggerRenderSimulation(true)}
               />
@@ -437,8 +484,8 @@ export function Studio() {
       </div>
 
       <StatusBar />
-      {draft.status === 'restored' && <div data-testid="editor-draft-restored" className="absolute bottom-7 left-3 z-[var(--ui-layer-toast)] rounded bg-emerald-950/90 px-2 py-1 text-[10px] text-emerald-200">Draft sesi dipulihkan. JSON lokal perlu diunggah ulang untuk preview data yang sama.</div>}
-      {draft.status === 'quota' && <div data-testid="editor-draft-storage-warning" className="absolute bottom-7 left-3 z-[var(--ui-layer-toast)] rounded bg-amber-950/90 px-2 py-1 text-[10px] text-amber-200">Draft sesi tidak dapat disimpan di browser ini.</div>}
+      {draft.status === 'restored' && <div data-testid="editor-draft-restored" className="absolute bottom-7 left-3 z-[var(--ui-layer-toast)] rounded bg-emerald-950/90 px-2 py-1 text-[10px] text-emerald-200">{t("Session draft restored. Upload local JSON again to preview the same data.")}</div>}
+      {draft.status === 'quota' && <div data-testid="editor-draft-storage-warning" className="absolute bottom-7 left-3 z-[var(--ui-layer-toast)] rounded bg-amber-950/90 px-2 py-1 text-[10px] text-amber-200">{t("Session draft cannot be saved in this browser.")}</div>}
 
       <CanvasSetupModal
         isOpen={isCanvasModalOpen}
@@ -475,6 +522,7 @@ export function Studio() {
         isOpen={editorSimulationOpen}
         onClose={() => setEditorSimulationOpen(false)}
         getSvg={getLatestSvg}
+        validate={() => bindingErrors(canvasRef.current?.getObjects() || [], useContractStore.getState().tokenMap, useContractStore.getState().fieldDescriptions)}
         widthMm={labelWidthMm}
         heightMm={labelHeightMm}
         dpi={dpi}

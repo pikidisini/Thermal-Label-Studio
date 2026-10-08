@@ -98,6 +98,21 @@ not wired. The actual SAP JSON contract remains unfinalized.
 
 ## Development checks
 
+For editing with live reload, from the repository root run:
+
+```powershell
+python -B scripts/dev.py
+```
+
+Open `http://127.0.0.1:5173/studio`. Vite updates frontend changes automatically;
+Uvicorn restarts for changes under backend/app. Ctrl+C stops both processes.
+This uses the same source and dependency manifests as Docker. It starts no
+containers and uses existing authorized Compose storage by default, with Save/Open
+and the installed Windows renderer. Stop the Compose app first. Use `--no-storage`
+only for editing without database access. See [Development](docs/DEVELOPMENT.md)
+for setup, renderer prerequisites and explicitly enabled storage. Build the
+Docker image for final packaging validation after the editing iteration.
+
 Install Python dependencies with `python -m pip install -r requirements.txt`
 when installation is authorized. Docker installs this same file. There are no
 runtime/dev or phase-specific requirement files in the active project. Frontend
@@ -164,3 +179,10 @@ The initial checkpoint retains the job/schema foundation for future development.
 
 Playwright screenshots/traces and HTML reports use unique .tmp/playwright-*
 children. No generated test results belong in frontend or docs.
+
+Studio also supports PostgreSQL JSONB storage for user-uploaded sample datasets,
+with a saved dataset list and reopening all items/descriptions. Sample datasets
+are separate from SAP rendering requests and SVG templates in MinIO. Preview
+edits remain local; dataset editing is future work.
+This source capability requires authorized persistence schema initialization for
+real storage; fake/source checks alone do not verify a live database deployment.

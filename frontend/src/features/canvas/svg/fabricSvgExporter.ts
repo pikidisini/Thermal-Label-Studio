@@ -28,7 +28,7 @@ export function exportFabricToSvg(canvas, labelWidthMm, labelHeightMm, pxPerMm =
     // attached to the correct element without changing the live object text.
     const serializers: Array<{ object: any; toSVG: Function }> = [];
     const allObjects: any[] = [];
-    const visit = (object: any) => { if (object) allObjects.push(object); };
+    const visit = (object: any) => { if (object) { allObjects.push(object); object.getObjects?.().forEach(visit); } };
     canvas.getObjects().forEach(visit);
     allObjects.forEach((object: any) => {
       if (!object || typeof object.toSVG !== 'function') return;
@@ -57,13 +57,13 @@ export function exportFabricToSvg(canvas, labelWidthMm, labelHeightMm, pxPerMm =
         if (this.dataQr) attrs.push(`data-qr="${escapeXmlAttribute(this.dataQr)}"`);
         if (this.barcodeType) attrs.push(`data-barcode-type="${escapeXmlAttribute(this.barcodeType)}"`);
         if (this.barcodeValue) attrs.push(`data-barcode-value="${escapeXmlAttribute(this.barcodeValue)}"`);
-        if (this.isBarcode && typeof this.payloadTemplate === 'string') {
+        if (typeof this.payloadTemplate === 'string') {
           attrs.push(`data-payload-spec="${encodePayloadSpec(this.payloadTemplate)}"`);
         }
         if (this.isBarcode) attrs.push('data-is-barcode="true"');
         if (this.isEditorGroup) markup = markup.replace(/(<g\b[^>]*)(>)/i, '$1 data-editor-group="true"$2');
         if (this.graphicAssetId && this.graphicAssetVersion) attrs.push(`data-graphic-asset-id="${escapeXmlAttribute(this.graphicAssetId)}" data-graphic-asset-version="${escapeXmlAttribute(this.graphicAssetVersion)}"`);
-        if (attrs.length && !field) markup = markup.replace(/(<(?:g|image|rect|path|svg)\b[^>]*)(>)/i, `$1 ${attrs.join(' ')}$2`);
+        if (attrs.length && !field) markup = markup.replace(/(<(?:g|image|rect|path|svg|text)\b[^>]*)(>)/i, `$1 ${attrs.join(' ')}$2`);
         return markup;
       };
     });

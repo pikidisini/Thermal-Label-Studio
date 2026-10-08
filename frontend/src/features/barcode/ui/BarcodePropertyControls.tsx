@@ -1,3 +1,4 @@
+import { translate as t, useTranslation } from "../../../shared/i18n";
 ﻿import React from 'react';
 
 interface BarcodePropertyControlsProps {
@@ -6,6 +7,7 @@ interface BarcodePropertyControlsProps {
 }
 
 export function BarcodePropertyControls({ selectedObject, onUpdateProperty }: BarcodePropertyControlsProps) {
+  useTranslation();
   if (!selectedObject?.isBarcode) return null;
 
   const isQr = selectedObject.barcodeType === 'qrcode';
@@ -16,22 +18,22 @@ export function BarcodePropertyControls({ selectedObject, onUpdateProperty }: Ba
       <span
         data-testid="ribbon-barcode-icon"
         className="material-symbols-outlined text-secondary"
-        style={{ fontSize: 15 }}
-        title={isQr ? 'QR Code' : '1D Barcode'}
-      >
-        {isQr ? 'qr_code_2' : 'barcode'}
+
+        title={isQr ? t("QR Code") : t("1D Barcode")}
+ style={{ fontSize: "var(--ui-icon-15)" }}>
+        {isQr ? "qr_code_2" : "barcode"}
       </span>
       <span data-testid="ribbon-barcode-type-label" className="text-[11px] text-secondary font-semibold">
-        {isQr ? 'QR' : 'Barcode'}
+        {isQr ? t("QR") : t("Barcode")}
       </span>
       <input
         data-testid="ribbon-input-barcode-value"
         type="text"
         value={selectedObject.barcodeValue || ''}
         onChange={(e) => onUpdateProperty('barcodeValue', e.target.value)}
-        placeholder="Barcode value…"
-        className="w-32 bg-surface-container border border-outline-variant px-2 py-0.5 text-[11px] text-on-surface font-mono focus:outline-none focus:border-primary"
-      />
+        placeholder={t("Barcode value…")}
+        className="w-32"
+       data-ui-control="input" data-variant="default" />
     </div>
   );
 }

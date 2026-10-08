@@ -7,3 +7,6 @@ export { useFabricCanvas } from './editor/useFabricCanvas';
 export { useAutoFitZoom } from './editor/useAutoFitZoom';
 export { useWheelZoom } from './editor/useWheelZoom';
 export { useTouchpadGestures } from './editor/useTouchpadGestures';
+export { importSvgIntoFabricCanvas } from './svg/fabricSvgImporter';
+export { exportFabricToSvg } from './svg/fabricSvgExporter';
+export { useEditorDraftRecovery } from './draft/useEditorDraftRecovery';

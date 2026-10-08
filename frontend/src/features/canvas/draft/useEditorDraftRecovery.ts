@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type * as fabric from 'fabric';
-import { parseEditorDraft, serializeEditorDraft, editorDraftKey, clearEditorDraft, type EditorDraft } from '../utils/editorDraftRecovery';
-import { useHistoryStore } from '../store/useHistoryStore';
+import { parseEditorDraft, serializeEditorDraft, editorDraftKey, clearEditorDraft, type EditorDraft } from './editorDraftRecovery';
+import { useHistoryStore } from '../../../store/useHistoryStore';
 
 export function useEditorDraftRecovery(userId: string | null, canvasRef: React.MutableRefObject<fabric.Canvas | null>, meta: { templateId: string; widthMm: number; heightMm: number; viewMode: 'design' | 'preview' }) {
   const restoredRef = useRef(false);

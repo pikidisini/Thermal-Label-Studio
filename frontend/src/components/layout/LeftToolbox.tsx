@@ -1,3 +1,4 @@
+import { translate as t, useTranslation } from "../../shared/i18n";
 import React, { useState } from 'react';
 import { ActiveTool } from '../../types/label';
 import { BasicToolsSection } from './toolbox/BasicToolsSection';
@@ -26,8 +27,13 @@ interface LeftToolboxProps {
   onUpdateToken?: (token: string, value: string) => void;
   onAddCustomToken?: (token: string, value: string) => void;
   usedTokens?: Set<string>;
-  localImport?: { format: 'v1.1' | 'raw-v2'; fileName: string; itemSequence: number; itemCount: number } | null;
+  localImport?: { format: 'v1.1' | 'raw-v2' | 'data'; fileName: string; itemSequence: number; itemCount: number } | null;
   onLocalJsonImport?: (file: File) => Promise<void>;
+  savedDatasets?: { id: string; name: string }[];
+  selectedDatasetId?: string;
+  onSelectSavedDataset?: (id: string) => Promise<void>;
+  onReloadDatasets?: () => Promise<void>;
+  datasetStatus?: string;
   onSelectLocalItem?: (sequence: number) => void;
   localItemSequences?: number[];
   localImportError?: string | null;
@@ -54,6 +60,7 @@ export function LeftToolbox({
   usedTokens = new Set(),
   localImport = null,
   onLocalJsonImport,
+  savedDatasets = [], selectedDatasetId = '', onSelectSavedDataset, onReloadDatasets, datasetStatus,
   onSelectLocalItem,
   localItemSequences = [],
   localImportError = null,
@@ -63,6 +70,7 @@ export function LeftToolbox({
   customTokens,
   onMarkCustomToken,
 }: LeftToolboxProps) {
+  useTranslation();
   const [openPanel, setOpenPanel] = useState<Panel>('tools');
 
   const togglePanel = (panel: Panel) =>
@@ -77,7 +85,7 @@ export function LeftToolbox({
       >
         <DockButton
           icon="gesture"
-          label="Design Tools"
+          label={t("Design Tools")}
           active={openPanel === 'tools'}
           showTooltip={!openPanel}
           onClick={() => togglePanel('tools')}
@@ -85,7 +93,7 @@ export function LeftToolbox({
         />
         <DockButton
           icon="image"
-          label="Graphics"
+          label={t("Graphics")}
           active={openPanel === 'graphics'}
           showTooltip={!openPanel}
           onClick={() => togglePanel('graphics')}
@@ -93,7 +101,7 @@ export function LeftToolbox({
         />
         <DockButton
           icon="database"
-          label="Data Tokens"
+          label={t("Data Tokens")}
           active={openPanel === 'sap'}
           showTooltip={!openPanel}
           onClick={() => togglePanel('sap')}
@@ -105,43 +113,42 @@ export function LeftToolbox({
       {openPanel && (
         <div
           data-testid="container-toolbox-flyout"
+          data-ui-motion="true"
           className={`${
-            openPanel === 'tools' ? 'w-12' : 'w-[220px]'
-          } bg-surface-container-low border-r border-outline-variant flex flex-col overflow-hidden shadow-2xl transition-all duration-150`}
+            openPanel === 'tools' ? "w-12" : "w-[220px]"
+          } bg-surface-container-low border-r border-outline-variant flex flex-col overflow-hidden shadow-2xl transition-all duration-[var(--ui-transition-duration)]`}
         >
           {/* Panel header */}
           <div
             data-testid="toolbox-flyout-header"
             className={`h-9 flex items-center ${
-              openPanel === 'tools' ? 'justify-center px-1' : 'justify-between px-3'
+              openPanel === 'tools' ? "justify-center px-1" : "justify-between px-3"
             } border-b border-outline-variant bg-surface-container shrink-0`}
           >
             {openPanel === 'tools' ? (
               <>
-                <span data-testid="toolbox-flyout-title" className="sr-only">
-                  Design Tools
-                </span>
+                <span data-testid="toolbox-flyout-title" className="sr-only">{t("Design Tools")} </span>
                 <IconButton
                   data-testid="btn-close-toolbox-flyout"
                   onClick={() => setOpenPanel(null)}
-                  label="Close panel"
-                  className="h-full w-full border-transparent text-on-surface-variant hover:border-transparent hover:bg-surface-container-high hover:text-on-surface"
+                  label={t("Close panel")}
+                  className="h-full w-full"
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_left</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-16)" }}>chevron_left</span>
                 </IconButton>
               </>
             ) : (
               <>
                 <span data-testid="toolbox-flyout-title" className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-widest">
-                  {openPanel === 'graphics' ? 'Graphics' : 'Data Tokens'}
+                  {openPanel === 'graphics' ? t("Graphics") : t("Data Tokens")}
                 </span>
                 <IconButton
                   data-testid="btn-close-toolbox-flyout"
                   onClick={() => setOpenPanel(null)}
-                  label="Close panel"
-                  className="h-auto w-auto border-transparent p-0.5 text-on-surface-variant hover:border-transparent hover:bg-surface-container-high hover:text-on-surface"
+                  label={t("Close panel")}
+                  className="h-auto w-auto"
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_left</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-16)" }}>chevron_left</span>
                 </IconButton>
               </>
             )}
@@ -161,7 +168,7 @@ export function LeftToolbox({
               />
             )}
             {openPanel === 'graphics' && (
-              <div data-testid="global-graphics-planned" className="p-3 text-xs text-on-surface-variant">Global graphics is planned for a future release. Use Upload Image / Logo in Design Tools for local images.</div>
+              <div data-testid="global-graphics-planned" className="p-3 text-xs text-on-surface-variant">{t("Global graphics is planned for a future release. Use Upload Image / Logo in Design Tools for local images.")}</div>
             )}
             {openPanel === 'sap' && (
               <SapTokenSection
@@ -175,6 +182,7 @@ export function LeftToolbox({
                 usedTokens={usedTokens}
                 localImport={localImport}
                 onLocalJsonImport={onLocalJsonImport}
+                savedDatasets={savedDatasets} selectedDatasetId={selectedDatasetId} onSelectSavedDataset={onSelectSavedDataset} onReloadDatasets={onReloadDatasets} datasetStatus={datasetStatus}
                 onSelectLocalItem={onSelectLocalItem}
                 localItemSequences={localItemSequences}
                 localImportError={localImportError}

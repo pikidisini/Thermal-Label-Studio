@@ -1,3 +1,5 @@
+import { translate as t, useTranslation } from "../../../shared/i18n";
+import { useTemplateStore } from '../../../store/useTemplateStore';
 import React, { useState, useEffect } from 'react';
 import { Save, X, Layers, HardDrive, CheckCircle2, AlertCircle, FileCode } from 'lucide-react';
 import { Badge, Button, Dialog, DialogBody, DialogFooter, DialogHeader, ErrorState, Field, IconButton, Input, Status } from '../../../shared/ui';
@@ -11,6 +13,8 @@ export default function SaveTemplateModal({
   existingTemplates = [],
   onSave
 }) {
+  useTranslation();
+  const templateTitle = useTemplateStore(state => state.templateTitle);
   const [templateName, setTemplateName] = useState('');
   const [templateId, setTemplateId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -20,12 +24,12 @@ export default function SaveTemplateModal({
     if (isOpen) {
       const initialId = activeTemplateId || 'custom_label';
       const initialName = initialId.replace(/[_-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-      setTemplateName(initialName);
+      setTemplateName(templateTitle || initialName);
       setTemplateId(initialId);
       setErrorMsg('');
       setIsSubmitting(false);
     }
-  }, [isOpen, activeTemplateId]);
+  }, [isOpen, activeTemplateId, templateTitle]);
 
   if (!isOpen) return null;
 
@@ -58,35 +62,29 @@ export default function SaveTemplateModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[var(--ui-layer-modal)] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 font-sans animate-fade-in">
+    <div className="fixed inset-0 z-[var(--ui-layer-modal)] flex items-center justify-center backdrop-blur-sm animate-fade-in p-4" data-ui-backdrop="true" data-ui-motion="true">
       <Dialog
-        className="w-full max-w-[560px] bg-surface-container-low shadow-2xl flex flex-col overflow-hidden animate-scale-up"
+        className="w-full max-w-[560px] flex flex-col overflow-hidden animate-scale-up"
         onClick={(e) => e.stopPropagation()}
-      >
+       data-ui-motion="true">
         {/* Header */}
-        <DialogHeader className="flex items-center justify-between bg-surface-container">
+        <DialogHeader className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 bg-tertiary/15 border border-tertiary/40 flex items-center justify-center text-tertiary">
               <Save className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-on-surface font-mono tracking-wide uppercase">
-                  Save Template to Repository
-                </h2>
-                <Badge className="font-mono">
-                  STORAGE // SVG
-                </Badge>
+                <h2 className="text-sm font-bold text-on-surface font-mono tracking-wide uppercase">{t("Save Template to Repository")} </h2>
+                <Badge>{t("STORAGE // SVG")} </Badge>
               </div>
-              <p className="text-[11px] text-on-surface-variant">
-                Store current label canvas, placeholders, and vector geometry to server
-              </p>
+              <p className="text-[11px] text-on-surface-variant">{t("Store current label canvas, placeholders, and vector geometry to server")} </p>
             </div>
           </div>
           <IconButton
             onClick={onClose}
-            label="Close dialog"
-            className="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high"
+            label={t("Close dialog")}
+
           >
             <X className="w-4 h-4" />
           </IconButton>
@@ -97,37 +95,33 @@ export default function SaveTemplateModal({
           {errorMsg && <ErrorState title={errorMsg} />}
 
           {/* Template Display Name */}
-          <Field label="Template Display Name" className="space-y-1.5">
+          <Field label={t("Template Display Name")} className="space-y-1.5">
             <Input
               type="text"
               value={templateName}
               onChange={handleNameChange}
-              placeholder="e.g. Shipping Pallet 100x150"
+              placeholder={t("e.g. Shipping Pallet 100x150")}
               autoFocus
-              className="w-full h-8 text-xs font-sans"
+              className="w-full h-8"
             />
           </Field>
 
           {/* System Template ID / Slug */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant flex items-center justify-between">
-              <span>System Slug / Filename</span>
-              <span className="text-[9px] text-outline">API &amp; Batch Dispatch ID</span>
+            <label data-ui-label="true" className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant flex items-center justify-between">
+              <span>{t("System Slug / Filename")}</span>
+              <span className="text-[9px] text-outline">{t("API & Batch Dispatch ID")}</span>
             </label>
             <div className="flex items-center">
-              <span className="h-8 px-2.5 bg-surface-container-highest border border-r-0 border-outline-variant text-[11px] font-mono text-on-surface-variant flex items-center select-none">
-                templates/
-              </span>
+              <span className="h-8 px-2.5 bg-surface-container-highest border border-r-0 border-outline-variant text-[11px] font-mono text-on-surface-variant flex items-center select-none">{t("templates/")} </span>
               <Input
                 type="text"
                 value={templateId}
                 onChange={(e) => setTemplateId(e.target.value.toLowerCase().replace(/[^a-z0-9_-]+/g, '_'))}
-                placeholder="label_custom_name"
-                className="flex-1 h-8 text-xs font-mono"
+                placeholder={t("label_custom_name")}
+                className="flex-1 h-8"
               />
-              <span className="h-8 px-2.5 bg-surface-container-highest border border-l-0 border-outline-variant text-[11px] font-mono text-on-surface-variant flex items-center select-none">
-                .svg
-              </span>
+              <span className="h-8 px-2.5 bg-surface-container-highest border border-l-0 border-outline-variant text-[11px] font-mono text-on-surface-variant flex items-center select-none">{t(".svg")} </span>
             </div>
           </div>
 
@@ -136,49 +130,45 @@ export default function SaveTemplateModal({
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 text-on-surface-variant">
                 <Layers className="w-3.5 h-3.5 text-primary" />
-                <span>Size:</span>
-                <span className="text-on-surface font-bold">{widthMm} × {heightMm} mm</span>
+                <span>{t("Size:")}</span>
+                <span className="text-on-surface font-bold">{widthMm} × {heightMm} {t("mm")}</span>
               </div>
             </div>
 
             <div className="flex items-center gap-1.5">
               {isExisting ? (
-                <Status tone="warning" >
+                <Status tone="warning">
                   <HardDrive className="w-3 h-3" />
-                  {matchedTemplate?.is_builtin ? 'Will Save as Custom Override' : 'Will Overwrite Existing'}
+                  {matchedTemplate?.is_builtin ? t("Will Save as Custom Override") : t("Will Create New Version")}
                 </Status>
               ) : (
                 <Status tone="success">
-                  <CheckCircle2 className="w-3 h-3" />
-                  New Custom Template
-                </Status>
+                  <CheckCircle2 className="w-3 h-3" />{t("New Custom Template")} </Status>
               )}
             </div>
           </div>
 
           {/* Footer Actions */}
-          <DialogFooter className="pt-2 flex items-center justify-end gap-2">
+          <DialogFooter className="flex items-center justify-end gap-2">
             <Button
               type="button"
               onClick={onClose}
-              className="h-8 px-4 text-xs font-mono uppercase tracking-wider"
-            >
-              Cancel
-            </Button>
+              className="h-8 uppercase tracking-wider"
+             variant="default">{t("Cancel")} </Button>
             <Button
               type="submit"
               disabled={isSubmitting || !templateId.trim()}
-              tone="success" className="h-8 px-5 text-surface-container-lowest font-mono text-xs font-bold uppercase tracking-wider flex items-center gap-1.5"
-            >
+              tone="success" className="h-8 uppercase tracking-wider flex items-center gap-1.5"
+             variant="default">
               {isSubmitting ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-surface-container-lowest border-t-transparent rounded-full animate-spin" />
-                  <span>Saving...</span>
+                  <div className="w-3.5 h-3.5 border-2 border-surface-container-lowest border-t-transparent rounded-full animate-spin"  data-ui-motion="true" />
+                  <span>{t("Saving...")}</span>
                 </>
               ) : (
                 <>
                   <Save className="w-3.5 h-3.5" />
-                  <span>Save to Server</span>
+                  <span>{t("Save to Server")}</span>
                 </>
               )}
             </Button>

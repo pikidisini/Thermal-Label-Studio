@@ -1,0 +1,4 @@
+# Tooling-only environment; not imported by the application runtime.
+mcp==1.30.0
+psycopg[binary]==3.3.6
+python-dotenv==1.2.2

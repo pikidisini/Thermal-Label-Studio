@@ -1,7 +1,9 @@
+import { translate as t, useTranslation } from "../../../shared/i18n";
+import { useFieldLabel } from '../model/useFieldLabel';
 import React from 'react';
 import { SAP_FIELD_REGISTRY, getSAPTypeLabel } from '../../../types/sap-contract';
 import type { FlatSapTokenMap, RawSapContract } from '../model/sapContractAdapter';
-import { adaptSapContract } from '../model/sapContractAdapter';
+import { getFieldStatus } from '../model/fieldPresentation';
 
 interface SapTokenSectionProps {
   sampleContracts: Record<string, RawSapContract>;
@@ -12,8 +14,13 @@ interface SapTokenSectionProps {
   onUpdateToken?: (token: string, value: string) => void;
   onAddCustomToken?: (token: string, value: string) => void;
   usedTokens?: Set<string>;
-  localImport?: { format: 'v1.1' | 'raw-v2'; fileName: string; itemSequence: number; itemCount: number } | null;
+  localImport?: { format: 'v1.1' | 'raw-v2' | 'data'; fileName: string; itemSequence: number; itemCount: number } | null;
   onLocalJsonImport?: (file: File) => Promise<void>;
+  savedDatasets?: { id: string; name: string }[];
+  selectedDatasetId?: string;
+  onSelectSavedDataset?: (id: string) => Promise<void>;
+  onReloadDatasets?: () => Promise<void>;
+  datasetStatus?: string;
   onSelectLocalItem?: (sequence: number) => void;
   localItemSequences?: number[];
   localImportError?: string | null;
@@ -28,14 +35,18 @@ interface TokenCardProps {
   fieldKey: string;
   value: string;
   isUsed: boolean;
+  status: string;
   onAddSapToken: (token: string, asType: 'text' | 'barcode' | 'qr') => void;
 }
 
 type TokenProfile = 'standard' | 'customer' | 'characteristic' | 'custom';
 
-function TokenCard({ fieldKey, value, isUsed, onAddSapToken, onUpdateToken, isAbsent = false }: TokenCardProps & { onUpdateToken?: (token: string, value: string) => void; isAbsent?: boolean }) {
+function TokenCard({ fieldKey, value, isUsed, onAddSapToken, onUpdateToken, status }: TokenCardProps & { onUpdateToken?: (token: string, value: string) => void }) {
+  useTranslation();
+  const fieldLabel = useFieldLabel();
   const typeLabel = getSAPTypeLabel(fieldKey);
   const meta = SAP_FIELD_REGISTRY[fieldKey];
+  const label = fieldLabel(fieldKey);
 
   const handleDrag = (e: React.DragEvent, asType: 'text' | 'barcode' | 'qr') => {
     if (!/^[a-zA-Z0-9_-]+$/.test(fieldKey)) return;
@@ -52,12 +63,10 @@ function TokenCard({ fieldKey, value, isUsed, onAddSapToken, onUpdateToken, isAb
       <div className="flex items-center justify-between px-3 py-1.5">
         <div className="flex items-center gap-1.5 min-w-0">
           <span data-testid={`sap-token-label-${fieldKey}`} className="font-mono text-[11px] font-bold text-tertiary truncate">
-            {`{{${fieldKey}}}`}
+            {label}
           </span>
           {isUsed && (
-            <span data-testid={`sap-token-bound-badge-${fieldKey}`} className="text-[8px] px-1 py-0.5 bg-tertiary/20 text-tertiary font-semibold shrink-0">
-              BOUND
-            </span>
+            <span data-testid={`sap-token-bound-badge-${fieldKey}`} className="text-[8px] px-1 py-0.5 bg-tertiary/20 text-tertiary font-semibold shrink-0">{t("LINKED")} </span>
           )}
         </div>
         {typeLabel && (
@@ -67,9 +76,10 @@ function TokenCard({ fieldKey, value, isUsed, onAddSapToken, onUpdateToken, isAb
         )}
       </div>
 
+      <details className="px-3 text-[9px] text-on-surface-variant"><summary>{t("Technical field")}</summary><code>{fieldKey}</code></details>
       {/* Sample value */}
       <div data-testid={`sap-token-val-${fieldKey}`} className="px-3 pb-1 text-[10px] text-on-surface-variant font-mono truncate">
-        {isAbsent && <span className="mr-1 text-secondary">ABSENT · </span>}<input aria-label={`Value {{${fieldKey}}}`} value={value} onChange={(e) => onUpdateToken?.(fieldKey, e.target.value)} className="w-full bg-transparent border-b border-outline-variant px-0.5 text-[10px] text-on-surface font-mono focus:outline-none focus:border-primary" />
+        <span className="block text-[9px] mb-1">{t(status)}</span><input aria-label={t("Preview value for {field}", { field: label })} value={value} onChange={(e) => onUpdateToken?.(fieldKey, e.target.value)} className="w-full"  data-ui-control="input" data-variant="default" />
         {meta && (
           <span className="ml-1 text-outline" title={meta.description}>— {meta.description}</span>
         )}
@@ -77,8 +87,8 @@ function TokenCard({ fieldKey, value, isUsed, onAddSapToken, onUpdateToken, isAb
 
       {/* Insert actions */}
       <div data-testid={`sap-token-actions-${fieldKey}`} className="flex px-2 pb-2 gap-1">
-        {!canPreviewToken && <div className="px-2 pb-1 text-[9px] text-secondary">Nama field belum didukung preview</div>}
-        {(['text', 'barcode', 'qr'] as const).map((t) => {
+        {!canPreviewToken && <div className="px-2 pb-1 text-[9px] text-secondary">{t("Field name is not supported")}</div>}
+        {(['text', 'barcode', 'qr'] as const).map((insertType) => {
           const icons: Record<string, string> = { text: 'title', barcode: 'barcode', qr: 'qr_code_2' };
           const labels: Record<string, string> = { text: 'Text', barcode: 'Bar', qr: 'QR' };
           const colors: Record<string, string> = {
@@ -88,17 +98,17 @@ function TokenCard({ fieldKey, value, isUsed, onAddSapToken, onUpdateToken, isAb
           };
           return (
             <button
-              key={t}
-              data-testid={`btn-insert-token-${fieldKey}-${t}`}
-              onClick={() => onAddSapToken(fieldKey, t)}
+              key={insertType}
+              data-testid={`btn-insert-token-${fieldKey}-${insertType}`}
+              onClick={() => onAddSapToken(fieldKey, insertType)}
               disabled={!canPreviewToken}
               draggable={canPreviewToken}
-              onDragStart={(e) => handleDrag(e, t)}
-              title={`Insert as ${labels[t]}`}
-              className={`flex-1 flex items-center justify-center gap-1 py-1 text-[10px] font-medium transition-colors border border-outline-variant ${colors[t]} disabled:cursor-not-allowed disabled:opacity-40`}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 12 }}>{icons[t]}</span>
-              {labels[t]}
+              onDragStart={(e) => handleDrag(e, insertType)}
+              title={t("Insert as {type}", { type: t(labels[insertType]) })}
+              className={`flex-1 flex items-center justify-center gap-1 ${colors[insertType]}disabled:cursor-not-allowed`}
+             data-ui-control="button" data-variant="compact">
+              <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-12)" }}>{icons[insertType]}</span>
+              {t(labels[insertType])}
             </button>
           );
         })}
@@ -118,6 +128,7 @@ export function SapTokenSection({
   usedTokens = new Set(),
   localImport = null,
   onLocalJsonImport,
+  savedDatasets = [], selectedDatasetId = '', onSelectSavedDataset, onReloadDatasets, datasetStatus,
   onSelectLocalItem,
   localItemSequences = [],
   localImportError = null,
@@ -127,9 +138,10 @@ export function SapTokenSection({
   customTokens = new Set(),
   onMarkCustomToken,
 }: SapTokenSectionProps) {
-  const schemaKeys = new Set<string>(Object.keys(SAP_FIELD_REGISTRY));
-  Object.values(sampleContracts).forEach((contract) => Object.keys(adaptSapContract(contract).tokenMap).forEach((key) => schemaKeys.add(key)));
-  Object.keys(jsonData || {}).forEach((key) => schemaKeys.add(key));
+  useTranslation();
+  const fieldLabel = useFieldLabel();
+  const datasetFileInput = React.useRef<HTMLInputElement>(null);
+  const schemaKeys = new Set<string>(Object.keys(jsonData || {}));
   usedTokens.forEach((key) => schemaKeys.add(key));
   const tokenKeys = Array.from(schemaKeys).sort((a, b) => a.localeCompare(b));
   const [customName, setCustomName] = React.useState('');
@@ -158,20 +170,20 @@ export function SapTokenSection({
     if (!normalizedSearch) return true;
     const meta = SAP_FIELD_REGISTRY[key];
     const value = jsonData[key] == null ? '' : String(jsonData[key]);
-    return `${key} ${value} ${meta?.description ?? ''}`.toLocaleLowerCase().includes(normalizedSearch);
+    return `${fieldLabel(key)} ${key} ${value} ${meta?.description ?? ''}`.toLocaleLowerCase().includes(normalizedSearch);
   });
 
   return (
     <div data-testid="container-sap-token-section" className="flex flex-col text-xs w-full">
       <div className="p-3 border-b border-outline-variant space-y-2">
-        <label className="block text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest" htmlFor="input-local-sap-json">
-          Data uji lokal JSON
-        </label>
+        <label data-ui-label="true" className="block text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest" htmlFor="input-local-sap-json">{t("Label Data")} </label>
         <input
+          ref={datasetFileInput}
           id="input-local-sap-json"
           type="file"
           accept=".json,application/json"
-          className="w-full text-[10px] text-on-surface-variant"
+          className="hidden"
+          aria-label={t("Upload dataset")}
           data-testid="input-local-sap-json"
           onChange={(event) => {
             const file = event.target.files?.[0];
@@ -179,56 +191,59 @@ export function SapTokenSection({
             event.currentTarget.value = '';
           }}
         />
-        <p className="text-[10px] leading-relaxed text-on-surface-variant">JSON diparse di browser; saat Preview dipilih, data dikirim ke render service lokal aplikasi. Tidak membuat batch atau mengganti canvas.</p>
+        <label data-ui-label="true" className="block text-[10px] transition-colors duration-150 hover:border-primary hover:bg-surface-container-high focus-visible:outline-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary cursor-pointer"><select aria-label={t("Saved sample datasets")}  data-testid="select-saved-dataset" onFocus={() => { void onReloadDatasets?.(); }} value={selectedDatasetId} onChange={(event) => { void onSelectSavedDataset?.(event.target.value); }} className="w-full" data-ui-control="select" data-variant="default">
+            <option value="">{t("Choose a saved dataset")}</option>
+            {savedDatasets.map((dataset) => <option key={dataset.id} value={dataset.id}>{dataset.name}</option>)}
+          </select>
+        </label>
+        <button type="button" data-testid="btn-upload-dataset" onClick={() => datasetFileInput.current?.click()} className="cursor-pointer" data-ui-control="button" data-variant="default">{t("Upload dataset")}</button>
+        {datasetStatus && <p role="status" data-testid="dataset-storage-status" className="text-[10px]">{t(datasetStatus)}</p>}
         {localImport && (
           <div className="rounded border border-tertiary/50 bg-tertiary/10 p-2 text-[10px] text-tertiary" data-testid="local-sap-import-banner">
-            <div className="font-semibold">Data uji lokal / belum memakai aturan profil produksi</div>
-            <div className="truncate">{localImport.fileName} · item {localImport.itemSequence}/{localImport.itemCount}</div>
-            <button type="button" onClick={onEnterPreview} className="mt-2 w-full border border-tertiary/60 px-2 py-1 text-[10px] font-semibold text-tertiary hover:bg-tertiary/10" data-testid="btn-local-sap-preview">Lihat preview desain</button>
-            {localItemSequences.length > 1 && (
-              <label className="mt-2 block text-on-surface-variant">
-                Item aktif
-                <select
-                  className="mt-1 w-full bg-surface-container border border-outline-variant px-1 py-1 text-on-surface"
+            <div className="font-semibold">{t("Imported data - local preview")}</div>
+            <div className="truncate">{localImport.fileName} {t("· item")} {localImport.itemSequence}/{localImport.itemCount}</div>
+            <button type="button" onClick={onEnterPreview} className="mt-2 w-full" data-testid="btn-local-sap-preview" data-ui-control="button" data-variant="default">{t("Preview label")}</button>
+            {localItemSequences.length> 1 && (
+              <label data-ui-label="true" className="mt-2 block text-on-surface-variant">{t("Active item")} <select
+                  className="mt-1 w-full"
                   value={localImport.itemSequence}
                   onChange={(event) => onSelectLocalItem?.(Number(event.target.value))}
                   data-testid="select-local-sap-item"
-                >
+                 data-ui-control="select" data-variant="default">
                   {localItemSequences.map((sequence) => <option key={sequence} value={sequence}>{sequence}</option>)}
                 </select>
               </label>
             )}
           </div>
         )}
-        {localImportError && <div role="alert" className="text-[10px] text-secondary" data-testid="local-sap-import-error">{localImportError}</div>}
-        {localImportWarning && <div className="text-[10px] text-amber-300" data-testid="local-sap-import-warning">Peringatan: {localImportWarning}</div>}
+        {localImportError && <div role="alert" className="text-[10px] text-secondary" data-testid="local-sap-import-error">{t(localImportError)}</div>}
+        {localImportWarning && <div className="text-[10px] text-secondary" data-testid="local-sap-import-warning">{t("Warning:")} {t(localImportWarning)}</div>}
       </div>
-      <div className="px-3 py-2 border-b border-outline-variant bg-surface-container-low text-[10px] text-on-surface-variant">Placeholders tersedia dari schema data dan JSON aktif. Nilai dapat diedit untuk preview lokal.</div>
+      <div className="px-3 py-2 border-b border-outline-variant bg-surface-container-low text-[10px] text-on-surface-variant">{t("Choose a field to add its value to the label. Changes here apply to local preview.")}</div>
 
       {/* Token count header */}
       <div data-testid="sap-tokens-header" className="px-3 py-1.5 flex items-center gap-1.5 border-b border-outline-variant bg-surface-container-lowest">
-        <span className="material-symbols-outlined text-tertiary" style={{ fontSize: 13 }}>data_object</span>
-        <span data-testid="sap-token-count" className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest">
-          Tokens ({visibleTokenKeys.length}/{tokenKeys.length})
+        <span className="material-symbols-outlined text-tertiary" style={{ fontSize: "var(--ui-icon-13)" }}>data_object</span>
+        <span data-testid="sap-token-count" className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest">{t("Fields (")}{visibleTokenKeys.length}/{tokenKeys.length})
         </span>
       </div>
       <div className="px-3 py-2 border-b border-outline-variant space-y-1.5">
-        <label className="sr-only" htmlFor="input-sap-token-search">Cari token</label>
-        <input id="input-sap-token-search" data-testid="input-sap-token-search" aria-label="Cari token" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari token, nilai, atau deskripsi" className="w-full bg-surface-container border border-outline-variant px-2 py-1 text-[10px] font-mono" />
-        <label className="sr-only" htmlFor="select-sap-token-profile">Profil token</label>
-        <select id="select-sap-token-profile" data-testid="select-sap-token-profile" aria-label="Profil token" value={profile} onChange={(e) => setProfile(e.target.value as TokenProfile)} className="w-full bg-surface-container border border-outline-variant px-2 py-1 text-[10px] text-on-surface">
-          <option value="standard">Standar (semua token)</option>
-          <option value="customer">Customer</option>
-          <option value="characteristic">Spesifikasi / Characteristic Produk</option>
-          <option value="custom">Custom</option>
+        <label data-ui-label="true" className="sr-only" htmlFor="input-sap-token-search">{t("Search fields")}</label>
+        <input id="input-sap-token-search" data-testid="input-sap-token-search" aria-label={t("Search fields")} value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Search fields or values")} className="w-full"  data-ui-control="input" data-variant="default" />
+        <label data-ui-label="true" className="sr-only" htmlFor="select-sap-token-profile">{t("Field group")}</label>
+        <select id="select-sap-token-profile" data-testid="select-sap-token-profile" aria-label={t("Field group")} value={profile} onChange={(e) => setProfile(e.target.value as TokenProfile)} className="w-full cursor-pointer" data-ui-control="select" data-variant="default">
+          <option value="standard">{t("All fields")}</option>
+          <option value="customer">{t("Customer")}</option>
+          <option value="characteristic">{t("Product characteristics")}</option>
+          <option value="custom">{t("Custom")}</option>
         </select>
       </div>
       <div className="px-3 py-2 border-b border-outline-variant space-y-1.5">
-        <div className="text-[9px] font-semibold uppercase tracking-widest text-on-surface-variant">Tambah placeholder</div>
+        <div className="text-[9px] font-semibold uppercase tracking-widest text-on-surface-variant">{t("Add a field")}</div>
         <div className="flex gap-1">
-          <input aria-label="Nama placeholder baru" value={customName} onChange={(e) => setCustomName(e.target.value)} placeholder="nama_field" className="min-w-0 flex-1 bg-surface-container border border-outline-variant px-1.5 py-1 text-[10px] font-mono" />
-          <input aria-label="Nilai placeholder baru" value={customValue} onChange={(e) => setCustomValue(e.target.value)} placeholder="nilai" className="min-w-0 flex-1 bg-surface-container border border-outline-variant px-1.5 py-1 text-[10px] font-mono" />
-          <button type="button" onClick={addCustom} disabled={!/^[A-Za-z0-9_-]+$/.test(customName.trim()) || Array.from(schemaKeys).some((key) => key.toLowerCase() === customName.trim().toLowerCase())} className="border border-primary px-2 text-[10px] text-primary disabled:opacity-40" data-testid="btn-add-custom-token">Tambah</button>
+          <input aria-label={t("New field key")} value={customName} onChange={(e) => setCustomName(e.target.value)} placeholder={t("field_key")} className="min-w-0 flex-1"  data-ui-control="input" data-variant="default" />
+          <input aria-label={t("New field value")} value={customValue} onChange={(e) => setCustomValue(e.target.value)} placeholder={t("value")} className="min-w-0 flex-1"  data-ui-control="input" data-variant="default" />
+          <button type="button" onClick={addCustom} disabled={!/^[A-Za-z0-9_-]+$/.test(customName.trim()) || Array.from(schemaKeys).some((key) => key.toLowerCase() === customName.trim().toLowerCase())}  data-testid="btn-add-custom-token" data-ui-control="button" data-variant="default">{t("Add")}</button>
         </div>
       </div>
 
@@ -236,7 +251,7 @@ export function SapTokenSection({
       <div data-testid="container-sap-token-list" className="overflow-y-auto flex-1">
           {visibleTokenKeys.length === 0 ? (
             <div data-testid="sap-token-empty-state" className="p-4 text-center text-[11px] text-on-surface-variant">
-            {tokenKeys.length === 0 ? 'No tokens in schema' : 'Tidak ada token sesuai filter'}
+            {tokenKeys.length === 0 ? t("No fields available") : t("No matching fields")}
           </div>
         ) : (
           visibleTokenKeys.map((key) => (
@@ -244,7 +259,7 @@ export function SapTokenSection({
               key={key}
               fieldKey={key}
               value={jsonData[key] == null ? '' : String(jsonData[key])}
-              isAbsent={usedTokens.has(key) && !Object.prototype.hasOwnProperty.call(jsonData, key)}
+              status={getFieldStatus(jsonData[key])}
               isUsed={usedTokens.has(key)}
               onAddSapToken={onAddSapToken}
               onUpdateToken={onUpdateToken}

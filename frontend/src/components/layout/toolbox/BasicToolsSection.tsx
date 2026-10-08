@@ -1,3 +1,4 @@
+import { translate as t, useTranslation } from "../../../shared/i18n";
 import React from 'react';
 import { ActiveTool } from '../../../types/label';
 import { DockButton } from './DockButton';
@@ -29,6 +30,7 @@ export function BasicToolsSection({
   onAddLine,
   onUploadImage,
 }: BasicToolsSectionProps) {
+  useTranslation();
   const tools: ToolDef[] = [
     { id: 'select',  label: 'Select & Move',  icon: 'near_me',         action: () => setActiveTool('select'), testId: 'btn-tool-select'  },
     { id: 'text',    label: 'Add Text (T)',    icon: 'title',           action: onAddText,                     testId: 'btn-add-text'     },
@@ -55,15 +57,13 @@ export function BasicToolsSection({
       <div className="w-8 my-1.5 h-px bg-outline-variant" />
 
       {/* Image upload */}
-      <label
+      <label data-ui-label="true"
         data-testid="btn-upload-image"
         className="w-12 h-12 flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer group relative"
-        title="Upload Image / Logo"
-      >
-        <span className="material-symbols-outlined" style={{ fontSize: 22 }}>image</span>
-        <span className="absolute left-full ml-2 px-2 py-1 bg-surface-container-highest text-on-surface text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[var(--ui-layer-tooltip)] border border-outline-variant">
-          Upload Image / Logo
-        </span>
+        title={t("Upload Image / Logo")}
+>
+        <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-22)" }}>image</span>
+        <span className="absolute left-full ml-2 px-2 py-1 bg-surface-container-highest text-on-surface text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[var(--ui-layer-tooltip)] border border-outline-variant">{t("Upload Image / Logo")} </span>
         <input
           data-testid="input-upload-image-file"
           type="file"

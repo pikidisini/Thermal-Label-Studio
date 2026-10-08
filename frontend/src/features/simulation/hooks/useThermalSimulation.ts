@@ -5,7 +5,8 @@ import { useTemplateStore } from '../../../store/useTemplateStore';
 import { useContractStore } from '../../../store/useContractStore';
 import { useStudioStore } from '../../../store/useStudioStore';
 import { runEditorPreview, editorPreviewUrl } from '../api/editorPreviewApi';
-import { exportFabricToSvg } from '../../../utils/fabricSvgExporter';
+import { exportFabricToSvg } from '../../canvas';
+import { bindingErrors } from '../../data-tokens/model/bindingValidation';
 
 export function useThermalSimulation(
   canvasRef: React.MutableRefObject<fabric.Canvas | null>,
@@ -52,6 +53,8 @@ export function useThermalSimulation(
       setThermalImage(null);
       setInspectionData(null);
       try {
+        const errors = bindingErrors(canvasRef.current.getObjects(), useContractStore.getState().tokenMap, useContractStore.getState().fieldDescriptions);
+        if (errors.length) throw new Error(`Label data is incomplete or invalid: ${errors.join(' ')}`);
         const svgStr = exportFabricToSvg(canvasRef.current, labelWidthMm, labelHeightMm, pxPerMm);
         if (!svgStr) return;
 

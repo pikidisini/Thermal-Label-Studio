@@ -38,15 +38,21 @@ export function importSvgIntoFabricCanvas(
   onError: (message: string) => void = () => undefined
 ) {
   const viewBox = sourceViewBox(svgString);
-  let parserSvg = svgString;
+  const document = new DOMParser().parseFromString(svgString, 'image/svg+xml');
+  // XML serializers may rename the XLink prefix (for example ns1:href).
+  // Fabric reads literal attribute names, so expose the namespace-resolved
+  // image source as SVG 2 href before parsing, including stored older layouts.
+  document.querySelectorAll('image').forEach((image) => {
+    const href = image.getAttribute('href') || image.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
+    if (href) image.setAttribute('href', href);
+  });
   if (viewBox) {
     // Fabric parses physical mm at CSS DPI; the editor uses its own px/mm.
     // Parse in viewBox units and apply the editor scale exactly once below.
-    const document = new DOMParser().parseFromString(svgString, 'image/svg+xml');
     document.documentElement.setAttribute('width', String(viewBox.width));
     document.documentElement.setAttribute('height', String(viewBox.height));
-    parserSvg = new XMLSerializer().serializeToString(document);
   }
+  const parserSvg = new XMLSerializer().serializeToString(document);
   // Fabric calls the reviver for the concrete SVG children, while editor
   // metadata is attached to parent <g> elements. Keep a stable key for each
   // marked editor group while importing ordinary SVG geometry.
@@ -178,6 +184,10 @@ export function importSvgIntoFabricCanvas(
             const field = (obj as any).dataPlaceholder || (obj as any).dataField;
             const resolved = field ? resolveFieldValue(field) : undefined;
             if (field && resolved !== undefined) textObj.set('text', resolved);
+            if (typeof (obj as any).payloadTemplate === 'string') {
+              textObj.set('text', (obj as any).payloadTemplate.replace(/\{\{\s*([A-Za-z0-9_-]+)\s*\}\}/g,
+                (_match: string, key: string) => resolveFieldValue(key) ?? 'No data'));
+            }
             if (textObj.stroke && (!textObj.fill || textObj.fill === 'none' || textObj.fill === 'transparent')) {
               textObj.set({
                 fill: '#000000',

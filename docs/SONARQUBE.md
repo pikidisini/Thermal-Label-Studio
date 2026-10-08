@@ -130,21 +130,25 @@ suppression, exclusions, quality-gate changes, or production actions.
 
 ## Codex read-only MCP
 
-After the local service is bootstrapped, create `tools/codex/.env` from
-`tools/codex/.env.example`. `Initialize-LocalSonar.ps1` creates that ignored
+After the local service is bootstrapped, create `tools/mcp/.env.sonar` from
+`tools/mcp/.env.sonar.example`. `Initialize-LocalSonar.ps1` creates that ignored
 file with a dedicated read-only SonarQube USER token; otherwise set the token
 there manually. Validate it without starting the MCP server:
 
 ```powershell
-.\tools\codex\Start-SonarMcp.ps1 -ValidateOnly
+.\tools\mcp\Start-SonarMcp.ps1 -ValidateOnly
 ```
 
 The launcher accepts only `http://host.docker.internal:9004` and
 `SONARQUBE_READ_ONLY=true`, passes the ignored env file to the pinned
 `sonarsource/sonarqube-mcp:1.19.0.2785` container, and mounts no workspace,
-application data, or Docker socket. The local `.codex/config.toml` uses this
-launcher as its `mcp_servers.sonarqube` command. Keep the token in
-`tools/codex/.env`, never in that Codex configuration or source control.
+application data, or Docker socket. Register this launcher in Codex after validating
+the credentials; its presence in the repository does not establish a connection.
+Keep the token in `tools/mcp/.env.sonar`, never in Codex configuration or source
+control. See [SonarQube MCP setup](../tools/mcp/SONARQUBE.md) for the portable
+configuration generator and migration instructions. The bootstrap initializer is
+for a new authorized service; do not rerun it against an existing configured server
+merely to create the MCP credential file.
 
 ## References
 

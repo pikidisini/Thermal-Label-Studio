@@ -50,6 +50,9 @@ export function useRulers({
       const majorStepMm = getMajorStepMm(pxMm);
       const minorStepMm = majorStepMm / 5;
 
+      const palette = getComputedStyle(document.documentElement);
+      const color = (name: string) => palette.getPropertyValue(name).trim();
+
       // 1. Draw Top Ruler
       const topCtx = topCanvas.getContext('2d');
       if (topCtx) {
@@ -59,16 +62,16 @@ export function useRulers({
         topCanvas.height = tH;
 
         // Background
-        topCtx.fillStyle = '#1a1b1e';
+        topCtx.fillStyle = color('--ui-surface-low');
         topCtx.fillRect(0, 0, tW, tH);
 
         // Active label width highlight
-        topCtx.fillStyle = '#25262b';
+        topCtx.fillStyle = color('--ui-surface-raised');
         topCtx.fillRect(originX, 0, labelWidthMm * pxMm, tH);
 
         // Ticks and Labels
-        topCtx.fillStyle = '#9ca3af';
-        topCtx.strokeStyle = '#4b5563';
+        topCtx.fillStyle = color('--ui-text-secondary');
+        topCtx.strokeStyle = color('--ui-border-default');
         topCtx.font = '9px JetBrains Mono, monospace';
         topCtx.lineWidth = 1;
 
@@ -95,7 +98,7 @@ export function useRulers({
 
         // Top cursor marker
         if (mouseX >= 0) {
-          topCtx.strokeStyle = '#3b82f6';
+          topCtx.strokeStyle = color('--ui-primary');
           topCtx.lineWidth = 1.5;
           topCtx.beginPath();
           const markerX = mouseX - topRect.left;
@@ -114,16 +117,16 @@ export function useRulers({
         leftCanvas.height = lH;
 
         // Background
-        leftCtx.fillStyle = '#1a1b1e';
+        leftCtx.fillStyle = color('--ui-surface-low');
         leftCtx.fillRect(0, 0, lW, lH);
 
         // Active label height highlight
-        leftCtx.fillStyle = '#25262b';
+        leftCtx.fillStyle = color('--ui-surface-raised');
         leftCtx.fillRect(0, originY, lW, labelHeightMm * pxMm);
 
         // Ticks and Labels
-        leftCtx.fillStyle = '#9ca3af';
-        leftCtx.strokeStyle = '#4b5563';
+        leftCtx.fillStyle = color('--ui-text-secondary');
+        leftCtx.strokeStyle = color('--ui-border-default');
         leftCtx.font = '9px JetBrains Mono, monospace';
         leftCtx.lineWidth = 1;
 
@@ -154,7 +157,7 @@ export function useRulers({
 
         // Left cursor marker
         if (mouseY >= 0) {
-          leftCtx.strokeStyle = '#3b82f6';
+          leftCtx.strokeStyle = color('--ui-primary');
           leftCtx.lineWidth = 1.5;
           leftCtx.beginPath();
           const markerY = mouseY - leftRect.top;
@@ -166,6 +169,12 @@ export function useRulers({
     },
     [viewportRef, canvasContainerRef, topRulerRef, leftRulerRef, labelWidthMm, labelHeightMm, pxPerMm]
   );
+
+  useEffect(() => {
+    const redraw = () => drawRulers();
+    window.addEventListener('studio-theme-change', redraw);
+    return () => window.removeEventListener('studio-theme-change', redraw);
+  }, [drawRulers]);
 
   return { drawRulers };
 }

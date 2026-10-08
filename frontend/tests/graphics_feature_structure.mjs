@@ -166,7 +166,8 @@ test('F3.51 top menu and status bar use shared UI without changing controls', ()
   assert.match(topMenu, /document\.addEventListener\('mousedown', closeWhenClickingOutside\)/);
   assert.match(topMenu, /event\.key === 'Escape'/);
   assert.doesNotMatch(topMenu, /logout|useAuthStore/);
-  assert.match(topActions, /onClick=\{onOpenLabelSimulation\}/);
+  assert.match(topMenu, /label: 'Label Simulation', action: props\.onOpenLabelSimulation, testId: 'btn-label-simulation'/);
+  assert.doesNotMatch(topActions, /onOpenLabelSimulation|btn-label-simulation/);
   assert.match(status, /triggerFit/);
   assert.match(status, /triggerReset100/);
 });
@@ -208,7 +209,7 @@ test('F3.54 Template Explorer uses a document-body modal portal above chrome', (
   assert.match(selector, /document\.body/);
   assert.match(selector, /data-testid="template-explorer-modal-overlay"/);
   assert.match(selector, /z-\[var\(--ui-layer-modal\)\]/);
-  assert.match(selector, /if \(e\.target === e\.currentTarget\) setOpen\(false\)/);
+  assert.match(selector, /if \(!busy && e\.target === e\.currentTarget\) setOpen\(false\)/);
   assert.match(selector, /e\.key === 'Escape'/);
   assert.match(selector, /onSelectTemplate\(selected\.id\)/);
 });
@@ -241,8 +242,8 @@ test('F3.57 Canvas keeps lifecycle ownership separate from cross-tool orchestrat
 
   assert.match(canvasIndex, /StudioCanvas/);
   assert.match(canvasIndex, /useFabricCanvas/);
-  assert.match(studio, /import \{ StudioCanvas \} from '\.\.\/\.\.\/features\/canvas'/);
-  assert.doesNotMatch(studio, /features\/canvas\/(ui|editor|ruler)\//);
+  assert.match(studio, /import\s*\{[^}]*\bStudioCanvas\b[^}]*\}\s*from '\.\.\/\.\.\/features\/canvas'/);
+  assert.doesNotMatch(studio, /features\/canvas\/(ui|editor|ruler|svg|draft)\//);
   assert.match(canvasLifecycle, /attachDrawingToolListeners/);
   for (const featurePath of ['features\/line', 'features\/text', 'features\/barcode', 'features\/qr', 'features\/graphics', 'features\/images']) {
     assert.match(canvasActions, new RegExp(featurePath));
@@ -259,8 +260,8 @@ test('F3.59 removes the retired grid feature without removing core editor tools'
   const canvasActions = read('hooks', 'useCanvasActions.ts');
   const drawingTools = read('hooks', 'canvas', 'useDrawingTools.ts');
   const activeTool = read('types', 'label.ts');
-  const importer = read('utils', 'fabricSvgImporter.ts');
-  const exporter = read('utils', 'fabricSvgExporter.ts');
+  const importer = read('features', 'canvas', 'svg', 'fabricSvgImporter.ts');
+  const exporter = read('features', 'canvas', 'svg', 'fabricSvgExporter.ts');
 
   for (const removedPath of [
     ['features', 'table'],

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { JsonObject } from '../types/api';
+import { compositionFields } from '../features/data-tokens/model/composition';
 import { adaptSapContract } from '../features/data-tokens';
 import type { FlatSapTokenMap, RawSapContract } from '../features/data-tokens';
 
@@ -8,8 +9,9 @@ interface ContractState {
   activeContractKey: string;
   jsonData: JsonObject;
   tokenMap: FlatSapTokenMap;
+  fieldDescriptions: Record<string, string>;
   usedTokens: Set<string>;
-  localImport: { format: 'v1.1' | 'raw-v2'; fileName: string; itemSequence: number; itemCount: number } | null;
+  localImport: { format: 'v1.1' | 'raw-v2' | 'data'; fileName: string; itemSequence: number; itemCount: number } | null;
   customTokens: Set<string>;
 
   // Actions
@@ -30,6 +32,7 @@ export const useContractStore = create<ContractState>((set, get) => ({
   activeContractKey: 'goods_receipt',
   jsonData: {},
   tokenMap: {},
+  fieldDescriptions: {},
   usedTokens: new Set<string>(),
   localImport: null,
   customTokens: new Set<string>(),
@@ -42,6 +45,7 @@ export const useContractStore = create<ContractState>((set, get) => ({
       activeContractKey: key,
       jsonData: contracts[key] || get().jsonData,
       tokenMap: contracts[key] ? adaptSapContract(contracts[key]).tokenMap : get().tokenMap,
+      fieldDescriptions: contracts[key] ? contracts[key].field_descriptions || {} : get().fieldDescriptions,
       localImport: null,
       customTokens: new Set<string>(),
     });
@@ -63,6 +67,7 @@ export const useContractStore = create<ContractState>((set, get) => ({
     jsonData: contract,
     tokenMap,
     localImport,
+    fieldDescriptions: contract.field_descriptions || {},
     customTokens: new Set<string>(),
     activeContractKey: `local:${localImport?.itemSequence ?? 1}`,
   }),
@@ -71,7 +76,9 @@ export const useContractStore = create<ContractState>((set, get) => ({
   updateUsedTokensFromCanvas: (canvas) => {
     if (!canvas) return;
     const tokens = new Set<string>();
-    canvas.getObjects().forEach((obj: any) => {
+    const visit = (obj: any) => {
+      obj.getObjects?.().forEach(visit);
+      if (typeof obj.payloadTemplate === 'string') compositionFields(obj.payloadTemplate).forEach((key) => tokens.add(key));
       if (obj.dataField) tokens.add(obj.dataField);
       if (obj.dataBarcode) tokens.add(obj.dataBarcode);
       if (obj.dataQr) tokens.add(obj.dataQr);
@@ -87,7 +94,8 @@ export const useContractStore = create<ContractState>((set, get) => ({
           matches.forEach((m: string) => tokens.add(m.replace(/[{}]/g, '').trim()));
         }
       }
-    });
+    };
+    canvas.getObjects().forEach(visit);
     set({ usedTokens: tokens });
   },
 }));

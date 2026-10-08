@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS label_studio.layouts (
     created_at timestamptz NOT NULL,
     updated_at timestamptz NOT NULL CHECK (updated_at >= created_at)
 );
+ALTER TABLE label_studio.layouts ADD COLUMN IF NOT EXISTS title_override varchar(160);
+ALTER TABLE label_studio.layouts ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
 CREATE TABLE IF NOT EXISTS label_studio.layout_versions (
     label_code varchar(128) NOT NULL REFERENCES label_studio.layouts(label_code),
     version integer NOT NULL CHECK (version >= 1),
@@ -86,12 +88,13 @@ class LayoutService:
 
     def list_layouts(self) -> list[LayoutSummary]:
         query = """
-            SELECT v.label_code, v.title, v.version, v.width_mm, v.height_mm,
+            SELECT v.label_code, COALESCE(l.title_override, v.title), v.version, v.width_mm, v.height_mm,
                    v.dpi, v.svg_sha256, v.object_key, v.created_at
             FROM label_studio.layouts l
             JOIN label_studio.layout_versions v
               ON v.label_code = l.label_code AND v.version = l.active_version
-            ORDER BY v.updated_at DESC, v.label_code
+            WHERE l.deleted_at IS NULL
+            ORDER BY l.updated_at DESC, v.label_code
         """
         try:
             with self._database.connect(self.settings.database_url) as connection:
@@ -103,12 +106,12 @@ class LayoutService:
 
     def get_layout(self, label_code: str) -> StoredLayout:
         query = """
-            SELECT v.label_code, v.title, v.version, v.width_mm, v.height_mm,
+            SELECT v.label_code, COALESCE(l.title_override, v.title), v.version, v.width_mm, v.height_mm,
                    v.dpi, v.svg_sha256, v.object_key, v.created_at
             FROM label_studio.layouts l
             JOIN label_studio.layout_versions v
               ON v.label_code = l.label_code AND v.version = l.active_version
-            WHERE l.label_code = %s
+            WHERE l.label_code = %s AND l.deleted_at IS NULL
         """
         try:
             with self._database.connect(self.settings.database_url) as connection:
@@ -133,6 +136,47 @@ class LayoutService:
         except Exception as exc:
             raise LayoutPersistenceError("Layout persistence is unavailable.") from exc
 
+    def rename_layout(self, label_code: str, title: str) -> LayoutSummary:
+        return self._manage_layout(label_code, title)
+
+    def delete_layout(self, label_code: str) -> None:
+        self._manage_layout(label_code, None)
+
+    def _manage_layout(self, label_code: str, title: str | None) -> LayoutSummary | None:
+        try:
+            with self._database.connect(self.settings.database_url) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (label_code,))
+                    if title is None:
+                        cursor.execute(
+                            """UPDATE label_studio.layouts SET deleted_at = now(), updated_at = now()
+                               WHERE label_code = %s AND deleted_at IS NULL RETURNING label_code""",
+                            (label_code,),
+                        )
+                    else:
+                        cursor.execute(
+                            """UPDATE label_studio.layouts SET title_override = %s, updated_at = now()
+                               WHERE label_code = %s AND deleted_at IS NULL RETURNING label_code""",
+                            (title, label_code),
+                        )
+                    if cursor.fetchone() is None:
+                        raise LayoutNotFoundError("Layout was not found.")
+                    if title is None:
+                        return None
+                    cursor.execute(
+                        """SELECT v.label_code, COALESCE(l.title_override, v.title), v.version,
+                                  v.width_mm, v.height_mm, v.dpi, v.svg_sha256, v.object_key, v.created_at
+                           FROM label_studio.layouts l JOIN label_studio.layout_versions v
+                           ON v.label_code = l.label_code AND v.version = l.active_version
+                           WHERE l.label_code = %s AND l.deleted_at IS NULL""", (label_code,),
+                    )
+                    summary = self._summary(cursor.fetchone())
+            return summary
+        except LayoutNotFoundError:
+            raise
+        except Exception as exc:
+            raise LayoutPersistenceError("Layout persistence is unavailable.") from exc
+
     def save_layout(self, request: SaveLayoutRequest) -> LayoutSummary:
         try:
             svg = validate_safe_svg(request.svg)
@@ -147,6 +191,10 @@ class LayoutService:
                         (stored_request.label_code,),
                     )
                     version_number = cursor.fetchone()[0]
+                    cursor.execute("SELECT deleted_at FROM label_studio.layouts WHERE label_code = %s", (stored_request.label_code,))
+                    existing = cursor.fetchone()
+                    if existing is not None and existing[0] is not None:
+                        raise LayoutConflictError("Deleted layout identifiers cannot be reused.")
                     # A failed/ambiguous commit can leave an immutable artifact.
                     # Preserve it: a commit acknowledgement failure does not prove
                     # rollback. Under the per-label DB lock, choose a fresh key
@@ -164,7 +212,7 @@ class LayoutService:
                         """INSERT INTO label_studio.layouts (label_code, active_version, created_at, updated_at)
                            VALUES (%s, %s, %s, %s)
                            ON CONFLICT (label_code) DO UPDATE
-                           SET active_version = EXCLUDED.active_version, updated_at = EXCLUDED.updated_at""",
+                           SET active_version = EXCLUDED.active_version, updated_at = EXCLUDED.updated_at, title_override = NULL""",
                         (version.label_code, version.version, now, now),
                     )
                     cursor.execute(
@@ -175,6 +223,8 @@ class LayoutService:
                          version.height_mm, version.dpi, version.svg_sha256, version.object_key, now, now),
                     )
             return LayoutSummary.from_version(version, now)
+        except LayoutConflictError:
+            raise
         except ValueError as exc:
             raise LayoutPersistenceError("Layout content is invalid.") from exc
         except Exception as exc:

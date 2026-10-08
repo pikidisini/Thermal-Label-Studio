@@ -17,6 +17,9 @@ from .runtime import configure_fixture_serving, readiness_response
 from .layouts.http import router as layouts_router
 from .layouts.service import LayoutPersistenceError, LayoutService
 
+from .studio_datasets.http import router as studio_datasets_router
+from .studio_datasets.service import StudioDatasetService, DatasetPersistenceError
+
 settings = get_settings()
 
 
@@ -29,6 +32,12 @@ async def lifespan(app: FastAPI):
         except LayoutPersistenceError as exc:
             raise RuntimeError("Layout persistence startup failed.") from exc
         app.state.layout_service = layout_service
+        dataset_service = StudioDatasetService(settings.persistence)
+        try:
+            dataset_service.initialize()
+        except DatasetPersistenceError as exc:
+            raise RuntimeError("Sample dataset persistence startup failed.") from exc
+        app.state.studio_dataset_service = dataset_service
     yield
 
 
@@ -37,6 +46,7 @@ app.add_middleware(CorrelationMiddleware)
 app.include_router(simulation_router, prefix=settings.api_prefix)
 app.include_router(editor_simulation_router, prefix=settings.api_prefix)
 app.include_router(layouts_router, prefix=settings.api_prefix)
+app.include_router(studio_datasets_router, prefix=settings.api_prefix)
 configure_fixture_serving(app, settings)
 
 
@@ -76,6 +86,10 @@ async def stable_request_validation_error(
 @app.exception_handler(HTTPException)
 async def correlated_http_error(_request: Request, exc: HTTPException) -> JSONResponse:
     safe_messages = {
+        "invalid_dataset": "The sample dataset is invalid.",
+        "dataset_too_large": "The sample dataset exceeds 2 MiB.",
+        "dataset_not_found": "The requested sample dataset was not found.",
+        "dataset_persistence_unavailable": "Sample dataset storage is unavailable.",
         "invalid_label_code": "label_code must not be blank.",
         "unknown_label_code": "No active layout is registered for this label_code.",
         "fixture_simulation_failed": "Fixture simulation could not be completed.",

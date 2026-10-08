@@ -1,3 +1,4 @@
+import { translate as t, useTranslation } from "../../../shared/i18n";
 import React, { useEffect, useRef, useState } from 'react';
 import { AnchoredOverlay } from '../../../shared/ui/layers';
 import { FONT_OPTIONS } from '../model/fontOptions';
@@ -15,6 +16,7 @@ const ALIGN_ICONS = [
 ];
 
 function TextRibbonDivider() {
+  useTranslation();
   return <div className="w-px h-4 bg-outline-variant mx-1 flex-shrink-0" />;
 }
 
@@ -27,6 +29,7 @@ export function isFontMenuInteractionTarget(
 }
 
 export function TextFormatControls({ selectedObject, pxPerMm, onUpdateProperty }: TextFormatControlsProps) {
+  useTranslation();
   const isText = selectedObject?.type === 'text' || selectedObject?.type === 'i-text';
   const [isFontMenuOpen, setIsFontMenuOpen] = useState(false);
   const fontMenuRef = useRef<HTMLDivElement>(null);
@@ -63,11 +66,11 @@ export function TextFormatControls({ selectedObject, pxPerMm, onUpdateProperty }
     <button
       data-testid={testId}
       onClick={handler}
-      title={title}
-      aria-label={title}
-      className={`p-1 transition-colors ${active ? 'bg-primary text-surface' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'}`}
-    >
-      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{icon}</span>
+      title={t(title)}
+      aria-label={t(title)}
+
+     data-ui-control="button" data-variant="icon" data-selected={active} data-tone="neutral">
+      <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-14)" }}>{icon}</span>
     </button>
   );
 
@@ -80,15 +83,15 @@ export function TextFormatControls({ selectedObject, pxPerMm, onUpdateProperty }
           ref={fontTriggerRef}
           type="button"
           data-testid="ribbon-select-font-family"
-          aria-label="Pilih font"
+          aria-label={t("Choose font")}
           aria-haspopup="listbox"
           aria-expanded={isFontMenuOpen}
           onClick={() => setIsFontMenuOpen((open) => !open)}
-          className="flex h-[22px] min-w-32 items-center justify-between gap-2 border border-outline-variant bg-surface-container px-2 text-[11px] text-on-surface transition-colors hover:border-primary focus:outline-none focus:border-primary"
-          title="Pilih font"
-        >
+          className="flex h-[var(--ui-height-compact)] min-w-32 items-center justify-between gap-2"
+          title={t("Choose font")}
+         data-ui-control="button" data-variant="compact">
           <span className="truncate" style={{ fontFamily: selectedFont }}>{selectedFontOption?.label || selectedFont}</span>
-          <span className="material-symbols-outlined text-on-surface-variant" style={{ fontSize: 15 }}>expand_more</span>
+          <span className="material-symbols-outlined text-on-surface-variant" style={{ fontSize: "var(--ui-icon-15)" }}>expand_more</span>
         </button>
 
         {isFontMenuOpen && (
@@ -96,9 +99,9 @@ export function TextFormatControls({ selectedObject, pxPerMm, onUpdateProperty }
           <div
             data-testid="ribbon-font-family-menu"
             role="listbox"
-            aria-label="Daftar font"
+            aria-label={t("Font list")}
             className="max-h-72 w-56 overflow-y-auto border border-outline-variant bg-surface-container-highest py-1 shadow-xl"
-          >
+           data-ui-surface="flyout">
             {FONT_OPTIONS.map((font) => {
               const selected = font.value === selectedFont;
               return (
@@ -112,11 +115,11 @@ export function TextFormatControls({ selectedObject, pxPerMm, onUpdateProperty }
                     onUpdateProperty('fontFamily', font.value);
                     setIsFontMenuOpen(false);
                   }}
-                  className={`flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-sm transition-colors ${selected ? 'bg-primary text-surface' : 'text-on-surface hover:bg-surface-container-high'}`}
+                  className={`flex w-full items-center justify-between gap-3 text-left`}
                   style={{ fontFamily: font.value }}
-                >
+                 data-ui-control="button" data-variant="menu" data-selected={selected} data-tone="neutral">
                   <span>{font.label}</span>
-                  <span className={`shrink-0 text-[9px] ${selected ? 'text-surface/75' : 'text-on-surface-variant'}`} style={{ fontFamily: 'Inter, sans-serif' }}>
+                  <span data-ui-caption="true" className="shrink-0">
                     {font.category}
                   </span>
                 </button>
@@ -128,7 +131,7 @@ export function TextFormatControls({ selectedObject, pxPerMm, onUpdateProperty }
       </div>
 
       <div data-testid="container-ribbon-font-size" className="flex items-center gap-1">
-        <div className="flex items-stretch border border-outline-variant bg-surface-container focus-within:border-primary-container h-[22px]">
+        <div data-ui-control-group="compact" className="flex items-stretch border border-outline-variant bg-surface-container focus-within:border-primary-container h-[var(--ui-height-compact)]">
           <input
             data-testid="ribbon-input-font-size-pt"
             type="number"
@@ -136,36 +139,36 @@ export function TextFormatControls({ selectedObject, pxPerMm, onUpdateProperty }
             max="72"
             value={fontPt}
             onChange={(e) => onUpdateProperty('fontSizePt', e.target.value)}
-            className="w-8 bg-transparent px-1 text-[11px] text-on-surface text-center font-mono focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          />
+            className="w-8 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+           data-ui-control="input" data-variant="compact" />
           <div className="flex flex-col border-l border-outline-variant w-3.5 divide-y divide-outline-variant bg-surface-container-high/40">
             <button
               type="button"
               onClick={() => onUpdateProperty('fontSizePt', Math.min(72, fontPt + 1))}
-              title="Increase Font Size (+1pt)"
-              className="flex-1 flex items-center justify-center text-outline hover:text-primary hover:bg-surface-bright transition-colors"
-            >
+              title={t("Increase Font Size (+1pt)")}
+              className="flex-1 flex items-center justify-center"
+             data-ui-control="button" data-variant="stepper">
               <svg width="6" height="4" viewBox="0 0 6 4" fill="currentColor"><path d="M3 0L6 4H0L3 0Z" /></svg>
             </button>
             <button
               type="button"
               onClick={() => onUpdateProperty('fontSizePt', Math.max(4, fontPt - 1))}
-              title="Decrease Font Size (-1pt)"
-              className="flex-1 flex items-center justify-center text-outline hover:text-primary hover:bg-surface-bright transition-colors"
-            >
+              title={t("Decrease Font Size (-1pt)")}
+              className="flex-1 flex items-center justify-center"
+             data-ui-control="button" data-variant="stepper">
               <svg width="6" height="4" viewBox="0 0 6 4" fill="currentColor"><path d="M3 4L0 0H6L3 4Z" /></svg>
             </button>
           </div>
         </div>
-        <span className="text-[10px] text-on-surface-variant font-mono">pt</span>
+        <span className="text-[10px] text-on-surface-variant font-mono">{t("pt")}</span>
       </div>
 
       <TextRibbonDivider />
       <div data-testid="container-ribbon-font-styles" className="flex items-center">
         {styleBtn(selectedObject.fontWeight === 'bold', 'format_bold', 'Bold', 'ribbon-btn-bold',
-          () => onUpdateProperty('fontWeight', selectedObject.fontWeight === 'bold' ? 'normal' : 'bold'))}
+          () => onUpdateProperty('fontWeight', selectedObject.fontWeight === 'bold' ? "normal" : "bold"))}
         {styleBtn(selectedObject.fontStyle === 'italic', 'format_italic', 'Italic', 'ribbon-btn-italic',
-          () => onUpdateProperty('fontStyle', selectedObject.fontStyle === 'italic' ? 'normal' : 'italic'))}
+          () => onUpdateProperty('fontStyle', selectedObject.fontStyle === 'italic' ? "normal" : "italic"))}
         {styleBtn(!!selectedObject.underline, 'format_underlined', 'Underline', 'ribbon-btn-underline',
           () => onUpdateProperty('underline', !selectedObject.underline))}
       </div>

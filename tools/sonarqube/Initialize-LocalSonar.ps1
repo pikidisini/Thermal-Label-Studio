@@ -3,7 +3,9 @@ param()
 $ErrorActionPreference = 'Stop'
 $baseUrl = 'http://127.0.0.1:9004'
 $authPath = Join-Path $PSScriptRoot '.env.auth'
+$mcpPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'mcp/.env.sonar'
 if (Test-Path -LiteralPath $authPath) { throw 'Local administrator credentials already exist. Refusing to replace them.' }
+if (Test-Path -LiteralPath $mcpPath) { throw 'Local MCP credentials already exist. Refusing to replace them.' }
 if ((Invoke-RestMethod "$baseUrl/api/system/status" -TimeoutSec 10).status -ne 'UP') { throw 'SonarQube is not UP yet.' }
 function BasicHeaders([string]$login, [string]$password) {
     return @{ Authorization = 'Basic ' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("${login}:$password")) }
@@ -27,6 +29,5 @@ foreach ($permission in @('user','codeviewer')) {
 }
 $mcpHeaders = BasicHeaders 'codex-reader' $mcpPassword
 $mcp = PostSonar 'user_tokens/generate' @{name='tls-codex-reader'; type='USER_TOKEN'} $mcpHeaders
-$mcpPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'codex/.env'
 Set-Content -LiteralPath $mcpPath -Value @(('SONARQUBE_TOKEN='+$mcp.token),'SONARQUBE_URL=http://host.docker.internal:9004','SONARQUBE_READ_ONLY=true','SONARQUBE_TOOLSETS=issues,quality-gates,rules,measures,coverage','SONARQUBE_LOG_TO_FILE_DISABLED=true','TELEMETRY_DISABLED=true') -Encoding ascii
 Write-Output 'PASS: private project, dedicated analysis token, and read-only Codex USER token created. Credentials stored only in ignored local files.'

@@ -23,7 +23,7 @@ export const CanvasRuler = forwardRef<HTMLCanvasElement, CanvasRulerProps>(
           width={24}
           className="absolute top-5 left-0 bottom-0 w-6 z-20 pointer-events-none"
           style={{ height: 'calc(100% - 20px)' }}
-      />
+        />
     );
   }
 );

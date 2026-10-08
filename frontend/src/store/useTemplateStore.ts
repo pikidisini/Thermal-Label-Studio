@@ -12,6 +12,8 @@ interface TemplateState {
   isShortcutModalOpen: boolean;
   isDiagnosticsModalOpen: boolean;
   isDirty: boolean;
+  templateTitle: string;
+  setTemplateTitle: (title: string) => void;
 
   // Actions
   setTemplates: (templates: TemplateMetadata[]) => void;
@@ -38,6 +40,8 @@ export const useTemplateStore = create<TemplateState>((set) => ({
   isShortcutModalOpen: false,
   isDiagnosticsModalOpen: false,
   isDirty: false,
+  templateTitle: '',
+  setTemplateTitle: (templateTitle) => set({ templateTitle }),
 
   setTemplates: (templates) => set({ templates }),
   setActiveTemplateId: (activeTemplateId) => set({ activeTemplateId }),

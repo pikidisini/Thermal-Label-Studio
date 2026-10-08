@@ -34,6 +34,32 @@ returns acceptance metadata. It does not render, print, invoke SAP or select the
 latest persisted Studio layout. Durable layouts and approved processing layouts
 are separate implemented boundaries; their integration remains future work.
 
+## Frontend module ownership
+
+Browser preferences belong to `frontend/src/features/preferences`: its controls
+and Zustand store persist language/theme under
+`thermal-label-studio.preferences.v1`. Feature-agnostic `shared/i18n` owns the
+typed Indonesian dictionary, English fallback and locale subscribers. Semantic
+CSS tokens provide dark/light editor palettes; `index.html` applies saved
+appearance before paint, and the preference initializer subscribes to OS changes
+with cleanup. Authored canvas objects, SVG/PNG pixels and protocol values remain
+outside these UI preferences.
+
+Keep feature-specific UI, hooks and helpers inside their owning feature.
+Canvas owns Fabric SVG import/export under `features/canvas/svg/` and draft
+serialization/recovery under `features/canvas/draft/`. Templates owns local
+SVG admission checks under `features/templates/lib/`. Diagnostics owns its
+recorder and report generator under `features/diagnostics/model/`.
+
+Production callers outside a feature should use its `index.ts` public exports;
+code inside the feature can import its own implementation directly. Reuse
+by another feature does not remove the original feature's ownership.
+`shared/` holds reusable code without feature-specific responsibilities,
+such as UI primitives and the common API base path. Do not introduce global
+`utils/` forwarding files for feature-owned implementations. Studio composes
+the feature APIs into the editor workflow; this organization does not imply
+that all existing root hooks or stores have been migrated.
+
 ## Studio preview
 
 Both Preview view and Label Simulation export the current Fabric canvas and call
@@ -101,3 +127,17 @@ current preview returns PNG; the IPL boundary is tested with fakes. Shared paylo
 orchestration, actual SAP contract/intake, physical transport, job orchestration,
 access control, migrations, backup/restore and production operations remain
 incomplete. Archived phase descriptions are historical reference only.
+
+## Studio sample dataset storage
+
+`backend/app/studio_datasets` owns user-uploaded example JSON, separate from SAP
+processing and layout persistence. PostgreSQL `label_studio.studio_sample_datasets`
+has UUID id, name, original_filename, payload JSONB, created_at and updated_at.
+One upload is one row, preserving the entire parsed envelope, all items and
+field descriptions. There is no MinIO dependency for datasets. Persistence startup
+initializes this table only with configured, authorized storage; fixture startup
+imports no storage drivers. Schema execution and real roundtrip/restart behavior
+require separate named-target authorization and are not established by fake tests.
+
+
+Frontend visual controls use CSS custom properties in `frontend/src/index.css` as the single source for palette pairs, UI typography, compact/default sizes, spacing, borders, radius, shadows, backdrop and motion. Shared primitives expose semantic `tone`, `variant`, `selected` and disabled treatment; native feature controls use the same `data-ui-*` contract. Keep caller classes for layout and deliberate technical geometry. Use compact/stepper variants for narrow editor fields. Selected colors have paired foregrounds. Planned actions remain native-disabled and use the generic planned hover treatment. Focus-visible stays observable. Reduced motion applies only to marked controls, chrome animations and modal portals; authored SVG, Fabric objects and export pixels remain outside UI styling.

@@ -224,7 +224,10 @@ the appropriate level/output. No persistent telemetry or print/job wiring.
 `GET /api/v1/layouts` returns published active layout summaries.
 `GET /api/v1/layouts/{label_code}` returns the active summary plus `svg`.
 `POST /api/v1/layouts` accepts exactly the authored layout body and returns the
-new version summary with HTTP 201. The server validates safe SVG, assigns the
+new version summary with HTTP 201. Image XLink attributes are serialized with
+the `xlink` prefix; Studio resolves image sources by namespace before Fabric
+import so existing SVGs with renamed prefixes also remain editable.
+The server validates safe SVG, assigns the
 positive version and object key, writes SVG to the configured MinIO bucket, and
 commits PostgreSQL active-version metadata. No request field may choose a bucket,
 object key, filesystem path, device, or printer.
@@ -250,3 +253,61 @@ was lost. Artifacts are preserved in both cases; a later save uses a fresh key.
 This is not request idempotency and unreferenced object reconciliation is future
 operational work. Clients must not claim a failed save succeeded or automatically
 delete artifacts. Allocation exhaustion returns layout_persistence_unavailable.
+
+### Template library management
+
+`PATCH /api/v1/layouts/{label_code}` accepts only `{ "title": "New name" }`
+and returns the updated layout summary. Names must be nonblank strings of at
+most 160 characters. The display name override does not change label_code,
+version metadata, SVG bytes, checksum, or object key. A later explicit canvas
+save publishes a new version with the submitted title.
+
+`DELETE /api/v1/layouts/{label_code}` returns 204 and records a logical deletion.
+Deleted layouts are excluded from listing and opening; versions and SVG objects
+remain retained. Unknown/already deleted layouts return 404; unavailable storage
+returns 503. Saving under a deleted identifier returns 409; use a new label code.
+Management and saves share the per-label transaction lock.
+
+Startup schema initialization adds nullable title_override and deleted_at columns
+idempotently to existing layout headers. This requires normal authorized persistence
+startup; source tests do not migrate operational storage.
+
+
+## Versionless local Studio data import
+
+The browser also accepts a local JSON object with sender.system, request_id,
+and 1-100 ordered items. Each item has a unique nonempty item_id, nonempty
+label_code, copies (integer 1-1000), and data (at most 200 scalar/null fields).
+There is no version field in this body. Data keys use ASCII letters, digits,
+underscore or hyphen, 1-128 characters, excluding prototype-related keys.
+Nested data values and nonfinite numbers are rejected. Import files are bounded
+to 2 MiB. Exact key case matters for binding; zero and false are valid values.
+The application preserves request/item/source metadata for local exploration.
+This format is not an HTTP SAP intake contract; the existing backend fixture
+adapter and accepted-only labels/process endpoint remain separate boundaries.
+Existing v1.1 and 2.0-raw local imports remain supported.
+
+Example: {"sender":{"system":"SAP_ECC"},"request_id":"REQ-001",
+"items":[{"item_id":"I1","label_code":"A013","copies":1,
+"data":{"ZZWIDTH":695,"customer_name":"Example Customer"}}]}
+
+
+### SAP characteristic descriptions in Studio
+
+The versionless local JSON envelope accepts optional request-level `field_descriptions`: an object mapping exact characteristic keys to SAP display descriptions, for example `{"ZZWIDTH":"WIDTH"}`. Every item keeps its scalar values under `data.ZZWIDTH`; descriptions never rename binding keys or become label values. Studio uses these descriptions in field search, selectors, composition chips, layers, and missing-data messages. Missing or blank descriptions fall back to the exact key. Duplicate descriptions include the key, for example `WIDTH (ZZWIDTH)`. Importing a new request replaces all previous description metadata.
+
+The description map allows at most 200 entries, the same safe keys as `data`, and string descriptions of at most 256 characters. The complete `docs/examples/label_data.example.json` includes blank descriptions and values for manual completion, with `ZZWIDTH: WIDTH` as the illustrative description. Descriptions are presentation metadata; the actual bound value appears on the label canvas.
+
+## Studio sample datasets
+
+User-uploaded versionless sample JSON is stored independently from SAP render
+requests and template artifacts. `POST /api/v1/studio-sample-datasets` accepts
+exactly `{name, original_filename, payload}` and returns a metadata summary (201).
+`GET /api/v1/studio-sample-datasets` lists summaries; `GET /api/v1/studio-sample-datasets/{uuid}`
+returns the summary and complete original parsed payload. Each upload creates a
+fresh UUID; sample request IDs are not unique. Names are nonblank strings up to
+160 characters, filenames up to 255. Payload validation matches the versionless
+Studio envelope above, bounds payload JSON to 2 MiB, and rejects nonfinite numbers
+and JSONB-incompatible NUL/unpaired-surrogate strings throughout preserved metadata.
+Errors are bounded: invalid_dataset (422), dataset_too_large (413), dataset_not_found
+(404), dataset_persistence_unavailable (503). No update/delete endpoint is provided.

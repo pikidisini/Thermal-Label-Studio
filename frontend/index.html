@@ -2,6 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Apply browser preferences before styles or React can paint the editor.
+      (() => {
+        let preference = {};
+        try { preference = JSON.parse(localStorage.getItem('thermal-label-studio.preferences.v1') || '{}') || {}; } catch {}
+        const theme = preference.theme === 'light' || (preference.theme === 'system' && !matchMedia('(prefers-color-scheme: dark)').matches) ? 'light' : 'dark';
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        document.documentElement.lang = preference.language === 'id' ? 'id' : 'en';
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='2'><path d='M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z'/><line x1='6' y1='18' x2='18' y2='18'/><line x1='6' y1='14' x2='18' y2='14'/><line x1='9' y1='6' x2='15' y2='6'/></svg>" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Thermal Label Studio - Data Contract & Vector Designer</title>

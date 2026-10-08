@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import * as fabric from 'fabric';
-import { resolveSapTokenDisplayValue } from '../../features/data-tokens';
+import { resolveSapTokenDisplayValue, getFieldLabel } from '../../features/data-tokens';
 import { useContractStore } from '../../store/useContractStore';
 import { generatePreviewDataUrl, resolvePayloadTemplate, validatePreviewPayload } from '../../features/barcode';
 import { useHistoryStore } from '../../store/useHistoryStore';
@@ -33,15 +33,34 @@ export function useObjectOrderingActions({
       const binding = property === 'dataField' || property === 'dataBarcode' || property === 'dataQr';
       const bindingProp = binding ? property : '';
       const bindingKey = binding ? String(value).trim() : '';
+      if (property === 'payloadTemplate' && !active.isBarcode) {
+        const template = String(value ?? '');
+        const resolved = resolvePayloadTemplate(template, useContractStore.getState().tokenMap, 'text', useContractStore.getState().fieldDescriptions);
+        active.set('payloadTemplate', template);
+        delete active.dataField; delete active.dataPlaceholder;
+        active.set('text', resolved.value ?? 'Text content — no data');
+        active.validationError = resolved.error || undefined;
+        active.previewOverride = false;
+        active.setCoords(); syncSelection(active); saveCanvasHistory();
+        canvasRef.current.renderAll(); triggerRenderSimulation?.(); return;
+      }
       if (property === 'previewOverride' && value === false) {
+        if (typeof active.payloadTemplate === 'string' && !active.isBarcode) {
+          const resolved = resolvePayloadTemplate(active.payloadTemplate, useContractStore.getState().tokenMap, 'text', useContractStore.getState().fieldDescriptions);
+          active.set('text', resolved.value ?? 'Text content — no data');
+          active.previewOverride = false; active.validationError = resolved.error || undefined;
+          active.setCoords(); syncSelection(active); saveCanvasHistory(); canvasRef.current.renderAll(); triggerRenderSimulation?.(); return;
+        }
         const key = active.dataField || active.dataBarcode || active.dataQr;
-        const restored = resolveSapTokenDisplayValue(useContractStore.getState().tokenMap[key], key);
+        const composite = typeof active.payloadTemplate === 'string' ? resolvePayloadTemplate(active.payloadTemplate, useContractStore.getState().tokenMap, active.barcodeType || 'code128', useContractStore.getState().fieldDescriptions) : null;
+        if (composite?.error) { active.validationError = composite.error; syncSelection(active); return; }
+        const restored = composite?.value ?? resolveSapTokenDisplayValue(useContractStore.getState().tokenMap[key], key, useContractStore.getState().fieldDescriptions);
         if (active.dataField) active.set('text', restored);
-        else { const type = active.barcodeType || 'code128'; const error = validatePreviewPayload(type, restored); if (error) { active.validationError = error; syncSelection(active); return; } const id = ++requestId.current; void generatePreviewDataUrl(type, restored).then((u) => { if (id !== requestId.current || !u || !active._element) return; active.setSrc(u, () => { active.barcodeValue = restored; active.previewOverride = false; active.validationError = undefined; active.setCoords(); syncSelection(active); saveCanvasHistory(); canvasRef.current?.renderAll(); triggerRenderSimulation?.(); }); }); }
+        else { const type = active.barcodeType || 'code128'; const error = validatePreviewPayload(type, restored); if (error) { active.validationError = error; syncSelection(active); return; } const id = ++requestId.current; void generatePreviewDataUrl(type, restored).then((u) => { if (id !== requestId.current || !u || !active._element) return; void active.setSrc(u).then(() => { active.barcodeValue = restored; active.previewOverride = false; active.validationError = undefined; active.setCoords(); syncSelection(active); saveCanvasHistory(); canvasRef.current?.renderAll(); triggerRenderSimulation?.(); }); }); }
         if (active.dataField) { active.previewOverride = false; active.validationError = undefined; active.setCoords(); syncSelection(active); saveCanvasHistory(); canvasRef.current.renderAll(); triggerRenderSimulation?.(); } return;
       }
       if ((property === 'dataBarcode' || property === 'dataQr') && binding && (!bindingKey || !Object.prototype.hasOwnProperty.call(useContractStore.getState().tokenMap, bindingKey) || useContractStore.getState().tokenMap[bindingKey] == null || String(useContractStore.getState().tokenMap[bindingKey]).trim() === '')) {
-        active.validationError = `Token {{${bindingKey}}} tidak memiliki nilai yang dapat digunakan`; syncSelection(active); return;
+        active.validationError = `${getFieldLabel(bindingKey, useContractStore.getState().fieldDescriptions)} has no usable value.`; syncSelection(active); return;
       }
       const templateValue = property === 'payloadTemplate' ? String(value ?? '') : '';
       if (property === 'payloadTemplate') {
@@ -53,13 +72,14 @@ export function useObjectOrderingActions({
         saveCanvasHistory();
         canvasRef.current.renderAll();
       }
-      const candidate = binding ? resolveSapTokenDisplayValue(useContractStore.getState().tokenMap[bindingKey], bindingKey) : (property === 'payloadTemplate' ? (resolvePayloadTemplate(templateValue, useContractStore.getState().tokenMap, active.barcodeType || 'code128').value || '') : String(value ?? ''));
-      if (binding && property === 'dataField') { active.set('dataField', bindingKey); active.set('text', candidate); active.previewOverride = false; active.setCoords(); syncSelection(active); saveCanvasHistory(); canvasRef.current.renderAll(); triggerRenderSimulation?.(); return; }
+      const candidate = binding ? resolveSapTokenDisplayValue(useContractStore.getState().tokenMap[bindingKey], bindingKey, useContractStore.getState().fieldDescriptions) : (property === 'payloadTemplate' ? (resolvePayloadTemplate(templateValue, useContractStore.getState().tokenMap, active.barcodeType || 'code128', useContractStore.getState().fieldDescriptions).value || '') : String(value ?? ''));
+      if (binding && property === 'dataField') { delete active.payloadTemplate; active.set('dataField', bindingKey); active.set('dataPlaceholder', bindingKey); active.set('text', candidate); active.previewOverride = false; active.setCoords(); syncSelection(active); saveCanvasHistory(); canvasRef.current.renderAll(); triggerRenderSimulation?.(); return; }
+      if (binding) active.set('payloadTemplate', `{{${bindingKey}}}`);
       if (binding) property = 'barcodeValue';
       if (property === 'barcodeValue' || property === 'barcodeType' || property === 'payloadTemplate') {
         const type = property === 'barcodeType' ? String(value) : (active.barcodeType || 'code128');
         const templateText = property === 'payloadTemplate' ? templateValue : (active.payloadTemplate || '');
-        const templateResolution = (property === 'payloadTemplate' || (property === 'barcodeType' && templateText)) ? resolvePayloadTemplate(templateText, useContractStore.getState().tokenMap, type) : null;
+        const templateResolution = (property === 'payloadTemplate' || (property === 'barcodeType' && templateText)) ? resolvePayloadTemplate(templateText, useContractStore.getState().tokenMap, type, useContractStore.getState().fieldDescriptions) : null;
         const val = binding ? candidate : (property === 'payloadTemplate' ? (templateResolution?.value || '') : (property === 'barcodeValue' ? String(value ?? '') : String(active.barcodeValue || '')));
         const resolvedVal = property === 'barcodeType' && templateResolution ? (templateResolution.value || '') : val;
         if (templateResolution && templateResolution.error) { active.validationError = templateResolution.error; active.set('opacity', 0.45); syncSelection(active); canvasRef.current.renderAll(); return; }

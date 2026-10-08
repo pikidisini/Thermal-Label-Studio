@@ -22,6 +22,7 @@ export async function reopenLayout(page, title) {
 }
 
 export async function preview(page) {
+  await page.getByTestId('topbar-menu-btn-utilities').click();
   await page.getByTestId('btn-label-simulation').click();
   await page.getByRole('button', { name: 'Run simulation', exact: true }).click();
   const image = page.getByAltText('Backend bitmap preview of the current Studio canvas');

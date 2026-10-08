@@ -1,3 +1,4 @@
+import { translate as t, useTranslation } from "../../../shared/i18n";
 ﻿import React from 'react';
 import { CanvasRuler } from '../ruler/CanvasRuler';
 
@@ -44,6 +45,7 @@ export function CanvasViewport({
   onDragOver,
   onDrop,
 }: CanvasViewportProps) {
+  useTranslation();
   const canvasWidthPx  = labelWidthMm  * pxPerMm;
   const canvasHeightPx = labelHeightMm * pxPerMm;
   const bleedPx        = BLEED_MM * pxPerMm * zoom;
@@ -61,7 +63,7 @@ export function CanvasViewport({
       onDragOver={onDragOver}
       onDrop={onDrop}
       style={{
-        backgroundImage: 'radial-gradient(#2d323f 1px, transparent 1px)',
+        backgroundImage: 'radial-gradient(var(--ui-viewport-dot) 1px, transparent 1px)',
         backgroundSize:  '16px 16px',
       }}
     >
@@ -113,7 +115,7 @@ export function CanvasViewport({
             inset:  bleedPx,
             border: '1px dashed rgba(156,163,175,0.40)',
           }}
-          title="2mm peripheral safe margin"
+          title={t("2mm peripheral safe margin")}
         />
 
         {/* Fabric canvas element */}

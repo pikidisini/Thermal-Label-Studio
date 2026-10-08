@@ -3,13 +3,25 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.labels.layout_contract import LayoutDraft, LayoutStatus, LayoutVersion, create_layout_version
 
 
 class SaveLayoutRequest(LayoutDraft):
     """One authored Studio canvas; each save creates a new active version."""
+
+
+class RenameLayoutRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    title: str = Field(min_length=1, max_length=160)
+
+    @field_validator("title")
+    @classmethod
+    def require_title(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("title must not be blank")
+        return value.strip()
 
 
 class LayoutSummary(BaseModel):

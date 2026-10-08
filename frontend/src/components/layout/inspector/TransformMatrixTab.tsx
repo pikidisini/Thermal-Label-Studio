@@ -1,3 +1,4 @@
+import { translate as t, useTranslation } from "../../../shared/i18n";
 import React from 'react';
 import { IconButton } from '../../../shared/ui';
 
@@ -29,15 +30,16 @@ interface AlignBtnProps {
 }
 
 function AlignBtn({ icon, title, testId, disabled, onClick }: AlignBtnProps) {
+  useTranslation();
   return (
     <IconButton
       data-testid={testId}
       onClick={onClick}
       disabled={disabled}
       label={title}
-      className="h-auto w-auto border-outline-variant bg-surface-container p-1.5 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface disabled:cursor-not-allowed disabled:opacity-30"
+      className="h-auto w-auto disabled:cursor-not-allowed"
     >
-      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{icon}</span>
+      <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-16)" }}>{icon}</span>
     </IconButton>
   );
 }
@@ -52,6 +54,7 @@ export function TransformMatrixTab({
   canvasRef,
   onUpdateProperty,
 }: TransformMatrixTabProps) {
+  useTranslation();
   const noSel = !selectedObject;
 
   const handleAlign = (type: AlignType) => {
@@ -87,10 +90,8 @@ export function TransformMatrixTab({
       {/* 9-Point Origin Anchor */}
       <div data-testid="container-origin-anchor-section">
         <div className="flex items-center gap-1.5 mb-3">
-          <span className="material-symbols-outlined text-primary" style={{ fontSize: 13 }}>my_location</span>
-          <span className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest">
-            9-Point Transform Origin
-          </span>
+          <span className="material-symbols-outlined text-primary" style={{ fontSize: "var(--ui-icon-13)" }}>my_location</span>
+          <span className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest">{t("9-Point Transform Origin")} </span>
         </div>
         <div
           data-testid="origin-anchor-grid"
@@ -106,12 +107,8 @@ export function TransformMatrixTab({
                 data-testid={`anchor-btn-${anc}`}
                 onClick={() => setActiveAnchor(anc)}
                 label={anc.replace(/-/g, ' ')}
-                className={`h-6 w-6 border-transparent p-0 ${
-                  isActive
-                    ? 'bg-primary'
-                    : 'bg-surface-container-high hover:bg-surface-container-highest'
-                }`}
-              >
+                variant="compact"
+               selected={isActive}>
                 {isCenter && !isActive && (
                   <span className="w-1.5 h-1.5 bg-on-surface-variant block" />
                 )}
@@ -130,10 +127,8 @@ export function TransformMatrixTab({
       {/* Canvas Auto Alignment */}
       <div data-testid="container-canvas-alignment-section" className="border-t border-outline-variant pt-4">
         <div className="flex items-center gap-1.5 mb-3">
-          <span className="material-symbols-outlined text-primary" style={{ fontSize: 13 }}>format_shapes</span>
-          <span className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest">
-            Canvas Alignment
-          </span>
+          <span className="material-symbols-outlined text-primary" style={{ fontSize: "var(--ui-icon-13)" }}>format_shapes</span>
+          <span className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest">{t("Canvas Alignment")} </span>
         </div>
         <div data-testid="canvas-alignment-btn-grid" className="grid grid-cols-3 gap-1">
           {ALIGN_BTNS.map((b) => (
@@ -141,9 +136,7 @@ export function TransformMatrixTab({
           ))}
         </div>
         {noSel && (
-          <p data-testid="align-no-selection-hint" className="text-center text-[10px] text-on-surface-variant mt-2">
-            Select an element first
-          </p>
+          <p data-testid="align-no-selection-hint" className="text-center text-[10px] text-on-surface-variant mt-2">{t("Select an element first")} </p>
         )}
       </div>
     </div>

@@ -58,6 +58,7 @@ class Cursor:
     def __exit__(self, *args):
         return False
     def execute(self, sql, args=None):
+        self.sql = sql
         database = self.connection.database
         if "pg_advisory_xact_lock" in sql:
             database.locks += 1
@@ -66,6 +67,8 @@ class Cursor:
                 raise RuntimeError("insert rejected")
             self.connection.pending.append(args[1])
     def fetchone(self):
+        if "SELECT deleted_at" in self.sql:
+            return None
         return (max(self.connection.database.versions, default=0) + 1,)
 
 @pytest.fixture

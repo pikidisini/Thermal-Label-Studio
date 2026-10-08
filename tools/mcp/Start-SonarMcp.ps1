@@ -2,9 +2,9 @@
 param([switch]$ValidateOnly)
 
 $ErrorActionPreference = 'Stop'
-$credentialPath = Join-Path $PSScriptRoot '.env'
+$credentialPath = Join-Path $PSScriptRoot '.env.sonar'
 if (-not (Test-Path -LiteralPath $credentialPath)) {
-    throw 'SonarQube MCP credentials are missing. Complete local SonarQube bootstrap first; never put tokens in Codex config.'
+    throw 'SonarQube MCP credentials are missing. Configure tools/mcp/.env.sonar with a dedicated USER token; never put tokens in Codex config.'
 }
 $settings = @{}
 foreach ($line in Get-Content -LiteralPath $credentialPath) {
