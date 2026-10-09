@@ -2,6 +2,7 @@
 import { InspectorTab } from './inspector/InspectorTab';
 import { LayersTab } from './inspector/LayersTab';
 import { TransformMatrixTab } from './inspector/TransformMatrixTab';
+import { getTransformAnchor } from '../../features/canvas';
 import { ObjectPropertyForm } from './inspector/ObjectPropertyForm';
 
 type Tab = 'properties' | 'layers' | 'transform';
@@ -45,7 +46,7 @@ export function RightInspector({
 }: RightInspectorProps) {
   const [activeTab, setActiveTab] = useState<Tab>('properties');
   const [objectsList, setObjectsList] = useState<any[]>([]);
-  const [activeAnchor, setActiveAnchor] = useState('center');
+  const activeAnchor = selectedObject ? getTransformAnchor(selectedObject) : undefined;
 
   const updateObjectsList = () => {
     if (!canvasRef.current) return;
@@ -71,6 +72,7 @@ export function RightInspector({
   return (
     <aside
       data-testid="container-right-inspector"
+      data-ui-region="inspector"
       className="w-80 bg-surface-container-low border-l border-outline-variant flex flex-col h-full select-none z-[var(--ui-layer-chrome)] shadow-xl"
     >
       {/* Tab bar */}
@@ -118,7 +120,7 @@ export function RightInspector({
           <TransformMatrixTab
             selectedObject={selectedObject}
             activeAnchor={activeAnchor}
-            setActiveAnchor={setActiveAnchor}
+            setActiveAnchor={(anchor) => onUpdateProperty('transformAnchor', anchor)}
             labelWidthMm={labelWidthMm}
             labelHeightMm={labelHeightMm}
             pxPerMm={pxPerMm}

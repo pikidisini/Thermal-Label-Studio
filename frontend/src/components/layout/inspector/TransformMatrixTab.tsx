@@ -1,11 +1,12 @@
 import { translate as t, useTranslation } from "../../../shared/i18n";
 import React from 'react';
-import { IconButton } from '../../../shared/ui';
+import { TRANSFORM_ANCHORS, type TransformAnchor } from '../../../features/canvas';
+import { Icon, IconButton } from '../../../shared/ui';
 
 interface TransformMatrixTabProps {
   selectedObject: any;
-  activeAnchor: string;
-  setActiveAnchor: (anchor: string) => void;
+  activeAnchor?: string;
+  setActiveAnchor: (anchor: TransformAnchor) => void;
   labelWidthMm: number;
   labelHeightMm: number;
   pxPerMm: number;
@@ -13,34 +14,35 @@ interface TransformMatrixTabProps {
   onUpdateProperty: (prop: string, val: any) => void;
 }
 
-const ANCHORS = [
-  'top-left', 'top-center', 'top-right',
-  'middle-left', 'center', 'middle-right',
-  'bottom-left', 'bottom-center', 'bottom-right',
-];
+const ANCHORS = Object.keys(TRANSFORM_ANCHORS) as TransformAnchor[];
 
 type AlignType = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
 
 interface AlignBtnProps {
   icon: string;
   title: string;
+  caption: string;
   testId: string;
   disabled: boolean;
   onClick: () => void;
 }
 
-function AlignBtn({ icon, title, testId, disabled, onClick }: AlignBtnProps) {
+function AlignBtn({ icon, title, caption, testId, disabled, onClick }: AlignBtnProps) {
   useTranslation();
   return (
+    <div className="flex min-w-0 flex-col gap-0.5 text-center">
     <IconButton
       data-testid={testId}
       onClick={onClick}
       disabled={disabled}
       label={title}
-      className="h-auto w-auto disabled:cursor-not-allowed"
+      variant="default"
+      className="w-full disabled:cursor-not-allowed"
     >
-      <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-16)" }}>{icon}</span>
+      <Icon  size="control" glyph={icon} />
     </IconButton>
+    <span className="text-[11px] text-on-surface-variant">{t(caption)}</span>
+    </div>
   );
 }
 
@@ -59,21 +61,7 @@ export function TransformMatrixTab({
 
   const handleAlign = (type: AlignType) => {
     if (!selectedObject || !canvasRef.current) return;
-    const canvasW = labelWidthMm * pxPerMm;
-    const canvasH = labelHeightMm * pxPerMm;
-    const objW = (selectedObject.width  || 0) * (selectedObject.scaleX || 1);
-    const objH = (selectedObject.height || 0) * (selectedObject.scaleY || 1);
-    const margin = 4;
-
-    const map: Record<AlignType, [string, number]> = {
-      left:   ['leftMm',  margin / pxPerMm],
-      center: ['leftMm',  ((canvasW - objW) / 2) / pxPerMm],
-      right:  ['leftMm',  (canvasW - objW - margin) / pxPerMm],
-      top:    ['topMm',   margin / pxPerMm],
-      middle: ['topMm',   ((canvasH - objH) / 2) / pxPerMm],
-      bottom: ['topMm',   (canvasH - objH - margin) / pxPerMm],
-    };
-    onUpdateProperty(map[type][0], map[type][1]);
+    onUpdateProperty('labelAlignment', { type, width: labelWidthMm * pxPerMm, height: labelHeightMm * pxPerMm });
   };
 
   const ALIGN_BTNS: { type: AlignType; icon: string; title: string; testId: string }[] = [
@@ -85,59 +73,52 @@ export function TransformMatrixTab({
     { type: 'bottom', icon: 'align_vertical_bottom',    title: 'Align Bottom',       testId: 'align-btn-bottom'  },
   ];
 
+  const captions = ['Left', 'Center', 'Right', 'Top', 'Middle', 'Bottom'];
+  const anchorLabel = activeAnchor?.replace(/-/g, ' ');
   return (
-    <div data-testid="container-transform-matrix-tab" className="p-3 space-y-5 text-xs">
-      {/* 9-Point Origin Anchor */}
-      <div data-testid="container-origin-anchor-section">
-        <div className="flex items-center gap-1.5 mb-3">
-          <span className="material-symbols-outlined text-primary" style={{ fontSize: "var(--ui-icon-13)" }}>my_location</span>
-          <span className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest">{t("9-Point Transform Origin")} </span>
-        </div>
-        <div
-          data-testid="origin-anchor-grid"
-          className="grid grid-cols-3 gap-1 w-[84px] mx-auto p-1.5 bg-surface-container-lowest border border-outline-variant"
-          style={{ boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.04)' }}
-        >
-          {ANCHORS.map((anc) => {
-            const isActive = activeAnchor === anc;
-            const isCenter = anc === 'center';
-            return (
-              <IconButton
-                key={anc}
-                data-testid={`anchor-btn-${anc}`}
-                onClick={() => setActiveAnchor(anc)}
-                label={anc.replace(/-/g, ' ')}
-                variant="compact"
-               selected={isActive}>
-                {isCenter && !isActive && (
-                  <span className="w-1.5 h-1.5 bg-on-surface-variant block" />
-                )}
-                {isCenter && isActive && (
-                  <span className="w-1.5 h-1.5 bg-surface block" />
-                )}
-              </IconButton>
-            );
-          })}
-        </div>
-        <p data-testid="origin-anchor-active-label" className="text-center text-[9px] text-on-surface-variant mt-1.5 font-mono">
-          {activeAnchor.replace(/-/g, ' ')}
-        </p>
+    <div data-testid="container-transform-matrix-tab" className="p-3 text-xs">
+      <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant">
+        <Icon size={16} glyph="title" />
+        <span>{noSel ? t('Select an object to align') : `${t('Selected object')} · ${t('Selected')}`}</span>
       </div>
-
-      {/* Canvas Auto Alignment */}
-      <div data-testid="container-canvas-alignment-section" className="border-t border-outline-variant pt-4">
-        <div className="flex items-center gap-1.5 mb-3">
-          <span className="material-symbols-outlined text-primary" style={{ fontSize: "var(--ui-icon-13)" }}>format_shapes</span>
-          <span className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest">{t("Canvas Alignment")} </span>
+      <div data-testid="container-canvas-alignment-section" className="mt-4">
+        <div className="flex items-center gap-1.5 font-medium">
+          <Icon size={16} glyph="format_shapes" />
+          <span>{t('Align to label')}</span>
         </div>
-        <div data-testid="canvas-alignment-btn-grid" className="grid grid-cols-3 gap-1">
-          {ALIGN_BTNS.map((b) => (
-            <AlignBtn key={b.type} icon={b.icon} title={b.title} testId={b.testId} disabled={noSel} onClick={() => handleAlign(b.type)} />
+        <div data-testid="canvas-alignment-btn-grid">
+          {[0, 3].map((start) => (
+            <div key={start} className="mt-2">
+              <p className="text-[11px] text-on-surface-variant">{t(start === 0 ? 'Horizontal' : 'Vertical')}</p>
+              <div className="mt-1.5 grid grid-cols-3 gap-1">
+                {ALIGN_BTNS.slice(start, start + 3).map((b, index) => (
+                  <AlignBtn key={b.type} icon={b.icon} title={b.title} caption={captions[start + index]} testId={b.testId} disabled={noSel} onClick={() => handleAlign(b.type)} />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
-        {noSel && (
-          <p data-testid="align-no-selection-hint" className="text-center text-[10px] text-on-surface-variant mt-2">{t("Select an element first")} </p>
-        )}
+      </div>
+      <div data-testid="container-origin-anchor-section" className="mt-4 border-t border-outline-variant pt-4">
+        <div className="flex items-center gap-1.5 font-medium">
+          <Icon size={16} glyph="my_location" />
+          <span>{t('Reference point')}</span>
+        </div>
+        <p className="mt-1.5 text-[11px] text-on-surface-variant">{t('Origin for X / Y coordinates')}</p>
+        <div className="mt-2 flex items-center gap-3">
+          <div data-testid="origin-anchor-grid" role="group" aria-label={t('Reference point')} className="grid shrink-0 grid-cols-3 gap-0.5">
+            {ANCHORS.map((anc) => (
+              <IconButton key={anc} data-testid={`anchor-btn-${anc}`} onClick={() => setActiveAnchor(anc)} disabled={noSel}
+                label={anc.replace(/-/g, ' ')} variant="compact" selected={activeAnchor === anc} aria-pressed={activeAnchor === anc}>
+                <Icon size={16} glyph={anc === 'center' ? 'my_location' : 'radio_button_unchecked'} />
+              </IconButton>
+            ))}
+          </div>
+          <div className="min-w-0 text-[11px]">
+            <p data-testid="origin-anchor-active-label" className="capitalize">{anchorLabel ? t(anchorLabel) : '—'}</p>
+            <p className="text-on-surface-variant">{t('Keeps object in place')}</p>
+          </div>
+        </div>
       </div>
     </div>
   );

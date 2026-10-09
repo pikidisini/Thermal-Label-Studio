@@ -13,6 +13,8 @@ interface ContractState {
   usedTokens: Set<string>;
   localImport: { format: 'v1.1' | 'raw-v2' | 'data'; fileName: string; itemSequence: number; itemCount: number } | null;
   customTokens: Set<string>;
+  outputBlocked: boolean;
+  setOutputBlocked: (blocked: boolean) => void;
 
   // Actions
   setSampleContracts: (contracts: Record<string, RawSapContract>) => void;
@@ -28,6 +30,8 @@ interface ContractState {
 }
 
 export const useContractStore = create<ContractState>((set, get) => ({
+  outputBlocked: false,
+  setOutputBlocked: (outputBlocked) => set({ outputBlocked }),
   sampleContracts: {},
   activeContractKey: 'goods_receipt',
   jsonData: {},
@@ -47,6 +51,7 @@ export const useContractStore = create<ContractState>((set, get) => ({
       tokenMap: contracts[key] ? adaptSapContract(contracts[key]).tokenMap : get().tokenMap,
       fieldDescriptions: contracts[key] ? contracts[key].field_descriptions || {} : get().fieldDescriptions,
       localImport: null,
+      outputBlocked: contracts[key] ? false : get().outputBlocked,
       customTokens: new Set<string>(),
     });
   },
@@ -56,6 +61,7 @@ export const useContractStore = create<ContractState>((set, get) => ({
     })),
   setTokenMap: (tokenMap) => set({ tokenMap }),
   updateTokenValue: (key, value) => set((state) => {
+    if (state.outputBlocked) return state;
     const next = { ...state.jsonData } as any;
     const section = next.fields && Object.prototype.hasOwnProperty.call(next.fields, key) ? 'fields' : next.codes && Object.prototype.hasOwnProperty.call(next.codes, key) ? 'codes' : 'fields';
     if (section) next[section] = { ...next[section], [key]: value };

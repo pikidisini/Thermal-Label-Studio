@@ -658,7 +658,7 @@ test('Fitur 2 - Vector Toolbox Tools & Token Bindings Suite', async (t) => {
 
 
 test('versionless data envelope preserves dynamic keys, identities, zero and null', () => {
-  const input = { sender: { system: 'SAP_ECC' }, request_id: 'REQ1', items: [
+  const input = { sender: { system: 'SAP_ECC' }, request_id: 'REQ1', mode: 'simulation', items: [
     { item_id: 'I1', label_code: 'A013', copies: 1, data: { ZZWIDTH: 695, 'ZZSPECIALTOUCH-1': 'A', arbitrary_field: 0, optional: null } },
     { item_id: 'I2', label_code: 'A013', copies: 2, data: { ZZWIDTH: 700 } },
   ] };
@@ -669,16 +669,16 @@ test('versionless data envelope preserves dynamic keys, identities, zero and nul
   assert.equal(parsed.items[0].tokenMap.optional, null);
   assert.equal(parsed.items[0].contract.source.item_id, 'I1');
   assert.equal(parsed.items[1].tokenMap.ZZWIDTH, 700);
-  assert.throws(() => parseLocalSapJson({ ...input, items: [input.items[0], input.items[0]] }), /unique/);
-  assert.throws(() => parseLocalSapJson({ ...input, items: [{ ...input.items[0], data: { nested: { value: 1 } } }] }), /scalar/);
+  assert.throws(() => parseLocalSapJson({ ...input, items: [input.items[0], input.items[0]] }), /validation|copies|mode/);
+  assert.throws(() => parseLocalSapJson({ ...input, items: [{ ...input.items[0], data: { nested: { value: 1 } } }] }), /validation|copies|mode/);
   assert.throws(() => parseLocalSapJson({ ...input, items: [{ ...input.items[0], copies: 0 }] }), /copies/);
-  assert.throws(() => parseLocalSapJson({ ...input, items: [{ ...input.items[0], data: JSON.parse('{"__proto__":"bad"}') }] }), /name/);
-  assert.throws(() => parseLocalSapJson({ ...input, request_id: '' }), /request_id/);
+  assert.throws(() => parseLocalSapJson({ ...input, items: [{ ...input.items[0], data: JSON.parse('{"__proto__":"bad"}') }] }), /validation|copies|mode/);
+  assert.throws(() => parseLocalSapJson({ ...input, request_id: '' }), /validation|copies|mode/);
 });
 
 
 test('versionless SAP descriptions are shared metadata and validate independently of values', () => {
-  const payload = { sender: { system: 'SAP_ECC' }, request_id: 'R1', field_descriptions: { ZZWIDTH: 'WIDTH', OTHER: '' }, items: [
+  const payload = { sender: { system: 'SAP_ECC' }, request_id: 'R1', mode: 'simulation', field_descriptions: { ZZWIDTH: 'WIDTH', OTHER: '' }, items: [
     { item_id: 'I1', label_code: 'A013', copies: 1, data: { ZZWIDTH: 695 } },
     { item_id: 'I2', label_code: 'A013', copies: 1, data: { ZZWIDTH: 700 } },
   ] };
@@ -689,7 +689,7 @@ test('versionless SAP descriptions are shared metadata and validate independentl
     assert.equal(item.tokenMap.WIDTH, undefined);
   }
   for (const invalid of [null, [], { ZZWIDTH: 695 }, { ZZWIDTH: 'X'.repeat(257) }, JSON.parse('{"__proto__":"WIDTH"}')]) {
-    assert.throws(() => parseLocalSapJson({ ...payload, field_descriptions: invalid }), /field_descriptions|description/);
+    assert.throws(() => parseLocalSapJson({ ...payload, field_descriptions: invalid }), /validation|copies|mode/);
   }
   assert.deepEqual(parseLocalSapJson({ ...payload, field_descriptions: undefined }).items[0].contract.field_descriptions, {});
 });

@@ -1,0 +1,23 @@
+{
+  "file": "bitmap-readable.ipl",
+  "bytes": 6455,
+  "sha256": "e9143103a8d26b9a45cf52b6d4253b284bde291de893004d10654f47d7becc6c",
+  "bitmap_dots": [
+    160,
+    96
+  ],
+  "nominal_bitmap_mm_at_8dpmm": [
+    20,
+    12
+  ],
+  "origin_dots": [
+    40,
+    40
+  ],
+  "graphic_id": 90,
+  "format_id": 90,
+  "columns_verified": 160,
+  "local_round_trip": "PASS",
+  "physical_print": "PASS - operator confirmed successful printing at 20 x 12 mm on 2026-10-09",
+  "physical_evidence_source": "User confirmation in this task; not independently measured by Codex"
+}

@@ -1,3 +1,4 @@
+import { Icon } from "../../../shared/ui";
 import { translate as t, useTranslation } from "../../../shared/i18n";
 import React from 'react';
 import { ActiveTool } from '../../../types/label';
@@ -62,7 +63,7 @@ export function BasicToolsSection({
         className="w-12 h-12 flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer group relative"
         title={t("Upload Image / Logo")}
 >
-        <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-22)" }}>image</span>
+        <Icon  size="dock" glyph="image" />
         <span className="absolute left-full ml-2 px-2 py-1 bg-surface-container-highest text-on-surface text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[var(--ui-layer-tooltip)] border border-outline-variant">{t("Upload Image / Logo")} </span>
         <input
           data-testid="input-upload-image-file"

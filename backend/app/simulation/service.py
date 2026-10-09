@@ -1,12 +1,16 @@
 """Capture one existing renderer result per ordered item, without output IO."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from pydantic import ValidationError
 
+from app.engine.pipeline import prepare_label_item
+from app.engine.output import PreparedOutput
+from app.protocols.registry import codec_for
 from app.observability import record_event, request_context
-from app.engine.raster import RasterError, RenderedLabel, RenderStage, render_label_item
+from app.engine.raster import RasterError, RenderStage
+from app.engine.bitmap import RenderedLabel
 from app.labels.models import LabelProcessRequest
 from app.labels.resolver import LayoutSource, UnknownLabelCodeError
 from app.labels.templates import TemplateError
@@ -37,6 +41,8 @@ class SimulationItemResult:
     trace: tuple[TraceEntry, ...]
     bitmap: RenderedLabel | None
     error: SimulationError | None
+    payload: bytes | None = None
+    prepared: PreparedOutput | None = None
 
 
 class SimulationRequestError(ValueError):
@@ -52,15 +58,22 @@ _STAGE_MESSAGES = {
 }
 
 
+def simulate_prepared_output(output: PreparedOutput) -> RenderedLabel:
+    """Decode the exact prepared payload without rendering, encoding or IO."""
+    _, decoder = codec_for(output.language)
+    bitmap = output.bitmap
+    return replace(bitmap, bitmap_png=decoder(output.payload, bitmap.width_px, bitmap.height_px, bitmap.dpi))
+
+
 def _simulate_label_request(
-    request: LabelProcessRequest, registry: LayoutSource,
+    request: LabelProcessRequest, registry: LayoutSource, *, encoder: str = "IPL",
 ) -> tuple[SimulationItemResult, ...]:
     """Return ordered capture evidence in memory; failures do not stop later items.
 
     Only simulation mode and 1-100 validated items may enter this service. Each
     renderer call owns resolution, binding, and rasterization, and reports its
-    real stage boundaries. Capture retains that returned object and its exact
-    PNG bytes; it performs no rerendering, encoding, file write, or transport.
+    real stage boundaries. Shared preparation encodes once; capture decodes that exact
+    payload to PNG. It performs no rerendering, file write, or transport.
     """
     try:
         # Revalidate even model_construct/mutated callers. Serializer warnings
@@ -70,6 +83,11 @@ def _simulate_label_request(
         raise SimulationRequestError("A valid label processing request is required.") from exc
     if validated.mode != "simulation" or not validated.items:
         raise SimulationRequestError("Simulation requires simulation mode and at least one item.")
+
+    try:
+        codec_for(encoder)
+    except ValueError:
+        raise SimulationRequestError("Unsupported simulation output language.") from None
 
     results = []
     for index, item in enumerate(validated.items):
@@ -82,10 +100,14 @@ def _simulate_label_request(
 
         bitmap = None
         error = None
+        payload = None
+        prepared = None
         try:
-            bitmap = render_label_item(
-                validated.label_code, item.facts, registry, on_stage=record_stage,
+            prepared = prepare_label_item(
+                validated.label_code, item.facts, registry, language=encoder, on_stage=record_stage,
             )
+            payload = prepared.payload
+            bitmap = simulate_prepared_output(prepared)
         except UnknownLabelCodeError:
             error = SimulationError("unknown_label_code", "No active layout is registered for this label_code.")
         except TemplateError:
@@ -99,18 +121,21 @@ def _simulate_label_request(
             status = "CAPTURED"
             trace.append(TraceEntry(status, "Bitmap captured in memory for preview."))
         else:
+            bitmap = None
+            payload = None
+            prepared = None
             status = "FAILED"
             trace.append(TraceEntry(status, error.message))
         record_event(status, item_index=index, error_code=error.code if error else None)
-        results.append(SimulationItemResult(index, item.item_id, status, tuple(trace), bitmap, error))
+        results.append(SimulationItemResult(index, item.item_id, status, tuple(trace), bitmap, error, payload, prepared))
     return tuple(results)
 
 
-def simulate_label_request(request: LabelProcessRequest, registry: LayoutSource) -> tuple[SimulationItemResult, ...]:
-    """Correlate all item stages while retaining exact bitmap capture semantics."""
+def simulate_label_request(request: LabelProcessRequest, registry: LayoutSource, *, encoder: str = "IPL") -> tuple[SimulationItemResult, ...]:
+    """Correlate all item stages while retaining decoded payload capture semantics."""
     with request_context():
         try:
-            return _simulate_label_request(request, registry)
+            return _simulate_label_request(request, registry, encoder=encoder)
         except SimulationRequestError:
             record_event("REQUEST_FAILED", error_code="invalid_request")
             raise

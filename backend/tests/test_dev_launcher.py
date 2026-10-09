@@ -88,3 +88,13 @@ def test_storage_can_only_be_disabled_explicitly():
 def test_explicit_environment_storage_does_not_read_compose():
     args = dev.parse_arguments(['--persistence'])
     assert args.persistence and not args.compose_storage
+
+
+def test_dev_carries_server_owned_printer_settings_without_connecting():
+    config = compose_config()
+    config["services"]["app"]["environment"].update(TLS_PRINTER_HOST="192.0.2.44", TLS_PRINTER_PORT="9100")
+    translated = dev.compose_storage_environment(config)
+    assert translated["TLS_PRINTER_HOST"] == "192.0.2.44"
+    with patch.dict(dev.os.environ, {}, clear=True):
+        child = dev.prepare_environment(True, translated)
+    assert child["TLS_PRINTER_HOST"] == "192.0.2.44" and child["TLS_PRINTER_PORT"] == "9100"

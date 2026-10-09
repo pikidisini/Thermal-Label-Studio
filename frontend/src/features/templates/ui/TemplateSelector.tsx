@@ -5,7 +5,7 @@ import { TemplateMetadata } from '../../../types/template';
 import { useTemplateStore } from '../../../store/useTemplateStore';
 import { layoutApi } from '../api/layoutApi';
 import { validateLocalSvg } from '../lib/validateLocalSvg';
-import { Badge, Button, Dialog, DialogHeader, ErrorState, IconButton, Input } from '../../../shared/ui';
+import { Icon, Badge, Button, Dialog, DialogHeader, ErrorState, IconButton, Input } from '../../../shared/ui';
 
 type Detail = { raw_svg?: string; svg_content?: string; svg?: string; width_mm?: number; height_mm?: number; label_code?: string; version?: number; status?: string; dpi?: number; created_at?: string; object_key?: string; svg_sha256?: string };
 interface Props { templates: TemplateMetadata[]; activeTemplateId: string; onSelectTemplate: (id: string) => void; labelWidthMm: number; labelHeightMm: number }
@@ -68,7 +68,7 @@ export function TemplateSelector({ templates, activeTemplateId, onSelectTemplate
 
   return <>
     <div data-testid="container-template-selector" className="flex items-center gap-2">
-      <Button data-testid="topbar-open-template-explorer" onClick={() => setOpen(true)} className="flex items-center gap-1.5" variant="default"><span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-14)" }}>folder_open</span>{templates.find((t) => t.id === activeTemplateId)?.name || t("Templates")}</Button>
+      <Button data-testid="topbar-open-template-explorer" onClick={() => setOpen(true)} className="flex items-center gap-1.5" variant="default"><Icon  size={14} glyph="folder_open" />{templates.find((t) => t.id === activeTemplateId)?.name || t("Templates")}</Button>
       <Badge data-ui-numeric="true">{labelWidthMm} × {labelHeightMm} {t("mm")}</Badge>
     </div>
     {open && typeof document !== 'undefined' && createPortal(<div role="dialog" aria-modal="true" aria-label={t("Template explorer")} data-testid="template-explorer-modal-overlay" className="fixed inset-0 z-[var(--ui-layer-modal)] flex items-center justify-center p-6" onMouseDown={(e) => { if (!busy && e.target === e.currentTarget) setOpen(false); }} data-ui-backdrop="true">

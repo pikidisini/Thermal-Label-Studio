@@ -7,9 +7,19 @@
       (() => {
         let preference = {};
         try { preference = JSON.parse(localStorage.getItem('thermal-label-studio.preferences.v1') || '{}') || {}; } catch {}
-        const theme = preference.theme === 'light' || (preference.theme === 'system' && !matchMedia('(prefers-color-scheme: dark)').matches) ? 'light' : 'dark';
-        document.documentElement.dataset.theme = theme;
-        document.documentElement.style.colorScheme = theme;
+        const selected = ['dark', 'light', 'industrial-dark', 'industrial-light', 'system'].includes(preference.theme) ? preference.theme : 'dark';
+        const systemDark = typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = selected === 'system' ? (systemDark ? 'dark' : 'light') : selected;
+        const tokens = { bar: ['--ui-region-menu'], tools: ['--ui-region-toolbar'], panel: ['--ui-region-inspector'], status: ['--ui-region-status'], workspace: ['--ui-region-workspace'], grid: ['--ui-viewport-dot'], text: ['--ui-text-primary', '--ui-text-secondary'], action: ['--ui-primary-container', '--ui-primary-fixed', '--ui-primary-hover'], actionText: ['--ui-on-primary-container'], warning: ['--ui-warning'], warningFill: ['--ui-warning-container'], warningText: ['--ui-on-warning-container'] };
+        const addedDefaults = { 'industrial-light': { warning: '#69583e', warningFill: '#a49478', warningText: '#282218' }, 'industrial-dark': { warning: '#c4b79b', warningFill: '#a49478', warningText: '#282218' } };
+        const custom = preference.customTheme;
+        const validCustom = custom && typeof custom === 'object' && !Array.isArray(custom) && ['industrial-light', 'industrial-dark'].includes(custom.base) && custom.colors && typeof custom.colors === 'object' && !Array.isArray(custom.colors) && Object.keys(tokens).every(key => Object.prototype.hasOwnProperty.call(addedDefaults[custom.base], key) && !Object.prototype.hasOwnProperty.call(custom.colors, key) || typeof custom.colors[key] === 'string' && /^#[0-9a-f]{6}$/i.test(custom.colors[key]));
+        const customActive = preference.theme === 'custom' && validCustom;
+        const resolved = customActive ? custom.base : theme;
+        if (customActive) Object.entries(tokens).forEach(([key, names]) => names.forEach(name => document.documentElement.style.setProperty(name, (Object.prototype.hasOwnProperty.call(custom.colors, key) ? custom.colors[key] : addedDefaults[custom.base][key]).toLowerCase())));
+        document.documentElement.dataset.customTheme = customActive ? 'true' : 'false';
+        document.documentElement.dataset.theme = resolved;
+        document.documentElement.style.colorScheme = resolved === 'dark' || resolved === 'industrial-dark' ? 'dark' : 'light';
         document.documentElement.lang = preference.language === 'id' ? 'id' : 'en';
       })();
     </script>

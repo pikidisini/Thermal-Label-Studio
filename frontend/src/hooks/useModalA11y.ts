@@ -12,7 +12,7 @@ export function useModalA11y(isOpen: boolean, onClose: () => void): RefObject<HT
     const dialog = dialogRef.current;
     const focusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>(
       'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    ) || []);
+    ) || []).filter(node => node.getAttribute('tabindex') !== '-1' && !node.closest('[hidden]'));
     (focusable()[0] || dialog)?.focus();
     const handleKeyDown = (event: KeyboardEvent) => {
       // A nested dialog owns an Escape it has already handled.  This avoids

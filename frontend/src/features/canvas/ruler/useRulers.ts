@@ -62,7 +62,7 @@ export function useRulers({
         topCanvas.height = tH;
 
         // Background
-        topCtx.fillStyle = color('--ui-surface-low');
+        topCtx.fillStyle = color('--ui-region-toolbar');
         topCtx.fillRect(0, 0, tW, tH);
 
         // Active label width highlight
@@ -117,7 +117,7 @@ export function useRulers({
         leftCanvas.height = lH;
 
         // Background
-        leftCtx.fillStyle = color('--ui-surface-low');
+        leftCtx.fillStyle = color('--ui-region-toolbar');
         leftCtx.fillRect(0, 0, lW, lH);
 
         // Active label height highlight

@@ -12,9 +12,9 @@ from starlette.responses import JSONResponse
 
 _current_id: ContextVar[str | None] = ContextVar("request_id", default=None)
 logger = logging.getLogger("thermal_label_studio.events")
-EventName = Literal["REQUEST_RECEIVED", "REQUEST_COMPLETED", "REQUEST_FAILED", "RECEIVED", "RESOLVING_LAYOUT", "BINDING_TEMPLATE", "RASTERIZING", "CAPTURED", "FAILED"]
+EventName = Literal["REQUEST_RECEIVED", "REQUEST_COMPLETED", "REQUEST_FAILED", "RECEIVED", "RESOLVING_LAYOUT", "BINDING_TEMPLATE", "RASTERIZING", "CAPTURED", "SUBMITTED", "FAILED"]
 EVENT_NAMES = frozenset(EventName.__args__)
-ERROR_CODES = frozenset({"unknown_label_code", "invalid_template_or_facts", "raster_failed", "processing_failed", "invalid_request", "fixture_simulation_failed"})
+ERROR_CODES = frozenset({"unknown_label_code", "invalid_template_or_facts", "raster_failed", "processing_failed", "invalid_request", "fixture_simulation_failed", "print_submission_uncertain"})
 
 
 def new_request_id() -> str:

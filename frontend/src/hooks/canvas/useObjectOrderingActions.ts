@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react';
+import { alignObjectToLabel, setTransformAnchor } from '../../features/canvas';
 import * as fabric from 'fabric';
 import { resolveSapTokenDisplayValue, getFieldLabel } from '../../features/data-tokens';
 import { useContractStore } from '../../store/useContractStore';
@@ -92,7 +93,11 @@ export function useObjectOrderingActions({
         return;
       }
 
-      if (property === 'leftMm') {
+      if (property === 'labelAlignment') {
+        alignObjectToLabel(active, value.type, value.width, value.height);
+      } else if (property === 'transformAnchor') {
+        setTransformAnchor(active, value);
+      } else if (property === 'leftMm') {
         active.set('left', Number(value) * pxPerMm);
       } else if (property === 'topMm') {
         active.set('top', Number(value) * pxPerMm);

@@ -1,3 +1,4 @@
+import { Icon } from "../../../shared/ui";
 import { translate as t, useTranslation } from "../../../shared/i18n";
 import React from 'react';
 import { ArrowLeftRight } from 'lucide-react';
@@ -28,7 +29,7 @@ export function CustomDimensionForm({
           title={t("Swap Width & Height")}
           className="flex items-center gap-1"
          data-ui-control="button" data-variant="compact">
-          <ArrowLeftRight size={12} />
+          <Icon component={ArrowLeftRight}  size="small" />
           <span>{t("Swap Orientation")}</span>
         </button>
       </div>
@@ -61,7 +62,7 @@ export function CustomDimensionForm({
           title={t("Swap Dimensions")}
           className="w-[30px] h-[30px] flex items-center justify-center shrink-0"
          data-ui-control="button" data-variant="default">
-          <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
+          <Icon size="control" glyph="swap_horiz" />
         </button>
 
         {/* Height */}

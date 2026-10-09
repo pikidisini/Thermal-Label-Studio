@@ -21,7 +21,7 @@ export function useThermalSimulation(
     setRenderError,
   } = useSimulationStore();
   const { labelWidthMm, labelHeightMm } = useTemplateStore();
-  const { jsonData } = useContractStore();
+  const { jsonData, outputBlocked } = useContractStore();
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDirtyRef = useRef<boolean>(true);
@@ -53,6 +53,7 @@ export function useThermalSimulation(
       setThermalImage(null);
       setInspectionData(null);
       try {
+        if (useContractStore.getState().outputBlocked) throw new Error('Create a canonical working copy before output.');
         const errors = bindingErrors(canvasRef.current.getObjects(), useContractStore.getState().tokenMap, useContractStore.getState().fieldDescriptions);
         if (errors.length) throw new Error(`Label data is incomplete or invalid: ${errors.join(' ')}`);
         const svgStr = exportFabricToSvg(canvasRef.current, labelWidthMm, labelHeightMm, pxPerMm);
@@ -60,8 +61,10 @@ export function useThermalSimulation(
 
         const controller = new AbortController();
         controllerRef.current = controller;
+        const admittedData = useContractStore.getState().jsonData;
         const result = await runEditorPreview({ svg: svgStr, widthMm: labelWidthMm, heightMm: labelHeightMm, dpi }, controller.signal);
-        if (!mountedRef.current || generation !== requestGenerationRef.current) return;
+        if (!mountedRef.current || generation !== requestGenerationRef.current
+          || useContractStore.getState().jsonData !== admittedData || useContractStore.getState().outputBlocked) return;
         const url = editorPreviewUrl(result);
         setPreviewImage(url);
         setThermalImage(url);
@@ -88,6 +91,15 @@ export function useThermalSimulation(
     setInspectionData,
     setRenderError,
   ]);
+
+  useEffect(() => {
+    requestGenerationRef.current += 1;
+    controllerRef.current?.abort();
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    setPreviewImage(null);
+    setThermalImage(null);
+    setIsRendering(false);
+  }, [jsonData, outputBlocked, setPreviewImage, setThermalImage, setIsRendering]);
 
   useEffect(() => {
     mountedRef.current = true;

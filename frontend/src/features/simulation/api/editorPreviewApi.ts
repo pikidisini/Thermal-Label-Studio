@@ -5,6 +5,7 @@ export interface EditorPreviewRequest {
   widthMm: number;
   heightMm: number;
   dpi: number;
+  encoder?: "IPL";
 }
 
 export interface EditorPreviewResult {
@@ -24,6 +25,7 @@ export async function runEditorPreview(request: EditorPreviewRequest, signal?: A
       width_mm: request.widthMm,
       height_mm: request.heightMm,
       dpi: request.dpi,
+      encoder: request.encoder ?? "IPL",
     }),
     signal,
   });

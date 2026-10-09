@@ -2,9 +2,28 @@
 
 ## Implemented local experience
 
-Studio and fixture pages offer browser-local Settings for English (default) or
-Bahasa Indonesia, and Dark (default), Light or System appearance. Invalid or
-unavailable local storage falls back safely; System follows OS color changes.
+Studio View â†’ Preference and the fixture page's direct Preference control offer
+browser-local settings for English (default) or
+Bahasa Indonesia, and Dark (default), Light, Industrial Dark, Industrial Light
+or System appearance. Dark/Light retain the original palettes; Industrial
+appearances use graphite/steel and warm-grey with muted status accents. Invalid or
+unavailable local storage falls back safely; System follows OS color changes
+using the original Dark/Light palettes. The browser-local v1 key accepts all
+explicit theme IDs without migrating existing choices.
+Preference always opens the full color editor and live preview, regardless of
+the active theme. Opening it does not change the theme. Editing a color, changing
+the custom base or resetting colors selects a Custom draft; Apply commits it.
+Custom appearance starts from Industrial Light or Industrial Dark and offers
+bounded colors for menu/toolbar/inspector/status surfaces, workspace/grid,
+text/icons, paired button/selected colors, and warning text/outline plus a
+separate selected warning fill/foreground pair. Existing nine-color palettes
+receive only missing warning fields from their selected Industrial base; invalid
+supplied warning colors are rejected. A miniature preview updates while
+editing; Apply commits the validated palette locally and Cancel discards it.
+Reset restores the selected base palette. Existing appearance choices still
+apply immediately. Language remains immediate. Contrast reports the lowest ratio
+among chrome text/surface and button pairs; it informs the choice without blocking
+valid colors. Custom settings retain the previous palette when a builtin is selected.
 The palette applies before first paint and changes editor chrome and rulers only.
 Authored labels, SVG/PNG exports, JSON/SAP keys and barcode payloads are unchanged.
 
@@ -24,22 +43,23 @@ fresh version; it is not an idempotent retry. Version gaps and unreferenced SVG
 artifacts may remain and require separately authorized reconciliation.
 
 Preview view and Label Simulation export the current canvas and use the same
-server editor-preview endpoint. Label Simulation opens from Utilities; the HUD
-keeps an icon-only, unavailable Print control with a planned tooltip. Its neutral
-icon gains a blue background on hover and sends no print request.
+server editor-preview endpoint. Label Simulation opens from Utilities and offers the implemented IPL output language; the HUD
+opens the Print dialog through an icon-only Print control. Opening it only reads
+the optional server default and offers editable target fields without submission.
 Preview view sends one render request and shares
-the returned 1-bit PNG in both panels. Display effects are cosmetic. Unsupported
+the returned 1-bit PNG in both panels. The server first encodes the processed
+bitmap as IPL G/u/U, then decodes that exact payload for the PNG. Display effects are cosmetic. Unsupported
 SVG/media and renderer failures remain visible; a failed or superseded request
 cannot leave an old bitmap displayed as a fresh result. SVG export remains local;
-legacy rendered-SVG/protocol export and physical delivery are unavailable.
+legacy rendered-SVG/protocol export remains unavailable.
 
 Studio Utilities links to `/fixture-simulation`. Its sample/mixed scenarios use
-application-owned synthetic data, showing ordered item results, exact backend
-bitmaps, bounded traces and failures. It performs no printer or storage writes.
+application-owned synthetic data, showing ordered item results, PNG decoded from the exact encoded IPL
+payload, bounded traces and failures. It performs no printer or storage writes.
 
 Global graphics-library clients are retained as future work and are not mounted
 by Studio. The graphics panel explains the planned status, while global graphics,
-data/protocol export and print actions remain disabled without API requests;
+data/protocol export actions remain disabled without API requests;
 local image upload is a separate current editor tool. Retired auth, operator
 simulation and direct print flows are historical reference only.
 
@@ -48,7 +68,8 @@ simulation and direct print flows are historical reference only.
 1. Resolve an approved label code/layout/version on the server.
 2. Validate actual SAP/API facts without fabricating missing business values.
 3. Bind supported text/barcode/QR facts and render the final bitmap once.
-4. Create the shared encoded payload; capture that output for simulation evidence.
+4. The local IPL codec already creates shared encoded payloads and decodes them
+   for simulation; connect this boundary to the eventual production workflow.
 5. Deliver that same output only through an authorized server-resolved transport.
 
 The acceptance endpoint, provisional SAP adapter, metadata-only job repository
@@ -56,7 +77,7 @@ and injected IPL boundary are source-tested foundations. They are not wired as a
 live product workflow and do not automatically consume saved Studio layouts.
 Processing acceptance, successful rasterization, simulated capture, submission
 and confirmed physical delivery are distinct evidence categories. Access controls,
-actual SAP intake, job orchestration and live printer delivery remain future work.
+actual SAP intake, job orchestration and full-media physical acceptance remain future work.
 
 Template Explorer provides Rename and Delete for saved custom templates. Rename
 changes the display name while retaining the label code. Delete requires an
@@ -68,7 +89,7 @@ leave the template in the explorer and display an error.
 
 Explorer details show the stable template code, active version/status, media size, DPI, and version creation time in WIB. Expand Storage details for the MinIO object key and SVG SHA-256. Rename does not change the code or object key. Version creation time is not the rename time.
 
-Studio File menu exposes New Template, Save Template, and Template Properties. New Template creates a blank canvas with a separate unsaved identity. Template Properties edits the display name, physical dimensions (10�500 mm per side), orientation, and DPI; Cancel discards these dialog edits. Apply keeps existing canvas objects. Save Template persists the applied name, dimensions, and DPI through the versioned layout API.
+Studio File menu exposes New Template, Save Template, and Template Properties. New Template creates a blank canvas with a separate unsaved identity. Template Properties edits the display name, physical dimensions (10â€“500 mm per side), orientation, and DPI; Cancel discards these dialog edits. Apply keeps existing canvas objects. Save Template persists the applied name, dimensions, and DPI through the versioned layout API.
 
 
 ## Friendly data fields in Studio
@@ -109,3 +130,35 @@ Legacy v1.1/raw-v2 imports stay local with an
 explicit unsaved status. Preview field edits remain in memory; dataset editing
 and Save changes are future development. Dataset selection does not bind its
 lifecycle to template storage or SAP rendering requests.
+
+Studio Align uses the active Fabric object's transformed scene bounding rectangle, including rotation, skew and stroke, for exact label edges and horizontal/vertical centers. Groups and active selections move as a unit. The nine-point origin changes the object's coordinate reference without moving its visible geometry; numeric X/Y fields refer to that origin. These changes use the normal selection synchronization and undo/redo history. Origins persist in editor JSON history; SVG export preserves geometry, while SVG import may normalize the coordinate origin. Fabric's centered rotation behavior is unchanged.
+
+Studio restores SVG text baseline coordinates from the first positioned tspan when its parent text has no coordinates. This preserves single-line placement in saved Fabric SVGs when reopening a template or loading it on refresh, including small and rotated text. Explicit parent coordinates remain authoritative.
+
+
+Studio Print opens from the HUD or Preview deck and displays editable Printer IP
+address/TCP port, current layout dimensions/DPI, IPL and Copies (default 1, integer 1..999).
+Port defaults to 9100.
+The last valid target in this browser takes precedence over the optional server
+default. Without a server default, enter a target directly; default lookup failure
+also leaves the fields usable. Invalid numeric IP/port shows localized guidance
+and disables submission. Opening, editing and remembering target contacts no printer.
+
+Print validates current bindings, exports the current canvas and sends its explicit
+target and copies. One native IPL quantity controls all identical copies, with one
+raster/encoded payload/transport submission. Layout dimensions/DPI remain authoritative.
+The target is remembered locally after a valid edit or explicit print action.
+There is no server restart, environment edit or shared configuration write needed.
+
+The dialog blocks duplicate clicks and closing/editing during an in-flight request.
+Success reads "Sent to printer; physical delivery is unconfirmed" and shows the
+effective target/copies returned by the server. After success, Print and fields
+unlock for another deliberate action without closing the dialog. Known pre-send
+validation/preparation failures also allow correction and retry. Unknown/failed
+send explains uncertainty and stays locked; inspect the printer and reopen before
+another explicit attempt. No automatic retry exists. Actual integrated PM45 delivery remains NOT RUN.
+
+
+## Historical sample working copies
+
+Opening/importing historical versionless data without mode shows a read-only warning. Preview, Label Simulation and Print are blocked. Choose Simulation working copy or Print working copy, explicitly correct any copies outside1..999, and work on the new unsaved copy. The original row is retained. Import and mode selection never print; canonical upload calls dataset storage only, returns to Design and clears stale previews. Legacy v1.1/raw-v2 remains local exploration.

@@ -14,7 +14,8 @@ const DESIGN_SAMPLE_DESCRIPTIONS = {
 };
 
 export const DESIGN_SAMPLE_PAYLOAD = {
-  sender: { system: 'DESIGN_SAMPLE', client: '000', plant: 'SAMPLE' },
+  sender: { system: 'DESIGN_SAMPLE' },
+  mode: 'simulation',
   request_id: 'design-sample-001',
   field_descriptions: { ...DESIGN_SAMPLE_DESCRIPTIONS, customer_name: 'Customer Name', material_number: 'Material Number', batch_number: 'Batch Number', production_date: 'Production Date' },
   items: [{ item_id: 'sample-roll-001', label_code: 'SAMPLE_ROLL', copies: 1,

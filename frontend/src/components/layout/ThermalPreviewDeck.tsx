@@ -1,13 +1,16 @@
+import { Icon } from "../../shared/ui";
 import { translate as t, useTranslation } from "../../shared/i18n";
 import React, { useState } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 
 export interface ThermalPreviewDeckProps {
   onRefresh?: () => void;
+  onPrint?: () => void;
 }
 
 export function ThermalPreviewDeck({
   onRefresh,
+  onPrint,
 }: ThermalPreviewDeckProps) {
   useTranslation();
   const {
@@ -56,7 +59,7 @@ export function ThermalPreviewDeck({
               onClick={() => setActiveBurnBleed(!activeBurnBleed)}
               className={`flex items-center gap-1.5`}
              data-ui-control="button" data-variant="toggle" data-selected={activeBurnBleed} data-tone="warning">
-              <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-14)" }}>local_fire_department</span>
+              <Icon  size={14} glyph="local_fire_department" />
               <span>{t("Display effect")}</span>
             </button>
           </div>
@@ -69,17 +72,18 @@ export function ThermalPreviewDeck({
             disabled={isRendering}
             className="h-7 flex items-center gap-1.5"
            data-ui-control="button" data-variant="toggle">
-            <span className={`material-symbols-outlined text-primary ${isRendering ? "animate-spin" : ''}`}  data-ui-motion="true">refresh</span>
+            <Icon className={` text-primary ${isRendering ? "animate-spin" : ''}`}  data-ui-motion="true" glyph="refresh" />
             <span>{t("Re-simulate")}</span>
           </button>
 
           <button
-            disabled
-            title={t("Physical printing is planned; this preview does not send print jobs.")}
+            onClick={onPrint}
+            data-testid="btn-preview-print"
+            title={t("Print label")}
             className="h-7 flex items-center gap-1.5"
            data-ui-control="button" data-variant="toggle">
-            <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-14)" }}>print</span>
-            <span>{t("Printing unavailable")}</span>
+            <Icon  size={14} glyph="print" />
+            <span>{t("Print label")}</span>
           </button>
         </div>
       </div>
@@ -144,9 +148,7 @@ export function ThermalPreviewDeck({
             <div className="h-7 bg-surface-container-low px-3 border-t border-outline-variant flex items-center justify-between text-[11px] font-mono">
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1 font-semibold text-tertiary">
-                  <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-13)" }}>
-                    check_circle
-                  </span>
+                  <Icon  size={13} glyph="check_circle" />
                   <span>{t("SVG Inspection: PASSED")}</span>
                 </span>
                 <span className="text-outline">|</span>

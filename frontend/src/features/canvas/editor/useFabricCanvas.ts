@@ -139,6 +139,8 @@ export function useFabricCanvas({
         scaleX: obj.scaleX,
         scaleY: obj.scaleY,
         angle: obj.angle,
+        originX: obj.originX,
+        originY: obj.originY,
         strokeWidth: obj.strokeWidth,
         fontSize: obj.fontSize,
         fill: obj.fill,

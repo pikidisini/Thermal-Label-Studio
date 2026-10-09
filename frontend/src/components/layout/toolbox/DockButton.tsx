@@ -1,3 +1,4 @@
+import { Icon } from "../../../shared/ui";
 import { useTranslation } from '../../../shared/i18n';
 ﻿import React from 'react';
 
@@ -28,7 +29,7 @@ export function DockButton({ icon, label, active = false, showTooltip = true, on
       {active && (
         <span className="absolute left-0 top-2 bottom-2 w-0.5 bg-primary" />
       )}
-      <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-22)" }}>{icon}</span>
+      <Icon  size="dock" glyph={icon} />
 
       {/* A flyout already identifies the active tool area, so an additional
           dock tooltip would overlap its header and the nearby ruler. */}

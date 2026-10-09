@@ -5,7 +5,7 @@ import React from 'react';
 import { PropField } from './PropField';
 import { getSAPTypeLabel } from '../../../types/sap-contract';
 import { LineInspector } from '../../../features/line';
-import { Badge, Button } from '../../../shared/ui';
+import { Icon, Badge, Button } from '../../../shared/ui';
 import { getFieldStatus } from '../../../features/data-tokens';
 import { FieldComposer } from '../../../features/data-tokens/ui/FieldComposer';
 import { compositionFields } from '../../../features/data-tokens/model/composition';
@@ -33,7 +33,7 @@ export function ObjectPropertyForm({ selectedObject, pxPerMm, jsonData, onUpdate
   if (!selectedObject) {
     return (
       <div data-testid="container-inspector-empty-state" className="p-6 flex flex-col items-center gap-2 text-center">
-        <span className="material-symbols-outlined text-outline" style={{ fontSize: "var(--ui-icon-32)" }}>touch_app</span>
+        <Icon className=" text-outline"  size={32} glyph="touch_app" />
         <p className="text-[11px] text-on-surface-variant leading-relaxed">{t("Select an element on canvas to inspect its properties.")} </p>
       </div>
     );
@@ -54,7 +54,7 @@ export function ObjectPropertyForm({ selectedObject, pxPerMm, jsonData, onUpdate
     <div data-testid="container-object-property-form" className="p-3 space-y-4 text-xs">
       {/* Section header */}
       <div data-testid="inspector-props-header" className="flex items-center gap-1.5 pb-1 border-b border-outline-variant">
-        <span className="material-symbols-outlined text-primary" style={{ fontSize: "var(--ui-icon-14)" }}>tune</span>
+        <Icon className=" text-primary"  size={14} glyph="tune" />
         <span className="font-semibold text-on-surface text-[11px]">{t("Transform Inspector")}</span>
       </div>
 
@@ -78,7 +78,7 @@ export function ObjectPropertyForm({ selectedObject, pxPerMm, jsonData, onUpdate
       {selectedObject.isBarcode && (
         <div data-testid="container-inspector-barcode-config" className="space-y-2 border-t border-outline-variant pt-3">
           <div className="flex items-center gap-1.5 mb-2">
-            <span className="material-symbols-outlined text-secondary" style={{ fontSize: "var(--ui-icon-13)" }}>barcode</span>
+            <Icon className=" text-secondary"  size={13} glyph="barcode" />
             <span className="font-semibold text-on-surface text-[11px]">{t("Barcode Config")}</span>
           </div>
           <div>
@@ -112,7 +112,7 @@ export function ObjectPropertyForm({ selectedObject, pxPerMm, jsonData, onUpdate
       {(sapField || ['i-text', 'text', 'textbox'].includes(selectedObject.type) || selectedObject.isBarcode) && (
         <div data-testid="container-inspector-sap-binding" className="space-y-1 border-t border-outline-variant pt-3">
           <div className="flex items-center gap-1.5 mb-2">
-            <span className="material-symbols-outlined text-tertiary" style={{ fontSize: "var(--ui-icon-13)" }}>link</span>
+            <Icon className=" text-tertiary"  size={13} glyph="link" />
             <span className="font-semibold text-tertiary text-[11px]">{t("Data Source")}</span>
             {sapTypeLabel && (
               <Badge data-testid="inspector-sap-type-badge" tone="success" className="ml-auto">

@@ -111,7 +111,9 @@ test('F3.42 application domains expose public feature owners while shell remains
   for (const exportedName of ['useThermalSimulation', 'EditorSimulationModal']) assert.match(simulationIndex, new RegExp(exportedName));
   assert.match(studio, /features\/templates/);
   assert.match(studio, /features\/simulation/);
-  assert.doesNotMatch(studio, /features\/print|features\/auth/);
+  assert.doesNotMatch(studio, /features\/print(?:\/|['"])|features\/auth(?:\/|['"])/);
+  assert.match(studio, /from ['"]\.\.\/\.\.\/features\/printing['"]/);
+  assert.match(read('features', 'printing', 'index.ts'), /EditorPrintModal/);
   assert.match(topMenu, /features\/templates/);
   assert.doesNotMatch(studio, /hooks\/useTemplateManager|hooks\/useThermalSimulation|components\/modals\/(PrintModal|SaveTemplateModal|SafeDemoModal|SapShadowSimulationModal)/);
   assert.equal(fs.existsSync(path.join(sourceRoot, 'hooks', 'useTemplateManager.ts')), false);
@@ -199,7 +201,8 @@ test('F3.53 right inspector panels use shared UI without changing object control
   for (const action of ['toggleVisibility', 'toggleLock', 'onSelectLayer', 'onBringForward', 'onSendBackward', 'onDuplicate', 'onDelete']) assert.match(layers, new RegExp(action));
   for (const prop of ['leftMm', 'topMm', 'angle', 'strokeWidthMm']) assert.match(properties, new RegExp(prop));
   for (const testId of ['align-btn-left', 'align-btn-center-h', 'align-btn-right', 'align-btn-top', 'align-btn-center-v', 'align-btn-bottom']) assert.match(align, new RegExp(`testId: '${testId}'`));
-  assert.match(align, /onUpdateProperty\(map\[type\]\[0\], map\[type\]\[1\]\)/);
+  assert.match(align, /onUpdateProperty\('labelAlignment'/);
+  assert.match(inspector, /onUpdateProperty\('transformAnchor', anchor\)/);
 });
 
 test('F3.54 Template Explorer uses a document-body modal portal above chrome', () => {

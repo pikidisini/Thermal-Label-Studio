@@ -41,6 +41,10 @@ def compose_storage_environment(config: dict) -> dict[str, str]:
     result["TLS_DATABASE_URL"] = database_url
     result["TLS_MINIO_ENDPOINT"] = "127.0.0.1:" + port("minio", 9000)
     result["TLS_MINIO_SECURE"] = str(values.get("TLS_MINIO_SECURE", "false"))
+    # Carry an explicitly configured Compose target; an empty host stays disabled.
+    for key in ("TLS_PRINTER_HOST", "TLS_PRINTER_PORT"):
+        if key in values:
+            result[key] = str(values[key])
     return result
 
 

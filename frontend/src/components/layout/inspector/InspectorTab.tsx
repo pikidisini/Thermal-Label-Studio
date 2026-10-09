@@ -1,6 +1,6 @@
 import { useTranslation } from '../../../shared/i18n';
 import React from 'react';
-import { Tab } from '../../../shared/ui';
+import { Icon, Tab } from '../../../shared/ui';
 
 interface InspectorTabProps {
   id: string;
@@ -18,7 +18,7 @@ export function InspectorTab({ id, icon, label, active, onClick }: InspectorTabP
       selected={active}
       onClick={onClick}
       className="flex flex-1 items-center justify-center gap-1.5">
-      <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-14)" }}>{icon}</span>
+      <Icon  size={14} glyph={icon} />
       <span>{t(label)}</span>
     </Tab>
   );

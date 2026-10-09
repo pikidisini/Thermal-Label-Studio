@@ -15,6 +15,7 @@ export interface EditorSimulationModalProps {
 
 export function EditorSimulationModal({ isOpen, onClose, getSvg, widthMm, heightMm, dpi, validate }: EditorSimulationModalProps) {
   useTranslation();
+  const [encoder, setEncoder] = React.useState<"IPL">("IPL");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [result, setResult] = React.useState<EditorPreviewResult | null>(null);
@@ -45,7 +46,7 @@ export function EditorSimulationModal({ isOpen, onClose, getSvg, widthMm, height
     setLoading(true);
     setError(null);
     try {
-      const next = await runEditorPreview({ svg, widthMm, heightMm, dpi }, active.signal);
+      const next = await runEditorPreview({ svg, widthMm, heightMm, dpi, encoder }, active.signal);
       if (!active.signal.aborted) setResult(next);
     } catch (cause) {
       if (!active.signal.aborted) setError(cause instanceof Error ? cause.message : 'Simulation preview failed.');
@@ -67,6 +68,12 @@ export function EditorSimulationModal({ isOpen, onClose, getSvg, widthMm, height
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-auto p-5 space-y-4">
           <p className="text-sm text-on-surface-variant">{t("The server receives the current SVG canvas and returns a 1-bit PNG bitmap. Nothing is sent to a printer.")}</p>
+          <label className="flex items-center gap-3 text-sm">
+            <span>{t("Output language")}</span>
+            <select aria-label={t("Output language")} value={encoder} onChange={() => setEncoder("IPL")} disabled={loading} data-ui-field="true" className="rounded border border-outline-variant bg-surface px-3 py-2 text-on-surface">
+              <option value="IPL">IPL</option>
+            </select>
+          </label>
           {error && <ErrorState title={error} />}
           {result && <section className="space-y-3 border border-outline-variant p-4"><p className="text-xs text-on-surface-variant">{t("Request ID:")} <code>{result.requestId}</code> · {result.widthPx} × {result.heightPx} {t("px ·")} {result.dpi} {t("DPI")}</p><img src={editorPreviewUrl(result)} alt={t("Backend bitmap preview of the current Studio canvas")} className="max-h-[55vh] max-w-full bg-white object-contain" /></section>}
         </div>

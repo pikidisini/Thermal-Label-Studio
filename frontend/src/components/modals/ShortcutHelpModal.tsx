@@ -1,7 +1,7 @@
 import { translate as t, useTranslation } from "../../shared/i18n";
 import React from 'react';
 import { X, Keyboard, Command, MousePointer, Move, ZoomIn, Undo, Redo, Copy, Trash2 } from 'lucide-react';
-import { Button, Dialog, DialogFooter, DialogHeader, IconButton } from '../../shared/ui';
+import { Icon, Button, Dialog, DialogFooter, DialogHeader, IconButton } from '../../shared/ui';
 
 const SHORTCUT_GROUPS = [
   {
@@ -62,7 +62,7 @@ export default function ShortcutHelpModal({ isOpen, onClose }) {
         <DialogHeader className="flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
             <div className="w-8 h-8 bg-primary-container/10 border border-primary-container flex items-center justify-center text-primary">
-              <Keyboard className="w-4 h-4" />
+              <Icon component={Keyboard}  size="control" />
             </div>
             <div>
               <h2 className="text-sm font-semibold text-on-surface">{t("Keyboard & Mouse Shortcuts")}</h2>
@@ -74,7 +74,7 @@ export default function ShortcutHelpModal({ isOpen, onClose }) {
 
             label={t("Close keyboard shortcuts")}
           >
-            <X className="w-4 h-4" />
+            <Icon component={X}  size="control" />
           </IconButton>
         </DialogHeader>
 

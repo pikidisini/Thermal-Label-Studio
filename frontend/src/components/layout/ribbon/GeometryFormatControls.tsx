@@ -1,7 +1,7 @@
 import { translate as t, useTranslation } from "../../../shared/i18n";
 import React from 'react';
 import { RibbonDivider } from './RibbonDivider';
-import { IconButton } from '../../../shared/ui';
+import { Icon, IconButton } from '../../../shared/ui';
 
 interface GeometryFormatControlsProps {
   selectedObject: any;
@@ -24,7 +24,7 @@ function ActionBtn({
       label={title}
 
      tone={danger ? 'danger' : 'neutral'}>
-      <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-15)" }}>{icon}</span>
+      <Icon  size={15} glyph={icon} />
     </IconButton>
   );
 }

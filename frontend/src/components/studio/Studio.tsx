@@ -12,6 +12,7 @@ import { useSimulationStore } from '../../store/useSimulationStore';
 // Custom Hooks
 import { useAutoFit } from '../../hooks/useAutoFit';
 import { useThermalSimulation, EditorSimulationModal } from '../../features/simulation';
+import { EditorPrintModal } from '../../features/printing';
 import { useCanvasActions } from '../../hooks/useCanvasActions';
 import { useTemplateManager, SaveTemplateModal, layoutApi, validateLocalSvg } from '../../features/templates';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
@@ -33,7 +34,7 @@ import ShortcutHelpModal from '../modals/ShortcutHelpModal';
 import { AiDiagnosticsModal } from '../../features/diagnostics';
 
 // Feature helpers
-import { resolveSapTokenDisplayValue, readLocalSapJson, readLocalSapJsonSource, parseLocalSapJson, studioDatasetApi, type StudioDatasetSummary } from '../../features/data-tokens';
+import { resolveSapTokenDisplayValue, readLocalSapJson, readLocalSapJsonSource, parseLocalSapJson, createCanonicalWorkingCopy, importDataset, studioDatasetApi, type StudioDatasetSummary } from '../../features/data-tokens';
 import { generatePreviewDataUrl, resolvePayloadTemplate, validatePreviewPayload } from '../../features/barcode';
 import { bindingErrors } from '../../features/data-tokens/model/bindingValidation';
 
@@ -64,6 +65,7 @@ export function Studio() {
   const { sampleContracts, activeContractKey, jsonData, tokenMap, fieldDescriptions, usedTokens, customTokens, switchContract, localImport, setLocalImportedContract, updateTokenValue, markCustomToken, updateUsedTokensFromCanvas } = useContractStore();
   const [localImportError, setLocalImportError] = React.useState<string | null>(null);
   const [localImportWarning, setLocalImportWarning] = React.useState<string | null>(null);
+  const [editorPrintOpen, setEditorPrintOpen] = React.useState(false);
   const [editorSimulationOpen, setEditorSimulationOpen] = React.useState(false);
   const [localItems, setLocalItems] = React.useState<Awaited<ReturnType<typeof readLocalSapJson>>['items']>([]);
   const [localFileName, setLocalFileName] = React.useState('');
@@ -76,6 +78,8 @@ export function Studio() {
   const [selectedDatasetId, setSelectedDatasetId] = React.useState('');
   const [datasetStatus, setDatasetStatus] = React.useState('');
   const datasetRequest = React.useRef(0);
+  const [historicalSource, setHistoricalSource] = React.useState<import('../../types/api').JsonObject | null>(null);
+  const [workingCopies, setWorkingCopies] = React.useState<string[]>([]);
   const datasetListRequest = React.useRef(0);
   const reloadDatasets = React.useCallback(async () => {
     const revision = datasetRequest.current; const listOperation = ++datasetListRequest.current;
@@ -87,6 +91,12 @@ export function Studio() {
   React.useEffect(() => { void reloadDatasets(); }, [reloadDatasets]);
   const applyDataset = React.useCallback((parsed: Awaited<ReturnType<typeof readLocalSapJson>>, filename: string) => {
     permitTokenHydration();
+    useStudioStore.getState().setViewMode('design');
+    useSimulationStore.getState().setPreviewImage(null);
+    useSimulationStore.getState().setThermalImage(null);
+    useContractStore.getState().setOutputBlocked(Boolean(parsed.outputBlocked));
+    setHistoricalSource(parsed.outputBlocked ? parsed.canonicalSource ?? null : null);
+    setWorkingCopies(parsed.items.map((item) => String(item.contract.source.copies ?? 1)));
     const first = parsed.items[0];
     setLocalItems(parsed.items); setLocalFileName(filename); setLocalImportError(null);
     setLocalImportWarning(parsed.warnings.length ? parsed.warnings.join(' ') : null);
@@ -95,18 +105,16 @@ export function Studio() {
   const handleLocalJsonImport = React.useCallback(async (file: File) => {
     const operation = ++datasetRequest.current;
     try {
-      const { source, parsed } = await readLocalSapJsonSource(file);
-      if (operation !== datasetRequest.current) return;
-      applyDataset(parsed, file.name); setSelectedDatasetId('');
-      if (parsed.format !== 'data') { setDatasetStatus('Unsaved - legacy JSON formats support local exploration only.'); return; }
-      setDatasetStatus('Saving sample dataset...');
-      try {
-        const saved = await studioDatasetApi.create(file.name.replace(/\.json$/i, '').slice(0, 160) || 'Sample dataset', file.name, source);
-        if (operation !== datasetRequest.current) return;
-        ++datasetListRequest.current;
-        setSavedDatasets((current) => [saved, ...current.filter((entry) => entry.id !== saved.id)]);
-        setSelectedDatasetId(saved.id); setDatasetStatus('Saved sample dataset');
-      } catch { if (operation === datasetRequest.current) setDatasetStatus('Unsaved - sample dataset could not be stored. Data is available for local preview.'); }
+      await importDataset(file, {
+        current: () => operation === datasetRequest.current,
+        apply: (parsed) => { applyDataset(parsed, file.name); setSelectedDatasetId(''); },
+        status: setDatasetStatus,
+        saved: (saved) => {
+          ++datasetListRequest.current;
+          setSavedDatasets((current) => [saved, ...current.filter((entry) => entry.id !== saved.id)]);
+          setSelectedDatasetId(saved.id);
+        },
+      });
     } catch (error) {
       if (operation !== datasetRequest.current) return;
       setLocalImportError(error instanceof Error ? error.message : 'JSON could not be used.');
@@ -373,6 +381,7 @@ export function Studio() {
         onOpenShortcuts={() => setShortcutModalOpen(true)}
         onOpenDiagnostics={() => setDiagnosticsModalOpen(true)}
         onOpenLabelSimulation={() => setEditorSimulationOpen(true)}
+        onOpenPrint={() => setEditorPrintOpen(true)}
         onImportTemplateSvg={openTemplateUpload}
         onImportJson={openJsonUpload}
         onExportTemplateSvg={exportTemplate}
@@ -381,6 +390,16 @@ export function Studio() {
         onShowAbout={() => window.alert('Thermal Label Studio v1.1')}
       />
       <input ref={templateFileRef} type="file" accept=".svg,image/svg+xml" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ''; if (file) void handleTemplateUpload(file); }} />
+      {historicalSource && <div role="region" aria-label={t("Historical dataset working copy")} className="absolute bottom-12 left-3 max-h-64 overflow-y-auto z-[var(--ui-layer-toast)] bg-surface-container border border-outline p-2 text-xs">
+        <span>{t("Create a canonical working copy before editing or output.")}</span>
+        {workingCopies.map((copies, index) => <label key={index} className="block">{t("Copies")} {index + 1}<input type="number" min="1" max="999" aria-label={t("Working copy copies item {item}", { item: index + 1 })} value={copies} onChange={(event) => setWorkingCopies((current) => current.map((entry, i) => i === index ? event.target.value : entry))} /></label>)}
+        {(['simulation', 'print'] as const).map((mode) => <button key={mode} data-testid={`canonical-copy-${mode}`} onClick={() => {
+          ++datasetRequest.current;
+          try { applyDataset(createCanonicalWorkingCopy(historicalSource, mode, workingCopies.map(Number)), `${localFileName} (working copy)`); }
+          catch (error) { setLocalImportError(error instanceof Error ? error.message : 'Working copy is invalid.'); return; }
+          setSelectedDatasetId(''); setDatasetStatus('Unsaved canonical working copy. Import and mode selection never print.');
+        }} data-ui-control="button">{t(mode === 'simulation' ? 'Simulation working copy' : 'Print working copy')}</button>)}
+      </div>}
       <input ref={jsonFileRef} type="file" accept=".json,application/json" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ''; if (file) void handleLocalJsonImport(file); }} />
 
       {viewMode === 'design' && (
@@ -417,6 +436,7 @@ export function Studio() {
               permitTokenHydration();
               switchContract(key);
             }}
+            readOnlyData={useContractStore.getState().outputBlocked}
             jsonData={tokenMap}
             onAddSapToken={actions.handleAddSapToken}
             onUpdateToken={(key, value) => { permitTokenHydration(); updateTokenValue(key, value); }}
@@ -477,6 +497,7 @@ export function Studio() {
 >
               <ThermalPreviewDeck
                 onRefresh={() => triggerRenderSimulation(true)}
+                onPrint={() => setEditorPrintOpen(true)}
               />
             </React.Suspense>
           </div>
@@ -518,11 +539,21 @@ export function Studio() {
         fabricCanvas={canvasRef.current}
       />
 
+      <EditorPrintModal
+        isOpen={editorPrintOpen}
+        onClose={() => setEditorPrintOpen(false)}
+        getSvg={getLatestSvg}
+        validate={() => useContractStore.getState().outputBlocked ? ['Create a canonical working copy before output.'] : bindingErrors(canvasRef.current?.getObjects() || [], useContractStore.getState().tokenMap, useContractStore.getState().fieldDescriptions)}
+        widthMm={labelWidthMm}
+        heightMm={labelHeightMm}
+        dpi={dpi}
+      />
+
       <EditorSimulationModal
         isOpen={editorSimulationOpen}
         onClose={() => setEditorSimulationOpen(false)}
         getSvg={getLatestSvg}
-        validate={() => bindingErrors(canvasRef.current?.getObjects() || [], useContractStore.getState().tokenMap, useContractStore.getState().fieldDescriptions)}
+        validate={() => useContractStore.getState().outputBlocked ? ['Create a canonical working copy before output.'] : bindingErrors(canvasRef.current?.getObjects() || [], useContractStore.getState().tokenMap, useContractStore.getState().fieldDescriptions)}
         widthMm={labelWidthMm}
         heightMm={labelHeightMm}
         dpi={dpi}

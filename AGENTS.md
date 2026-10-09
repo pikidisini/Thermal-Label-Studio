@@ -4,7 +4,7 @@
   The current local implementation is Studio editing/server PNG preview plus
   P8C versioned layout persistence in PostgreSQL/MinIO. Fixture mode remains
   available without persistence configuration or storage-driver imports.
-  SAP intake, physical delivery, current API authentication, job orchestration,
+  SAP intake, physical printer acceptance, current API authentication, job orchestration,
   migrations and production operations remain separate work.
   Studio has no login/session/role implementation. Retired auth and dependent
   prototype flows stay archived. Fixture entry loading is separate from Studio/
@@ -15,7 +15,14 @@
 - The checkpoint includes local SVG import/export and JSON exploration, editing,
   versioned layouts, Preview, PNG Label Simulation and fixture simulation.
   Global graphics is planned; keep its prepared implementation unmounted.
-  Unavailable global graphics, data/protocol export and print controls must
+  Studio IPL Print uses a validated per-action numeric TCP target
+  edited in its dialog and remembered locally; server target is optional fallback.
+  Opening/editing Print never connects; explicit Print encodes copies 1..999
+  (default 1) through native IPL quantity and submits one payload once.
+  Success permits another deliberate print; uncertain failures remain locked
+  until the user checks the printer and reopens. No automatic retry exists. Real printer acceptance/feedback
+  require separate named-target authorization.
+  Unavailable global graphics and data/protocol export controls must
   explain availability without sending unsupported requests. Python binds
   loopback by default; the container explicitly configures its internal bind,
   while Compose host ports must stay loopback-only.

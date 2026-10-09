@@ -46,6 +46,19 @@ export function importSvgIntoFabricCanvas(
     const href = image.getAttribute('href') || image.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
     if (href) image.setAttribute('href', href);
   });
+  // Fabric exports the baseline coordinates on tspan but its SVG text parser
+  // reads only the parent text. Preserve those offsets before applying the
+  // surrounding group transform, instead of treating its center as the baseline.
+  document.querySelectorAll('text').forEach((text) => {
+    const span = text.querySelector('tspan');
+    if (!span) return;
+    for (const coordinate of ['x', 'y']) {
+      const value = span.getAttribute(coordinate);
+      if (!text.hasAttribute(coordinate) && value !== null && Number.isFinite(Number(value))) {
+        text.setAttribute(coordinate, value);
+      }
+    }
+  });
   if (viewBox) {
     // Fabric parses physical mm at CSS DPI; the editor uses its own px/mm.
     // Parse in viewBox units and apply the editor scale exactly once below.

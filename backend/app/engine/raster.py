@@ -2,6 +2,7 @@
 
 from io import BytesIO
 import subprocess
+import re
 from typing import Callable, Literal
 
 from PIL import Image
@@ -38,35 +39,58 @@ def render_label_item(
     if on_stage is not None:
         on_stage("RASTERIZING")
     settings = get_settings()
-    executable = settings.renderer_path
-    font = settings.fixture_font_path
-    # Fixture deployment deliberately selects one installed font. Cross-font
-    # pixel equivalence is not claimed; no arbitrary family/input is accepted.
     svg = svg.replace('font-family="Arial"', f'font-family="{settings.fixture_font_family}"')
-    if not executable.is_file() or not font.is_file():
-        raise RasterError("Required local renderer or fixture font is unavailable.")
+    bitmap = render_svg_bitmap(svg, width, height, layout.dpi, allow_edge_rounding=False)
+    return RenderedLabel(layout.label_code, layout.version, width, height, layout.dpi, bitmap)
+
+
+def normalize_editor_fonts(svg: str, font_family: str) -> str:
+    """Use the container-owned font for browser-authored text during preview."""
+    # The submitted SVG has already passed the server safety check. This is a
+    # rendering-only normalization: the stored Studio SVG remains unchanged.
+    attribute_pattern = r"font-family\s*=\s*(['\"]).*?\1"
+    style_pattern = r"(font-family\s*:\s*)[^;}]+"
+    normalized = re.sub(attribute_pattern, f'font-family="{font_family}"', svg, flags=re.IGNORECASE)
+    return re.sub(style_pattern, lambda match: f"{match.group(1)}{font_family}", normalized, flags=re.IGNORECASE)
+
+
+def render_svg_bitmap(svg: str, width: int, height: int, dpi: float, *, allow_edge_rounding: bool = True) -> bytes:
+    settings = get_settings()
+    if not settings.renderer_path.is_file() or not settings.fixture_font_path.is_file():
+        raise RasterError("renderer_unavailable")
     try:
         result = subprocess.run(
-            [str(executable), "-", "-c", "--width", str(width), "--height", str(height),
-             # This CLI accepts integer DPI. The restricted SVG uses only pixel
-             # units; exact media DPI is used for dimensions and final metadata.
-             "--dpi", str(round(layout.dpi)), "--background", "white", "--skip-system-fonts",
-             "--use-font-file", str(font), "--font-family", settings.fixture_font_family],
+            [str(settings.renderer_path), "-", "-c", "--width", str(width), "--height", str(height),
+             "--dpi", str(round(dpi)), "--background", "white", "--skip-system-fonts",
+             "--use-font-file", str(settings.fixture_font_path), "--font-family", settings.fixture_font_family],
             input=svg.encode("utf-8"), capture_output=True, timeout=15, check=False,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        raise RasterError("Local raster rendering failed.") from exc
+        raise RasterError("renderer_unavailable") from exc
     if result.returncode != 0:
-        raise RasterError("Local raster rendering failed.")
+        raise RasterError("render_failed")
     try:
         with Image.open(BytesIO(result.stdout)) as image:
             image.load()
-            if image.format != "PNG" or image.size != (width, height):
-                raise RasterError("Renderer output dimensions or format are invalid.")
-            bitmap = image.convert("L").point(lambda value: 255 if value >= 128 else 0, "1")
+            if image.format != "PNG":
+                raise RasterError("render_failed")
+            if image.size != (width, height):
+                # resvg rounds a physical SVG viewport down by one pixel in some
+                # cases (for example 80 mm at 203.2 DPI). Preserve the rendered
+                # geometry and add only the missing white edge pixel; reject any
+                # material size mismatch rather than stretching the label.
+                delta_width = width - image.width
+                delta_height = height - image.height
+                if not allow_edge_rounding or abs(delta_width) > 1 or abs(delta_height) > 1:
+                    raise RasterError("render_failed")
+                normalized = Image.new("RGBA", (width, height), "white")
+                normalized.paste(image, (0, 0))
+                image = normalized
             output = BytesIO()
-            bitmap.save(output, format="PNG", dpi=(layout.dpi, layout.dpi))
+            image.convert("L").point(lambda value: 255 if value >= 128 else 0, "1").save(
+                output, format="PNG", dpi=(dpi, dpi)
+            )
+            return output.getvalue()
     except (OSError, ValueError) as exc:
-        raise RasterError("Renderer output is invalid.") from exc
-    return RenderedLabel(layout.label_code, layout.version, width, height, layout.dpi, output.getvalue())
+        raise RasterError("render_failed") from exc

@@ -2,7 +2,7 @@ import { translate as t, useTranslation } from "../../../shared/i18n";
 import React, { useState, useEffect } from 'react';
 import { Bug, Copy, Download, Trash2, X, Check, Activity, AlertTriangle, Wifi } from 'lucide-react';
 import { sessionRecorder } from '../model/sessionRecorder';
-import { Button, Dialog, DialogFooter, DialogHeader, IconButton } from '../../../shared/ui';
+import { Icon, Button, Dialog, DialogFooter, DialogHeader, IconButton } from '../../../shared/ui';
 
 export default function AiDiagnosticsModal({ isOpen, onClose, fabricCanvas }) {
   useTranslation();
@@ -46,7 +46,7 @@ export default function AiDiagnosticsModal({ isOpen, onClose, fabricCanvas }) {
         <DialogHeader className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-primary/20 text-primary rounded">
-              <Bug className="w-5 h-5 text-primary" />
+              <Icon component={Bug} className=" text-primary"  size={20} />
             </div>
             <div>
               <h2 className="text-sm font-bold text-on-surface">{t("AI Session Diagnostics & Telemetry")}</h2>
@@ -58,14 +58,14 @@ export default function AiDiagnosticsModal({ isOpen, onClose, fabricCanvas }) {
 
             label={t("Close diagnostics")}
           >
-            <X className="w-4 h-4" />
+            <Icon component={X}  size="control" />
           </IconButton>
         </DialogHeader>
 
         {/* Quick Stats Banner */}
         <div className="grid grid-cols-3 gap-2 p-3 bg-surface-container border-b border-outline-variant text-xs">
           <div className="flex items-center gap-2 p-2 bg-surface-container-low rounded border border-outline-variant/40">
-            <AlertTriangle className={`w-4 h-4 ${errorCount> 0 ? 'text-studio-rose' : 'text-outline'}`} />
+            <Icon component={AlertTriangle} className={errorCount> 0 ? 'text-studio-rose' : 'text-outline'} />
             <div>
               <div className="text-[10px] text-outline uppercase font-bold">{t("Console Errors")}</div>
               <div className={`font-mono font-bold ${errorCount> 0 ? 'text-studio-rose' : 'text-on-surface'}`}>{errorCount} {t("detected")}</div>
@@ -73,7 +73,7 @@ export default function AiDiagnosticsModal({ isOpen, onClose, fabricCanvas }) {
           </div>
 
           <div className="flex items-center gap-2 p-2 bg-surface-container-low rounded border border-outline-variant/40">
-            <Wifi className={`w-4 h-4 ${failedReqCount> 0 ? 'text-studio-rose' : 'text-tertiary'}`} />
+            <Icon component={Wifi} className={failedReqCount> 0 ? 'text-studio-rose' : 'text-tertiary'} />
             <div>
               <div className="text-[10px] text-outline uppercase font-bold">{t("Failed Requests")}</div>
               <div className={`font-mono font-bold ${failedReqCount> 0 ? 'text-studio-rose' : 'text-on-surface'}`}>{failedReqCount} {t("failed")}</div>
@@ -81,7 +81,7 @@ export default function AiDiagnosticsModal({ isOpen, onClose, fabricCanvas }) {
           </div>
 
           <div className="flex items-center gap-2 p-2 bg-surface-container-low rounded border border-outline-variant/40">
-            <Activity className="w-4 h-4 text-primary" />
+            <Icon component={Activity} className=" text-primary"  size="control" />
             <div>
               <div className="text-[10px] text-outline uppercase font-bold">{t("Logged Actions")}</div>
               <div className="font-mono font-bold text-on-surface">{actionCount} {t("steps")}</div>
@@ -112,7 +112,7 @@ export default function AiDiagnosticsModal({ isOpen, onClose, fabricCanvas }) {
               onClick={handleDownload}
               className="flex items-center gap-1.5"
              variant="default">
-              <Download className="w-3.5 h-3.5 text-outline" />
+              <Icon component={Download} className=" text-outline"  size={14} />
               <span>{t("Download .md")}</span>
             </Button>
 
@@ -122,12 +122,12 @@ export default function AiDiagnosticsModal({ isOpen, onClose, fabricCanvas }) {
              variant="default"  selected={copied} tone="success">
               {copied ? (
                 <>
-                  <Check className="w-3.5 h-3.5" />
+                  <Icon component={Check}  size={14} />
                   <span>{t("Copied to clipboard")}</span>
                 </>
               ) : (
                 <>
-                  <Copy className="w-3.5 h-3.5" />
+                  <Icon component={Copy}  size={14} />
                   <span>{t("Copy for AI chat")}</span>
                 </>
               )}

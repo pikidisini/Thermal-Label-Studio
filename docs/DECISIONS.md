@@ -19,8 +19,8 @@ archived documents retain history; they are not current launch instructions.
    unreferenced artifacts are allowed; automatic deletion after errors is unsafe.
 6. Layout processing validates caller facts and server layout resolution. Current
    acceptance/fixture processing does not automatically consume saved Studio
-   layouts. Actual SAP intake, approved layouts, jobs and live transport are future
-   integration work.
+   layouts. Actual SAP intake, approved layouts, jobs are future integration
+   work. Studio Print separately chooses a per-action TCP target.
 7. Target flow: SAP/API -> validate label_code -> resolve layout -> bind SVG ->
    raster bitmap -> shared encoded payload -> simulation sink OR print transport.
    Both final sinks must consume the same processed output. Preview alone does
@@ -56,3 +56,42 @@ archived documents retain history; they are not current launch instructions.
     its internal bridge listener; Compose host publishing stays localhost-only.
     Remaining quality/dependency findings are recorded in SONARQUBE.md and are
     not waived by source tests or by a planned fresh repository.
+
+
+The successful PM45 G/u/U sample supersedes Direct Graphics for the retained IPL
+encoder. Simulation now decodes its exact payload, including tiled graphics at
+most799dots per side, rather than returning the source raster PNG. Graphics 64..99
+and format 90 are a bounded reserved namespace requiring deployment allocation.
+Direction0 is the supported logical canvas subset; full physical placement and
+tiled printing remain unverified. Printer feedback and full-media physical acceptance remain deferred.
+
+
+Shared output preparation chooses language at the simulation/print action, with
+IPL as the only implemented choice. Layout owns physical dimensions and DPI.
+Prepared output is immutable and both sinks consume the exact encoded payload;
+print submission does not reencode or rasterize and adds no printer profile
+compatibility gate. Studio TCP RAW transport is implemented; real target setup
+and physical acceptance remain separately authorized actions.
+
+
+Studio Print permits one explicit submission to a validated per-action
+numeric IPv4/IPv6 target. The dialog owns editable IP/port and remembers the last
+valid target in browser-local storage; the environment target is optional fallback
+for clients omitting an action target. Browser choices never mutate server-global
+configuration. Default loading cannot gate manual entry or overwrite later edits.
+Copies is an action parameter (default 1, strict integer 1..999). The shared pipeline
+encodes native IPL `<RS>N` with `<US>1`; it does not loop the raster, encoder or
+transport. Simulation renders one logical canvas for quantity N. Success unlocks
+a deliberate subsequent Print; deterministic pre-send errors also unlock. Uncertain
+failures retain the inspection/reopen lock. TCP connect/write remain bounded;
+exact bytes are sent once and socket closes on
+every path. No retry or printer feedback is added. Invalid target fails before
+rasterization/transport construction. Known pre-send preparation failure and
+unknown/uncertain delivery remain distinct; HTTP 500 alone cannot prove no send.
+Opening/editing target does not contact a printer. Source/fake validation does
+not establish physical acceptance.
+
+
+## T02 admission refinements
+
+Canonical mode/copies are strict semantic JSON values: 1.0/1e0 copies equal1, typed models normalize copies to int. Backend/frontend object budgets use common conservative reservation instead of float JSON spelling; raw limit remains2MiB. Historical missing-mode copies1000 is retained read-only and requires explicit correction. No compatibility intake aliases or automatic output were added.

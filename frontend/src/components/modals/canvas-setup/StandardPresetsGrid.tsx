@@ -1,3 +1,4 @@
+import { Icon } from "../../../shared/ui";
 import { translate as t, useTranslation } from "../../../shared/i18n";
 import React from 'react';
 import { CANVAS_PRESETS } from '../../../types/template';
@@ -36,9 +37,7 @@ export function StandardPresetsGrid({
               {isSelected && (
                 <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-primary-container" />
               )}
-              <span className="material-symbols-outlined text-[18px]">
-                {getPresetIcon(p.widthMm, p.heightMm)}
-              </span>
+              <Icon size={18} glyph={getPresetIcon(p.widthMm, p.heightMm)} />
               <span className="font-mono text-[10px] font-medium leading-none">
                 {p.widthMm}×{p.heightMm} {t("mm")} </span>
               <span className="text-[9px] text-outline truncate max-w-full px-1">

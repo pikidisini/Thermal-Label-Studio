@@ -29,6 +29,8 @@ services:
       TLS_MINIO_SECRET_KEY: ${TLS_MINIO_SECRET_KEY:?Set a local MinIO secret key}
       TLS_MINIO_BUCKET: thermal-label-layouts
       TLS_MINIO_SECURE: "false"
+      TLS_PRINTER_HOST: ${TLS_PRINTER_HOST:-}
+      TLS_PRINTER_PORT: ${TLS_PRINTER_PORT:-9100}
     depends_on:
       postgres:
         condition: service_healthy

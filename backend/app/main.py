@@ -13,6 +13,7 @@ from .labels.resolver import ACTIVE_LAYOUTS, UnknownLabelCodeError
 from .labels.service import InvalidLabelCodeError, accept_label_process_request
 from .simulation.http import router as simulation_router
 from .simulation.editor_http import router as editor_simulation_router
+from .printing.http import router as printing_router
 from .runtime import configure_fixture_serving, readiness_response
 from .layouts.http import router as layouts_router
 from .layouts.service import LayoutPersistenceError, LayoutService
@@ -45,17 +46,22 @@ app = FastAPI(title=settings.application_name, lifespan=lifespan)
 app.add_middleware(CorrelationMiddleware)
 app.include_router(simulation_router, prefix=settings.api_prefix)
 app.include_router(editor_simulation_router, prefix=settings.api_prefix)
+app.include_router(printing_router, prefix=settings.api_prefix)
 app.include_router(layouts_router, prefix=settings.api_prefix)
 app.include_router(studio_datasets_router, prefix=settings.api_prefix)
 configure_fixture_serving(app, settings)
 
 
-def request_validation_detail(errors: list[dict[str, object]]) -> dict[str, str]:
+def request_validation_detail(errors: list[dict[str, object]], *, print_request: bool = False) -> dict[str, str]:
     """Convert framework validation data into the bounded public error shape."""
     location = errors[0].get("loc", ()) if errors else ()
     field = location[-1] if location else "request"
     error_type = errors[0].get("type", "") if errors else ""
 
+    if print_request and tuple(location) == ("body", "copies"):
+        return {"code": "invalid_print_copies", "message": "Copies must be an integer from 1 to 999."}
+    if "target" in location:
+        return {"code": "invalid_printer_target", "message": "Enter a valid numeric printer IP address and TCP port (1-65535)."}
     if field == "label_code":
         message = (
             "label_code is required."
@@ -80,12 +86,16 @@ def request_validation_detail(errors: list[dict[str, object]]) -> dict[str, str]
 async def stable_request_validation_error(
     _request: Request, exc: RequestValidationError
 ) -> JSONResponse:
-    return JSONResponse(status_code=422, content={"detail": request_validation_detail(exc.errors()), "request_id": current_request_id()})
+    return JSONResponse(status_code=422, content={"detail": request_validation_detail(exc.errors(), print_request=_request.scope.get("path") == f"{settings.api_prefix}/printing/editor"), "request_id": current_request_id()})
 
 
 @app.exception_handler(HTTPException)
 async def correlated_http_error(_request: Request, exc: HTTPException) -> JSONResponse:
     safe_messages = {
+        "printer_unavailable": "Choose a printer IP address and TCP port in the Print dialog.",
+        "invalid_print_layout": "The current Studio canvas cannot be printed.",
+        "print_preparation_failed": "The print payload could not be prepared.",
+        "print_submission_uncertain": "Print submission failed or is uncertain. Check the printer before sending again; delivery is unconfirmed.",
         "invalid_dataset": "The sample dataset is invalid.",
         "dataset_too_large": "The sample dataset exceeds 2 MiB.",
         "dataset_not_found": "The requested sample dataset was not found.",

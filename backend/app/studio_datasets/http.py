@@ -1,10 +1,10 @@
 """Safe create/list/open API for uploaded Studio sample data."""
-import json
+from app.label_data import decode_json, MAX_BYTES, validate_payload
 from uuid import UUID
 from fastapi import APIRouter, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 from .service import DatasetPersistenceError, DatasetNotFoundError
-from .validation import MAX_BYTES, validate_payload
+from .validation import validate_upload
 
 router = APIRouter()
 
@@ -37,11 +37,8 @@ async def create_dataset(request: Request):
         if len(body) + len(chunk) > MAX_BYTES + 4096: raise error(413, "dataset_too_large")
         body.extend(chunk)
     try:
-        value = json.loads(body)
-        if not isinstance(value, dict) or set(value) != {"name", "original_filename", "payload"}: raise ValueError()
-        for key, limit in (("name", 160), ("original_filename", 255)):
-            if not isinstance(value[key], str) or not 1 <= len(value[key].strip()) <= limit or "\x00" in value[key]: raise ValueError()
-            value[key].encode("utf-8")
+        value = decode_json(bytes(body), limit=MAX_BYTES + 4096)
+        validate_upload(value)
         payload = validate_payload(value["payload"])
     except (ValueError, TypeError, UnicodeError, RecursionError):
         raise error(422, "invalid_dataset") from None

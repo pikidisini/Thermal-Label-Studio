@@ -1,3 +1,4 @@
+import { validateCanonicalLabelData, parseBoundedJson } from './canonicalLabelData';
 import type { JsonObject } from '../../../types/api';
 import { adaptSapContract } from './sapContractAdapter';
 import type { FlatSapTokenMap, RawSapContract } from './sapContractAdapter';
@@ -17,6 +18,8 @@ export interface LocalSapImport {
   format: 'v1.1' | 'raw-v2' | 'data';
   items: LocalSapItem[];
   warnings: string[];
+  outputBlocked?: boolean;
+  canonicalSource?: JsonObject;
 }
 
 function isObject(value: unknown): value is JsonObject {
@@ -117,47 +120,38 @@ export function parseLocalSapJson(value: unknown): LocalSapImport {
 }
 
 function parseDataEnvelope(value: JsonObject): LocalSapImport {
-  if (!isObject(value.sender)) throw new Error('sender must be an object.');
-  requireString(value.sender.system, 'sender.system');
-  requireString(value.request_id, 'request_id');
-  const descriptions = value.field_descriptions === undefined ? {} : value.field_descriptions;
-  if (!isObject(descriptions) || Object.keys(descriptions).length > MAX_CHARACTERISTICS) throw new Error('field_descriptions must be an object with at most 200 entries.');
-  for (const [key, description] of Object.entries(descriptions)) {
-    if (!/^[A-Za-z0-9_-]{1,128}$/.test(key) || ['__proto__', 'constructor', 'prototype'].includes(key)) throw new Error('Unsupported description field name.');
-    if (typeof description !== 'string' || description.length > 256) throw new Error('Field descriptions must be strings of at most 256 characters.');
-  }
-  if (!Array.isArray(value.items) || value.items.length < 1 || value.items.length > MAX_ITEMS) {
-    throw new Error(`Payload requires 1-${MAX_ITEMS} items.`);
-  }
-  const identities = new Set<string>();
-  const items = value.items.map((entry, index) => {
-    if (!isObject(entry)) throw new Error('Each item must be an object.');
-    const itemId = requireString(entry.item_id, 'item_id');
-    if (identities.has(itemId)) throw new Error('item_id must be unique.');
-    identities.add(itemId);
-    const labelCode = requireString(entry.label_code, 'label_code');
-    if (!Number.isInteger(entry.copies) || Number(entry.copies) < 1 || Number(entry.copies) > 1000) throw new Error('copies must be an integer from 1 to 1000.');
-    if (!isObject(entry.data) || Object.keys(entry.data).length > MAX_CHARACTERISTICS) throw new Error(`data must contain at most ${MAX_CHARACTERISTICS} fields.`);
-    for (const [key, fieldValue] of Object.entries(entry.data)) {
-      if (!/^[A-Za-z0-9_-]{1,128}$/.test(key) || ['__proto__', 'constructor', 'prototype'].includes(key)) throw new Error('Unsupported data field name.');
-      if (!isScalar(fieldValue) || (typeof fieldValue === 'number' && !Number.isFinite(fieldValue))) throw new Error(`data.${key} must be a finite scalar or null.`);
-    }
-    return buildItem(index + 1, {
-      label_code: labelCode,
-      source: { sender: value.sender, request_id: value.request_id, item_id: itemId, copies: entry.copies },
-      fields: entry.data,
-      codes: {},
-      field_descriptions: descriptions,
-    }, labelCode);
+  const historical = !Object.prototype.hasOwnProperty.call(value, 'mode');
+  const source = historical ? { ...value, mode: 'simulation', items: Array.isArray(value.items) ? value.items.map((item) => {
+    if (!isObject(item) || typeof item.copies !== 'number' || !Number.isInteger(item.copies) || item.copies < 1 || item.copies > 1000) throw new Error('Historical copies must be an integer from 1 to 1000.');
+    // Validation probe only. The original 1000 remains visible and blocked.
+    return { ...item, copies: item.copies === 1000 ? 999 : item.copies };
+  }) : value.items } : value;
+  validateCanonicalLabelData(source);
+  const items = (value.items as JsonObject[]).map((entry, index) => {
+    // Canonical data is exact: the legacy SAP adapter must not synthesize aliases.
+    const contract = { contract_version: '1.1', label_code: entry.label_code,
+      source: { sender: value.sender, request_id: value.request_id, item_id: entry.item_id, copies: entry.copies, ...(historical ? {} : { mode: value.mode }) },
+      fields: entry.data, codes: {}, field_descriptions: value.field_descriptions ?? {} } as RawSapContract;
+    return { itemSequence: index + 1, labelCode: entry.label_code as string, contract, tokenMap: { ...(entry.data as FlatSapTokenMap) } };
   });
-  return { format: 'data', items, warnings: [] };
+  return { format: 'data', items, warnings: historical ? ['This historical dataset has no mode. Output and edits are disabled until you create a canonical working copy.'] : [], outputBlocked: historical, canonicalSource: value };
+}
+
+export function createCanonicalWorkingCopy(source: JsonObject, mode: 'simulation' | 'print', copies?: number[]): LocalSapImport {
+  const copy = JSON.parse(JSON.stringify(source));
+  copy.mode = mode;
+  if (copies) {
+    if (copies.length !== copy.items.length) throw new Error('Provide explicit copies for every item.');
+    copy.items.forEach((item: JsonObject, index: number) => { item.copies = copies[index]; });
+  }
+  return parseDataEnvelope(validateCanonicalLabelData(copy));
 }
 
 export async function readLocalSapJsonSource(file: File): Promise<{ source: unknown; parsed: LocalSapImport }> {
   if (!file.name.toLowerCase().endsWith('.json')) throw new Error('Only .json files are allowed.');
   if (file.size > 2 * 1024 * 1024) throw new Error('JSON exceeds the maximum size of 2 MiB.');
   let parsed: unknown;
-  try { parsed = JSON.parse(await file.text()); } catch { throw new Error('The file does not contain valid JSON.'); }
+  try { const bytes = await file.arrayBuffer(); parsed = parseBoundedJson(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes)); } catch { throw new Error('The file does not contain valid JSON.'); }
   return { source: parsed, parsed: parseLocalSapJson(parsed) };
 }
 

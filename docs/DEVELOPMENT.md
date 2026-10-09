@@ -227,7 +227,7 @@ BLOCKED and NOT RUN precisely.
 ## Checkpoint review
 
 Use the local scope in README and Architecture. Do not present planned graphics,
-shared authentication, SAP, jobs or physical printing as implemented workflows.
+shared authentication, SAP, jobs or physical printer acceptance as implemented workflows.
 The direct Python entry uses loopback by default (`TLS_BIND_HOST=127.0.0.1`).
 The image explicitly sets its internal bridge listener to `0.0.0.0`; standard
 Compose host ports remain loopback-only. Never use host networking or expose
@@ -260,3 +260,56 @@ for editor surfaces; canvas and preview pixels keep their authored colors.
 
 
 Frontend visual controls use CSS custom properties in `frontend/src/index.css` as the single source for palette pairs, UI typography, compact/default sizes, spacing, borders, radius, shadows, backdrop and motion. Shared primitives expose semantic `tone`, `variant`, `selected` and disabled treatment; native feature controls use the same `data-ui-*` contract. Keep caller classes for layout and deliberate technical geometry. Use compact/stepper variants for narrow editor fields. Selected colors have paired foregrounds. Planned actions remain native-disabled and use the generic planned hover treatment. Focus-visible stays observable. Reduced motion applies only to marked controls, chrome animations and modal portals; authored SVG, Fabric objects and export pixels remain outside UI styling.
+
+
+Appearance offers Dark, Light, Industrial Dark, Industrial Light and System. Original Dark/Light palettes are restored; industrial choices retain graphite/steel and warm-grey palettes. System follows original Dark/Light. Browser-local v1 preferences accept all theme IDs, and authored canvas/export colors remain unchanged.
+Custom adds a draft editor under Preference with Industrial Light/Dark base,
+twelve allowlisted six-digit HEX colors, horizontal area tabs, a miniature preview,
+and an informational minimum contrast ratio. Apply persists the validated custom
+palette under the existing browser-local key; Cancel/backdrop/Escape discard the
+draft. Reset copies the chosen base colors. Builtin and language selection retain
+their immediate behavior. Both pre-paint bootstrap and runtime validate the same
+allowlist, ignore unknown color keys, and never interpolate arbitrary CSS.
+Switching away from Custom removes every applied inline override while retaining
+the saved palette for later editing. Warning customization keeps the outline/status color separate from
+the selected warning fill and its paired foreground. Nine-key saved palettes
+default only absent warning fields from their Industrial base; supplied invalid
+values fail validation in both bootstrap and runtime. Region tokens affect actual chrome and ruler
+backgrounds; viewport/grid tokens affect only the area outside the white label.
+Fabric objects/background, authored SVG, barcode payloads and exported pixels are
+outside this preference boundary.
+Mounted UI icons use the shared `Icon` primitive for Material glyphs and Lucide
+components. Icons inherit currentColor and token sizes; `--ui-icon-scale` changes
+both families together while control/dock/small and deliberate numeric size tokens
+retain their roles. Icons are decorative by default; standalone meaningful icons
+provide a label. The Studio mark is a currentColor label outline with three barcode
+bars inside a shared primary badge. This UI system never restyles authored SVG
+objects, Fabric icons, raster output, or exported label content.
+
+
+## IPL target and copies in the Print dialog
+
+Open Print, enter numeric Printer IP address and TCP port (default 9100), confirm
+layout/IPL and Copies (1..999, default 1), then explicitly choose Print. No environment edit or restart
+is required. The last valid target is remembered in this browser under
+`thermal-label-studio.print-target.v1`, with safe fallback if storage is unavailable.
+Opening, editing or remembering fields never connects to a printer.
+
+An optional server default can still use `TLS_PRINTER_HOST`/`TLS_PRINTER_PORT`.
+An empty host means no default, and clients must supply an action target. Compose
+and the dev launcher carry these optional settings. Explicit action targets override
+the default for one request without modifying it. Default GET failure does not block
+manual target entry. Configure/deliver only to a named authorized target; do not edit
+ignored `.env` or send an operational label without authorization.
+
+One payload/connection requests all copies through native IPL quantity. Success
+unlocks Print for another deliberate submission, without closing. Known pre-send
+errors can be corrected/retried; uncertain outcomes retain the inspection/reopen
+lock. Submission is unconfirmed physical delivery; inspect the printer before retrying
+uncertain results. Tests use fake transports/mocked APIs and no actual PM45 target
+was contacted for this implementation.
+
+
+## T02 synthetic contract checks
+
+Shared cases live in tests/contracts/label_data_cases.json, consumed by backend/tests/test_label_data.py and frontend/tests/label_data.mjs. Dataset tests use fake DB calls and monkeypatch transport to fail if upload calls printing; frontend tests exercise the importDataset action consumed by Studio, dataset-only HTTP, offline preservation and historical output hook gate. Browser target absent means browser integration NOT RUN; do not start services for these source checks.

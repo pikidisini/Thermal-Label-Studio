@@ -88,7 +88,7 @@ test('versionless import selects item data without filling gaps from the design 
   await uploadSampleFixture(page);
   await page.getByTestId('input-sap-token-search').fill('Roll Width');
   await page.getByTestId('btn-insert-token-ZZWIDTH-text').click();
-  const payload = { sender: { system: 'SAP_TEST' }, request_id: 'REQ_TEST', items: [
+  const payload = { sender: { system: 'SAP_TEST' }, request_id: 'REQ_TEST', mode: 'simulation', items: [
     { item_id: 'I1', label_code: 'A013', copies: 1, data: { ZZWIDTH: 800 } },
     { item_id: 'I2', label_code: 'A013', copies: 1, data: { ZZWIDTH: null } },
   ] };
@@ -238,7 +238,7 @@ test('planned features explain availability without sending unsupported API requ
     if (/\/api\/.*(graphics|print|render\/|parse-raw|export)/.test(new URL(request.url()).pathname)) unsupported.push(request.url());
   });
   await openStudio(page);
-  await expect(page.getByTestId('btn-topbar-print')).toBeDisabled();
+  await expect(page.getByTestId('btn-topbar-print')).toBeEnabled();
   await page.getByTestId('dock-btn-graphics').click();
   await expect(page.getByTestId('global-graphics-planned')).toContainText('planned for a future release');
   await page.getByTestId('topbar-menu-btn-utilities').click();
@@ -562,7 +562,7 @@ test('Matrix HUD preserves physical proportions across dimensions, DPI and viewp
 test('SAP descriptions rename visible fields while preserving characteristic bindings', async ({ page }, testInfo) => {
   await openStudio(page);
   await page.getByTestId('dock-btn-sap').click();
-  const payload = { sender: { system: 'SAP_ECC' }, request_id: 'REQ_DESC', field_descriptions: { ZZWIDTH: 'WIDTH' }, items: [
+  const payload = { sender: { system: 'SAP_ECC' }, request_id: 'REQ_DESC', mode: 'simulation', field_descriptions: { ZZWIDTH: 'WIDTH' }, items: [
     { item_id: 'I1', label_code: 'A013', copies: 1, data: { ZZWIDTH: 695, ZZWIDTH_ALT: 700 } },
   ] };
   const upload = async () => page.getByTestId('input-local-sap-json').setInputFiles({ name: 'characteristics.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(payload)) });
@@ -600,7 +600,7 @@ test('Data Tokens starts empty and import adds fields without registry defaults'
   await expect(page.getByText('No fields available', { exact: true })).toBeVisible();
   await expect(page.locator('[data-testid^="sap-token-card-"]')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Use design sample', exact: true })).toHaveCount(0);
-  const payload = { sender: { system: 'SAP_TEST' }, request_id: 'REQ_NO_DEFAULTS', items: [
+  const payload = { sender: { system: 'SAP_TEST' }, request_id: 'REQ_NO_DEFAULTS', mode: 'simulation', items: [
     { item_id: 'I1', label_code: 'A013', copies: 1, data: { ZZWIDTH: '695', ZZLENGTH: '8000' } },
   ] };
   await page.getByTestId('input-local-sap-json').setInputFiles({ name: 'only-supplied.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(payload)) });
@@ -625,7 +625,7 @@ test('sample upload stores original envelope and reopens all items without savin
   await page.route('**/api/v1/studio-sample-datasets/*', route => route.fulfill({ json: stored }));
   await openStudio(page); await page.getByTestId('dock-btn-sap').click();
   await expect(page.getByTestId('sap-token-empty-state')).toContainText('No fields');
-  const payload = { sender: { system: 'EXAMPLE' }, request_id: 'sample', field_descriptions: { ZZWIDTH: 'WIDTH' }, items: [
+  const payload = { sender: { system: 'EXAMPLE' }, request_id: 'sample', mode: 'simulation', field_descriptions: { ZZWIDTH: 'WIDTH' }, items: [
     { item_id: 'one', label_code: 'A013', copies: 1, data: { ZZWIDTH: 695 } },
     { item_id: 'two', label_code: 'A013', copies: 2, data: { ZZWIDTH: 700, flag: false } },
   ] };
@@ -654,7 +654,7 @@ test('failed sample save retains local values and reports unsaved', async ({ pag
     return route.fulfill({ json: [] });
   });
   await openStudio(page); await page.getByTestId('dock-btn-sap').click();
-  const payload = { sender: { system: 'EXAMPLE' }, request_id: 'sample', items: [{ item_id: 'one', label_code: 'A013', copies: 1, data: { ZZWIDTH: 42 } }] };
+  const payload = { sender: { system: 'EXAMPLE' }, request_id: 'sample', mode: 'simulation', items: [{ item_id: 'one', label_code: 'A013', copies: 1, data: { ZZWIDTH: 42 } }] };
   await page.getByTestId('input-local-sap-json').setInputFiles({ name: 'example.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(payload)) });
   await expect(page.getByTestId('dataset-storage-status')).toContainText('Unsaved');
   await expect(page.getByLabel('Preview value for ZZWIDTH', { exact: true })).toHaveValue('42');
@@ -669,7 +669,7 @@ test('a delayed dataset list cannot erase a newly saved upload', async ({ page }
     await pending; return route.fulfill({ json: [] });
   });
   await openStudio(page); await page.getByTestId('dock-btn-sap').click();
-  const payload = { sender: { system: 'EXAMPLE' }, request_id: 'race', items: [{ item_id: 'one', label_code: 'A013', copies: 1, data: { ZZWIDTH: 42 } }] };
+  const payload = { sender: { system: 'EXAMPLE' }, request_id: 'race', mode: 'simulation', items: [{ item_id: 'one', label_code: 'A013', copies: 1, data: { ZZWIDTH: 42 } }] };
   await page.getByTestId('input-local-sap-json').setInputFiles({ name: 'race.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(payload)) });
   await expect(page.getByTestId('dataset-storage-status')).toHaveText('Saved sample dataset');
   release();
@@ -693,7 +693,7 @@ test('refresh started during save cannot remove the completed dataset', async ({
     return route.fulfill({ json: [] });
   });
   await openStudio(page); await page.getByTestId('dock-btn-sap').click();
-  const payload = { sender: { system: 'EXAMPLE' }, request_id: 'race', items: [{ item_id: 'one', label_code: 'A013', copies: 1, data: { ZZWIDTH: 42 } }] };
+  const payload = { sender: { system: 'EXAMPLE' }, request_id: 'race', mode: 'simulation', items: [{ item_id: 'one', label_code: 'A013', copies: 1, data: { ZZWIDTH: 42 } }] };
   await page.getByTestId('input-local-sap-json').setInputFiles({ name: 'refresh.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(payload)) });
   await expect(page.getByTestId('dataset-storage-status')).toContainText('Saving');
   await page.getByTestId('select-saved-dataset').focus(); await requested;

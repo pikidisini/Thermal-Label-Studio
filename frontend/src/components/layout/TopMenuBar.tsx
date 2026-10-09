@@ -5,8 +5,8 @@ import { TemplateMetadata } from '../../types/template';
 import { TemplateSelector } from '../../features/templates';
 import { TopBarActions } from './topbar/TopBarActions';
 import { AnchoredOverlay } from '../../shared/ui/layers';
-import { Button } from '../../shared/ui';
-import { PreferencesButton } from '../../features/preferences';
+import { Badge, Icon, LabelStudioLogo, Button } from '../../shared/ui';
+import { PreferencesDialog } from '../../features/preferences';
 
 interface TopMenuBarProps {
   templates: TemplateMetadata[];
@@ -20,6 +20,7 @@ interface TopMenuBarProps {
   onOpenSave: () => void;
   onOpenShortcuts: () => void;
   onOpenDiagnostics: () => void;
+  onOpenPrint: () => void;
   onOpenLabelSimulation: () => void;
   onImportTemplateSvg: () => void;
   onImportJson: () => void;
@@ -36,6 +37,7 @@ interface TopMenuBarProps {
 function BrandRow(props: Readonly<Pick<TopMenuBarProps, 'onOpenCanvasSetup' | 'onOpenSave' | 'onImportTemplateSvg' | 'onImportJson' | 'onExportTemplateSvg' | 'onUndo' | 'onRedo' | 'setViewMode' | 'viewMode' | 'onOpenShortcuts' | 'onShowAbout' | 'onOpenLabelSimulation'>>) {
   const t = useTranslation();
   const [openMenu, setOpenMenu] = React.useState<string | null>(null);
+  const [preferencesOpen, setPreferencesOpen] = React.useState(false);
   const activeMenuTriggerRef = React.useRef<HTMLButtonElement>(null);
   const activeMenuOverlayRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
@@ -64,6 +66,7 @@ function BrandRow(props: Readonly<Pick<TopMenuBarProps, 'onOpenCanvasSetup' | 'o
     View: [
       { label: 'Design', action: () => props.setViewMode('design') },
       { label: 'Preview', action: () => props.setViewMode('preview') },
+      { label: 'Preference', action: () => { activeMenuTriggerRef.current?.focus(); setPreferencesOpen(true); }, testId: 'preferences-button' },
     ],
     Utilities: [{ label: 'Label Simulation', action: props.onOpenLabelSimulation, testId: 'btn-label-simulation' }, { label: 'Global graphics (planned)', disabled: true }, { label: 'Fixture simulation', action: () => { window.location.href = '/fixture-simulation'; } }],
     Help: [{ label: 'Keyboard shortcuts', action: props.onOpenShortcuts }, { label: 'About Thermal Label Studio', action: props.onShowAbout }],
@@ -72,14 +75,15 @@ function BrandRow(props: Readonly<Pick<TopMenuBarProps, 'onOpenCanvasSetup' | 'o
   return (
     <div
       data-testid="container-topbar-brand-row"
+      data-ui-region="menu"
       className="h-10 px-4 flex items-center justify-between border-b border-outline-variant bg-surface-container-lowest"
     >
       <div className="flex items-center gap-3">
         {/* Wordmark */}
         <div data-testid="topbar-brand-logo" className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-primary flex items-center justify-center shadow-md">
-            <span className="material-symbols-outlined text-surface" style={{ fontSize: "var(--ui-icon-15)" }}>label</span>
-          </div>
+          <Badge tone="primary" className="w-6 h-6 items-center justify-center" data-testid="topbar-brand-mark">
+            <Icon component={LabelStudioLogo} />
+          </Badge>
           <span className="font-mono font-bold text-xs text-on-surface tracking-tight hidden sm:inline">
             Thermal Label Studio
           </span>
@@ -100,7 +104,7 @@ function BrandRow(props: Readonly<Pick<TopMenuBarProps, 'onOpenCanvasSetup' | 'o
           ))}
         </div>
       </div>
-      <PreferencesButton />
+      <PreferencesDialog open={preferencesOpen} onClose={() => setPreferencesOpen(false)} />
     </div>
   );
 }
@@ -117,6 +121,7 @@ export function TopMenuBar({
   onOpenSave,
   onOpenShortcuts,
   onOpenDiagnostics,
+  onOpenPrint,
   onOpenLabelSimulation, onImportTemplateSvg, onImportJson, onExportTemplateSvg, onUndo, onRedo, onShowAbout,
 }: TopMenuBarProps) {
   return (
@@ -127,6 +132,7 @@ export function TopMenuBar({
       {/* Row 2 — 36px HUD / workspace toolbar */}
       <div
         data-testid="container-topbar-hud-row"
+        data-ui-region="toolbar"
         className="h-9 px-3 flex items-center justify-between bg-surface-container-low border-b border-outline-variant"
       >
         <TemplateSelector
@@ -144,6 +150,7 @@ export function TopMenuBar({
           onOpenSave={onOpenSave}
           onOpenShortcuts={onOpenShortcuts}
           onOpenDiagnostics={onOpenDiagnostics}
+          onOpenPrint={onOpenPrint}
         />
       </div>
     </header>

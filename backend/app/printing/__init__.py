@@ -1,1 +1,1 @@
-"""Bitmap-only IPL encoding and injected submission; no physical transport."""
+"""Prepared-payload single-label printing and configured TCP RAW transport."""

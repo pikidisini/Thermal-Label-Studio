@@ -10,3 +10,6 @@ export { useTouchpadGestures } from './editor/useTouchpadGestures';
 export { importSvgIntoFabricCanvas } from './svg/fabricSvgImporter';
 export { exportFabricToSvg } from './svg/fabricSvgExporter';
 export { useEditorDraftRecovery } from './draft/useEditorDraftRecovery';
+
+export { TRANSFORM_ANCHORS, getTransformAnchor, setTransformAnchor, alignObjectToLabel } from './editor/objectGeometry';
+export type { TransformAnchor, LabelAlignment } from './editor/objectGeometry';

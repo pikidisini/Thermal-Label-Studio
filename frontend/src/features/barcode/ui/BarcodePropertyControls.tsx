@@ -1,3 +1,4 @@
+import { Icon } from "../../../shared/ui";
 import { translate as t, useTranslation } from "../../../shared/i18n";
 ﻿import React from 'react';
 
@@ -15,14 +16,12 @@ export function BarcodePropertyControls({ selectedObject, onUpdateProperty }: Ba
   return (
     <div data-testid="container-barcode-property-controls" className="flex items-center gap-2 pl-2">
       <div aria-hidden="true" className="w-px h-4 bg-outline-variant mx-1 flex-shrink-0" />
-      <span
+      <Icon
         data-testid="ribbon-barcode-icon"
-        className="material-symbols-outlined text-secondary"
+        className=" text-secondary"
 
         title={isQr ? t("QR Code") : t("1D Barcode")}
- style={{ fontSize: "var(--ui-icon-15)" }}>
-        {isQr ? "qr_code_2" : "barcode"}
-      </span>
+  size={15} glyph={isQr ? "qr_code_2" : "barcode"} />
       <span data-testid="ribbon-barcode-type-label" className="text-[11px] text-secondary font-semibold">
         {isQr ? t("QR") : t("Barcode")}
       </span>

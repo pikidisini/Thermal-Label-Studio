@@ -14,6 +14,7 @@ from app.engine.raster import RasterError, render_label_item
 from app.labels.models import LabelProcessRequest
 from app.labels.resolver import LayoutDefinition, LayoutRegistry
 from app.simulation import service
+from app.engine import pipeline
 from app.simulation.service import SimulationRequestError, simulate_label_request
 
 
@@ -42,7 +43,7 @@ def observe_renderer(monkeypatch):
         rendered.append(bitmap)
         return bitmap
 
-    monkeypatch.setattr(service, "render_label_item", spy)
+    monkeypatch.setattr(pipeline, "render_label_item", spy)
     return calls, rendered
 
 
@@ -73,9 +74,10 @@ def test_valid_fixture_captures_exact_renderer_bitmap_once_without_output_io(mon
 
     result, = simulate_label_request(request, LayoutRegistry({layout.label_code: layout}))
     assert len(calls) == len(rendered) == len(launches) == 1
-    assert result.bitmap is rendered[0]
-    assert result.bitmap.bitmap_png is rendered[0].bitmap_png
-    assert result.bitmap.bitmap_png == rendered[0].bitmap_png
+    assert result.bitmap is not rendered[0]
+    assert result.payload is not None
+    with Image.open(BytesIO(result.bitmap.bitmap_png)) as decoded, Image.open(BytesIO(rendered[0].bitmap_png)) as original_image:
+        assert decoded.tobytes() == original_image.tobytes()
     assert result.item_index == 0 and result.item_id == request.items[0].item_id
     assert result.status == "CAPTURED" and result.error is None
     assert [entry.status for entry in result.trace] == SUCCESS_STAGES
@@ -105,7 +107,8 @@ def test_ordered_items_keep_independent_trace_and_failure_context(monkeypatch, f
         "RECEIVED", "RESOLVING_LAYOUT", "BINDING_TEMPLATE", "FAILED"
     ]
     assert [entry.status for entry in results[2].trace] == SUCCESS_STAGES
-    assert results[0].bitmap is rendered[0] and results[2].bitmap is rendered[1]
+    assert results[0].payload and results[2].payload
+    assert results[0].bitmap is not rendered[0] and results[2].bitmap is not rendered[1]
     assert results[1].bitmap is None
     assert results[1].error.code == "invalid_template_or_facts"
     assert "private" not in repr(results[1])
@@ -153,7 +156,7 @@ def test_renderer_failure_has_bounded_error_and_no_capture(monkeypatch, fixture_
             on_stage(stage)
         raise failure
 
-    monkeypatch.setattr(service, "render_label_item", fail)
+    monkeypatch.setattr(pipeline, "render_label_item", fail)
     result, = simulate_label_request(request, LayoutRegistry({layout.label_code: layout}))
     assert len(calls) == 1
     assert result.status == "FAILED" and result.bitmap is None
@@ -176,7 +179,7 @@ def test_invalid_simulation_request_cannot_enter_renderer(monkeypatch, fixture_i
     else:
         values["items"] = [{"item_id": "a", "facts": []}]
     request = LabelProcessRequest.model_construct(**values)
-    monkeypatch.setattr(service, "render_label_item", lambda *a, **k: pytest.fail("Invalid request reached renderer"))
+    monkeypatch.setattr(pipeline, "render_label_item", lambda *a, **k: pytest.fail("Invalid request reached renderer"))
     with pytest.raises(SimulationRequestError) as raised:
         simulate_label_request(request, LayoutRegistry({layout.label_code: layout}))
     assert raised.value.code == "invalid_simulation_request"
@@ -185,7 +188,7 @@ def test_invalid_simulation_request_cannot_enter_renderer(monkeypatch, fixture_i
 def test_simulation_imports_no_transport_or_external_adapter():
     source = Path(service.__file__).read_text()
     allowed = {"dataclasses", "typing", "pydantic", "app.engine.raster", "app.labels.models",
-               "app.labels.resolver", "app.labels.templates", "app.observability"}
+               "app.labels.resolver", "app.labels.templates", "app.observability", "app.engine.pipeline", "app.engine.output", "app.engine.bitmap", "app.protocols.registry"}
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.Import):
             assert all(alias.name in allowed for alias in node.names)
@@ -194,3 +197,11 @@ def test_simulation_imports_no_transport_or_external_adapter():
         elif isinstance(node, ast.Call):
             assert not (isinstance(node.func, ast.Name) and node.func.id in {"__import__", "eval", "exec"})
             assert not (isinstance(node.func, ast.Attribute) and node.func.attr == "import_module")
+
+
+def test_unsupported_action_encoder_cannot_enter_renderer(monkeypatch, fixture_input):
+    layout, request = fixture_input
+    monkeypatch.setattr(pipeline, "render_label_item", lambda *a, **k: pytest.fail("Unsupported encoder reached raster"))
+    with pytest.raises(SimulationRequestError) as raised:
+        simulate_label_request(request, LayoutRegistry({layout.label_code: layout}), encoder="ZPL")
+    assert raised.value.code == "invalid_simulation_request"

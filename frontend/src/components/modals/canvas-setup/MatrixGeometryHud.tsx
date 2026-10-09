@@ -1,3 +1,4 @@
+import { Icon } from "../../../shared/ui";
 import { translate as t, useTranslation } from "../../../shared/i18n";
 ﻿import React from 'react';
 
@@ -24,7 +25,7 @@ export function MatrixGeometryHud({
   return (
     <div data-testid="container-matrix-geometry-hud" className="w-full md:w-[320px] bg-surface flex flex-col p-4 gap-3">
       <div className="flex items-center gap-1.5 pb-1 border-b border-outline-variant">
-        <span className="material-symbols-outlined text-[16px] text-primary-container">memory</span>
+        <Icon className="  text-primary-container" size="control" glyph="memory" />
         <h3 className="text-[10px] font-semibold text-on-surface uppercase tracking-wider">{t("Matrix Geometry HUD")} </h3>
       </div>
 
@@ -49,9 +50,7 @@ export function MatrixGeometryHud({
             {/* Left Height Dimension Marker */}
             <div className="absolute top-1/2 -left-6 -translate-y-1/2 font-mono text-[9px] text-primary-container whitespace-nowrap bg-surface-container-lowest px-1 border border-primary-container/30 rotate-[-90deg]">
               {dotHeight}    {t("px")}  </div>
-            <span className="material-symbols-outlined text-primary-container/40 text-[28px]">
-              crop_free
-            </span>
+            <Icon className=" text-primary-container/40 " size="large" glyph="crop_free" />
           </div>
         </div>
       </div>

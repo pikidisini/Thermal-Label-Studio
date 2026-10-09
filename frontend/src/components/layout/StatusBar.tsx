@@ -4,7 +4,7 @@ import React from 'react';
 import { useStudioStore } from '../../store/useStudioStore';
 import { useTemplateStore } from '../../store/useTemplateStore';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { Button, IconButton } from '../../shared/ui';
+import { Icon, Button, IconButton } from '../../shared/ui';
 
 export function StatusBar() {
   useTranslation();
@@ -35,12 +35,13 @@ export function StatusBar() {
   return (
     <footer
       data-testid="container-status-bar"
+      data-ui-region="status"
       className="h-[24px] bg-surface-container-lowest border-t border-outline-variant px-3 flex items-center justify-between font-mono text-[10px] text-on-surface-variant select-none shrink-0 z-[var(--ui-layer-chrome)]"
     >
       {/* Left: Cursor position + target summary */}
       <div data-testid="statusbar-left-section" className="flex items-center gap-3 overflow-hidden">
         <div data-testid="statusbar-cursor-pos" className="flex items-center gap-1.5 shrink-0">
-          <span className="material-symbols-outlined text-secondary shrink-0" style={{ fontSize: "var(--ui-icon-11)" }}>my_location</span>
+          <Icon className=" text-secondary shrink-0"  size={11} glyph="my_location" />
           <span>{t("X:")}</span>
           <strong data-testid="statusbar-val-x" className="text-on-surface tabular-nums">{cursorPos.xMm}</strong>
           <span className="text-outline px-0.5">|</span>
@@ -79,7 +80,7 @@ export function StatusBar() {
           label={t("Zoom Out (-)")}
           variant="compact"
         >
-          <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-12)" }}>remove</span>
+          <Icon  size="small" glyph="remove" />
         </IconButton>
 
         <Button
@@ -98,7 +99,7 @@ export function StatusBar() {
           label={t("Zoom In (+)")}
           variant="compact"
         >
-          <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-12)" }}>add</span>
+          <Icon  size="small" glyph="add" />
         </IconButton>
 
         <IconButton
@@ -107,7 +108,7 @@ export function StatusBar() {
           label={t("Fit Label to Viewport (F)")}
           variant="compact" className="ml-1"
         >
-          <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-12)" }}>fit_screen</span>
+          <Icon  size="small" glyph="fit_screen" />
         </IconButton>
       </div>
     </footer>

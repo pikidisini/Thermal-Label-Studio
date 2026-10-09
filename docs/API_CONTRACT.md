@@ -1,6 +1,6 @@
 # API contract
 
-Current API includes `/layouts` persistence and editor preview. The standard
+Current API includes `/layouts` persistence, editor preview and Studio print with action targets. The standard
 Compose stack configures persistence; fake-based source tests can leave it disabled.
 Without persistence configuration, layout endpoints return bounded 503 errors.
 The phase sections describe successive slices; use the P8C section for stored
@@ -62,7 +62,8 @@ Phase 7C supplies `simulate_label_request(request, registry)` as a direct Python
 service only. It requires simulation mode and 1-100 validated ordered items,
 with injected fixture SVG/media metadata. It returns an ordered tuple of item
 results: zero-based `item_index`, original `item_id`, `CAPTURED` or `FAILED`,
-bounded trace, the exact `RenderedLabel` object or `None`, and a bounded error
+bounded trace, a `RenderedLabel` containing the decoded IPL PNG or `None`,
+exact encoded `payload` bytes or `None` (internal Python evidence), and a bounded error
 or `None`. Successful PNG bytes are available through `result.bitmap.bitmap_png`
 for an in-memory preview. Phase 7H exposes only a fixed development fixture
 through a separate route; this does not change the acceptance endpoint.
@@ -90,16 +91,16 @@ as `invalid_template_or_facts` with `FAILED` immediately after
 boundary with fakes; the HTTP route still uses its original in-memory registry
 and accepts neither storage paths nor version/bucket overrides.
 
-Phase 7F adds a direct Python bitmap-only IPL/fake submission boundary, separate
-from HTTP. `submit_processed_bitmap(bitmap, profiles, transport)` accepts an
-existing `RenderedLabel`, resolves a server-owned profile by its label code,
-validates exact PNG dimensions/mode/DPI, encodes once, and submits exact bytes
-once. The result retains source bitmap, profile ID, payload, `SUBMITTED`, and
-`confirmed=False`; invalid input fails before submission and transport errors
-are bounded failure-or-uncertain outcomes with no retry. There are no request
-destination fields, active profiles, real transport, print endpoint, or job
-orchestration. Simulation still captures PNG only; its same object is accepted
-as this encoder's input. HTTP accepted-only semantics remain unchanged.
+The direct Python print boundary consumes shared prepared output, separate from
+HTTP. `prepare_editor_output` or `prepare_label_item` chooses the implemented
+language, obtains layout dimensions/DPI, rasterizes once and encodes once.
+`submit_prepared_output(output, transport)` sends the immutable output payload
+once without encoding, rendering or printer profile checks. The result retains
+the same prepared output, `SUBMITTED` and `confirmed=False`. Invalid prepared
+output fails before submission; transport errors are bounded failure-or-uncertain
+outcomes with no retry. Studio and fixture simulation decode the same exact
+prepared payload to PNG. The Studio print endpoint uses the configured TCP transport described below;
+job orchestration is inactive. The label acceptance endpoint remains acceptance-only.
 
 ## Provisional external fixture envelope (Phase 7G)
 
@@ -180,7 +181,7 @@ layout-specific processing are not implemented by this foundation.
 The target pipeline, `SAP/API -> validate label_code -> resolve layout -> bind SVG -> raster bitmap`,
 will produce one shared bitmap and encoded payload before choosing the final sink.
 
-The future simulation sink will capture that output and never invoke physical transport. Printing
+The local simulation sink decodes that IPL output and never invokes physical transport. Printing
 delivers the same processed bytes to a server-approved destination. The output
 record must distinguish processed, simulated, submitted, and confirmed delivery;
 a timeout must not be represented as confirmed success.
@@ -273,24 +274,19 @@ idempotently to existing layout headers. This requires normal authorized persist
 startup; source tests do not migrate operational storage.
 
 
-## Versionless local Studio data import
+## Canonical label-data admission and local exploration (T02)
 
-The browser also accepts a local JSON object with sender.system, request_id,
-and 1-100 ordered items. Each item has a unique nonempty item_id, nonempty
-label_code, copies (integer 1-1000), and data (at most 200 scalar/null fields).
-There is no version field in this body. Data keys use ASCII letters, digits,
-underscore or hyphen, 1-128 characters, excluding prototype-related keys.
-Nested data values and nonfinite numbers are rejected. Import files are bounded
-to 2 MiB. Exact key case matters for binding; zero and false are valid values.
-The application preserves request/item/source metadata for local exploration.
-This format is not an HTTP SAP intake contract; the existing backend fixture
-adapter and accepted-only labels/process endpoint remain separate boundaries.
-Existing v1.1 and 2.0-raw local imports remain supported.
+`backend/app/label_data` owns canonical validation and typed models; there is no universal intake endpoint or orchestration yet. POST /api/v1/label-intake remains a future T07 contract. Fixture facts/acceptance routes are unchanged.
 
-Example: {"sender":{"system":"SAP_ECC"},"request_id":"REQ-001",
-"items":[{"item_id":"I1","label_code":"A013","copies":1,
-"data":{"ZZWIDTH":695,"customer_name":"Example Customer"}}]}
+Canonical versionless JSON requires sender:{system}, request_id, mode (simulation|print), and 1..100 ordered items. Each item requires unique item_id, label_code, copies (semantic integral JSON number 1..999), data (0..200 finite scalar/null fields). Optional field_descriptions allows up to200 string entries, 256 Unicode codepoints each. Unknown envelope/sender/item fields reject; exact ASCII identifiers/keys and forbidden prototype keys follow the frozen implementation-package CONTRACT. Required values are never trimmed/coerced. 1, 1.0 and 1e0 copies are the same integral JSON value; boolean/string/fractional/0/1000 reject. Typed models expose copies as int. Strings preserve whitespace/Unicode and are limited to4096 codepoints/16384 UTF8 bytes; NUL and unpaired surrogates reject. Integral data numbers beyond +/-9007199254740991 and nonfinite values reject; fractional JSON numbers parse once into binary64.
 
+Raw file/body bytes are capped at2MiB. UTF8 is strict; BOM, duplicate object members (including escaped equivalent keys), malformed JSON/nonfinite literals and nesting>32 reject before object admission. Object admission uses identical conservative byte reservation in both languages: compact JSON punctuation and escaped UTF8 strings, 32 bytes per number, true4/false5/null4 bytes, total<=2MiB. This reservation may reject a near-limit document smaller than2MiB; it bounds programmatic inputs consistently without relying on different float serializers. The dataset wrapper additionally allows4096 bytes for upload metadata; HTTP maps invalid dataset to bounded422 and streaming overflow to413. Service.create also validates canonical data before DB calls.
+
+Browser canonical tokens preserve exact data keys without legacy SAP aliases or synthesized label_code. Mode/copies/source IDs remain metadata, not token values. Descriptions remain presentation metadata. Missing/null/empty/zero/false remain distinct. ECMAScript number stringification for future binding and JCS digest remains T04/T08 implementation work; T02 proves numeric admission/value parity, not bound output or digest parity.
+
+Historical mode-less versionless data may be opened for read-only local exploration, including historical copies1..1000. It displays a warning, disables token-value edits and all preview/simulation/print output, and is never uploaded automatically. Accessible Simulation working copy / Print working copy controls require explicit copies corrections for each item and create a new in-memory canonical copy; copies1000 is never silently clamped. Original saved rows remain unchanged. Working copies are unsaved until exported/imported as a canonical sample; mode selection/import never submits print. New canonical imports may save a dataset only and switch to Design with stale previews cleared. Existing v1.1/raw-v2 exploration remains a separate parser, cannot be admitted as canonical intake and has no automatic storage/output effect.
+
+Example: {"sender":{"system":"SAP_ECC"},"request_id":"REQ-001","mode":"simulation","items":[{"item_id":"I1","label_code":"A013","copies":1,"data":{"ZZWIDTH":695,"customer_name":"Example Customer"}}]}
 
 ### SAP characteristic descriptions in Studio
 
@@ -311,3 +307,84 @@ Studio envelope above, bounds payload JSON to 2 MiB, and rejects nonfinite numbe
 and JSONB-incompatible NUL/unpaired-surrogate strings throughout preserved metadata.
 Errors are bounded: invalid_dataset (422), dataset_too_large (413), dataset_not_found
 (404), dataset_persistence_unavailable (503). No update/delete endpoint is provided.
+
+
+## IPL payload simulation (2026-10-09)
+
+The editor-preview response shape and 72..600 DPI request range remain unchanged.
+After the existing SVG rasterization/thresholding, `protocols/ipl/encoder.py` encodes the
+processed mode-1 PNG and decodes its exact readable ASCII G/u/U payload. The
+returned PNG is decoded evidence; no printer connection or storage operation
+occurs. Encoding/decoding failures return the bounded `editor_preview_failed`
+500 response. Fixture simulation retains its exact payload internally and reports
+codec failure as `processing_failed`, with no bitmap or payload.
+
+Each G graphic is at most 799x799dots, so larger media uses tiles without resizing.
+The encoder reserves up to 36 graphic slots 64..99 and format 90, uses fields 0..35,
+direction 0, unit scale, sequential six-bit vertical columns, and one RS/US/ETB
+print. Sending these bytes would replace those printer-resident IDs and select
+Advanced Mode; there is no allocation negotiation. Studio Print sends this payload
+through the TCP transport described below.
+Only occupied slots are defined; payload generation accumulates no new IDs.
+The decoder requires complete columns, white padding, valid references, a single
+format and one print command with validated copies 1..999. It supports nonnegative origin and scale 1..10 for
+direction 0 only and rejects unsupported directions/commands, clipping, duplicate
+IDs, malformed framing and extra prints. It is a bounded subset, not a full IPL
+printer emulator. Canvas dimensions/DPI come from validated media metadata.
+The PM45 sample proves six-bit bitmap size; full-media physical axis/placement,
+tiled printing and slot availability still require authorized physical validation.
+
+
+### Shared output preparation and action language
+
+Editor-preview accepts optional `encoder: "IPL"` (default `IPL` for existing clients).
+The fixture request/SAP envelope retains its existing shape. Direct fixture
+simulation selects language through the `simulate_label_request(..., encoder="IPL")`
+keyword; unsupported selections fail before rasterization with a bounded
+`SimulationRequestError`. Unsupported editor encoder values fail request validation
+with 422. Studio Label Simulation displays the implemented IPL choice;
+the shared client sends it explicitly. Layout dimensions/DPI are not replaced by
+printer settings. The shared engine validates the SVG/media, rasterizes once and
+encodes once into immutable `PreparedOutput(bitmap, payload, language, copies)`.
+Simulation decodes those bytes to PNG. `submit_prepared_output` consumes the same
+object and submits its payload once to an injected transport without rendering or
+encoding. Print callers choose language while calling the engine preparation API.
+Studio Print uses that boundary through the configured print endpoint below.
+
+
+## Single-label Studio print with an action target (2026-10-09)
+
+`GET /api/v1/printing/target` returns the optional server default as
+`{available, host, port, encoder:"IPL"}`. Host/port are null without a default.
+This reads configuration only; no printer probe occurs. A missing/failed default
+lookup does not prevent a client from providing an explicit target.
+
+`POST /api/v1/printing/editor` accepts `{svg, width_mm, height_mm, dpi, encoder,
+target:{host,port}, copies}`. Copies defaults to 1 and must be a strict integer
+1..999. Native IPL `<RS>N`/`<US>1` requests that many identical rendered labels.
+The explicit target overrides the optional server default
+for this request only. Existing clients may omit `target` to use the default.
+Target host must be numeric IPv4/IPv6; DNS names, URLs, scopes, multicast and
+unspecified addresses fail closed. Target port is a strict integer 1..65535.
+Unknown top-level host/port/profile fields and extra nested target fields
+remain rejected. No global target-update endpoint or database setting is added.
+
+SVG is bounded restricted Studio content; dimensions are 10..500 mm, DPI 72..600,
+and final pixels remain at most 4096 per side / 4 million total. Encoder defaults
+to IPL and only IPL is accepted. Layout controls dimensions/DPI without a printer
+profile compatibility gate. Target validation precedes raster/transport creation.
+
+Response is `{request_id, status:"SUBMITTED", confirmed:false, width_px,
+height_px, dpi, encoder:"IPL", payload_bytes, target:{host,port}, copies}`. Target is the
+effective destination. Local TCP send completion does not confirm physical printing.
+One request prepares/encodes one payload and attempts one connection/send for all
+copies, without retry,
+feedback or idempotency guarantees. Resending may produce a duplicate.
+
+Errors are correlated/bounded: 503 `printer_unavailable` when both targets are
+missing before raster; 422 `invalid_printer_target` or `invalid_print_copies` before preparation, or
+`invalid_print_layout`/framework `invalid_request`; 500 `print_preparation_failed`
+before submission; 502 `print_submission_uncertain` after failed connection/send.
+Unknown failures/lost responses are also uncertain. Inspect the printer before
+another explicit request. Browser-local target memory is a client preference and
+does not change server defaults.

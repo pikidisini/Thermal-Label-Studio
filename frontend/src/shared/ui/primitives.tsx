@@ -9,7 +9,7 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ControlVariant;
   selected?: boolean;
   /** Planned actions stay native-disabled; hover only explains availability. */
-  disabledTreatment?: 'muted' | 'planned';
+  disabledTreatment?: 'muted' | 'subtle' | 'planned';
 };
 export function Button({ tone = 'neutral', variant = 'default', selected = false, disabledTreatment = 'muted', className, type = 'button', ...props }: ButtonProps) {
   return <button {...props} type={type} data-ui-control="button" data-variant={variant} data-tone={tone} data-selected={selected} data-disabled-treatment={disabledTreatment} className={cx('ui-control', className)} />;

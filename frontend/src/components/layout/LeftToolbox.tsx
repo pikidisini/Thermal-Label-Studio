@@ -5,7 +5,7 @@ import { BasicToolsSection } from './toolbox/BasicToolsSection';
 import type { GraphicAsset } from '../../features/graphics';
 import { SapTokenSection } from '../../features/data-tokens';
 import { DockButton } from './toolbox/DockButton';
-import { IconButton } from '../../shared/ui';
+import { Icon, IconButton } from '../../shared/ui';
 import type { FlatSapTokenMap, RawSapContract } from '../../features/data-tokens';
 
 type Panel = 'tools' | 'graphics' | 'sap' | null;
@@ -24,6 +24,7 @@ interface LeftToolboxProps {
   onSelectContract?: (key: string) => void;
   jsonData?: FlatSapTokenMap;
   onAddSapToken?: (token: string, asType: 'text' | 'barcode' | 'qr') => void;
+  readOnlyData?: boolean;
   onUpdateToken?: (token: string, value: string) => void;
   onAddCustomToken?: (token: string, value: string) => void;
   usedTokens?: Set<string>;
@@ -56,6 +57,7 @@ export function LeftToolbox({
   jsonData = {},
   onAddSapToken = () => {},
   onUpdateToken,
+  readOnlyData = false,
   onAddCustomToken,
   usedTokens = new Set(),
   localImport = null,
@@ -134,7 +136,7 @@ export function LeftToolbox({
                   label={t("Close panel")}
                   className="h-full w-full"
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-16)" }}>chevron_left</span>
+                  <Icon  size="control" glyph="chevron_left" />
                 </IconButton>
               </>
             ) : (
@@ -148,7 +150,7 @@ export function LeftToolbox({
                   label={t("Close panel")}
                   className="h-auto w-auto"
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-16)" }}>chevron_left</span>
+                  <Icon  size="control" glyph="chevron_left" />
                 </IconButton>
               </>
             )}
@@ -178,6 +180,7 @@ export function LeftToolbox({
                 jsonData={jsonData}
                 onAddSapToken={onAddSapToken}
                 onUpdateToken={onUpdateToken}
+                readOnly={readOnlyData}
                 onAddCustomToken={onAddCustomToken}
                 usedTokens={usedTokens}
                 localImport={localImport}

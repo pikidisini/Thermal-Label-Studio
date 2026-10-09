@@ -1,3 +1,4 @@
+import { Icon } from "../../../shared/ui";
 import { translate as t, useTranslation } from "../../../shared/i18n";
 import React, { useEffect, useRef, useState } from 'react';
 import { AnchoredOverlay } from '../../../shared/ui/layers';
@@ -70,7 +71,7 @@ export function TextFormatControls({ selectedObject, pxPerMm, onUpdateProperty }
       aria-label={t(title)}
 
      data-ui-control="button" data-variant="icon" data-selected={active} data-tone="neutral">
-      <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-14)" }}>{icon}</span>
+      <Icon  size={14} glyph={icon} />
     </button>
   );
 
@@ -91,7 +92,7 @@ export function TextFormatControls({ selectedObject, pxPerMm, onUpdateProperty }
           title={t("Choose font")}
          data-ui-control="button" data-variant="compact">
           <span className="truncate" style={{ fontFamily: selectedFont }}>{selectedFontOption?.label || selectedFont}</span>
-          <span className="material-symbols-outlined text-on-surface-variant" style={{ fontSize: "var(--ui-icon-15)" }}>expand_more</span>
+          <Icon className=" text-on-surface-variant"  size={15} glyph="expand_more" />
         </button>
 
         {isFontMenuOpen && (

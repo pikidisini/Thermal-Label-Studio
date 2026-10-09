@@ -45,6 +45,8 @@ class StudioDatasetService:
         return dict(id=str(row[0]), name=row[1], original_filename=row[2], created_at=row[3], updated_at=row[4])
 
     def create(self, name, original_filename, payload):
+        from app.label_data import validate_payload
+        payload = validate_payload(payload)
         identifier = uuid4(); now = datetime.now(timezone.utc)
         self._execute("""INSERT INTO label_studio.studio_sample_datasets
             (id, name, original_filename, payload, created_at, updated_at)

@@ -6,7 +6,7 @@ import { CustomDimensionForm } from './canvas-setup/CustomDimensionForm';
 import { MatrixGeometryHud } from './canvas-setup/MatrixGeometryHud';
 import { useTemplateStore } from '../../store/useTemplateStore';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { Button, Dialog, DialogBody, DialogFooter, DialogHeader, Field, IconButton } from '../../shared/ui';
+import { Icon, Badge, Button, Dialog, DialogBody, DialogFooter, DialogHeader, Field, IconButton } from '../../shared/ui';
 
 interface CanvasSetupModalProps {
   isOpen: boolean;
@@ -85,11 +85,9 @@ export function CanvasSetupModal({
         {/* 1. HEADER */}
         <DialogHeader className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-secondary flex items-center justify-center text-background">
-              <span className="material-symbols-outlined text-[18px]">
-                {mode === 'new' ? "new_label" : "aspect_ratio"}
-              </span>
-            </div>
+            <Badge tone="primary" data-testid="canvas-setup-header-icon" className="w-8 h-8 items-center justify-center">
+              <Icon size={18} glyph={mode === 'new' ? "new_label" : "aspect_ratio"} />
+            </Badge>
             <div>
               <h2 className="font-semibold text-sm text-on-surface">
                 {mode === 'new' ? t("New Blank Label Template") : t("Template Properties")}
@@ -102,7 +100,7 @@ export function CanvasSetupModal({
             label={t("Close dialog")}
 
           >
-            <X size={18} />
+            <Icon component={X}  size={18} />
           </IconButton>
         </DialogHeader>
 
@@ -192,7 +190,7 @@ export function CanvasSetupModal({
             data-testid="btn-apply-dimensions"
             tone="success" className="h-[28px] text-background flex items-center justify-center gap-1"
            variant="default">
-            <Check size={14} />
+            <Icon component={Check}  size={14} />
             <span>{mode === 'new' ? t("Create Template") : t("Apply Properties")}</span>
           </Button>
         </DialogFooter>

@@ -1,7 +1,7 @@
 import { translate as t, useTranslation } from "../../../shared/i18n";
 import React from 'react';
 import { ViewMode } from '../../../types/label';
-import { Button, IconButton } from '../../../shared/ui';
+import { Icon, Button, IconButton } from '../../../shared/ui';
 
 interface TopBarActionsProps {
   viewMode: ViewMode;
@@ -10,6 +10,7 @@ interface TopBarActionsProps {
   onOpenSave: () => void;
   onOpenShortcuts: () => void;
   onOpenDiagnostics: () => void;
+  onOpenPrint: () => void;
 }
 
 
@@ -41,7 +42,7 @@ function IconBtn({ icon, title, onClick, testId, danger }: IconBtnProps) {
       label={title}
 
      tone={danger ? 'danger' : 'neutral'}>
-      <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-16)" }}>{icon}</span>
+      <Icon  size="control" glyph={icon} />
     </IconButton>
   );
 }
@@ -53,6 +54,7 @@ export function TopBarActions({
   onOpenSave,
   onOpenShortcuts,
   onOpenDiagnostics,
+  onOpenPrint,
 }: TopBarActionsProps) {
   useTranslation();
   return (
@@ -67,7 +69,7 @@ export function TopBarActions({
             title={t(label)}
             className="flex items-center gap-1"
            data-ui-control="button" data-variant="toggle" data-selected={viewMode === mode} data-tone="neutral">
-            <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-14)" }}>{icon}</span>
+            <Icon  size={14} glyph={icon} />
             <span className="hidden sm:inline">{t(label)}</span>
           </button>
         ))}
@@ -84,16 +86,16 @@ export function TopBarActions({
       <div className="w-px h-4 bg-outline-variant mx-1" />
 
 
-      {/* Planned printing stays disabled; its icon gains emphasis on hover. */}
+      {/* Open the shared explicit print dialog; opening does not submit. */}
       <Button
         data-testid="btn-topbar-print"
-        disabled
-        aria-label={t("Print (planned)")}
-        title={t("Physical printing is planned. Use Label Simulation for a PNG preview.")}
-        disabledTreatment="planned"
+        data-hover-tone="primary"
+        onClick={onOpenPrint}
+        aria-label={t("Print label")}
+        title={t("Print label")}
         className="ml-1 inline-flex items-center justify-center"
        variant="icon">
-        <span aria-hidden="true" className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-14)" }}>print</span>
+        <Icon aria-hidden="true"  size={14} glyph="print" />
       </Button>
     </div>
   );

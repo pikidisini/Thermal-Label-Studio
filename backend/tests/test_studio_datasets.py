@@ -6,9 +6,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from app.studio_datasets.http import router
 from app.studio_datasets.service import StudioDatasetService, DatasetPersistenceError
-from app.studio_datasets.validation import validate_payload
+from app.label_data import validate_payload
 
-PAYLOAD = {"sender": {"system": "SAP_ECC", "plant": "1000"}, "request_id": "R1", "field_descriptions": {"ZZWIDTH": "WIDTH"}, "items": [{"item_id": "I1", "label_code": "A013", "copies": 1, "data": {"ZZWIDTH": 0, "flag": False, "empty": None}}, {"item_id": "I2", "label_code": "A013", "copies": 2, "data": {"ZZWIDTH": 700}}]}
+PAYLOAD = {"sender": {"system": "SAP_ECC"}, "request_id": "R1", "mode": "simulation", "field_descriptions": {"ZZWIDTH": "WIDTH"}, "items": [{"item_id": "I1", "label_code": "A013", "copies": 1, "data": {"ZZWIDTH": 0, "flag": False, "empty": None}}, {"item_id": "I2", "label_code": "A013", "copies": 2, "data": {"ZZWIDTH": 700}}]}
 
 class Database:
     def __init__(self): self.rows = {}; self.description = None; self.fail = False; self.sql = []
@@ -78,3 +78,19 @@ def test_database_failures_are_bounded(managed):
     managed._database.fail = True
     with pytest.raises(DatasetPersistenceError, match=r"^Sample dataset storage is unavailable\.$"):
         managed.list()
+
+def test_duplicate_raw_members_and_print_upload_never_call_transport(managed, monkeypatch):
+    from app.printing import service as printing
+    monkeypatch.setattr(printing, 'submit_prepared_output', lambda *_args: pytest.fail('Upload called print transport'))
+    app=FastAPI();app.include_router(router);app.state.studio_dataset_service=managed
+    import json
+    with TestClient(app) as client:
+        payload=deepcopy(PAYLOAD);payload['mode']='print'
+        assert client.post('/studio-sample-datasets',json={'name':'Sample','original_filename':'sample.json','payload':payload}).status_code==201
+        before=len(managed._database.sql)
+        raw=json.dumps({'name':'Sample','original_filename':'sample.json','payload':payload}).replace('"copies": 1','"copies": 1, "copies": 2')
+        assert client.post('/studio-sample-datasets',content=raw).status_code==422
+        assert len(managed._database.sql)==before
+        payload.pop('mode')
+        with pytest.raises(ValueError): managed.create('Sample','sample.json',payload)
+        assert len(managed._database.sql)==before

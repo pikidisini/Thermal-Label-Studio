@@ -2,7 +2,7 @@ import { translate as t, useTranslation } from "../../../shared/i18n";
 import { useTemplateStore } from '../../../store/useTemplateStore';
 import React, { useState, useEffect } from 'react';
 import { Save, X, Layers, HardDrive, CheckCircle2, AlertCircle, FileCode } from 'lucide-react';
-import { Badge, Button, Dialog, DialogBody, DialogFooter, DialogHeader, ErrorState, Field, IconButton, Input, Status } from '../../../shared/ui';
+import { Icon, Badge, Button, Dialog, DialogBody, DialogFooter, DialogHeader, ErrorState, Field, IconButton, Input, Status } from '../../../shared/ui';
 
 export default function SaveTemplateModal({
   isOpen,
@@ -71,7 +71,7 @@ export default function SaveTemplateModal({
         <DialogHeader className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 bg-tertiary/15 border border-tertiary/40 flex items-center justify-center text-tertiary">
-              <Save className="w-4 h-4" />
+              <Icon component={Save}  size="control" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -86,7 +86,7 @@ export default function SaveTemplateModal({
             label={t("Close dialog")}
 
           >
-            <X className="w-4 h-4" />
+            <Icon component={X}  size="control" />
           </IconButton>
         </DialogHeader>
 
@@ -129,7 +129,7 @@ export default function SaveTemplateModal({
           <div className="bg-surface border border-outline-variant/50 p-3 flex items-center justify-between font-mono text-xs">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 text-on-surface-variant">
-                <Layers className="w-3.5 h-3.5 text-primary" />
+                <Icon component={Layers} className=" text-primary"  size={14} />
                 <span>{t("Size:")}</span>
                 <span className="text-on-surface font-bold">{widthMm} × {heightMm} {t("mm")}</span>
               </div>
@@ -138,12 +138,12 @@ export default function SaveTemplateModal({
             <div className="flex items-center gap-1.5">
               {isExisting ? (
                 <Status tone="warning">
-                  <HardDrive className="w-3 h-3" />
+                  <Icon component={HardDrive}  size="small" />
                   {matchedTemplate?.is_builtin ? t("Will Save as Custom Override") : t("Will Create New Version")}
                 </Status>
               ) : (
                 <Status tone="success">
-                  <CheckCircle2 className="w-3 h-3" />{t("New Custom Template")} </Status>
+                  <Icon component={CheckCircle2}  size="small" />{t("New Custom Template")} </Status>
               )}
             </div>
           </div>
@@ -167,7 +167,7 @@ export default function SaveTemplateModal({
                 </>
               ) : (
                 <>
-                  <Save className="w-3.5 h-3.5" />
+                  <Icon component={Save}  size={14} />
                   <span>{t("Save to Server")}</span>
                 </>
               )}

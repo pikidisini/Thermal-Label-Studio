@@ -56,6 +56,7 @@ export function CanvasViewport({
     <div
       ref={viewportRef}
       data-testid="container-canvas-viewport"
+      data-ui-region="workspace"
       className={`relative flex-1 overflow-hidden select-none bg-surface ${cursor}`}
       onMouseDown={(e) => { onOuterMouseDown(e); onMouseDown(e); }}
       onMouseMove={onMouseMove}
@@ -68,6 +69,21 @@ export function CanvasViewport({
       }}
     >
       {/* Rulers */}
+      <div
+        data-testid="ruler-unit"
+        className="absolute top-0 left-0 z-20 flex h-5 w-6 items-center justify-center pointer-events-none"
+        style={{
+          backgroundColor: 'var(--ui-region-toolbar)',
+          color: 'var(--ui-text-secondary)',
+          borderRight: '1px solid var(--ui-border-default)',
+          borderBottom: '1px solid var(--ui-border-default)',
+          fontFamily: 'JetBrains Mono, monospace',
+          fontSize: '9px',
+          lineHeight: 1,
+        }}
+      >
+        mm
+      </div>
       <div data-testid="container-top-ruler">
         <CanvasRuler ref={topRulerRef} orientation="horizontal" />
       </div>

@@ -1,10 +1,9 @@
 {
   "sender": {
-    "system": "SAP_TEST",
-    "client": "000",
-    "plant": "SAMPLE"
+    "system": "SAP_TEST"
   },
   "request_id": "EXAMPLE-REQUEST-001",
+  "mode": "simulation",
   "field_descriptions": {
     "ZZALIAS": "Film Alias",
     "ZZPACKINGCODE": "Packing Code",

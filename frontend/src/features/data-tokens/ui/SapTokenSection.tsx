@@ -1,3 +1,4 @@
+import { Icon } from "../../../shared/ui";
 import { translate as t, useTranslation } from "../../../shared/i18n";
 import { useFieldLabel } from '../model/useFieldLabel';
 import React from 'react';
@@ -12,6 +13,7 @@ interface SapTokenSectionProps {
   jsonData: FlatSapTokenMap;
   onAddSapToken: (token: string, asType: 'text' | 'barcode' | 'qr') => void;
   onUpdateToken?: (token: string, value: string) => void;
+  readOnly?: boolean;
   onAddCustomToken?: (token: string, value: string) => void;
   usedTokens?: Set<string>;
   localImport?: { format: 'v1.1' | 'raw-v2' | 'data'; fileName: string; itemSequence: number; itemCount: number } | null;
@@ -41,7 +43,7 @@ interface TokenCardProps {
 
 type TokenProfile = 'standard' | 'customer' | 'characteristic' | 'custom';
 
-function TokenCard({ fieldKey, value, isUsed, onAddSapToken, onUpdateToken, status }: TokenCardProps & { onUpdateToken?: (token: string, value: string) => void }) {
+function TokenCard({ fieldKey, value, isUsed, onAddSapToken, onUpdateToken, status, readOnly }: TokenCardProps & { onUpdateToken?: (token: string, value: string) => void; readOnly?: boolean }) {
   useTranslation();
   const fieldLabel = useFieldLabel();
   const typeLabel = getSAPTypeLabel(fieldKey);
@@ -79,7 +81,7 @@ function TokenCard({ fieldKey, value, isUsed, onAddSapToken, onUpdateToken, stat
       <details className="px-3 text-[9px] text-on-surface-variant"><summary>{t("Technical field")}</summary><code>{fieldKey}</code></details>
       {/* Sample value */}
       <div data-testid={`sap-token-val-${fieldKey}`} className="px-3 pb-1 text-[10px] text-on-surface-variant font-mono truncate">
-        <span className="block text-[9px] mb-1">{t(status)}</span><input aria-label={t("Preview value for {field}", { field: label })} value={value} onChange={(e) => onUpdateToken?.(fieldKey, e.target.value)} className="w-full"  data-ui-control="input" data-variant="default" />
+        <span className="block text-[9px] mb-1">{t(status)}</span><input readOnly={readOnly} aria-label={t("Preview value for {field}", { field: label })} value={value} onChange={(e) => onUpdateToken?.(fieldKey, e.target.value)} className="w-full"  data-ui-control="input" data-variant="default" />
         {meta && (
           <span className="ml-1 text-outline" title={meta.description}>— {meta.description}</span>
         )}
@@ -107,7 +109,7 @@ function TokenCard({ fieldKey, value, isUsed, onAddSapToken, onUpdateToken, stat
               title={t("Insert as {type}", { type: t(labels[insertType]) })}
               className={`flex-1 flex items-center justify-center gap-1 ${colors[insertType]}disabled:cursor-not-allowed`}
              data-ui-control="button" data-variant="compact">
-              <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-12)" }}>{icons[insertType]}</span>
+              <Icon  size="small" glyph={icons[insertType]} />
               {t(labels[insertType])}
             </button>
           );
@@ -124,6 +126,7 @@ export function SapTokenSection({
   jsonData,
   onAddSapToken,
   onUpdateToken,
+  readOnly = false,
   onAddCustomToken,
   usedTokens = new Set(),
   localImport = null,
@@ -223,7 +226,7 @@ export function SapTokenSection({
 
       {/* Token count header */}
       <div data-testid="sap-tokens-header" className="px-3 py-1.5 flex items-center gap-1.5 border-b border-outline-variant bg-surface-container-lowest">
-        <span className="material-symbols-outlined text-tertiary" style={{ fontSize: "var(--ui-icon-13)" }}>data_object</span>
+        <Icon className=" text-tertiary"  size={13} glyph="data_object" />
         <span data-testid="sap-token-count" className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest">{t("Fields (")}{visibleTokenKeys.length}/{tokenKeys.length})
         </span>
       </div>
@@ -263,6 +266,7 @@ export function SapTokenSection({
               isUsed={usedTokens.has(key)}
               onAddSapToken={onAddSapToken}
               onUpdateToken={onUpdateToken}
+              readOnly={readOnly}
             />
           ))
         )}

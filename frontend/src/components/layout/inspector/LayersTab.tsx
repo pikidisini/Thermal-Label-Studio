@@ -1,7 +1,7 @@
 import { translate as t, useTranslation } from "../../../shared/i18n";
 import { useFieldLabel } from '../../../features/data-tokens';
 import React from 'react';
-import { Badge, IconButton } from '../../../shared/ui';
+import { Icon, Badge, IconButton } from '../../../shared/ui';
 
 interface LayersTabProps {
   objectsList: any[];
@@ -59,7 +59,7 @@ function LayerActionBtn({ icon, title, testId, onClick, disabled, danger }: {
       label={title}
       className={`h-auto w-auto disabled:cursor-not-allowed`}
      tone={danger ? 'danger' : 'neutral'}>
-      <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-14)" }}>{icon}</span>
+      <Icon  size={14} glyph={icon} />
     </IconButton>
   );
 }
@@ -110,7 +110,7 @@ export function LayersTab({
       <div data-testid="container-layers-list" className="flex-1 overflow-y-auto divide-y divide-outline-variant/40">
         {objectsList.length === 0 ? (
           <div data-testid="layers-empty-state" className="p-6 flex flex-col items-center gap-2 text-center">
-            <span className="material-symbols-outlined text-outline" style={{ fontSize: "var(--ui-icon-28)" }}>layers_clear</span>
+            <Icon className=" text-outline"  size="large" glyph="layers_clear" />
             <p className="text-[11px] text-on-surface-variant">{t("No vector elements on canvas")}</p>
           </div>
         ) : (
@@ -138,9 +138,7 @@ export function LayersTab({
                   onClick={() => onSelectLayer(obj)}
                   className="flex flex-1 min-w-0 items-center gap-2 text-left"
                  data-ui-control="button" data-variant="default"  data-selected={Boolean(isSelected)}>
-                <span className={`material-symbols-outlined shrink-0 ${getObjColor(obj)}`}>
-                  {getObjIcon(obj)}
-                </span>
+                <Icon className={` shrink-0 ${getObjColor(obj)}`} glyph={getObjIcon(obj)} />
 
                 <span className="flex-1 min-w-0 flex items-center gap-1.5">
                   <span className={`truncate font-mono ${isHidden ? "opacity-40" : ''} `}>
@@ -161,9 +159,7 @@ export function LayersTab({
                     label={isHidden ? t("Show") : t("Hide")}
                     className="h-auto w-auto"
                   >
-                    <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-13)" }}>
-                      {isHidden ? "visibility_off" : "visibility"}
-                    </span>
+                    <Icon  size={13} glyph={isHidden ? "visibility_off" : "visibility"} />
                   </IconButton>
                   <IconButton
                     data-testid={`layer-btn-lock-${idx}`}
@@ -171,9 +167,7 @@ export function LayersTab({
                     label={isLocked ? t("Unlock") : t("Lock")}
 
                    selected={isLocked} tone="warning">
-                    <span className="material-symbols-outlined" style={{ fontSize: "var(--ui-icon-13)" }}>
-                      {isLocked ? "lock" : "lock_open"}
-                    </span>
+                    <Icon  size={13} glyph={isLocked ? "lock" : "lock_open"} />
                   </IconButton>
                 </div>
               </div>
