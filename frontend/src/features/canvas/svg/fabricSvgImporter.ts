@@ -1,12 +1,10 @@
+import { decodeSpec, validateMetadataDocument } from './bindingMetadata';
 import * as fabric from 'fabric';
 
 function restorePayloadTemplate(obj: fabric.FabricObject, payloadSpec: string | null) {
   if (!payloadSpec) return;
-  try {
-    const bytes = Uint8Array.from(atob(payloadSpec), (char) => char.charCodeAt(0));
-    const parsed = JSON.parse(new TextDecoder().decode(bytes));
-    if (parsed?.version === 1 && typeof parsed.template === 'string') obj.set('payloadTemplate', parsed.template);
-  } catch { /* malformed metadata is ignored; normal SVG remains importable */ }
+  const parsed = decodeSpec(payloadSpec);
+  obj.set('payloadTemplate', parsed.template);
 }
 
 function restoreTextAlignment(elem: Element, obj: fabric.FabricObject) {
@@ -39,6 +37,7 @@ export function importSvgIntoFabricCanvas(
 ) {
   const viewBox = sourceViewBox(svgString);
   const document = new DOMParser().parseFromString(svgString, 'image/svg+xml');
+  try { validateMetadataDocument(document); } catch { onError('Template binding metadata is invalid or needs explicit migration.'); return; }
   // XML serializers may rename the XLink prefix (for example ns1:href).
   // Fabric reads literal attribute names, so expose the namespace-resolved
   // image source as SVG 2 href before parsing, including stored older layouts.
@@ -106,6 +105,58 @@ export function importSvgIntoFabricCanvas(
       const elemId = elem.getAttribute('id') || '';
       const barcodeType = attr('data-barcode-type') || attr('barcodeType');
       const payloadSpec = attr('data-payload-spec');
+      const symbolSpec = attr('data-symbol-spec');
+      if (symbolSpec) {
+        obj.set('symbolSpec', decodeSpec(symbolSpec));
+        // Canonical symbol specs identify symbols even without optional editor hints.
+        obj.set('isBarcode', true);
+      }
+      const textSpec = attr('data-text-spec');
+      const textLayout = attr('data-text-layout');
+      if (textLayout) {
+        const layout = decodeSpec(textLayout);
+        obj.set({ originX: layout.origin_x, originY: layout.origin_y, charSpacing: layout.char_spacing });
+      }
+      if (textSpec) {
+        const metrics = decodeSpec(textSpec);
+        const spans = Array.from(elem.querySelectorAll('tspan'));
+        obj.set({ fontSize: metrics.font_size, lineHeight: metrics.line_height, textAlign: metrics.text_align });
+        if (spans.length && spans.every((span) => span.hasAttribute('y'))) {
+          const layout = textLayout ? decodeSpec(textLayout) : null;
+          const step = metrics.font_size * 1.13 * metrics.line_height;
+          const firstY = layout ? -layout.height / 2 + metrics.font_size * 1.13 * (1 - .222) : Number(spans[0].getAttribute('y'));
+          const count = layout ? Math.round((layout.height / (metrics.font_size * 1.13) - 1) / metrics.line_height) + 1 : 1;
+          if (!Number.isFinite(count) || count < 1 || count > 100) throw new Error('Unsupported canonical text line count.');
+          const lines = Array.from({ length: count }, () => '');
+          for (const span of spans) {
+            const index = Math.round((Number(span.getAttribute('y')) - firstY) / step);
+            if (index < 0 || index > 99) throw new Error('Unsupported canonical text baseline.');
+            while (lines.length <= index) lines.push('');
+            lines[index] += span.textContent ?? '';
+          }
+          obj.set('text', lines.join('\n'));
+        }
+      }
+      const chain: Element[] = [];
+      let cursor: Element | null = elem.parentElement;
+      while (cursor) { chain.unshift(cursor); cursor = cursor.parentElement; }
+      let world: fabric.TMat2D = [1, 0, 0, 1, 0, 0];
+      const groupPath: { key: string; matrix: fabric.TMat2D }[] = [];
+      for (const source of chain) {
+        const transform = source.getAttribute('transform');
+        if (transform && document.documentElement.getAttribute('data-editor-coordinate-profile') === 'fabric7') {
+          const parsed = /^matrix\(([^)]+)\)$/.exec(transform.trim());
+          if (!parsed) throw new Error('Canonical Fabric transform is unsupported.');
+          const matrix = parsed[1].trim().split(/[ ,]+/).map(Number);
+          if (matrix.length !== 6 || matrix.some((value) => !Number.isFinite(value))) throw new Error('Invalid canonical transform.');
+          world = fabric.util.multiplyTransformMatrices(world, matrix as fabric.TMat2D);
+        }
+        if (source.hasAttribute('data-editor-group')) groupPath.push({ key: groupKey(source, 'group'), matrix: world });
+      }
+      if (document.documentElement.getAttribute('data-editor-coordinate-profile') === 'fabric7') {
+        (obj as any).__canonicalWorldMatrix = world;
+        (obj as any).__canonicalGroupPath = groupPath;
+      }
       const editorGroupSource = nearestAncestorWith(elem, 'data-editor-group');
       if (editorGroupSource) {
         (obj as any).__editorGroupKey = groupKey(editorGroupSource, 'group');
@@ -159,34 +210,31 @@ export function importSvgIntoFabricCanvas(
         // Restore only the editor groups marked in the SVG. A normal SVG root
         // is flattened, so marked editor groups are rebuilt from their own
         // children without swallowing unrelated elements.
-        const grouped = new Map<string, { kind: 'group'; members: any[] }>();
+        type Entry = { key: string; matrix: fabric.TMat2D; children: (Entry | fabric.FabricObject)[] };
+        const roots: (Entry | fabric.FabricObject)[] = [];
+        const entries = new Map<string, Entry>();
         rawItems.forEach((obj: any) => {
-          const key = obj.__editorGroupKey as string | undefined;
-          if (!key) return;
-          const entry = grouped.get(key) || { kind: 'group', members: [] };
-          entry.members.push(obj);
-          grouped.set(key, entry);
+          if (obj.__canonicalWorldMatrix) fabric.util.applyTransformToObject(obj, obj.__canonicalWorldMatrix);
+          let target = roots;
+          const path = obj.__canonicalGroupPath as { key: string; matrix: fabric.TMat2D }[] | undefined;
+          for (const group of path || []) {
+            let entry = entries.get(group.key);
+            if (!entry) { entry = { ...group, children: [] }; entries.set(group.key, entry); target.push(entry); }
+            target = entry.children;
+          }
+          target.push(obj);
         });
-        const rebuiltByKey = new Map<string, any>();
-        grouped.forEach((entry) => {
-          if (entry.members.length < 1) return;
-          const rebuiltGroup: any = new fabric.Group(entry.members, { originX: 'left', originY: 'top' });
-          rebuiltGroup.isEditorGroup = true;
-          const key = (entry.members[0] as any).__editorGroupKey as string | undefined;
-          if (key) rebuiltByKey.set(key, rebuiltGroup);
-        });
-        // Replace each editor group's first source member in place. Appending
-        // reconstructed groups keep their source ordering relative to later
-        // text, barcode, and image objects on every SVG round-trip.
-        const insertedGroups = new Set<string>();
-        const items = rawItems.flatMap((obj) => {
-          const key = (obj as any).__editorGroupKey as string | undefined;
-          if (!key) return [obj];
-          if (insertedGroups.has(key)) return [];
-          insertedGroups.add(key);
-          const rebuiltGroup = rebuiltByKey.get(key);
-          return rebuiltGroup ? [rebuiltGroup] : [];
-        });
+        const build = (entry: Entry | fabric.FabricObject): fabric.FabricObject => {
+          if (!('children' in entry)) return entry;
+          const children = entry.children.map(build);
+          const inverse = fabric.util.invertTransform(entry.matrix);
+          children.forEach((child) => fabric.util.applyTransformToObject(child, fabric.util.multiplyTransformMatrices(inverse, child.calcTransformMatrix())));
+          const group = new fabric.Group(children);
+          group.isEditorGroup = true;
+          fabric.util.applyTransformToObject(group, entry.matrix);
+          return group;
+        };
+        const items = roots.map(build);
         canvas.clear();
         canvas.backgroundColor = '#ffffff'; canvas.requestRenderAll();
 
@@ -214,6 +262,8 @@ export function importSvgIntoFabricCanvas(
           obj.left = (obj.left || 0) * fitScale;
           obj.top = (obj.top || 0) * fitScale;
           obj.setCoords();
+          const refreshChildren = (parent: any) => parent.getObjects?.().forEach((child: any) => { child.setCoords(); refreshChildren(child); });
+          refreshChildren(obj);
           canvas.add(obj);
         });
       } else {

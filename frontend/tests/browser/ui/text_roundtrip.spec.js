@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { openStudio, saveLayout, reopenLayout } from '../helpers/studio.js';
+import { openStudio, saveLayout, reopenLayout, mockBuiltApplication } from '../helpers/studio.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const dist = fileURLToPath(new URL('../../../dist/', import.meta.url));
 test.beforeEach(async ({ page }) => {
+  await mockBuiltApplication(page);
   await page.route('**/studio', route => route.fulfill({ path: path.join(dist, 'index.html'), contentType: 'text/html' }));
   await page.route('**/assets/**', route => {
     const file = path.resolve(dist, `.${decodeURIComponent(new URL(route.request().url()).pathname)}`);

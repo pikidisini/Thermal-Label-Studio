@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { isLabelFieldKey } from '../features/data-tokens/model/labelFieldCatalog';
+import { createDefaultTokenData } from '../features/data-tokens/model/defaultTokenData';
 import type { JsonObject } from '../types/api';
 import { compositionFields } from '../features/data-tokens/model/composition';
 import { adaptSapContract } from '../features/data-tokens';
@@ -33,9 +35,9 @@ export const useContractStore = create<ContractState>((set, get) => ({
   outputBlocked: false,
   setOutputBlocked: (outputBlocked) => set({ outputBlocked }),
   sampleContracts: {},
-  activeContractKey: 'goods_receipt',
-  jsonData: {},
-  tokenMap: {},
+  activeContractKey: 'demo-defaults',
+  jsonData: { fields: createDefaultTokenData() },
+  tokenMap: createDefaultTokenData(),
   fieldDescriptions: {},
   usedTokens: new Set<string>(),
   localImport: null,
@@ -61,7 +63,7 @@ export const useContractStore = create<ContractState>((set, get) => ({
     })),
   setTokenMap: (tokenMap) => set({ tokenMap }),
   updateTokenValue: (key, value) => set((state) => {
-    if (state.outputBlocked) return state;
+    if (state.outputBlocked || !isLabelFieldKey(key)) return state;
     const next = { ...state.jsonData } as any;
     const section = next.fields && Object.prototype.hasOwnProperty.call(next.fields, key) ? 'fields' : next.codes && Object.prototype.hasOwnProperty.call(next.codes, key) ? 'codes' : 'fields';
     if (section) next[section] = { ...next[section], [key]: value };
@@ -77,7 +79,7 @@ export const useContractStore = create<ContractState>((set, get) => ({
     customTokens: new Set<string>(),
     activeContractKey: `local:${localImport?.itemSequence ?? 1}`,
   }),
-  markCustomToken: (key) => set((state) => ({ customTokens: new Set(state.customTokens).add(`${state.activeContractKey}:${key.toLocaleLowerCase()}`) })),
+  markCustomToken: (key) => set((state) => ({ customTokens: new Set(state.customTokens).add(`${state.activeContractKey}:${key}`) })),
 
   updateUsedTokensFromCanvas: (canvas) => {
     if (!canvas) return;

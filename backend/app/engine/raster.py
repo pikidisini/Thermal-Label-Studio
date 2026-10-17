@@ -58,11 +58,19 @@ def render_svg_bitmap(svg: str, width: int, height: int, dpi: float, *, allow_ed
     settings = get_settings()
     if not settings.renderer_path.is_file() or not settings.fixture_font_path.is_file():
         raise RasterError("renderer_unavailable")
+    # Binding measures these same trusted siblings. Loading regular alone
+    # silently loses authored bold/italic shapes despite correct text metrics.
+    names = ('arialbd.ttf', 'ariali.ttf', 'arialbi.ttf') if settings.fixture_font_path.name.lower() == 'arial.ttf' else (
+        ('LiberationSans-Bold.ttf', 'LiberationSans-Italic.ttf', 'LiberationSans-BoldItalic.ttf')
+        if settings.fixture_font_path.name == 'LiberationSans-Regular.ttf' else ())
+    fonts = [settings.fixture_font_path] + [settings.fixture_font_path.with_name(name) for name in names
+                                          if settings.fixture_font_path.with_name(name).is_file()]
+    font_arguments = [argument for font in fonts for argument in ('--use-font-file', str(font))]
     try:
         result = subprocess.run(
             [str(settings.renderer_path), "-", "-c", "--width", str(width), "--height", str(height),
              "--dpi", str(round(dpi)), "--background", "white", "--skip-system-fonts",
-             "--use-font-file", str(settings.fixture_font_path), "--font-family", settings.fixture_font_family],
+             *font_arguments, "--font-family", settings.fixture_font_family],
             input=svg.encode("utf-8"), capture_output=True, timeout=15, check=False,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )

@@ -5,6 +5,7 @@ import React from 'react';
 import { SAP_FIELD_REGISTRY, getSAPTypeLabel } from '../../../types/sap-contract';
 import type { FlatSapTokenMap, RawSapContract } from '../model/sapContractAdapter';
 import { getFieldStatus } from '../model/fieldPresentation';
+import { LABEL_FIELD_GROUPS, getLabelField, labelTokenKeys, isLabelFieldKey, canAddLabelField } from '../model/labelFieldCatalog';
 
 interface SapTokenSectionProps {
   sampleContracts: Record<string, RawSapContract>;
@@ -41,20 +42,21 @@ interface TokenCardProps {
   onAddSapToken: (token: string, asType: 'text' | 'barcode' | 'qr') => void;
 }
 
-type TokenProfile = 'standard' | 'customer' | 'characteristic' | 'custom';
+type TokenProfile = string;
 
 function TokenCard({ fieldKey, value, isUsed, onAddSapToken, onUpdateToken, status, readOnly }: TokenCardProps & { onUpdateToken?: (token: string, value: string) => void; readOnly?: boolean }) {
   useTranslation();
   const fieldLabel = useFieldLabel();
-  const typeLabel = getSAPTypeLabel(fieldKey);
+  const definition = getLabelField(fieldKey);
+  const typeLabel = definition ? definition.businessType : getSAPTypeLabel(fieldKey);
   const meta = SAP_FIELD_REGISTRY[fieldKey];
   const label = fieldLabel(fieldKey);
 
   const handleDrag = (e: React.DragEvent, asType: 'text' | 'barcode' | 'qr') => {
-    if (!/^[a-zA-Z0-9_-]+$/.test(fieldKey)) return;
+    if (!isLabelFieldKey(fieldKey) || definition?.bindingSupported === false) return;
     e.dataTransfer.setData('application/json', JSON.stringify({ type: 'sap-token', token: fieldKey, asType }));
   };
-  const canPreviewToken = /^[a-zA-Z0-9_-]+$/.test(fieldKey);
+  const canPreviewToken = isLabelFieldKey(fieldKey) && definition?.bindingSupported !== false;
 
   return (
     <div
@@ -82,6 +84,11 @@ function TokenCard({ fieldKey, value, isUsed, onAddSapToken, onUpdateToken, stat
       {/* Sample value */}
       <div data-testid={`sap-token-val-${fieldKey}`} className="px-3 pb-1 text-[10px] text-on-surface-variant font-mono truncate">
         <span className="block text-[9px] mb-1">{t(status)}</span><input readOnly={readOnly} aria-label={t("Preview value for {field}", { field: label })} value={value} onChange={(e) => onUpdateToken?.(fieldKey, e.target.value)} className="w-full"  data-ui-control="input" data-variant="default" />
+        {definition && <details className="mt-1 whitespace-normal"><summary>{t("Field contract")}</summary>
+          <div>{t("Source reference")}: <code>{definition.source}</code></div>
+          <div>{t("Example only")}: {String(definition.example)}</div>
+          <div>{t("Required for output when used by the template.")}</div>
+        </details>}
         {meta && (
           <span className="ml-1 text-outline" title={meta.description}>— {meta.description}</span>
         )}
@@ -89,7 +96,7 @@ function TokenCard({ fieldKey, value, isUsed, onAddSapToken, onUpdateToken, stat
 
       {/* Insert actions */}
       <div data-testid={`sap-token-actions-${fieldKey}`} className="flex px-2 pb-2 gap-1">
-        {!canPreviewToken && <div className="px-2 pb-1 text-[9px] text-secondary">{t("Field name is not supported")}</div>}
+        {!canPreviewToken && <div className="px-2 pb-1 text-[9px] text-secondary">{t(definition?.bindingSupported === false ? "Array fields are not supported for binding" : "Field name is not supported")}</div>}
         {(['text', 'barcode', 'qr'] as const).map((insertType) => {
           const icons: Record<string, string> = { text: 'title', barcode: 'barcode', qr: 'qr_code_2' };
           const labels: Record<string, string> = { text: 'Text', barcode: 'Bar', qr: 'QR' };
@@ -144,16 +151,15 @@ export function SapTokenSection({
   useTranslation();
   const fieldLabel = useFieldLabel();
   const datasetFileInput = React.useRef<HTMLInputElement>(null);
-  const schemaKeys = new Set<string>(Object.keys(jsonData || {}));
-  usedTokens.forEach((key) => schemaKeys.add(key));
+  const schemaKeys = new Set(labelTokenKeys(jsonData || {}, usedTokens));
   const tokenKeys = Array.from(schemaKeys).sort((a, b) => a.localeCompare(b));
   const [customName, setCustomName] = React.useState('');
   const [customValue, setCustomValue] = React.useState('');
   const [search, setSearch] = React.useState('');
   const [profile, setProfile] = React.useState<TokenProfile>('standard');
   const addCustom = () => {
-    const name = customName.trim();
-    if (!/^[A-Za-z0-9_-]+$/.test(name) || Array.from(schemaKeys).some((key) => key.toLowerCase() === name.toLowerCase())) return;
+    const name = customName;
+    if (!canAddLabelField(name, schemaKeys) || readOnly) return;
     onAddCustomToken?.(name, customValue);
     onMarkCustomToken?.(name);
     setCustomName(''); setCustomValue('');
@@ -161,7 +167,9 @@ export function SapTokenSection({
 
   const categoryByKey = new Map<string, TokenProfile>();
   tokenKeys.forEach((key) => {
-    if (customTokens.has(`${activeContractKey}:${key.toLocaleLowerCase()}`)) { categoryByKey.set(key, 'custom'); return; }
+    if (customTokens.has(`${activeContractKey}:${key}`)) { categoryByKey.set(key, 'custom'); return; }
+    const definition = getLabelField(key);
+    if (definition) { categoryByKey.set(key, definition.category); return; }
     if (SAP_FIELD_REGISTRY[key]) { categoryByKey.set(key, 'standard'); return; }
     const category = tokenCategories[key];
     categoryByKey.set(key, category ?? 'standard');
@@ -200,6 +208,7 @@ export function SapTokenSection({
           </select>
         </label>
         <button type="button" data-testid="btn-upload-dataset" onClick={() => datasetFileInput.current?.click()} className="cursor-pointer" data-ui-control="button" data-variant="default">{t("Upload dataset")}</button>
+        {activeContractKey === 'demo-defaults' && <p role="status" data-testid="default-token-data-notice" className="text-[10px]">{t("Default demo values - edit or load a dataset for actual data.")}</p>}
         {datasetStatus && <p role="status" data-testid="dataset-storage-status" className="text-[10px]">{t(datasetStatus)}</p>}
         {localImport && (
           <div className="rounded border border-tertiary/50 bg-tertiary/10 p-2 text-[10px] text-tertiary" data-testid="local-sap-import-banner">
@@ -222,7 +231,7 @@ export function SapTokenSection({
         {localImportError && <div role="alert" className="text-[10px] text-secondary" data-testid="local-sap-import-error">{t(localImportError)}</div>}
         {localImportWarning && <div className="text-[10px] text-secondary" data-testid="local-sap-import-warning">{t("Warning:")} {t(localImportWarning)}</div>}
       </div>
-      <div className="px-3 py-2 border-b border-outline-variant bg-surface-container-low text-[10px] text-on-surface-variant">{t("Choose a field to add its value to the label. Changes here apply to local preview.")}</div>
+      <div className="px-3 py-2 border-b border-outline-variant bg-surface-container-low text-[10px] text-on-surface-variant">{t("Choose a field to add its value to the label. Changes here apply to local preview.")} {t("Examples are references only. Missing values stay not supplied.")}</div>
 
       {/* Token count header */}
       <div data-testid="sap-tokens-header" className="px-3 py-1.5 flex items-center gap-1.5 border-b border-outline-variant bg-surface-container-lowest">
@@ -236,6 +245,7 @@ export function SapTokenSection({
         <label data-ui-label="true" className="sr-only" htmlFor="select-sap-token-profile">{t("Field group")}</label>
         <select id="select-sap-token-profile" data-testid="select-sap-token-profile" aria-label={t("Field group")} value={profile} onChange={(e) => setProfile(e.target.value as TokenProfile)} className="w-full cursor-pointer" data-ui-control="select" data-variant="default">
           <option value="standard">{t("All fields")}</option>
+          {LABEL_FIELD_GROUPS.map(group => <option key={group.id} value={group.id}>{t(group.label)}</option>)}
           <option value="customer">{t("Customer")}</option>
           <option value="characteristic">{t("Product characteristics")}</option>
           <option value="custom">{t("Custom")}</option>
@@ -246,7 +256,7 @@ export function SapTokenSection({
         <div className="flex gap-1">
           <input aria-label={t("New field key")} value={customName} onChange={(e) => setCustomName(e.target.value)} placeholder={t("field_key")} className="min-w-0 flex-1"  data-ui-control="input" data-variant="default" />
           <input aria-label={t("New field value")} value={customValue} onChange={(e) => setCustomValue(e.target.value)} placeholder={t("value")} className="min-w-0 flex-1"  data-ui-control="input" data-variant="default" />
-          <button type="button" onClick={addCustom} disabled={!/^[A-Za-z0-9_-]+$/.test(customName.trim()) || Array.from(schemaKeys).some((key) => key.toLowerCase() === customName.trim().toLowerCase())}  data-testid="btn-add-custom-token" data-ui-control="button" data-variant="default">{t("Add")}</button>
+          <button type="button" onClick={addCustom} disabled={readOnly || !canAddLabelField(customName, schemaKeys)}  data-testid="btn-add-custom-token" data-ui-control="button" data-variant="default">{t("Add")}</button>
         </div>
       </div>
 

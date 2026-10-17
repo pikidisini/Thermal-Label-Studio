@@ -1,9 +1,11 @@
 # Universal label pipeline implementation
 
+Use [STATUS.md](STATUS.md) for current implementation status, open issues and the next checkpoint. Task narratives and dated reports below record historical evidence and do not override that status.
+
 Created: 2026-10-10 (Asia/Jakarta).
-Status: T01 and T02 DONE with independent review PASS. This package authorizes no external delivery, deployment or publication by itself.
+Status: T01, T02 and T03 DONE with independent review PASS; T04/T05 DONE with primary-agent source self-review PASS; T06 source implementation complete with current-app browser acceptance BLOCKED; T07 local intake implemented with resource acceptance NEEDS_REPLAN; T08 durable identity source/fake acceptance DONE with self-review PASS; T09 source/synthetic admission, approval and target preflight DONE with self-review PASS. This package authorizes no external delivery, deployment or publication by itself.
 Execute a task when the user asks to execute that task. Do not implement the entire roadmap in one AI turn.
-The task package was created earlier. The user subsequently authorized T01 and then T02. [BASELINE](BASELINE.md), [CONTRACT](CONTRACT.md), [PARITY_MATRIX](PARITY_MATRIX.md), [T01 result](results/T01_RESULT.md) and [independent review](results/T01_REVIEW.md) record the accepted design. [T02 result](results/T02_RESULT.md) and [T02 review PASS](results/T02_REVIEW.md) record canonical admission and local sample handling. T03 is eligible and unstarted.
+The task package was created earlier. The user subsequently authorized T01, T02 and T03. [BASELINE](BASELINE.md), [CONTRACT](CONTRACT.md), [PARITY_MATRIX](PARITY_MATRIX.md), [T01 result](results/T01_RESULT.md) and [independent review](results/T01_REVIEW.md) record the accepted design. [T02 result](results/T02_RESULT.md) and [T02 review PASS](results/T02_REVIEW.md) record canonical admission and local sample handling. [T03 result](results/T03_RESULT.md), [T03 review PASS](results/T03_REVIEW.md) and [implemented metadata contract](../../TEMPLATE_BINDING_CONTRACT.md) record accepted local metadata behavior and limitations. [T04 result](results/T04_RESULT.md) and [source self-review](results/T04_REVIEW.md) record pure text preparation; [T05 result](results/T05_RESULT.md) and [source self-review](results/T05_REVIEW.md) record complete binding for explicit proven profiles. T06 source/client/native parity is implemented; [result](results/T06_RESULT.md) and [review](results/T06_REVIEW.md) keep current-app browser acceptance BLOCKED. T07 local intake simulation is implemented; [result](results/T07_RESULT.md) and [review](results/T07_REVIEW.md) record NEEDS_REPLAN for hard deadline/native memory enforcement. Default external authorization stays closed.
 
 ## Objective
 
@@ -27,7 +29,7 @@ Re-read actual source at the start of each task. The worktree was already dirty 
 
 - Latest versionless envelope: sender, request_id, required mode, optional field_descriptions, ordered items.
 - mode is simulation or print for the whole request.
-- Each item contains unique item_id, label_code, copies (strict integer 1–999), and scalar/null data.
+- Each item contains unique item_id, label_code, copies (strict integer 1â€“999), and scalar/null data.
 - Data Tokens remains an editor feature. It does not listen to external requests or change the selected Studio dataset when intake runs.
 - Importing a JSON file with mode=print never prints automatically.
 - Studio output submits the current draft and explicit data to server binding. Intake resolves a stored template by label_code and pins the exact version/checksum.
@@ -90,7 +92,7 @@ T01 decides the universal intake endpoint and editor request shape, preserving o
 | [T08](tasks/T08_DURABLE_REQUEST_IDENTITY.md) | Durable deduplication and recovery boundaries | T01, T07 | Source/schema/tests with fakes |
 | [T09](tasks/T09_ADMISSION_AND_TARGET_POLICY.md) | Admission, approved templates and server target routing | T01, T07 | Source/policy/tests with fakes |
 | [T10](tasks/T10_INTAKE_PRINT.md) | Universal print and unambiguous per-item outcomes | T06, T07, T08, T09 | Source/tests; no physical send |
-| [T11](tasks/T11_SOURCE_AND_RUNTIME_ACCEPTANCE.md) | Main software acceptance and separate runtime evidence | T02–T10 | Source/parity checks; live storage/container checks require named authorization |
+| [T11](tasks/T11_SOURCE_AND_RUNTIME_ACCEPTANCE.md) | Main software acceptance and separate runtime evidence | T02â€“T10 | Source/parity checks; live storage/container checks require named authorization |
 | [T12](tasks/T12_PHYSICAL_ACCEPTANCE.md) | Optional named printer/external-sender acceptance | T11 | Run only when requested; explicit named-target authorization required |
 
 The default implementation sequence is T01 through T11 with one active writer. T12 is optional device/integration acceptance and does not block software feature acceptance. Dependency edges allow review preparation, not permission for parallel source writers.
@@ -133,3 +135,17 @@ Write results/T01_RESULT.md with evidence and remaining decisions. Do not begin 
 ```
 
 For later tasks substitute the task ID and filename, and read prerequisite results/reviews.
+
+## T08 durable identity handoff
+
+[T08 result](results/T08_RESULT.md) and [source self-review](results/T08_REVIEW.md) record completed source/transactional-fake acceptance. [Operations](T08_LEDGER_OPERATIONS.md) and [crash matrix](T08_CRASH_MATRIX.md) describe the unapplied schema/key/connection/retention/recovery boundaries. The user explicitly selected this source slice while preserving T07 NEEDS_REPLAN and T06 browser BLOCKED. T09/T10 are not implemented and intake print/default external admission remain denied.
+
+T09 source policy is implemented; see [result](results/T09_RESULT.md), [self-review PASS](results/T09_REVIEW.md) and [configuration/handoff](T09_POLICY_OPERATIONS.md). Default configuration stays denied, and intake print awaits T10. T07/T06 gates are unchanged; no operational setup was performed.
+
+T10 functional print source and fake/native tests are implemented; see [result](results/T10_RESULT.md), [review CHANGES_REQUIRED](results/T10_REVIEW.md) and [runtime matrix](T10_RUNTIME_MATRIX.md). Overall T10 remains NEEDS_REPLAN for mandatory T07 hard cancellation/native memory. Default operational configuration is still denied and T11 is unstarted.
+
+
+T11 has been executed locally; see [software acceptance](T11_SOFTWARE_ACCEPTANCE.md), [runtime acceptance](T11_RUNTIME_ACCEPTANCE.md), [result](results/T11_RESULT.md) and [review](results/T11_REVIEW.md). Overall NEEDS_REPLAN retains the mandatory T07/T10 resource requirement; runtime is PARTIAL/NOT RUN and standard intake setup has unresolved source wiring. Current built-assets browser mocks are distinct from current-app availability. T12 stays optional and unstarted. Earlier execution paragraphs describe their dated task state, not the final T11 state.
+
+
+T12 was explicitly requested and local preparation is complete: [nine-case UAT plan](T12_UAT_PLAN.md), [exact manifest/templates](T12_ACCEPTANCE_PLAN.json), [result](results/T12_RESULT.md) and [review](results/T12_REVIEW.md). Native local preparation/pixel checks PASS; physical/integration acceptance is BLOCKED/NOT RUN for missing named device/count/slot/source authority and relevant T11 prerequisites. The optional task does not infer physical readiness from preview or historical printer evidence.

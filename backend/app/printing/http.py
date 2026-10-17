@@ -3,13 +3,16 @@ from typing import Callable, Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.config import get_settings, PrinterTarget
-from app.engine.pipeline import prepare_editor_output
+from app.engine.pipeline import prepare_draft_output
+from app.engine.editor_request import EditorOutputRequest
+from app.template_binding.composition import BindingError
+from app.template_binding.models import TemplateAdmissionError
 from app.engine.raster import RasterError
 from app.observability import record_event, request_context
 from app.printing.service import BitmapTransport, PrintSubmissionError, submit_prepared_output
 from app.printing.transport import TcpRawTransport
 from app.protocols.ipl.errors import IplError
-from app.svg_safety import MAX_SVG_BYTES
+from app.activity.context import studio_identity, studio_outcome, stage
 
 router = APIRouter()
 
@@ -24,15 +27,8 @@ class PrintTargetInput(BaseModel):
         return self
 
 
-class EditorPrintRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-    svg: str = Field(min_length=1, max_length=MAX_SVG_BYTES)
-    width_mm: float = Field(ge=10, le=500)
-    height_mm: float = Field(ge=10, le=500)
-    dpi: float = Field(ge=72, le=600)
-    encoder: Literal["IPL"] = "IPL"
+class EditorPrintRequest(EditorOutputRequest):
     target: PrintTargetInput | None = None
-    copies: int = Field(default=1, ge=1, le=999)
 
 class PrintTargetResponse(BaseModel):
     available: bool
@@ -42,6 +38,8 @@ class PrintTargetResponse(BaseModel):
 
 class EditorPrintResponse(BaseModel):
     request_id: str
+    template_sha256: str
+    binding_version: Literal[1] = 1
     status: Literal["SUBMITTED"] = "SUBMITTED"
     confirmed: Literal[False] = False
     width_px: int
@@ -72,14 +70,17 @@ def print_editor(
     default_target: PrinterTarget | None = Depends(configured_target),
 ):
     with request_context() as request_id:
+        studio_identity(request)
         # Pydantic validated the explicit target before entering the endpoint.
         target = PrinterTarget(request.target.host, request.target.port) if request.target else default_target
         if target is None:
             raise HTTPException(status_code=503, detail={"code": "printer_unavailable"})
-        transport = factory(target)
         try:
-            prepared = prepare_editor_output(request.svg, request.width_mm, request.height_mm,
-                                             request.dpi, language=request.encoder, copies=request.copies)
+            bound, prepared = prepare_draft_output(request)
+        except BindingError as exc:
+            raise HTTPException(status_code=422, detail={"code": exc.code}) from None
+        except TemplateAdmissionError:
+            raise HTTPException(status_code=422, detail={"code": "invalid_print_layout"}) from None
         except IplError:
             record_event("FAILED", error_code="processing_failed")
             raise HTTPException(status_code=500, detail={"code": "print_preparation_failed"}) from None
@@ -90,14 +91,17 @@ def print_editor(
             record_event("FAILED", error_code="raster_failed")
             raise HTTPException(status_code=500, detail={"code": "print_preparation_failed"}) from None
         try:
-            submission = submit_prepared_output(prepared, transport)
+            stage('SUBMITTING')
+            submission = submit_prepared_output(prepared, factory(target))
         except PrintSubmissionError:
             record_event("FAILED", error_code="print_submission_uncertain")
             raise HTTPException(status_code=502, detail={"code": "print_submission_uncertain"}) from None
         record_event("SUBMITTED")
         bitmap = submission.output.bitmap
-        return EditorPrintResponse(request_id=request_id, width_px=bitmap.width_px,
+        result = EditorPrintResponse(request_id=request_id, template_sha256=bound.manifest.svg_sha256, width_px=bitmap.width_px,
                                    height_px=bitmap.height_px, dpi=bitmap.dpi,
                                    payload_bytes=len(submission.output.payload),
                                    target=PrintTargetInput(host=target.host, port=target.port),
                                    copies=submission.output.copies)
+        studio_outcome(result)
+        return result

@@ -1,7 +1,7 @@
 # T10 — Connect universal intake print with durable outcomes
 
 TASK_ID: T10
-Status: PENDING
+Status: NEEDS_REPLAN (functional source/fake PASS; mandatory T07 resource gate unmet)
 Depends on: T06, T07, T08, T09
 Execution size: One bounded AI task; do not start successors automatically.
 
@@ -49,13 +49,13 @@ Enable intake mode=print only after canonical validation, template/policy prefli
 
 ## Acceptance criteria
 
-- [ ] An authorized valid request creates one payload and one submit per item; copies affects IPL quantity, not the number of submits.
-- [ ] Equal stored template/data/parameters match the Studio server output pixels/payload.
-- [ ] Validation/policy/ledger/preparation failures never call transport.
-- [ ] Ambiguous send/terminal persistence failures cannot unlock automatic resend or send later batch items.
-- [ ] Replay/concurrent duplicate cannot send again; result exposes chosen version, copies, effective target and confirmation limit.
-- [ ] All results reflect actual processed/submitted/skipped items. No response claims physical printing succeeded.
-- [ ] Only injected fake targets/transports are exercised in this task.
+- [x] An authorized valid request creates one payload and one submit per item; copies affects IPL quantity, not the number of submits.
+- [x] Equal stored template/data/parameters match the Studio server output pixels/payload.
+- [x] Validation/policy/ledger/preparation failures never call transport.
+- [x] Ambiguous send/terminal persistence failures cannot unlock automatic resend or send later batch items.
+- [x] Replay/concurrent duplicate cannot send again; result exposes chosen version, copies, effective target and confirmation limit.
+- [x] All results reflect actual processed/submitted/skipped items. No response claims physical printing succeeded.
+- [x] Only injected fake targets/transports are exercised in this task.
 
 ## Required validation
 
@@ -78,3 +78,11 @@ For source implementation choices within scope, proceed with documented judgment
 Provide full source/fake evidence and runtime matrix for T11. Physical acceptance is still NOT RUN.
 Write results/T10_RESULT.md using [RESULT_TEMPLATE](../RESULT_TEMPLATE.md); request/record review via [REVIEW_TEMPLATE](../REVIEW_TEMPLATE.md).
 Update STATUS.md honestly and stop at this task's boundary.
+
+## Execution evidence and unmet mandatory gate (2026-10-10)
+
+Functional criteria above have source/fake evidence: 267 focused cases and full source gate PASS, six native Studio/intake pixel/IPL cases, transactional crash/claim/replay/concurrency and recorded one-attempt transport. See [result](../results/T10_RESULT.md), [review CHANGES_REQUIRED](../results/T10_REVIEW.md) and [runtime matrix](../T10_RUNTIME_MATRIX.md).
+
+- [ ] Frozen hard cancellation/deadline and native process memory requirement: same T07 boundary is not sufficient. Overall T10 remains NEEDS_REPLAN until corrected/retested; functional checkbox evidence does not waive it.
+
+Current browser is still T06 BLOCKED. Runtime/storage/device acceptance is NOT RUN. No operational configuration/schema/device action or T11 execution occurred.

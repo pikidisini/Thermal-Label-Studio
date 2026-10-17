@@ -75,10 +75,10 @@ export function useTemplateManager(
   );
 
   const loadTemplateById = useCallback(
-    async (templateId: string) => {
+    async (templateId: string, version?: number) => {
       const requestId = ++templateRequestRef.current;
       try {
-        const data = await layoutApi.get(templateId);
+        const data = await layoutApi.get(templateId, version);
         if (requestId !== templateRequestRef.current) return;
         const svg = data.svg;
         if (svg) {
@@ -133,7 +133,10 @@ export function useTemplateManager(
   const saveCurrentTemplate = useCallback(
     async (templateCode: string, templateTitle?: string) => {
       if (!canvasRef.current) return;
-      const svgStr = exportFabricToSvg(canvasRef.current, labelWidthMm, labelHeightMm, pxPerMm);
+      // Store the binding contract even when local sample data is unavailable.
+      // Actual output resolves and validates current data on the server.
+      const svgStr = exportFabricToSvg(canvasRef.current, labelWidthMm, labelHeightMm, pxPerMm, { serverBinding: true });
+      if (!svgStr) throw new Error(t('Template SVG export failed. Check text and symbol binding properties before saving.'));
       await layoutApi.save({
         label_code: templateCode,
         title: templateTitle || templateCode,

@@ -1,7 +1,7 @@
 # T07 — Implement universal intake with stored-template simulation
 
 TASK_ID: T07
-Status: PENDING
+Status: NEEDS_REPLAN
 Depends on: T02, T03, T04, T05, T06
 Execution size: One bounded AI task; do not start successors automatically.
 
@@ -51,13 +51,13 @@ Add backend/app/label_intake HTTP/service/results using the frozen API contract 
 
 ## Acceptance criteria
 
-- [ ] A synthetic request can simulate two items/two label codes using injected stored templates with correct order and evidence.
-- [ ] Simulation never creates a transport or contacts a printer, including a denied mode=print request.
-- [ ] Unknown/deleted/invalid template does not fallback; item-specific failures follow the documented batch policy.
-- [ ] Concurrent template changes do not alter the already-pinned versions used within a request.
-- [ ] Canonical data, geometry and output parity match T06 under equal inputs.
+- [x] A synthetic request can simulate two items/two label codes using injected stored templates with correct order and evidence.
+- [x] Simulation never creates a transport or contacts a printer, including a denied mode=print request.
+- [x] Unknown/deleted/invalid template does not fallback; item-specific failures follow the documented batch policy.
+- [x] Concurrent template changes do not alter the already-pinned versions used within a request.
+- [x] Canonical data, geometry and output parity match T06 under equal inputs.
 - [ ] Request/response aggregate limits stop resource-heavy batches before violating the documented budget.
-- [ ] Source authentication/admission readiness is accurately reported and no LAN/production claim is made.
+- [x] Source authentication/admission readiness is accurately reported and no LAN/production claim is made.
 
 ## Required validation
 
@@ -80,3 +80,9 @@ For source implementation choices within scope, proceed with documented judgment
 Provide the stable intake/result service boundary for T08/T09/T10. Live PostgreSQL/MinIO verification remains for authorized T11.
 Write results/T07_RESULT.md using [RESULT_TEMPLATE](../RESULT_TEMPLATE.md); request/record review via [REVIEW_TEMPLATE](../REVIEW_TEMPLATE.md).
 Update STATUS.md honestly and stop at this task's boundary.
+
+## Execution update: 2026-10-10
+
+Local intake and shared native simulation are implemented; [result](../results/T07_RESULT.md) and [review](../results/T07_REVIEW.md) record actual checks. User explicitly authorized proceeding with T06 source/native parity while retaining T06 browser BLOCKED. Resource acceptance remains unchecked: the cooperative deadline cannot interrupt a blocked storage call, and native renderer memory has no OS fence. Do not mark DONE or silently weaken the frozen limits.
+
+Required follow-up within T07: establish a cancellable isolated execution boundary covering resolution/preparation; enforce the 60-second deadline and combined working/native memory limit; release the process slot only after all child work is terminated/reaped; preserve pinned versions, the existing binder/engine/simulation sink and ordered failure results. Test a never-returning resolver, native timeout, memory exhaustion, worker crash and subsequent admission recovery. Keep operational storage/printer effects unexecuted. T08/T09/T10 remain pending.

@@ -24,7 +24,7 @@ test('F3.38 Graphics has one feature-owned public API', () => {
 
 test('F3.38 shell and canvas aggregator import Graphics only through its feature API', () => {
   const leftToolbox = read('components', 'layout', 'LeftToolbox.tsx');
-  const studio = read('components', 'studio', 'Studio.tsx');
+  const studio = read('features', 'studio', 'ui', 'Studio.tsx');
   const canvasActions = read('hooks', 'useCanvasActions.ts');
   for (const source of [leftToolbox, canvasActions]) {
     assert.match(source, /features\/graphics/);
@@ -93,7 +93,8 @@ test('F3.41 Barcode and QR own generators and public feature APIs', () => {
   assert.match(qrIndex, /useQrActions/);
   assert.match(canvasActions, /features\/barcode/);
   assert.match(canvasActions, /features\/qr/);
-  assert.match(barcodePreview, /from '..\/..\/qr\/model\/qrGenerator'/);
+  assert.match(barcodePreview, /from ['"]\.\.\/\.\.\/qr['"]/);
+  assert.doesNotMatch(barcodePreview, /from ['"]\.\.\/\.\.\/qr\//);
   assert.match(ribbon, /features\/barcode/);
   assert.equal(fs.existsSync(path.join(sourceRoot, 'utils', 'barcodeGenerators.ts')), false);
   assert.equal(fs.existsSync(path.join(sourceRoot, 'utils', 'barcodePayload.ts')), false);
@@ -104,15 +105,15 @@ test('F3.41 Barcode and QR own generators and public feature APIs', () => {
 test('F3.42 application domains expose public feature owners while shell remains generic', () => {
   const templatesIndex = read('features', 'templates', 'index.ts');
   const simulationIndex = read('features', 'simulation', 'index.ts');
-  const studio = read('components', 'studio', 'Studio.tsx');
+  const studio = read('features', 'studio', 'ui', 'Studio.tsx');
   const topMenu = read('components', 'layout', 'TopMenuBar.tsx');
 
   for (const exportedName of ['useTemplateManager', 'TemplateSelector', 'SaveTemplateModal']) assert.match(templatesIndex, new RegExp(exportedName));
   for (const exportedName of ['useThermalSimulation', 'EditorSimulationModal']) assert.match(simulationIndex, new RegExp(exportedName));
-  assert.match(studio, /features\/templates/);
-  assert.match(studio, /features\/simulation/);
+  assert.match(studio, /from ['"]\.\.\/\.\.\/templates['"]/);
+  assert.match(studio, /from ['"]\.\.\/\.\.\/simulation['"]/);
   assert.doesNotMatch(studio, /features\/print(?:\/|['"])|features\/auth(?:\/|['"])/);
-  assert.match(studio, /from ['"]\.\.\/\.\.\/features\/printing['"]/);
+  assert.match(studio, /from ['"]\.\.\/\.\.\/printing['"]/);
   assert.match(read('features', 'printing', 'index.ts'), /EditorPrintModal/);
   assert.match(topMenu, /features\/templates/);
   assert.doesNotMatch(studio, /hooks\/useTemplateManager|hooks\/useThermalSimulation|components\/modals\/(PrintModal|SaveTemplateModal|SafeDemoModal|SapShadowSimulationModal)/);
@@ -138,12 +139,12 @@ test('F3.46 Templates use shared UI controls while keeping explorer actions', ()
   assert.match(save, /shared\/ui/);
   assert.match(selector, /layoutApi\.get/);
   assert.doesNotMatch(selector, /apiClient|createTemplateFolder|moveTemplate/);
-  assert.match(save, /onSave\(templateId\.trim\(\), templateName\.trim\(\)\)/);
+  assert.match(save, /onSave\(templateId, templateName\.trim\(\)\)/);
 });
 
 test('F3.50 diagnostics and shortcut help use shared UI without changing actions or layering', () => {
   const diagnostics = read('features', 'diagnostics', 'ui', 'AiDiagnosticsModal.tsx');
-  const shortcuts = read('components', 'modals', 'ShortcutHelpModal.tsx');
+  const shortcuts = read('features', 'studio', 'ui', 'ShortcutHelpModal.tsx');
   for (const source of [diagnostics, shortcuts]) {
     assert.match(source, /shared\/ui/);
     assert.match(source, /<Dialog/);
@@ -237,7 +238,7 @@ test('F3.56 Data Tokens callers use the public feature API instead of legacy uti
 
 test('F3.57 Canvas keeps lifecycle ownership separate from cross-tool orchestration', () => {
   const canvasIndex = read('features', 'canvas', 'index.ts');
-  const studio = read('components', 'studio', 'Studio.tsx');
+  const studio = read('features', 'studio', 'ui', 'Studio.tsx');
   const canvasLifecycle = read('features', 'canvas', 'editor', 'useFabricCanvas.ts');
   const canvasActions = read('hooks', 'useCanvasActions.ts');
   const drawingTools = read('hooks', 'canvas', 'useDrawingTools.ts');
@@ -245,7 +246,7 @@ test('F3.57 Canvas keeps lifecycle ownership separate from cross-tool orchestrat
 
   assert.match(canvasIndex, /StudioCanvas/);
   assert.match(canvasIndex, /useFabricCanvas/);
-  assert.match(studio, /import\s*\{[^}]*\bStudioCanvas\b[^}]*\}\s*from '\.\.\/\.\.\/features\/canvas'/);
+  assert.match(studio, /import\s*\{[^}]*\bStudioCanvas\b[^}]*\}\s*from '\.\.\/\.\.\/canvas'/);
   assert.doesNotMatch(studio, /features\/canvas\/(ui|editor|ruler|svg|draft)\//);
   assert.match(canvasLifecycle, /attachDrawingToolListeners/);
   for (const featurePath of ['features\/line', 'features\/text', 'features\/barcode', 'features\/qr', 'features\/graphics', 'features\/images']) {
@@ -258,7 +259,7 @@ test('F3.57 Canvas keeps lifecycle ownership separate from cross-tool orchestrat
 });
 
 test('F3.59 removes the retired grid feature without removing core editor tools', () => {
-  const studio = read('components', 'studio', 'Studio.tsx');
+  const studio = read('features', 'studio', 'ui', 'Studio.tsx');
   const basicTools = read('components', 'layout', 'toolbox', 'BasicToolsSection.tsx');
   const canvasActions = read('hooks', 'useCanvasActions.ts');
   const drawingTools = read('hooks', 'canvas', 'useDrawingTools.ts');

@@ -2,7 +2,7 @@ import { translate as t, useTranslation } from "../../shared/i18n";
 import React, { useState } from 'react';
 import { ActiveTool } from '../../types/label';
 import { BasicToolsSection } from './toolbox/BasicToolsSection';
-import type { GraphicAsset } from '../../features/graphics';
+import { GraphicsSection, type GraphicAsset } from '../../features/graphics';
 import { SapTokenSection } from '../../features/data-tokens';
 import { DockButton } from './toolbox/DockButton';
 import { Icon, IconButton } from '../../shared/ui';
@@ -17,7 +17,7 @@ interface LeftToolboxProps {
   onAddBarcode: () => void;
   onAddQrCode: () => void;
   onAddLine: () => void;
-  onAddGraphic: (asset: GraphicAsset) => void;
+  onAddGraphic: (asset: GraphicAsset) => Promise<void>;
   onUploadImage: (e: React.ChangeEvent<HTMLInputElement>) => void;
   sampleContracts?: Record<string, RawSapContract>;
   activeContractKey?: string;
@@ -50,6 +50,7 @@ export function LeftToolbox({
   setActiveTool,
   onAddText, onAddBarcode, onAddQrCode,
   onAddLine,
+  onAddGraphic,
   onUploadImage,
   sampleContracts = {},
   activeContractKey = 'goods_receipt',
@@ -170,7 +171,7 @@ export function LeftToolbox({
               />
             )}
             {openPanel === 'graphics' && (
-              <div data-testid="global-graphics-planned" className="p-3 text-xs text-on-surface-variant">{t("Global graphics is planned for a future release. Use Upload Image / Logo in Design Tools for local images.")}</div>
+              <GraphicsSection onAdd={onAddGraphic} />
             )}
             {openPanel === 'sap' && (
               <SapTokenSection

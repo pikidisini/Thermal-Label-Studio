@@ -1,0 +1,9 @@
+.management-rfc-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; min-width: 0; margin: 8px 0; border: 1px solid var(--ui-border-default); padding: 8px; }
+.management-rfc-result { max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.management-source-form textarea { width: 100%; min-width: 0; resize: vertical; }
+.management-sap-list { display: grid; align-content: start; }
+.management-sap-list .management-source-row { width: 100%; }
+.management-rfc-fields input[type="checkbox"] { width: var(--ui-space-4); height: var(--ui-space-4); min-height: 0; justify-self: start; }
+.management-sap-field { min-width: 0; }
+.management-sap-help { margin: var(--ui-space-1) 0 0; font-size: var(--ui-font-label); color: var(--ui-text-secondary); line-height: 1.45; overflow-wrap: anywhere; }
+.management-sap-field input:not([type="checkbox"]), .management-sap-field select { width: 100%; min-width: 0; }

@@ -1,0 +1,2 @@
+# Install alongside requirements.txt in the tooling environment.
+httpx==0.28.1

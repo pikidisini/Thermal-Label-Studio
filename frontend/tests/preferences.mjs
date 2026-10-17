@@ -7,13 +7,44 @@ import { translate, setTranslationLanguage } from '../src/shared/i18n/index.ts';
 import { initializePreferences } from '../src/features/preferences/model/theme.ts';
 import { usePreferencesStore } from '../src/features/preferences/model/usePreferencesStore.ts';
 import { COLOR_KEYS, COLOR_TOKENS, newCustomTheme, parseCustomTheme, contrastRatio } from '../src/features/preferences/model/customTheme.ts';
+import { SIGNATURE_THEME, signatureDraft } from '../src/features/preferences/model/signatureTheme.ts';
 const fakeStyle = () => ({ setProperty(name, value) { this[name] = value; }, removeProperty(name) { delete this[name]; } });
+
+test('Signature default is immutable, exact and identical before paint and at runtime', () => {
+  const expected = { bar: '#ededed', tools: '#ffffff', panel: '#ffffff', status: '#ededed', workspace: '#ededed', grid: '#9e9e9e', text: '#030303', action: '#749faa', actionText: '#ffffff', warning: '#89806c', warningFill: '#89806c', warningText: '#ffffff' };
+  assert.deepEqual(SIGNATURE_THEME.colors, expected);
+  assert.equal(SIGNATURE_THEME.base, 'industrial-light');
+  assert.ok(Object.isFrozen(SIGNATURE_THEME) && Object.isFrozen(SIGNATURE_THEME.colors));
+  const draft = signatureDraft(); draft.colors.bar = '#000000'; assert.equal(SIGNATURE_THEME.colors.bar, '#ededed');
+  const script = readFileSync(new URL('../index.html', import.meta.url), 'utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
+  const previous = { window: globalThis.window, document: globalThis.document };
+  let dispose;
+  try {
+    for (const raw of [null, '{bad', '[]', '{}', '{"theme":"unsupported"}', '{"theme":"label-studio-signature"}']) {
+      const bootstrap = { dataset: {}, style: fakeStyle() };
+      runInNewContext(script, { localStorage: { getItem: () => raw }, document: { documentElement: bootstrap } });
+      const runtime = { dataset: {}, style: fakeStyle() };
+      globalThis.window = { dispatchEvent: () => true };
+      globalThis.document = { documentElement: runtime };
+      usePreferencesStore.setState({ ...parsePreferences(raw), customTheme: newCustomTheme('industrial-dark') });
+      dispose = initializePreferences();
+      assert.deepEqual(runtime.dataset, bootstrap.dataset);
+      assert.equal(runtime.dataset.theme, 'label-studio-signature');
+      for (const key of COLOR_KEYS) for (const token of COLOR_TOKENS[key]) { assert.equal(runtime.style[token], expected[key]); assert.equal(bootstrap.style[token], expected[key]); }
+      assert.equal(runtime.style.colorScheme, 'light');
+      usePreferencesStore.getState().setTheme('dark');
+      for (const key of COLOR_KEYS) for (const token of COLOR_TOKENS[key]) assert.equal(runtime.style[token], undefined);
+      dispose(); dispose = undefined;
+    }
+    assert.equal(parsePreferences('{"theme":"dark"}').theme, 'dark');
+  } finally { dispose?.(); globalThis.window = previous.window; globalThis.document = previous.document; usePreferencesStore.setState({ ...DEFAULT_PREFERENCES, customTheme: undefined }); setTranslationLanguage('en'); }
+});
 
 test('preferences independently validate malformed or partial saved values', () => {
   for (const value of [null, '', '{bad', 'null', '[]', '42', '"id"']) assert.deepEqual(parsePreferences(value), DEFAULT_PREFERENCES);
   assert.deepEqual(parsePreferences('{"language":"id","theme":"system","canvas":"black"}'), { language: 'id', theme: 'system' });
   assert.deepEqual(parsePreferences('{"language":"unsupported","theme":"light"}'), { language: 'en', theme: 'light' });
-  assert.deepEqual(parsePreferences('{"language":"id","theme":"unsupported"}'), { language: 'id', theme: 'dark' });
+  assert.deepEqual(parsePreferences('{"language":"id","theme":"unsupported"}'), { language: 'id', theme: 'label-studio-signature' });
 });
 test('unavailable and quota-full storage preserve usable defaults and in-memory preferences', () => {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
@@ -65,20 +96,20 @@ test('system appearance updates and cleanup removes both OS and store subscripti
 
 test('all explicit themes validate and ignore OS; bootstrap and resolver stay equivalent', () => {
   const script = readFileSync(new URL('../index.html', import.meta.url), 'utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
-  for (const theme of ['dark', 'light', 'industrial-dark', 'industrial-light', 'system', 'unknown']) {
+  for (const theme of ['dark', 'light', 'industrial-dark', 'industrial-light', 'system', 'label-studio-signature', 'unknown']) {
     for (const systemDark of [false, true]) {
       const parsed = parsePreferences(JSON.stringify({ language: 'id', theme }));
       const resolved = resolveTheme(parsed.theme, systemDark);
       if (theme !== 'unknown') assert.equal(parsed.theme, theme);
       if (theme !== 'system' && theme !== 'unknown') assert.equal(resolved, theme);
-      const element = { dataset: {}, style: {} };
+      const element = { dataset: {}, style: fakeStyle() };
       runInNewContext(script, { localStorage: { getItem: () => JSON.stringify({ language: 'id', theme }) }, matchMedia: () => ({ matches: systemDark }), document: { documentElement: element } });
       assert.equal(element.dataset.theme, resolved);
       assert.equal(element.style.colorScheme, themeColorScheme(resolved));
       assert.equal(element.lang, 'id');
     }
   }
-  const element = { dataset: {}, style: {} };
+  const element = { dataset: {}, style: fakeStyle() };
   runInNewContext(script, { localStorage: { getItem: () => '{"theme":"system"}' }, document: { documentElement: element } });
   assert.equal(element.dataset.theme, 'light');
   assert.equal(translate('Industrial Dark', 'id'), 'Gelap Industrial');
@@ -93,7 +124,7 @@ test('custom palettes validate exact bounded HEX values and strip arbitrary keys
   assert.deepEqual(Object.keys(parsed.colors), [...COLOR_KEYS]);
   for (const bad of [null, [], {}, { ...custom, base: 'light' }, { ...custom, colors: [] }, { ...custom, colors: { ...custom.colors, text: 'red' } }, { ...custom, colors: { ...custom.colors, grid: '#fff' } }]) {
     assert.equal(parseCustomTheme(bad), undefined);
-    assert.equal(parsePreferences(JSON.stringify({ theme: 'custom', customTheme: bad })).theme, 'dark');
+    assert.equal(parsePreferences(JSON.stringify({ theme: 'custom', customTheme: bad })).theme, 'label-studio-signature');
   }
   assert.equal(contrastRatio('#000000', '#ffffff'), 21);
   assert.equal(contrastRatio('#ffffff', '#ffffff'), 1);
@@ -117,7 +148,7 @@ test('legacy nine-key custom palettes default only absent warning fields with bo
         const bad = { dataset: {}, style: fakeStyle() };
         runInNewContext(script, { localStorage: { getItem: () => JSON.stringify({ theme: 'custom', customTheme }) }, document: { documentElement: bad } });
         assert.equal(bad.dataset.customTheme, 'false');
-        assert.equal(bad.dataset.theme, 'dark');
+        assert.equal(bad.dataset.theme, 'label-studio-signature');
       }
       const supplied = { base, colors: { ...oldColors, [key]: '#ABCDEF' } };
       assert.equal(parseCustomTheme(supplied).colors[key], '#abcdef');
@@ -156,7 +187,7 @@ test('prepaint and runtime custom tokens agree and switching builtin removes eve
   for (const bad of [[], { ...custom, base: 'light' }, { ...custom, colors: [] }, { ...custom, colors: { ...custom.colors, bar: 'url(evil)' } }]) {
     const element = { dataset: {}, style: fakeStyle() };
     runInNewContext(script, { localStorage: { getItem: () => JSON.stringify({ theme: 'custom', customTheme: bad }) }, document: { documentElement: element } });
-    assert.equal(element.dataset.theme, 'dark');
+    assert.equal(element.dataset.theme, 'label-studio-signature');
     assert.equal(element.dataset.customTheme, 'false');
   }
 });

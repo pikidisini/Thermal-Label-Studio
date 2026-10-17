@@ -68,7 +68,7 @@ export function BasicToolsSection({
         <input
           data-testid="input-upload-image-file"
           type="file"
-          accept="image/*,.svg"
+          accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
           onChange={onUploadImage}
           className="hidden"
         />

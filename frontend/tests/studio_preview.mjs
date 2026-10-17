@@ -1,4 +1,5 @@
 import './setup_dom_mock.mjs';
+import { JSDOM } from 'jsdom';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import React from 'react';
@@ -27,9 +28,54 @@ import { isNumericPrinterHost, targetFromFields, loadPrinterTarget, rememberPrin
 import { EditorSimulationModal } from '../src/features/simulation/ui/EditorSimulationModal.tsx';
 import { Icon, LabelStudioLogo } from '../src/shared/ui/index.ts';
 import { Printer } from 'lucide-react';
+import SaveTemplateModal from '../src/features/templates/ui/SaveTemplateModal.tsx';
+
+test('Save Template preserves exact code case and keeps display name independent', async () => {
+  const { createRoot } = await import('react-dom/client');
+  const { Simulate } = await import('react-dom/test-utils');
+  const dom = new JSDOM('<div id="root"></div>', { url: 'http://127.0.0.1:8002' });
+  // React selects its legacy input-event fallback under the minimal DOM mock.
+  dom.window.HTMLElement.prototype.attachEvent = () => {};
+  dom.window.HTMLElement.prototype.detachEvent = () => {};
+  const saved = { window: global.window, document: global.document, act: global.IS_REACT_ACT_ENVIRONMENT };
+  global.window = dom.window; global.document = dom.window.document; global.IS_REACT_ACT_ENVIRONMENT = true;
+  const root = createRoot(document.getElementById('root'));
+  const submissions = [];
+  try {
+    await React.act(async () => root.render(React.createElement(SaveTemplateModal, {
+      isOpen: true, onClose() {}, activeTemplateId: 'Existing_Mixed', widthMm: 80, heightMm: 60,
+      onSave: async (...args) => { submissions.push(args); },
+    })));
+    const codeInput = document.querySelector('[aria-label="Label code"]');
+    const nameInput = document.querySelector('input');
+    const submit = document.querySelector('button[type="submit"]');
+    assert.equal(codeInput.value, 'Existing_Mixed');
+    for (const code of ['A174', 'a174', 'Ab103_Long-Code', 'A'.repeat(128)]) {
+      await React.act(async () => Simulate.change(codeInput, { target: { value: code } }));
+      assert.equal(codeInput.value, code);
+      await React.act(async () => Simulate.change(nameInput, { target: { value: 'Changed title' } }));
+      assert.equal(codeInput.value, code);
+      assert.equal(submit.disabled, false);
+      await React.act(async () => Simulate.submit(document.querySelector('form')));
+      assert.deepEqual(submissions.at(-1), [code, 'Changed title']);
+    }
+    for (const code of [' A174', 'A174 ', 'A 174', 'A'.repeat(129), '']) {
+      const count = submissions.length;
+      await React.act(async () => Simulate.change(codeInput, { target: { value: code } }));
+      assert.equal(codeInput.value, code);
+      assert.equal(submit.disabled, true);
+      await React.act(async () => Simulate.submit(document.querySelector('form')));
+      assert.equal(submissions.length, count);
+    }
+  } finally {
+    await React.act(async () => root.unmount());
+    global.window = saved.window; global.document = saved.document; global.IS_REACT_ACT_ENVIRONMENT = saved.act;
+    dom.window.close();
+  }
+});
 
 const bitmap = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
-const response = { request_id: 'preview-test', width_px: 640, height_px: 1600, dpi: 203.2, png_base64: bitmap };
+const response = { template_sha256: 'a'.repeat(64), binding_version: 1, request_id: 'preview-test', width_px: 640, height_px: 1600, dpi: 203.2, png_base64: bitmap };
 
 test('shared icons expose token geometry and decorative or labelled semantics for both families', async () => {
   const material = await render(React.createElement(Icon, { glyph: 'print', size: 'small' }));
@@ -53,6 +99,8 @@ test('shared icons expose token geometry and decorative or labelled semantics fo
 });
 
 test('Studio preview renders once through the current endpoint and clears stale images on failure', async () => {
+  const originalDomParser = global.DOMParser;
+  global.DOMParser = new JSDOM('').window.DOMParser;
   const originalSnapshot = React.useSyncExternalStore;
   const originalFetch = global.fetch;
   const originalTimer = global.setTimeout;
@@ -79,11 +127,11 @@ test('Studio preview renders once through the current endpoint and clears stale 
     assert.equal(requests.length, 1);
     assert.equal(requests[0].url, '/api/v1/simulation/editor-preview');
     const body = JSON.parse(requests[0].options.body);
-    assert.equal(body.width_mm, 80);
-    assert.equal(body.height_mm, 200);
-    assert.equal(body.dpi, 203.2);
+    assert.equal(body.draft.width_mm, 80);
+    assert.equal(body.draft.height_mm, 200);
+    assert.equal(body.draft.dpi, 203.2);
     assert.equal(body.encoder, "IPL");
-    assert.match(body.svg, /<svg/);
+    assert.match(body.draft.svg, /<svg/);
     assert.ok(requests[0].options.signal instanceof AbortSignal);
     const state = useSimulationStore.getState();
     assert.equal(state.previewImage, `data:image/png;base64,${bitmap}`);
@@ -98,13 +146,13 @@ test('Studio preview renders once through the current endpoint and clears stale 
     };
     trigger(true);
     const oldRun = callbacks.pop()();
-    global.fetch = async () => ({ ok: true, json: async () => ({ ...response, png_base64: bitmap + 'new' }) });
+    global.fetch = async () => ({ ok: true, json: async () => ({ ...response, png_base64: bitmap.replace('AAAAASUVORK5CYII=', 'AAAAASUVORK5CYIA=') }) });
     trigger(true);
     assert.equal(oldSignal.aborted, true);
     await callbacks.pop()();
     resolveOld({ ok: true, json: async () => response });
     await oldRun;
-    assert.equal(useSimulationStore.getState().previewImage, `data:image/png;base64,${bitmap}new`);
+    assert.equal(useSimulationStore.getState().previewImage, `data:image/png;base64,${bitmap.replace('AAAAASUVORK5CYII=', 'AAAAASUVORK5CYIA=')}`);
     global.fetch = async () => ({ ok: false, status: 503 });
     trigger(true);
     await callbacks.pop()();
@@ -126,12 +174,12 @@ test('Studio preview renders once through the current endpoint and clears stale 
     useContractStore.getState().setOutputBlocked(true);
     global.fetch = async (url) => { requests.push({ url }); throw new Error('Blocked output made HTTP call'); };
     trigger(true);
-    await callbacks.pop()();
     assert.equal(requests.length, beforeBlocked);
     assert.equal(useSimulationStore.getState().previewImage, null);
     assert.match(useSimulationStore.getState().renderError, /canonical working copy/);
     useContractStore.getState().setOutputBlocked(false);
   } finally {
+    global.DOMParser = originalDomParser;
     React.useSyncExternalStore = originalSnapshot;
     global.fetch = originalFetch;
     global.setTimeout = originalTimer;
@@ -149,7 +197,7 @@ test('preview client propagates cancellation and reports unsupported canvas', as
       assert.equal(options.signal, controller.signal);
       return { ok: false, status: 422 };
     };
-    await assert.rejects(runEditorPreview({ svg: '<svg/>', widthMm: 80, heightMm: 200, dpi: 203.2 }, controller.signal), /cannot be simulated/);
+    await assert.rejects(runEditorPreview({ draft: { svg: '<svg/>', width_mm: 80, height_mm: 200, dpi: 203.2, binding_version: 1 }, data: {}, field_descriptions: {}, encoder: 'IPL', copies: 1 }, controller.signal), /cannot be simulated/);
   } finally { global.fetch = original; }
 });
 
@@ -162,7 +210,7 @@ test('local application renders Studio without a login or session controls', asy
 
 test('simulation action offers the implemented IPL output language', async () => {
   const html = await render(React.createElement(EditorSimulationModal, {
-    isOpen: true, onClose() {}, getSvg: () => '<svg/>', widthMm: 80, heightMm: 200, dpi: 203.2,
+    isOpen: true, onClose() {}, getSnapshot: () => ({ draft: { svg: '<svg/>', width_mm: 20, height_mm: 12, dpi: 203.2, binding_version: 1 }, data: {}, field_descriptions: {}, encoder: 'IPL', copies: 1 }), widthMm: 80, heightMm: 200, dpi: 203.2,
   }));
   assert.match(html, /<select[^>]+aria-label="Output language"/);
   assert.match(html, /<option value="IPL" selected="">IPL<\/option>/);
@@ -177,15 +225,15 @@ test('print target inspection is a GET and a single explicit label POST sends la
       requests.push({ url, options });
       return { ok: true, json: async () => url.endsWith('/target')
         ? { available: true, host: '192.0.2.44', port: 9100, encoder: 'IPL' }
-        : { request_id: 'print-test', status: 'SUBMITTED', confirmed: false, width_px: 160, height_px: 96, dpi: 203.2, payload_bytes: 800, copies: 3, target: { host: "192.0.2.99", port: 9200 } } };
+        : { template_sha256: 'a'.repeat(64), binding_version: 1, request_id: 'print-test', status: 'SUBMITTED', confirmed: false, width_px: 160, height_px: 96, dpi: 203.2, payload_bytes: 800, copies: 3, target: { host: "192.0.2.99", port: 9200 } } };
     };
     const target = await getPrintTarget();
     assert.equal(target.host, '192.0.2.44');
     assert.equal(requests[0].options.method, undefined);
-    const result = await printEditorLabel({ svg: '<svg/>', widthMm: 20, heightMm: 12, dpi: 203.2, encoder: 'IPL', target: { host: '192.0.2.99', port: 9200 }, copies: 3 });
+    const result = await printEditorLabel({ draft: { svg: '<svg/>', width_mm: 20, height_mm: 12, dpi: 203.2, binding_version: 1 }, data: {}, field_descriptions: {}, encoder: 'IPL', target: { host: '192.0.2.99', port: 9200 }, copies: 3 });
     assert.equal(result.confirmed, false);
     assert.equal(result.copies, 3);
-    assert.deepEqual(JSON.parse(requests[1].options.body), { svg: '<svg/>', width_mm: 20, height_mm: 12, dpi: 203.2, encoder: 'IPL', target: { host: '192.0.2.99', port: 9200 }, copies: 3 });
+    assert.deepEqual(JSON.parse(requests[1].options.body), { draft: { svg: '<svg/>', width_mm: 20, height_mm: 12, dpi: 203.2, binding_version: 1 }, data: {}, field_descriptions: {}, encoder: 'IPL', target: { host: '192.0.2.99', port: 9200 }, copies: 3 });
     assert.deepEqual(result.target, { host: '192.0.2.99', port: 9200 });
     assert.equal(requests[1].options.method, 'POST');
     assert.equal(requests[1].options.signal, undefined);
@@ -195,7 +243,7 @@ test('print target inspection is a GET and a single explicit label POST sends la
 
 test('print client treats unknown server failures and lost responses as uncertain without retry', async () => {
   const original = global.fetch;
-  const request = { svg: '<svg/>', widthMm: 20, heightMm: 12, dpi: 203.2, encoder: 'IPL' };
+  const request = { draft: { svg: '<svg/>', width_mm: 20, height_mm: 12, dpi: 203.2, binding_version: 1 }, data: {}, field_descriptions: {}, encoder: 'IPL', copies: 1 };
   try {
     for (const [status, code, expected] of [[500, 'processing_failed', 'uncertain'], [500, 'print_preparation_failed', 'preparation'], [502, 'print_submission_uncertain', 'uncertain'], [503, 'printer_unavailable', 'unavailable'], [422, 'invalid_printer_target', 'target'], [422, 'invalid_print_copies', 'copies']]) {
       let calls = 0;
@@ -211,7 +259,7 @@ test('print client treats unknown server failures and lost responses as uncertai
 });
 
 test('print dialog provides editable IP and port without requiring server configuration', async () => {
-  const html = await render(React.createElement(EditorPrintModal, { isOpen: true, onClose() {}, getSvg: () => '<svg/>', widthMm: 20, heightMm: 12, dpi: 203.2 }));
+  const html = await render(React.createElement(EditorPrintModal, { isOpen: true, onClose() {}, getSnapshot: () => ({ draft: { svg: '<svg/>', width_mm: 20, height_mm: 12, dpi: 203.2, binding_version: 1 }, data: {}, field_descriptions: {}, encoder: 'IPL', copies: 1 }), widthMm: 20, heightMm: 12, dpi: 203.2 }));
   assert.match(html, /Loading optional server default/);
   assert.match(html.replace(/<!-- -->/g, ""), /20 × 12 mm/);
   assert.match(html, /aria-label="Printer IP address"/);
@@ -256,8 +304,8 @@ test('print client rejects missing or invalid response copies as uncertain', asy
   const original = global.fetch;
   try {
     for (const copies of [undefined, 0, 1000, true, 1.5, '3']) {
-      global.fetch = async () => ({ ok: true, json: async () => ({ request_id: 'test', status: 'SUBMITTED', confirmed: false, width_px: 160, height_px: 96, dpi: 203.2, payload_bytes: 800, target: { host: '192.0.2.44', port: 9100 }, copies }) });
-      await assert.rejects(printEditorLabel({ svg: '<svg/>', widthMm: 20, heightMm: 12, dpi: 203.2, encoder: 'IPL', copies: 3 }), error => error.kind === 'uncertain');
+      global.fetch = async () => ({ ok: true, json: async () => ({ template_sha256: 'a'.repeat(64), binding_version: 1, request_id: 'test', status: 'SUBMITTED', confirmed: false, width_px: 160, height_px: 96, dpi: 203.2, payload_bytes: 800, target: { host: '192.0.2.44', port: 9100 }, copies }) });
+      await assert.rejects(printEditorLabel({ draft: { svg: '<svg/>', width_mm: 20, height_mm: 12, dpi: 203.2, binding_version: 1 }, data: {}, field_descriptions: {}, encoder: 'IPL', copies: 3 }), error => error.kind === 'uncertain');
     }
   } finally { global.fetch = original; }
 });
@@ -268,7 +316,107 @@ test('print client rejects invalid copy requests before fetch', async () => {
   try {
     global.fetch = async () => assert.fail('Invalid copies contacted API');
     for (const copies of [0, 1000, true, 1.5, '3', null]) {
-      await assert.rejects(printEditorLabel({ svg: '<svg/>', widthMm: 20, heightMm: 12, dpi: 203.2, encoder: 'IPL', copies }), error => error.kind === 'copies');
+      await assert.rejects(printEditorLabel({ draft: { svg: '<svg/>', width_mm: 20, height_mm: 12, dpi: 203.2, binding_version: 1 }, data: {}, field_descriptions: {}, encoder: 'IPL', copies }), error => error.kind === 'copies');
     }
   } finally { global.fetch = original; }
+});
+
+
+test('action snapshot keeps explicit scalar data independent of old local symbol samples and later edits', async () => {
+  const { captureEditorOutput } = await import('../src/features/canvas/model/editorOutputSnapshot.ts');
+  const { exportFabricToSvg } = await import('../src/features/canvas/svg/fabricSvgExporter.ts');
+  const saved = useContractStore.getState();
+  const oldParser = global.DOMParser;
+  global.DOMParser = new JSDOM('').window.DOMParser;
+  try {
+    useContractStore.setState({ tokenMap: { KEY: 'NEW', ZERO: 0, FLAG: false }, fieldDescriptions: { KEY: 'Friendly' }, outputBlocked: false });
+    const image = { type: 'image', isBarcode: true, barcodeType: 'qrcode', dataField: 'KEY', barcodeValue: 'OLD', validationError: 'Previous local error',
+      symbolSpec: { version: 1, type: 'qrcode', options: { size: 16, ecc: 'M', margin: 1, encoding: 'utf8', segmentation: 'byte', qr_version: 'auto', mask: 'auto' } },
+      toSVG() { return `<g transform="matrix(1 0 0 1 10 10)"><image style="opacity: 0.45;" href="data:image/png;base64,${bitmap}" x="0" y="0" width="16" height="16"/></g>`; } };
+    const originalSerializer = image.toSVG;
+    const canvas = { getObjects: () => [image], toSVG: () => `<svg xmlns="http://www.w3.org/2000/svg">${image.toSVG()}</svg>` };
+    const first = captureEditorOutput(canvas, 999);
+    assert.equal(first.data.KEY, 'NEW');
+    assert.equal(first.data.ZERO, 0);
+    assert.equal(first.data.FLAG, false);
+    assert.equal(first.copies, 999);
+    assert.match(first.draft.svg, /data-barcode-value="OLD"/);
+    assert.match(first.draft.svg, /opacity: 1;/);
+    assert.match(first.draft.svg, /preserveAspectRatio="none"/);
+    assert.equal(image.toSVG, originalSerializer);
+    assert.equal(image.validationError, 'Previous local error');
+    useContractStore.setState({ tokenMap: { KEY: 'NEXT' } });
+    assert.equal(first.data.KEY, 'NEW');
+    assert.equal(captureEditorOutput(canvas).data.KEY, 'NEXT');
+    assert.ok(Object.isFrozen(first) && Object.isFrozen(first.data) && Object.isFrozen(first.draft));
+    assert.equal(exportFabricToSvg(canvas, 80, 60), '');
+  } finally { useContractStore.setState(saved); global.DOMParser = oldParser; }
+});
+
+test('preview malformed successes never become an image', async () => {
+  const original = global.fetch;
+  const input = { draft: { svg: '<svg/>', width_mm: 80, height_mm: 200, dpi: 203.2, binding_version: 1 }, data: {}, field_descriptions: {}, encoder: 'IPL', copies: 1 };
+  try {
+    for (const change of [{}, { png_base64: '' }, { width_px: 0 }, { dpi: 600 }, { binding_version: 2 }, { template_sha256: 'invalid' }]) {
+      global.fetch = async () => ({ ok: true, json: async () => Object.keys(change).length ? { ...response, ...change } : null });
+      await assert.rejects(runEditorPreview(input), /invalid simulation/);
+    }
+  } finally { global.fetch = original; }
+});
+
+
+test('mounted print dialog sends one frozen action and keeps uncertain delivery locked', async () => {
+  const { createRoot } = await import('react-dom/client');
+  const dom = new JSDOM('<div id="root"></div>', { url: 'http://127.0.0.1:8002' });
+  const saved = { window: global.window, document: global.document, fetch: global.fetch, act: global.IS_REACT_ACT_ENVIRONMENT };
+  global.window = dom.window; global.document = dom.window.document; global.IS_REACT_ACT_ENVIRONMENT = true;
+  const root = createRoot(document.getElementById('root'));
+  let calls = 0, captures = 0, release;
+  global.fetch = async (url, options) => {
+    if (url.endsWith('/target')) return { ok: true, json: async () => ({ available: true, host: '192.0.2.44', port: 9100, encoder: 'IPL' }) };
+    calls++;
+    const input = JSON.parse(options.body);
+    assert.equal(input.data.KEY, 'CURRENT');
+    assert.equal(input.copies, 1);
+    return new Promise(resolve => { release = resolve; });
+  };
+  const snapshot = () => { captures++; return { draft: { svg: '<svg/>', width_mm: 80, height_mm: 200, dpi: 203.2, binding_version: 1 }, data: { KEY: 'CURRENT' }, field_descriptions: {}, encoder: 'IPL', copies: 1 }; };
+  try {
+    await React.act(async () => { root.render(React.createElement(EditorPrintModal, { isOpen: true, onClose() {}, getSnapshot: snapshot, widthMm: 80, heightMm: 200, dpi: 203.2 })); });
+    assert.equal(calls, 0);
+    const button = document.querySelector('[data-testid="btn-print-one-label"]');
+    await React.act(async () => { button.click(); button.click(); });
+    assert.equal(calls, 1); assert.equal(captures, 1); assert.equal(button.disabled, true);
+    await React.act(async () => { release({ ok: false, status: 502, json: async () => ({ detail: { code: 'print_submission_uncertain' } }) }); });
+    assert.match(document.body.textContent, /Delivery is uncertain/);
+    assert.equal(button.disabled, true);
+    await React.act(async () => { button.click(); });
+    assert.equal(calls, 1);
+  } finally {
+    await React.act(async () => root.unmount());
+    global.window = saved.window; global.document = saved.document; global.fetch = saved.fetch; global.IS_REACT_ACT_ENVIRONMENT = saved.act; dom.window.close();
+  }
+});
+
+test('mounted simulation cancels and ignores a late result after the selected draft changes', async () => {
+  const { createRoot } = await import('react-dom/client');
+  const dom = new JSDOM('<div id="root"></div>', { url: 'http://127.0.0.1:8002' });
+  const saved = { window: global.window, document: global.document, fetch: global.fetch, act: global.IS_REACT_ACT_ENVIRONMENT };
+  global.window = dom.window; global.document = dom.window.document; global.IS_REACT_ACT_ENVIRONMENT = true;
+  const root = createRoot(document.getElementById('root'));
+  let release, signal;
+  global.fetch = async (_url, options) => { signal = options.signal; return new Promise(resolve => { release = resolve; }); };
+  const snapshot = (key) => () => ({ draft: { svg: '<svg/>', width_mm: 80, height_mm: 200, dpi: 203.2, binding_version: 1 }, data: { KEY: key }, field_descriptions: {}, encoder: 'IPL', copies: 1 });
+  const props = { isOpen: true, onClose() {}, widthMm: 80, heightMm: 200, dpi: 203.2 };
+  try {
+    await React.act(async () => root.render(React.createElement(EditorSimulationModal, { ...props, getSnapshot: snapshot('OLD') })));
+    await React.act(async () => { [...document.querySelectorAll('button')].find(button => button.textContent === 'Run simulation').click(); });
+    await React.act(async () => root.render(React.createElement(EditorSimulationModal, { ...props, getSnapshot: snapshot('NEW') })));
+    assert.equal(signal.aborted, true);
+    await React.act(async () => release({ ok: true, json: async () => response }));
+    assert.equal(document.querySelector('img'), null);
+  } finally {
+    await React.act(async () => root.unmount());
+    global.window = saved.window; global.document = saved.document; global.fetch = saved.fetch; global.IS_REACT_ACT_ENVIRONMENT = saved.act; dom.window.close();
+  }
 });

@@ -1,5 +1,6 @@
 import { translate as t, useTranslation } from "../../../shared/i18n";
 import React from 'react';
+import { HttpError } from '../../../shared/api';
 import { createPortal } from 'react-dom';
 import { TemplateMetadata } from '../../../types/template';
 import { useTemplateStore } from '../../../store/useTemplateStore';
@@ -7,7 +8,7 @@ import { layoutApi } from '../api/layoutApi';
 import { validateLocalSvg } from '../lib/validateLocalSvg';
 import { Icon, Badge, Button, Dialog, DialogHeader, ErrorState, IconButton, Input } from '../../../shared/ui';
 
-type Detail = { raw_svg?: string; svg_content?: string; svg?: string; width_mm?: number; height_mm?: number; label_code?: string; version?: number; status?: string; dpi?: number; created_at?: string; object_key?: string; svg_sha256?: string };
+type Detail = { title?: string; raw_svg?: string; svg_content?: string; svg?: string; width_mm?: number; height_mm?: number; label_code?: string; version?: number; status?: string; dpi?: number; created_at?: string; object_key?: string; svg_sha256?: string };
 interface Props { templates: TemplateMetadata[]; activeTemplateId: string; onSelectTemplate: (id: string) => void; labelWidthMm: number; labelHeightMm: number }
 
 export function TemplateSelector({ templates, activeTemplateId, onSelectTemplate, labelWidthMm, labelHeightMm }: Readonly<Props>) {
@@ -23,10 +24,11 @@ export function TemplateSelector({ templates, activeTemplateId, onSelectTemplate
   const [action, setAction] = React.useState<'rename' | 'delete' | null>(null);
   const [title, setTitle] = React.useState('');
   const [busy, setBusy] = React.useState(false);
+  const [needsRefresh, setNeedsRefresh] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) return;
-    setError(null); setSelected(null); setDetail(null); setAction(null); setLoading(true);
+    setError(null); setNeedsRefresh(false); setSelected(null); setDetail(null); setAction(null); setLoading(true);
     setLibrary(templates);
     setLoading(false);
   }, [open]);
@@ -45,16 +47,17 @@ export function TemplateSelector({ templates, activeTemplateId, onSelectTemplate
   const shown = library.filter((t) => !query || t.name.toLowerCase().includes(query.toLowerCase()) || t.id.toLowerCase().includes(query.toLowerCase()));
 
   const manageTemplate = async () => {
-    if (!selected || !action || busy) return;
+    if (!selected || !action || busy || needsRefresh || !detail?.version || !detail.svg_sha256) return;
+    const expected = { label_code: selected.id, title: detail.title ?? selected.name, version: detail.version, svg_sha256: detail.svg_sha256 };
     setBusy(true); setError(null);
     try {
       if (action === 'rename') {
-        const renamed = await layoutApi.rename(selected.id, title.trim());
+        const renamed = await layoutApi.rename(selected.id, title.trim(), expected);
         const state = useTemplateStore.getState();
         state.setTemplates(state.templates.map(t => t.id === selected.id ? { ...t, name: renamed.title } : t));
         setSelected({ ...selected, name: renamed.title });
       } else {
-        await layoutApi.delete(selected.id);
+        await layoutApi.delete(selected.id, expected);
         const state = useTemplateStore.getState();
         state.setTemplates(state.templates.filter(t => t.id !== selected.id));
         if (state.activeTemplateId === selected.id) state.setActiveTemplateId('');
@@ -63,6 +66,7 @@ export function TemplateSelector({ templates, activeTemplateId, onSelectTemplate
       setAction(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Template update failed.');
+      setNeedsRefresh(!(e instanceof HttpError && e.isInputError));
     } finally { setBusy(false); }
   };
 
@@ -78,9 +82,9 @@ export function TemplateSelector({ templates, activeTemplateId, onSelectTemplate
           <aside className="w-2/5 border-r border-outline-variant overflow-auto p-3"><div className="mt-3 border-t border-outline-variant">{shown.map((template) => <button key={template.id} disabled={busy} onClick={() => setSelected(template)} className={`block w-full text-left`} data-ui-control="button" data-variant="default" data-selected={selected?.id === template.id} data-tone="neutral">{template.name}<span data-ui-caption="true" className="block">{template.is_builtin ? t("Built-in") : t("Custom")}</span></button>)}{!shown.length && <div className="p-3 text-xs text-on-surface-variant">{t("No templates found.")}</div>}</div></aside>
           <section className="flex-1 p-5 flex flex-col min-w-0">{error && <ErrorState title={error} />}{loading && <div className="m-auto text-xs">{t("Loading preview…")}</div>}{selected && detail && !loading && <><div className="flex-1 min-h-0 flex items-center justify-center bg-surface-container border border-outline-variant p-4"><div className="w-full h-full flex items-center justify-center" style={{ containerType: 'size' }}><SafePreview svg={detail.raw_svg || detail.svg_content || detail.svg || ''} widthMm={detail.width_mm} heightMm={detail.height_mm} /></div></div><TemplateDetails key={selected.id} template={selected} detail={detail} />{action && <div className="mt-3 border border-outline-variant p-3 text-xs">
               {action === 'rename' ? <><label data-ui-label="true" htmlFor="template-rename-title">{t("Template name")}</label><Input id="template-rename-title" autoFocus value={title} maxLength={160} disabled={busy} onChange={e => setTitle(e.target.value)} className="mt-2 w-full" /></> : <p>{t('Delete "{name}" from the template library? Version history is retained. The current canvas will remain available.', { name: selected.name })}</p>}
-              <div className="mt-3 flex justify-end gap-2"><Button disabled={busy} onClick={() => setAction(null)} variant="default">{t("Cancel")}</Button><Button disabled={busy || (action === 'rename' && !title.trim())} onClick={manageTemplate} variant="default">{busy ? t("Saving...") : action === 'rename' ? t("Save name") : t("Confirm delete")}</Button></div>
+              <div className="mt-3 flex justify-end gap-2"><Button disabled={busy} onClick={() => setAction(null)} variant="default">{t("Cancel")}</Button><Button disabled={busy || needsRefresh || (action === 'rename' && !title.trim())} onClick={manageTemplate} variant="default">{busy ? t("Saving...") : action === 'rename' ? t("Save name") : t("Confirm delete")}</Button></div>
             </div>}
-            <div className="mt-3 flex items-center gap-2">{!selected.is_builtin && <><Button disabled={busy || loading} onClick={() => { setTitle(selected.name); setAction('rename'); setError(null); }} variant="default">{t("Rename")}</Button><Button disabled={busy || loading} onClick={() => { setAction('delete'); setError(null); }} variant="default">{t("Delete")}</Button></>}<Button disabled={busy || !!action} tone="primary" onClick={() => { onSelectTemplate(selected.id); setOpen(false); }} className="ml-auto" variant="default">{t("Open template")}</Button></div></>}{!selected && !loading && <div className="m-auto text-sm text-on-surface-variant">{t("Select a template to preview it.")}</div>}</section>
+            <div className="mt-3 flex items-center gap-2">{!selected.is_builtin && <><Button disabled={busy || needsRefresh || loading} onClick={() => { setTitle(selected.name); setAction('rename'); setError(null); }} variant="default">{t("Rename")}</Button><Button disabled={busy || needsRefresh || loading} onClick={() => { setAction('delete'); setError(null); }} variant="default">{t("Delete")}</Button></>}<Button disabled={busy || needsRefresh || !!action} tone="primary" onClick={() => { onSelectTemplate(selected.id); setOpen(false); }} className="ml-auto" variant="default">{t("Open template")}</Button></div></>}{!selected && !loading && <div className="m-auto text-sm text-on-surface-variant">{t("Select a template to preview it.")}</div>}</section>
         </div>
       </Dialog>
     </div>, document.body)}

@@ -5,9 +5,34 @@ import path from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 const dist = fileURLToPath(new URL('../../../dist/', import.meta.url));
-import { openStudio, saveLayout, reopenLayout, preview } from '../helpers/studio.js';
+import { openStudio, saveLayout, reopenLayout, preview, mockBuiltApplication } from '../helpers/studio.js';
 
 // All API requests are mocked; no backend writes are permitted by this project.
+test.beforeEach(async ({ page }) => { await mockBuiltApplication(page); });
+
+test('Fit centers landscape and portrait labels beyond the rulers with balanced margins', async ({ page }, testInfo) => {
+  await openStudio(page);
+  for (const viewport of [{ width: 1918, height: 950 }, { width: 1440, height: 900 }]) {
+    await page.setViewportSize(viewport);
+    for (const [width, height] of [[200, 80], [80, 200]]) {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="0 0 ${width * 4} ${height * 4}"><rect width="100%" height="100%" fill="white"/></svg>`;
+      await page.locator('input[accept=".svg,image/svg+xml"]').setInputFiles({ name: 'fit.svg', mimeType: 'image/svg+xml', buffer: Buffer.from(svg) });
+      await expect(page.getByTestId('statusbar-target-summary')).toContainText(`${width} × ${height} mm`);
+      await page.getByTestId('statusbar-btn-zoom-in').click();
+      await page.getByTestId('statusbar-btn-zoom-fit').click();
+      await expect.poll(() => page.getByTestId('canvas-container').evaluate(sheet => {
+        const label = sheet.getBoundingClientRect();
+        const viewport = sheet.parentElement.getBoundingClientRect();
+        const left = label.left - viewport.left - 24;
+        const right = viewport.right - label.right;
+        const top = label.top - viewport.top - 20;
+        const bottom = viewport.bottom - label.bottom;
+        return Math.abs(left - right) < 1 && Math.abs(top - bottom) < 1 && Math.min(left, right, top, bottom) >= 23.5;
+      })).toBe(true);
+      await page.screenshot({ path: testInfo.outputPath(`fit-${viewport.width}-${width}x${height}.png`) });
+    }
+  }
+});
 
 test('friendly fields compose text and retain bindings through mocked save and reopen', async ({ page }, testInfo) => {
   let stored;
@@ -38,6 +63,8 @@ test('friendly fields compose text and retain bindings through mocked save and r
   await expect(page.getByTestId('inspector-input-token-value')).toHaveValue('695 mm');
   await saveLayout(page, 'friendly_fields', 'Friendly Fields');
   await reopenLayout(page, 'Friendly Fields');
+  // The explorer closes before asynchronous Fabric import completes.
+  await expect(page.getByTestId('container-inspector-empty-state')).toBeVisible();
   await page.getByLabel('Preview value for Roll Width').fill('700');
   await page.getByTestId('inspector-tab-btn-layers').click();
   await page.getByTestId('layer-select-0').click();
@@ -50,7 +77,8 @@ test('missing bound data blocks PNG preview and clears the prior image', async (
   let calls = 0;
   await page.route('**/api/v1/simulation/editor-preview', route => {
     calls++;
-    return route.fulfill({ json: { request_id: 'mock', width_px: 1, height_px: 1, dpi: 203.2,
+    if (route.request().postDataJSON().data.ZZWIDTH === '') return route.fulfill({ status: 422, json: { detail: { code: 'empty_binding' } } });
+    return route.fulfill({ json: { template_sha256: 'a'.repeat(64), binding_version: 1, request_id: 'mock', width_px: 1, height_px: 1, dpi: 203.2,
       png_base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=' } });
   });
   await openStudio(page);
@@ -66,9 +94,9 @@ test('missing bound data blocks PNG preview and clears the prior image', async (
   await page.getByTestId('topbar-menu-btn-utilities').click();
   await page.getByTestId('btn-label-simulation').click();
   await page.getByRole('button', { name: 'Run simulation', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Roll Width has no data');
+  await expect(page.getByRole('alert')).toContainText('cannot be simulated');
   await expect(page.getByAltText('Backend bitmap preview of the current Studio canvas')).toHaveCount(0);
-  expect(calls).toBe(before);
+  expect(calls).toBe(before + 1);
 });
 
 test('an initially unbound text links from the friendly field dropdown', async ({ page }) => {
@@ -81,6 +109,51 @@ test('an initially unbound text links from the friendly field dropdown', async (
   await page.getByRole('button', { name: 'Link', exact: true }).click();
   await expect(page.getByTestId('inspector-input-token-value')).toHaveValue('Example Customer');
 });
+
+for (const [tool, attribute] of [['btn-add-qrcode', 'data-qr'], ['btn-add-barcode', 'data-barcode']]) {
+  test(`${attribute} links an empty field, saves its contract and refreshes when data arrives`, async ({ page }, testInfo) => {
+    let stored;
+    await page.route('**/api/v1/layouts', route => {
+      if (route.request().method() === 'POST') {
+        stored = route.request().postDataJSON();
+        return route.fulfill({ status: 201, json: { ...stored, version: 1 } });
+      }
+      return route.fulfill({ json: [] });
+    });
+    await page.route('**/api/v1/simulation/editor-preview', route => {
+      expect(route.request().postDataJSON().data.ZZNOMORROLL).toBe('');
+      return route.fulfill({ status: 422, json: { detail: { code: 'empty_binding', message: 'Roll Number is empty.' } } });
+    });
+    await openStudio(page);
+    await page.getByTestId('dock-btn-sap').click();
+    await uploadSampleFixture(page);
+    await page.getByLabel('Preview value for Roll Number', { exact: true }).fill('');
+    await page.getByTestId('dock-btn-tools').click();
+    await page.getByTestId(tool).click();
+    await page.getByTestId('inspector-field-select').selectOption('ZZNOMORROLL');
+    await page.getByRole('button', { name: 'Link', exact: true }).click();
+    await expect(page.getByTestId('inspector-field-status')).toContainText('Roll Number · Empty value');
+    await expect(page.getByTestId('composition-parts')).toContainText('Roll Number');
+    await expect(page.getByRole('alert')).toContainText('Missing data: Roll Number');
+    await page.screenshot({ path: testInfo.outputPath('linked-roll-empty.png') });
+    await saveLayout(page, 'empty_roll_binding', 'Empty Roll Binding');
+    await expect.poll(() => stored?.svg).toContain(`${attribute}="ZZNOMORROLL"`);
+    expect(stored.svg).toContain('data-payload-spec=');
+    expect(stored.svg).not.toContain('opacity: 0.45;');
+    await page.getByTestId('topbar-menu-btn-utilities').click();
+    await page.getByTestId('btn-label-simulation').click();
+    await page.getByRole('button', { name: 'Run simulation', exact: true }).click();
+    await expect(page.getByAltText('Backend bitmap preview of the current Studio canvas')).toHaveCount(0);
+    await expect(page.getByRole('alert').filter({ hasText: 'cannot be simulated' })).toBeVisible();
+    await page.getByRole('button', { name: 'Close simulation', exact: true }).click();
+    await page.getByTestId('dock-btn-sap').click();
+    await page.getByLabel('Preview value for Roll Number', { exact: true }).fill('12345678');
+    await expect(page.getByTestId('inspector-input-token-value')).toHaveValue('12345678');
+    await expect(page.getByTestId('inspector-field-status')).toContainText('Available');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath('linked-roll-with-data.png') });
+  });
+}
 
 test('versionless import selects item data without filling gaps from the design sample', async ({ page }) => {
   await openStudio(page);
@@ -96,7 +169,7 @@ test('versionless import selects item data without filling gaps from the design 
   await expect(page.getByTestId('inspector-input-token-value')).toHaveValue('800');
   await expect(page.getByTestId('local-sap-import-banner')).toContainText('Imported data');
   await page.getByTestId('select-local-sap-item').selectOption('2');
-  await expect(page.getByTestId('inspector-input-token-value')).toHaveValue('ZZWIDTH — no data');
+  await expect(page.getByTestId('inspector-input-token-value')).toHaveValue('Width — no data');
   await page.getByTestId('input-sap-token-search').fill('ZZWIDTH');
   await expect(page.getByTestId('sap-token-val-ZZWIDTH')).toContainText('Null value');
 });
@@ -197,7 +270,7 @@ test('simulation displays a mocked bitmap without printer requests', async ({ pa
   const physical = [];
   page.on('request', request => { if (/\/(print|sap)(\/|$)/.test(new URL(request.url()).pathname)) physical.push(request.url()); });
   await page.route('**/api/v1/simulation/editor-preview', route => route.fulfill({ json: {
-    request_id: 'ui-preview', width_px: 1, height_px: 1, dpi: 203.2,
+    template_sha256: 'a'.repeat(64), binding_version: 1, request_id: 'ui-preview', width_px: 1, height_px: 1, dpi: 203.2,
     png_base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
   } }));
   await openStudio(page);
@@ -213,7 +286,7 @@ test('Preview view uses the current endpoint once and clears the bitmap on serve
   await page.route('**/api/v1/simulation/editor-preview', route => fail
     ? route.fulfill({ status: 503, json: { detail: { message: 'Preview unavailable.' } } })
     : route.fulfill({ json: {
-      request_id: 'ui-preview-view', width_px: 1, height_px: 1, dpi: 203.2,
+      template_sha256: 'a'.repeat(64), binding_version: 1, request_id: 'ui-preview-view', width_px: 1, height_px: 1, dpi: 203.2,
       png_base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
     } }));
   await openStudio(page);
@@ -235,14 +308,14 @@ test('Preview view uses the current endpoint once and clears the bitmap on serve
 test('planned features explain availability without sending unsupported API requests', async ({ page }) => {
   const unsupported = [];
   page.on('request', request => {
-    if (/\/api\/.*(graphics|print|render\/|parse-raw|export)/.test(new URL(request.url()).pathname)) unsupported.push(request.url());
+    if (/\/api\/.*(print|render\/|parse-raw|export)/.test(new URL(request.url()).pathname)) unsupported.push(request.url());
   });
   await openStudio(page);
   await expect(page.getByTestId('btn-topbar-print')).toBeEnabled();
   await page.getByTestId('dock-btn-graphics').click();
-  await expect(page.getByTestId('global-graphics-planned')).toContainText('planned for a future release');
+  await expect(page.getByTestId('graphics-library')).toBeVisible();
   await page.getByTestId('topbar-menu-btn-utilities').click();
-  await expect(page.getByRole('menuitem', { name: 'Global graphics (planned)' })).toBeDisabled();
+  await expect(page.getByRole('menuitem', { name: 'Graphic Update Center (planned)' })).toBeDisabled();
   await page.getByTestId('topbar-menu-btn-file').click();
   await expect(page.getByRole('menuitem', { name: 'Data / protocol export (planned)' })).toBeDisabled();
   expect(unsupported).toEqual([]);
@@ -588,27 +661,33 @@ test('SAP descriptions rename visible fields while preserving characteristic bin
   await page.screenshot({ path: testInfo.outputPath('sap-field-descriptions.png') });
   delete payload.field_descriptions;
   await upload();
-  await expect(page.getByTestId('sap-token-label-ZZWIDTH')).toHaveText('ZZWIDTH');
-  await expect(page.getByTestId('composition-parts')).toContainText('ZZWIDTH');
+  await expect(page.getByTestId('sap-token-label-ZZWIDTH')).toHaveText('Width');
+  await expect(page.getByTestId('composition-parts')).toContainText('Width');
 });
 
 
-test('Data Tokens starts empty and import adds fields without registry defaults', async ({ page }) => {
+test('Data Tokens uses SAP sample keys and dataset import replaces demo values exactly', async ({page}) => {
   await openStudio(page);
   await page.getByTestId('dock-btn-sap').click();
-  await expect(page.getByTestId('container-sap-token-section')).toContainText('Fields (0/0)');
-  await expect(page.getByText('No fields available', { exact: true })).toBeVisible();
-  await expect(page.locator('[data-testid^="sap-token-card-"]')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Use design sample', exact: true })).toHaveCount(0);
-  const payload = { sender: { system: 'SAP_TEST' }, request_id: 'REQ_NO_DEFAULTS', mode: 'simulation', items: [
-    { item_id: 'I1', label_code: 'A013', copies: 1, data: { ZZWIDTH: '695', ZZLENGTH: '8000' } },
-  ] };
-  await page.getByTestId('input-local-sap-json').setInputFiles({ name: 'only-supplied.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(payload)) });
-  await expect(page.locator('[data-testid^="sap-token-card-"]')).toHaveCount(3);
-  await expect(page.getByTestId('sap-token-card-ZZWIDTH')).toBeVisible();
-  await expect(page.getByTestId('sap-token-card-ZZLENGTH')).toBeVisible();
-  await expect(page.getByTestId('sap-token-card-label_code')).toBeVisible();
-  await expect(page.getByTestId('sap-token-card-BEDAT')).toHaveCount(0);
+  await expect(page.getByTestId('container-sap-token-section')).toContainText('Fields (47/47)');
+  await expect(page.getByTestId('default-token-data-notice')).toBeVisible();
+  await expect(page.getByLabel('Preview value for Width', {exact:true})).toHaveValue('1200');
+  await expect(page.getByLabel('Preview value for Sequence Number JR', {exact:true})).toHaveValue('000001');
+  for (const key of ['width_mm', 'roll_number', 'label_code']) await expect(page.getByTestId(`sap-token-card-${key}`)).toHaveCount(0);
+  const payload = {sender:{system:'SAP_TEST'}, request_id:'EXACT_SAP_KEYS', mode:'simulation', items:[
+    {item_id:'I1', label_code:'sample_roll', copies:1, data:{ZZWIDTH:'0695', extra_field:'0009'}}
+  ]};
+  await page.getByTestId('input-local-sap-json').setInputFiles({name:'sap.json', mimeType:'application/json', buffer:Buffer.from(JSON.stringify(payload))});
+  await expect(page.getByTestId('default-token-data-notice')).toHaveCount(0);
+  await expect(page.locator('[data-testid^="sap-token-card-"]')).toHaveCount(48);
+  await expect(page.getByLabel('Preview value for Width', {exact:true})).toHaveValue('0695');
+  await expect(page.getByLabel('Preview value for Length', {exact:true})).toHaveValue('');
+  await expect(page.getByTestId('sap-token-card-ZZLENGTH')).toContainText('Not supplied');
+  await expect(page.getByLabel('Preview value for extra_field', {exact:true})).toHaveValue('0009');
+  await expect(page.getByTestId('sap-token-card-ZZLABEL')).toContainText('Not supplied');
+  await page.getByTestId('select-sap-token-profile').selectOption('sap_label_fields');
+  await expect(page.locator('[data-testid^="sap-token-card-"]')).toHaveCount(47);
+  await expect(page.getByTestId('sap-token-card-extra_field')).toHaveCount(0);
 });
 
 
@@ -624,7 +703,7 @@ test('sample upload stores original envelope and reopens all items without savin
   });
   await page.route('**/api/v1/studio-sample-datasets/*', route => route.fulfill({ json: stored }));
   await openStudio(page); await page.getByTestId('dock-btn-sap').click();
-  await expect(page.getByTestId('sap-token-empty-state')).toContainText('No fields');
+  await expect(page.getByLabel('Preview value for Roll Number', {exact:true})).toHaveValue('ROLL-TEST-001');
   const payload = { sender: { system: 'EXAMPLE' }, request_id: 'sample', mode: 'simulation', field_descriptions: { ZZWIDTH: 'WIDTH' }, items: [
     { item_id: 'one', label_code: 'A013', copies: 1, data: { ZZWIDTH: 695 } },
     { item_id: 'two', label_code: 'A013', copies: 2, data: { ZZWIDTH: 700, flag: false } },
@@ -639,7 +718,7 @@ test('sample upload stores original envelope and reopens all items without savin
   await page.getByLabel('Preview value for WIDTH', { exact: true }).fill('999');
   expect(posts).toBe(1);
   await page.reload(); await page.getByTestId('dock-btn-sap').click();
-  await expect(page.getByTestId('sap-token-empty-state')).toContainText('No fields');
+  await expect(page.getByLabel('Preview value for Roll Number', {exact:true})).toHaveValue('ROLL-TEST-001');
   await page.getByTestId('select-saved-dataset').selectOption(stored.id);
   await expect(page.getByLabel('Preview value for WIDTH', { exact: true })).toHaveValue('695');
   await page.getByTestId('select-local-sap-item').selectOption('2');
@@ -701,4 +780,73 @@ test('refresh started during save cannot remove the completed dataset', async ({
   const response = page.waitForResponse(r => r.request().method() === 'GET' && r.url().endsWith('/studio-sample-datasets'));
   releaseList(); await response;
   await expect(page.getByTestId('select-saved-dataset').locator('option[value="refresh-race"]')).toHaveText('refresh');
+});
+
+
+test('both output previews receive latest unsaved draft and separate current data', async ({ page }) => {
+  const posts = [];
+  await page.route('**/api/v1/simulation/editor-preview', route => {
+    posts.push(route.request().postDataJSON());
+    return route.fulfill({ json: { template_sha256: 'a'.repeat(64), binding_version: 1, request_id: 'draft-data', width_px: 1, height_px: 1, dpi: 203.2,
+      png_base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=' } });
+  });
+  await openStudio(page);
+  await page.getByTestId('dock-btn-sap').click();
+  await uploadSampleFixture(page);
+  await page.getByTestId('input-sap-token-search').fill('Roll Width');
+  await page.getByTestId('btn-insert-token-ZZWIDTH-text').click();
+  await page.getByLabel('Preview value for Roll Width').fill('777');
+  await preview(page);
+  expect(posts.at(-1).data.ZZWIDTH).toBe('777');
+  expect(posts.at(-1).draft.svg).toContain('data-field="ZZWIDTH"');
+  expect(posts.at(-1).draft.binding_version).toBe(1);
+  expect(posts.at(-1).copies).toBe(1);
+  expect(posts.at(-1).svg).toBeUndefined();
+  await page.getByRole('button', { name: 'Close simulation', exact: true }).click();
+  await page.getByRole('button', { name: 'View', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Preview', exact: true }).click();
+  await expect(page.getByAltText('Backend bitmap reference')).toBeVisible();
+  expect(posts.at(-1).data.ZZWIDTH).toBe('777');
+});
+
+
+test('catalog examples stay separate and custom fields preserve exact key case', async ({page}, testInfo) => {
+  await openStudio(page);
+  await page.getByTestId('dock-btn-sap').click();
+  const width = page.getByTestId('sap-token-card-ZZWIDTH');
+  await width.getByText('Field contract', {exact:true}).click();
+  await expect(width).toContainText('Example only: 1200');
+  await expect(page.getByLabel('Preview value for Width', {exact:true})).toHaveValue('1200');
+  await page.getByLabel('Preview value for Width', {exact:true}).fill('0695');
+  await expect(width).toContainText('Available');
+  await page.getByLabel('New field value', {exact:true}).fill('00001');
+  for (const key of [' bad', 'bad ', '__proto__', 'constructor', 'prototype', 'x'.repeat(129)]) {
+    await page.getByLabel('New field key', {exact:true}).fill(key);
+    await expect(page.getByTestId('btn-add-custom-token')).toBeDisabled();
+  }
+  for (const key of ['TestField', 'testfield']) {
+    await page.getByLabel('New field key', {exact:true}).fill(key);
+    await page.getByTestId('btn-add-custom-token').click();
+    await page.getByLabel('New field value', {exact:true}).fill('00001');
+  }
+  await page.getByTestId('select-sap-token-profile').selectOption('custom');
+  await expect(page.locator('[data-testid^="sap-token-card-"]')).toHaveCount(2);
+  await expect(page.getByLabel('Preview value for TestField', {exact:true})).toHaveValue('00001');
+  await expect(page.getByLabel('Preview value for testfield', {exact:true})).toHaveValue('00001');
+  await page.getByTestId('select-sap-token-profile').selectOption('sap_label_fields');
+  await expect(page.getByLabel('Preview value for Width', {exact:true})).toHaveValue('0695');
+  await page.screenshot({path:testInfo.outputPath('default-label-field-catalog.png')});
+});
+
+
+test('default catalog fields can be linked and composed before a dataset is loaded', async ({page}) => {
+  await openStudio(page);
+  await page.getByTestId('btn-add-text').click();
+  await page.getByTestId('inspector-field-select').selectOption('ZZWIDTH');
+  await page.getByRole('button', {name:'Link', exact:true}).click();
+  await expect(page.getByTestId('inspector-field-status')).toContainText('Available');
+  await expect(page.getByTestId('inspector-input-token-value')).toHaveValue('1200');
+  await page.getByRole('button', {name:'Build with fields and text', exact:true}).click();
+  // Composition uses the same exact SAP field catalog.
+  await expect(page.getByLabel('Composition field', {exact:true}).locator('option[value="ZZLENGTH"]')).toHaveCount(1);
 });

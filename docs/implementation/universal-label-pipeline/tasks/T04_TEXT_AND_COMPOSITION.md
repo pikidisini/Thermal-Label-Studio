@@ -1,7 +1,7 @@
-# T04 — Implement server text and composition binding
+# T04 â€” Implement server text and composition binding
 
 TASK_ID: T04
-Status: PENDING
+Status: DONE
 Depends on: T03
 Execution size: One bounded AI task; do not start successors automatically.
 
@@ -48,12 +48,12 @@ Implement template_binding text/composition/service and semantic data validation
 
 ## Acceptance criteria
 
-- [ ] Two different valid data snapshots produce the correct different text, not the saved sample value.
-- [ ] Missing/null/empty required values fail; 0 and false bind correctly; keys and significant string content stay intact.
-- [ ] Multiline/tspan, text alignment, group/rotation and composition fixture placement match the declared Studio contract.
-- [ ] Required field failures occur before renderer invocation.
-- [ ] Neither legacy ASCII fixture restrictions nor silent aliases/coercions leak into the canonical path.
-- [ ] The binder returns SVG/media evidence independently of simulation or print.
+- [x] Two different valid data snapshots produce the correct different text, not the saved sample value.
+- [x] Missing/null/empty required values fail; 0 and false bind correctly; keys and significant string content stay intact.
+- [x] Multiline/tspan, text alignment, group/rotation and composition fixture placement match the declared Studio contract.
+- [x] Required field failures occur before renderer invocation.
+- [x] Neither legacy ASCII fixture restrictions nor silent aliases/coercions leak into the canonical path.
+- [x] The binder returns SVG/media evidence independently of simulation or print.
 
 ## Required validation
 
@@ -75,3 +75,5 @@ For source implementation choices within scope, proceed with documented judgment
 Record exact scalar conversion/text-layout rules and parity limits for T05/T06. Do not report complete barcode/QR or Studio output parity.
 Write results/T04_RESULT.md using [RESULT_TEMPLATE](../RESULT_TEMPLATE.md); request/record review via [REVIEW_TEMPLATE](../REVIEW_TEMPLATE.md).
 Update STATUS.md honestly and stop at this task's boundary.
+
+Acceptance evidence: [T04_RESULT](../results/T04_RESULT.md), [source self-review PASS](../results/T04_REVIEW.md). This task was implemented directly; no delegated writer/reviewer or independent-review claim. T05 was not started.

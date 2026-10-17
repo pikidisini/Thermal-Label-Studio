@@ -125,8 +125,8 @@ export function useWheelZoom({
       const nextTargetZ = Math.min(4.0, Math.max(0.15, baseZ * scaleFactor));
 
       const basePan = isContinuous ? panOffsetRef.current : targetPanRef.current;
-      const canvasCenterX = vRect.width / 2 + basePan.x;
-      const canvasCenterY = vRect.height / 2 + basePan.y;
+      const canvasCenterX = (vRect.width + 24) / 2 + basePan.x;
+      const canvasCenterY = (vRect.height + 20) / 2 + basePan.y;
       const mouseRelCenterX = clientX - vRect.left - canvasCenterX;
       const mouseRelCenterY = clientY - vRect.top - canvasCenterY;
 

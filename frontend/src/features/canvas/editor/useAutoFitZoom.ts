@@ -41,8 +41,9 @@ export function useAutoFitZoom({
     const vRect = viewportRef.current.getBoundingClientRect();
     if (!vRect.width || !vRect.height) return 1.0;
 
-    const availableW = Math.max(100, vRect.width - 48);
-    const availableH = Math.max(100, vRect.height - 48);
+    // Exclude the rulers, then leave 24px of breathing room on every side.
+    const availableW = Math.max(1, vRect.width - 24 - 48);
+    const availableH = Math.max(1, vRect.height - 20 - 48);
     const targetW = labelWidthMm * pxPerMm;
     const targetH = labelHeightMm * pxPerMm;
     if (targetW <= 0 || targetH <= 0) return 1.0;
@@ -50,7 +51,7 @@ export function useAutoFitZoom({
     const fitX = availableW / targetW;
     const fitY = availableH / targetH;
     const clampedZoom = Math.min(4.0, Math.max(0.15, Math.min(fitX, fitY)));
-    return Math.round(clampedZoom * 20) / 20;
+    return Math.max(0.15, Math.floor(clampedZoom * 20) / 20);
   }, [labelWidthMm, labelHeightMm, pxPerMm, viewportRef]);
 
   const handleResetFit = useCallback(() => {

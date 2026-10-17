@@ -1,16 +1,16 @@
 import { parseCustomTheme, type CustomTheme } from './customTheme';
 export type Language = 'en' | 'id';
-export type Theme = 'dark' | 'light' | 'industrial-dark' | 'industrial-light' | 'system' | 'custom';
+export type Theme = 'dark' | 'light' | 'industrial-dark' | 'industrial-light' | 'system' | 'custom' | 'label-studio-signature';
 export interface Preferences { language: Language; theme: Theme; customTheme?: CustomTheme }
 export const PREFERENCES_KEY = 'thermal-label-studio.preferences.v1';
-export const DEFAULT_PREFERENCES: Preferences = { language: 'en', theme: 'dark' };
+export const DEFAULT_PREFERENCES: Preferences = { language: 'en', theme: 'label-studio-signature' };
 export function parsePreferences(raw: string | null): Preferences {
   try {
     const value: unknown = raw ? JSON.parse(raw) : null;
     if (!value || typeof value !== 'object' || Array.isArray(value)) return { ...DEFAULT_PREFERENCES };
     const candidate = value as Record<string, unknown>;
     const customTheme = parseCustomTheme(candidate.customTheme);
-    const theme = candidate.theme === 'custom' && customTheme ? 'custom' : candidate.theme === 'light' || candidate.theme === 'industrial-dark' || candidate.theme === 'industrial-light' || candidate.theme === 'system' ? candidate.theme : 'dark';
+    const theme = candidate.theme === 'custom' && customTheme ? 'custom' : candidate.theme === 'dark' || candidate.theme === 'light' || candidate.theme === 'industrial-dark' || candidate.theme === 'industrial-light' || candidate.theme === 'system' || candidate.theme === 'label-studio-signature' ? candidate.theme : DEFAULT_PREFERENCES.theme;
     return { language: candidate.language === 'id' ? 'id' : 'en', theme, ...(customTheme ? { customTheme } : {}) };
   } catch { return { ...DEFAULT_PREFERENCES }; }
 }

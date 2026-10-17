@@ -1,7 +1,7 @@
 # T12 — Optional named printer and external-sender acceptance
 
 TASK_ID: T12
-Status: PENDING
+Status: BLOCKED (local preparation complete; named target/authority and relevant T11 prerequisites missing)
 Depends on: T11
 Classification: OPTIONAL; outside the required software acceptance sequence. Execute only when requested.
 Execution size: One bounded AI task; do not start successors automatically.
@@ -53,8 +53,8 @@ Execute bounded external-sender/printer acceptance only for named targets and ex
 - [ ] Physical quantities/placement/payloads match approved expectations, or deviations are measured and reported.
 - [ ] Studio/intake same-input parity is established through the named physical target without replacing logical evidence with visual intuition.
 - [ ] Duplicate handling does not print twice; ambiguous results remain unresolved until inspection, never hidden as confirmed success.
-- [ ] External-system acceptance and synthetic-client evidence are labeled separately.
-- [ ] Missing authorization leaves physical tests NOT RUN and does not claim successful device readiness.
+- [x] External-system acceptance and synthetic-client evidence are labeled separately.
+- [x] Missing authorization leaves physical tests NOT RUN and does not claim successful device readiness.
 
 ## Required validation
 
@@ -76,3 +76,8 @@ For source implementation choices within scope, proceed with documented judgment
 Write optional device/integration acceptance evidence and target-specific limitations. Do not hold software acceptance open solely because this optional task was not executed. Leave production deployment, backup/recovery operations and wider exposure pending unless separately authorized.
 Write results/T12_RESULT.md using [RESULT_TEMPLATE](../RESULT_TEMPLATE.md); request/record review via [REVIEW_TEMPLATE](../REVIEW_TEMPLATE.md).
 Update STATUS.md honestly and stop at this task's boundary.
+
+
+## Executed local preparation (2026-10-10)
+
+See [UAT plan](../T12_UAT_PLAN.md), [manifest](../T12_ACCEPTANCE_PLAN.json), [result](../results/T12_RESULT.md) and [review](../results/T12_REVIEW.md). Nine native preparations/decoded-pixel comparisons PASS, no transport or operational effects. Exact physical criteria above remain unexecuted; target/count/slot authority and relevant T11 corrections/runtime acceptance are required before deliberate sends. Proposed22 labels are not authorized.

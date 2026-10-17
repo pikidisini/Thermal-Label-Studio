@@ -9,11 +9,12 @@ from app.engine.bitmap import RenderedLabel
 from app.engine.pipeline import prepare_bitmap
 from app.main import app
 from app.printing import http, transport
+from app.printing.service import PrintBeforeSendError
 
 REAL_TCP_SUBMIT = transport.TcpRawTransport.submit
 
-SVG = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="4" height="4"/></svg>'
-REQUEST = {"svg": SVG, "width_mm": 20., "height_mm": 12., "dpi": 203.2, "encoder": "IPL"}
+SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="20mm" height="12mm" viewBox="0 0 80 48"><rect width="4" height="4"/></svg>'
+REQUEST = {"draft": {"svg": SVG, "width_mm": 20., "height_mm": 12., "dpi": 203.2, "binding_version": 1}, "data": {}, "encoder": "IPL", "copies": 1}
 
 @pytest.fixture(autouse=True)
 def no_printer_network(monkeypatch):
@@ -21,6 +22,10 @@ def no_printer_network(monkeypatch):
     app.dependency_overrides[http.configured_target] = lambda: PrinterTarget("192.0.2.44")
     yield
     app.dependency_overrides.clear()
+
+def provenance():
+    from types import SimpleNamespace
+    return SimpleNamespace(manifest=SimpleNamespace(svg_sha256="a" * 64))
 
 def output():
     stream = BytesIO()
@@ -77,7 +82,8 @@ def test_tcp_exact_bytes_once_timeouts_and_close(monkeypatch, host, family, dest
     # Exercise the implementation while socket construction remains an injected fake.
     monkeypatch.setattr(transport.TcpRawTransport, "submit", REAL_TCP_SUBMIT)
     if failure:
-        with pytest.raises((OSError, TimeoutError)): sender.submit(payload)
+        with pytest.raises(PrintBeforeSendError if failure == 'connect' else (OSError, TimeoutError)):
+            sender.submit(payload)
     else: sender.submit(payload)
     assert launches == [(family, socket.SOCK_STREAM)]
     assert connection.operations[:2] == [("timeout", 3), ("connect", destination)]
@@ -89,7 +95,7 @@ def test_tcp_exact_bytes_once_timeouts_and_close(monkeypatch, host, family, dest
 
 def test_target_inspection_no_network_and_unconfigured_print_stops_before_raster(monkeypatch):
     app.dependency_overrides[http.configured_target] = lambda: None
-    monkeypatch.setattr(http, "prepare_editor_output", lambda *a, **k: pytest.fail("No target rendered"))
+    monkeypatch.setattr(http, "prepare_draft_output", lambda *a, **k: pytest.fail("No target rendered"))
     client = TestClient(app)
     response = client.get("/api/v1/printing/target")
     assert response.json() == {"available": False, "host": None, "port": None, "encoder": "IPL"}
@@ -102,8 +108,8 @@ def test_configured_target_get_does_not_probe():
 
 def test_editor_http_prepares_once_submits_exact_payload_and_reports_unconfirmed(monkeypatch):
     prepared = output(); fake = FakeTransport(); calls = []
-    def prepare(*args, **kwargs): calls.append((args, kwargs)); return prepared
-    monkeypatch.setattr(http, "prepare_editor_output", prepare)
+    def prepare(request): calls.append(request); return provenance(), prepared
+    monkeypatch.setattr(http, "prepare_draft_output", prepare)
     app.dependency_overrides[http.print_transport_factory] = lambda: lambda target: fake
     response = TestClient(app).post("/api/v1/printing/editor", json=REQUEST)
     assert response.status_code == 200
@@ -112,26 +118,26 @@ def test_editor_http_prepares_once_submits_exact_payload_and_reports_unconfirmed
     assert result["copies"] == 1
     assert (result["width_px"], result["height_px"], result["dpi"]) == (160, 96, 203.2)
     assert result["payload_bytes"] == len(prepared.payload)
-    assert len(calls) == 1 and calls[0] == ((SVG, 20., 12., 203.2), {"language": "IPL", "copies": 1})
+    assert len(calls) == 1 and calls[0].draft.svg == SVG and calls[0].copies == 1
     assert fake.calls == [prepared.payload] and fake.calls[0] is prepared.payload
 
 @pytest.mark.parametrize("extra", [{"host": "192.0.2.99"}, {"port": 9101}, {"encoder": "ZPL"}, {"copies_extra": 2}])
 def test_unknown_top_level_destination_fields_rejected(monkeypatch, extra):
     fake = FakeTransport()
     app.dependency_overrides[http.print_transport_factory] = lambda: lambda target: fake
-    monkeypatch.setattr(http, "prepare_editor_output", lambda *a, **k: pytest.fail("Invalid request rendered"))
+    monkeypatch.setattr(http, "prepare_draft_output", lambda *a, **k: pytest.fail("Invalid request rendered"))
     response = TestClient(app).post("/api/v1/printing/editor", json={**REQUEST, **extra})
     assert response.status_code == 422 and fake.calls == []
 
 def test_invalid_svg_never_submits():
     fake = FakeTransport(); app.dependency_overrides[http.print_transport_factory] = lambda: lambda target: fake
-    response = TestClient(app).post("/api/v1/printing/editor", json={**REQUEST, "svg": '<svg><script>bad</script></svg>'})
+    response = TestClient(app).post("/api/v1/printing/editor", json={**REQUEST, "draft": {**REQUEST["draft"], "svg": '<svg><script>bad</script></svg>'}})
     assert response.status_code == 422 and fake.calls == []
 
 def test_send_failure_has_bounded_uncertain_result_without_retry(monkeypatch):
     prepared = output(); fake = FakeTransport(TimeoutError("private host"))
     app.dependency_overrides[http.print_transport_factory] = lambda: lambda target: fake
-    monkeypatch.setattr(http, "prepare_editor_output", lambda *a, **k: prepared)
+    monkeypatch.setattr(http, "prepare_draft_output", lambda *a, **k: (provenance(), prepared))
     response = TestClient(app).post("/api/v1/printing/editor", json=REQUEST)
     assert response.status_code == 502
     assert response.json()["detail"]["code"] == "print_submission_uncertain"
@@ -144,7 +150,7 @@ def test_known_preparation_failure_returns_500_before_submission(monkeypatch, fa
     fake = FakeTransport()
     app.dependency_overrides[http.print_transport_factory] = lambda: lambda target: fake
     def fail(*args, **kwargs): raise failure
-    monkeypatch.setattr(http, "prepare_editor_output", fail)
+    monkeypatch.setattr(http, "prepare_draft_output", fail)
     response = TestClient(app).post("/api/v1/printing/editor", json=REQUEST)
     assert response.status_code == 500 and response.json()["detail"]["code"] == "print_preparation_failed"
     assert fake.calls == [] and "private" not in response.text
@@ -156,7 +162,7 @@ def test_explicit_action_target_overrides_optional_default(monkeypatch, default)
     app.dependency_overrides[http.configured_target] = lambda: default
     def factory(target): constructed.append(target); return fake
     app.dependency_overrides[http.print_transport_factory] = lambda: factory
-    monkeypatch.setattr(http, "prepare_editor_output", lambda *a, **k: output())
+    monkeypatch.setattr(http, "prepare_draft_output", lambda *a, **k: (provenance(), output()))
     response = TestClient(app).post("/api/v1/printing/editor", json={**REQUEST, "target": {"host": "2001:db8::44", "port": 9200}})
     assert response.status_code == 200
     assert constructed == [PrinterTarget("2001:db8::44", 9200)] and len(fake.calls) == 1
@@ -173,7 +179,7 @@ def test_explicit_action_target_overrides_optional_default(monkeypatch, default)
 ])
 def test_invalid_action_target_fails_before_raster_and_transport(monkeypatch, target):
     app.dependency_overrides[http.print_transport_factory] = lambda: lambda *a: pytest.fail("Invalid target constructed transport")
-    monkeypatch.setattr(http, "prepare_editor_output", lambda *a, **k: pytest.fail("Invalid target rendered"))
+    monkeypatch.setattr(http, "prepare_draft_output", lambda *a, **k: pytest.fail("Invalid target rendered"))
     response = TestClient(app).post("/api/v1/printing/editor", json={**REQUEST, "target": target})
     assert response.status_code == 422
     assert response.json()["detail"]["code"] == "invalid_printer_target"
@@ -183,7 +189,7 @@ def test_invalid_action_target_fails_before_raster_and_transport(monkeypatch, ta
 @pytest.mark.parametrize("copies", [0, 1000, -1, True, 1.5, "3", None])
 def test_invalid_copies_rejected_before_prepare_and_transport(monkeypatch, copies):
     app.dependency_overrides[http.print_transport_factory] = lambda: lambda *a: pytest.fail("Invalid copies created transport")
-    monkeypatch.setattr(http, "prepare_editor_output", lambda *a, **k: pytest.fail("Invalid copies prepared"))
+    monkeypatch.setattr(http, "prepare_draft_output", lambda *a, **k: pytest.fail("Invalid copies prepared"))
     response = TestClient(app).post("/api/v1/printing/editor", json={**REQUEST, "copies": copies})
     assert response.status_code == 422 and response.json()["detail"]["code"] == "invalid_print_copies"
 

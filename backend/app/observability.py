@@ -70,6 +70,8 @@ def record_event(event: EventName, *, item_index: int | None = None,
     # No body, facts, label values, path, headers, exception text or traceback.
     fields = asdict(diagnostic)
     logger.info(json.dumps(fields, separators=(",", ":")), extra={"diagnostic": fields})
+    from app.activity.context import stage
+    stage(event, item_index=item_index, error_code=error_code)
 
 
 class CorrelationMiddleware:

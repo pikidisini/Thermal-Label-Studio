@@ -1,7 +1,7 @@
 # T08 — Implement durable request identity and safe replay boundaries
 
 TASK_ID: T08
-Status: PENDING
+Status: DONE (source/transactional-fake scope; operational T11 gates NOT RUN)
 Depends on: T01, T07
 Execution size: One bounded AI task; do not start successors automatically.
 
@@ -47,13 +47,13 @@ Implement the agreed label_intake ledger/schema and service identity handling wi
 
 ## Acceptance criteria
 
-- [ ] Concurrent duplicate claims have one owner; changed-input collision is rejected.
-- [ ] Replay after success cannot repeat a print; replay after SENDING/UNCERTAIN cannot automatically retry.
-- [ ] Pinned template versions are reused on replay even if current active versions change.
-- [ ] Crash windows before/after claim, before send, after send and during terminal commit are documented and tested.
-- [ ] Database failure/rollback uncertainty produces bounded errors and no unsafe transport eligibility.
-- [ ] No in-memory-only idempotency, arbitrary expiry-based resend or old job-state shortcut is presented as durable safety.
-- [ ] Schema edits are reviewable without applying them to operational storage.
+- [x] Concurrent duplicate claims have one owner; changed-input collision is rejected.
+- [x] Replay after success cannot repeat a print; replay after SENDING/UNCERTAIN cannot automatically retry.
+- [x] Pinned template versions are reused on replay even if current active versions change.
+- [x] Crash windows before/after claim, before send, after send and during terminal commit are documented and tested.
+- [x] Database failure/rollback uncertainty produces bounded errors and no unsafe transport eligibility.
+- [x] No in-memory-only idempotency, arbitrary expiry-based resend or old job-state shortcut is presented as durable safety.
+- [x] Schema edits are reviewable without applying them to operational storage.
 
 ## Required validation
 
@@ -76,3 +76,7 @@ For source implementation choices within scope, proceed with documented judgment
 Expose the durable claim/outcome API and crash matrix for T10. Record all unapplied schema requirements for T11.
 Write results/T08_RESULT.md using [RESULT_TEMPLATE](../RESULT_TEMPLATE.md); request/record review via [REVIEW_TEMPLATE](../REVIEW_TEMPLATE.md).
 Update STATUS.md honestly and stop at this task's boundary.
+
+## Execution update: 2026-10-10
+
+Explicit user authorization allowed this local slice while preserving T07 NEEDS_REPLAN and T06 browser BLOCKED. [T08 result](../results/T08_RESULT.md) and [review](../results/T08_REVIEW.md) record 149 focused tests, full source gate PASS and the unapplied runtime gates. Review-only schema/setup requirements are in [operations](../T08_LEDGER_OPERATIONS.md); [crash matrix](../T08_CRASH_MATRIX.md) describes actual source/fake windows. All task acceptance checks above apply to source/transactional-fake evidence, not live PostgreSQL/device proof. No successor is started.

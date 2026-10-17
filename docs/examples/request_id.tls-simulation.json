@@ -1,0 +1,20 @@
+{
+  "sender": {"system": "TLS_BACKEND"},
+  "request_id": "TLS-B368C7CC30734DD4800A93A119ECFC25",
+  "mode": "simulation",
+  "items": [
+    {
+      "item_id": "ITEM-001",
+      "label_code": "A013",
+      "copies": 1,
+      "data": {
+        "batch_number": "0000317326",
+        "material_number": "EXAMPLE-MATERIAL",
+        "roll_number": "EXAMPLE-ROLL-001",
+        "ZZWIDTH": 695,
+        "ZZLENGTH": 8000,
+        "production_date": "2026-10-15"
+      }
+    }
+  ]
+}

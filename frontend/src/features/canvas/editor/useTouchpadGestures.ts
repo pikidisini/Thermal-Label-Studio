@@ -1,3 +1,4 @@
+import { isEditorKeyboardBlocked } from '../../../shared/keyboard/keyboardContext';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type * as fabric from 'fabric';
 import { useWheelZoom } from './useWheelZoom';
@@ -102,6 +103,7 @@ export function useTouchpadGestures({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isEditorKeyboardBlocked(e) || e.ctrlKey || e.metaKey || e.altKey) return;
       const activeEl = document.activeElement;
       const isInteractive = activeEl && (activeEl.closest('button, input, textarea, select, a[href], [role="button"]') || (activeEl as HTMLElement).isContentEditable);
       const isFabricEditing = canvasRef.current && (canvasRef.current.getActiveObject() as any)?.isEditing;
@@ -132,9 +134,13 @@ export function useTouchpadGestures({
       }
     };
 
+    const resetPan = () => { handleKeyUp({ code: 'Space' } as KeyboardEvent); };
+    window.addEventListener('blur', resetPan);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     return () => {
+      resetPan();
+      window.removeEventListener('blur', resetPan);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };

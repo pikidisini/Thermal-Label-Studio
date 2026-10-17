@@ -1,5 +1,5 @@
 import { translate as t, useTranslation } from "../../../shared/i18n";
-import { useFieldLabel } from '../../../features/data-tokens';
+import { labelTokenKeys, isLabelFieldKey, getLabelField, useFieldLabel } from '../../../features/data-tokens';
 import { translate as translateLabel } from "../../../shared/i18n";
 import React from 'react';
 import { PropField } from './PropField';
@@ -125,16 +125,16 @@ export function ObjectPropertyForm({ selectedObject, pxPerMm, jsonData, onUpdate
             <div className="flex gap-1">
               <select id="inspector-data-source" data-testid="inspector-field-select" value={tokenDraft} onChange={(event) => setTokenDraft(event.target.value)} className="min-w-0 flex-1" data-ui-control="select" data-variant="default">
                 <option value="">{t("Choose a field")}</option>
-                {Array.from(new Set([...Object.keys(jsonData), ...(sapField ? [sapField] : [])])).filter((key) => /^[A-Za-z0-9_-]+$/.test(key)).sort().map((key) => <option key={key} value={key}>{fieldLabel(key)}</option>)}
+                {labelTokenKeys(jsonData, new Set(sapField ? [sapField] : [])).filter((key) => isLabelFieldKey(key) && getLabelField(key)?.bindingSupported !== false).sort().map((key) => <option key={key} value={key}>{fieldLabel(key)}</option>)}
               </select>
-              <Button disabled={!tokenDraft} onClick={() => onUpdateProperty(selectedObject.isBarcode ? (selectedObject.barcodeType === 'qrcode' ? "dataQr" : "dataBarcode") : "dataField", tokenDraft)} tone="success"  variant="default">{t("Link")}</Button>
+              <Button disabled={!isLabelFieldKey(tokenDraft)} onClick={() => onUpdateProperty(selectedObject.isBarcode ? (selectedObject.barcodeType === 'qrcode' ? "dataQr" : "dataBarcode") : "dataField", tokenDraft)} tone="success"  variant="default">{t("Link")}</Button>
             </div>
             {sapField && <div data-testid="inspector-field-status" className="text-[10px] text-on-surface-variant">{fieldLabel(sapField)} · {getFieldStatus(sapSampleValue)}</div>}
             {sapSampleValue != null && <div data-testid="inspector-sap-sample-val" className="text-[10px] text-on-surface truncate">{t("Value:")} {String(sapSampleValue)}</div>}
             <details className="text-[10px] text-on-surface-variant">
               <summary>{t("Technical field")}</summary>
-              <input data-testid="inspector-sap-token-name" aria-label={t("Technical field key")} value={tokenDraft} onChange={(e) => setTokenDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && /^[A-Za-z0-9_-]+$/.test(tokenDraft.trim())) onUpdateProperty(selectedObject.isBarcode ? (selectedObject.barcodeType === 'qrcode' ? "dataQr" : "dataBarcode") : "dataField", tokenDraft.trim()); }} className="w-full"  data-ui-control="input" data-variant="default" />
-              <Button disabled={!/^[A-Za-z0-9_-]+$/.test(tokenDraft.trim())} onClick={() => onUpdateProperty(selectedObject.isBarcode ? (selectedObject.barcodeType === 'qrcode' ? "dataQr" : "dataBarcode") : "dataField", tokenDraft.trim())} variant="default">{t("Apply field")}</Button>
+              <input data-testid="inspector-sap-token-name" aria-label={t("Technical field key")} value={tokenDraft} onChange={(e) => setTokenDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && isLabelFieldKey(tokenDraft)) onUpdateProperty(selectedObject.isBarcode ? (selectedObject.barcodeType === 'qrcode' ? "dataQr" : "dataBarcode") : "dataField", tokenDraft); }} className="w-full"  data-ui-control="input" data-variant="default" />
+              <Button disabled={!isLabelFieldKey(tokenDraft)} onClick={() => onUpdateProperty(selectedObject.isBarcode ? (selectedObject.barcodeType === 'qrcode' ? "dataQr" : "dataBarcode") : "dataField", tokenDraft)} variant="default">{t("Apply field")}</Button>
             </details>
             <label data-ui-label="true" className="block text-[9px] text-on-surface-variant uppercase tracking-widest">{t("Local preview override")}</label>
             <input data-testid="inspector-input-token-value" aria-label={t("Token preview value")} value={selectedObject.text || selectedObject.barcodeValue || ''} onChange={(e) => onUpdateProperty(selectedObject.isBarcode ? "barcodeValue" : "text", e.target.value)} className="w-full"  data-ui-control="input" data-variant="default" />

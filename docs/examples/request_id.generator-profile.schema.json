@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "New SAP and TLS request ID generator profile",
+  "description": "String-only generation profile; the existing intake receiver accepts a broader identifier grammar. This is not an envelope schema or authentication rule.",
+  "type": "string",
+  "minLength": 36,
+  "maxLength": 36,
+  "pattern": "^(SAP|TLS)-[0-9A-F]{32}$",
+  "examples": [
+    "SAP-550E8400E29B41D4A716446655440000",
+    "TLS-B368C7CC30734DD4800A93A119ECFC25"
+  ]
+}

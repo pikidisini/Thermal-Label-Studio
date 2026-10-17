@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { openStudio } from '../helpers/studio.js';
+import { openStudio, mockBuiltApplication } from '../helpers/studio.js';
 
 const target = { available: true, host: '192.0.2.44', port: 9100, encoder: 'IPL' };
-const submitted = { request_id: 'fake-print-1', status: 'SUBMITTED', confirmed: false, width_px: 640, height_px: 1600, dpi: 203.2, encoder: 'IPL', payload_bytes: 1200, copies: 1, target: { host: '192.0.2.44', port: 9100 } };
+const submitted = { template_sha256: 'a'.repeat(64), binding_version: 1, request_id: 'fake-print-1', status: 'SUBMITTED', confirmed: false, width_px: 640, height_px: 1600, dpi: 203.2, encoder: 'IPL', payload_bytes: 1200, copies: 1, target: { host: '192.0.2.44', port: 9100 } };
 
 // Every API request is mocked. Tests never contact storage or a physical printer.
 test.beforeEach(async ({ page }) => {
+  await mockBuiltApplication(page);
   await page.route('**/api/v1/**', route => route.fulfill({ json: [] }));
 });
 test('opening Print inspects target; one explicit action locks duplicate clicks and reports unconfirmed delivery', async ({ page }) => {
@@ -37,12 +38,12 @@ test('opening Print inspects target; one explicit action locks duplicate clicks 
   const input = posts[0];
   expect(input.encoder).toBe('IPL');
   expect(input.copies).toBe(3);
-  expect(input.svg).toContain('<svg');
-  expect(input.svg).toContain('Text');
+  expect(input.draft.svg).toContain('<svg');
+  expect(input.draft.svg).toContain('Text');
   expect(input.target).toEqual({ host: '192.0.2.99', port: 9200 });
   expect(input).not.toHaveProperty('host');
   expect(input).not.toHaveProperty('port');
-  await expect(dialog.getByTestId('print-layout-summary')).toContainText(`${input.width_mm} × ${input.height_mm} mm`);
+  await expect(dialog.getByTestId('print-layout-summary')).toContainText(`${input.draft.width_mm} × ${input.draft.height_mm} mm`);
   release();
   await expect(dialog.getByTestId('print-submitted')).toContainText('physical delivery is unconfirmed');
   await expect(send).toBeEnabled();

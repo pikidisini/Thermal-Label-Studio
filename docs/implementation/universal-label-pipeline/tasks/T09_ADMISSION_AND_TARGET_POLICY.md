@@ -1,7 +1,7 @@
 # T09 — Implement intake admission, template approval and target routing
 
 TASK_ID: T09
-Status: PENDING
+Status: DONE (source/synthetic preflight scope; self-review PASS)
 Depends on: T01, T07
 Execution size: One bounded AI task; do not start successors automatically.
 
@@ -50,12 +50,12 @@ Implement the narrow admission/approval/target policy frozen in T01, using local
 
 ## Acceptance criteria
 
-- [ ] Missing/invalid identity and unauthorized source/capability are denied without render/send.
-- [ ] Published-but-unapproved versions cannot externally print; changed version/checksum requires the selected explicit approval step.
-- [ ] External request data cannot control arbitrary destinations.
-- [ ] Target resolution is deterministic, server-owned and reflected appropriately in results; unavailable mapping fails closed.
-- [ ] Policy failures cannot mutate approved template/sample data or bypass the ledger gate.
-- [ ] Existing manual print UX and no-probe target inspection remain intact.
+- [x] Missing/invalid identity and unauthorized source/capability are denied without render/send.
+- [x] Published-but-unapproved versions cannot externally print; changed version/checksum requires the selected explicit approval step.
+- [x] External request data cannot control arbitrary destinations.
+- [x] Target resolution is deterministic, server-owned and reflected appropriately in results; unavailable mapping fails closed.
+- [x] Policy failures cannot mutate approved template/sample data or bypass the ledger gate.
+- [x] Existing manual print UX and no-probe target inspection remain intact.
 
 ## Required validation
 
@@ -78,3 +78,7 @@ For source implementation choices within scope, proceed with documented judgment
 Provide preflight policy APIs for T10 and an explicit local runtime configuration checklist for T11.
 Write results/T09_RESULT.md using [RESULT_TEMPLATE](../RESULT_TEMPLATE.md); request/record review via [REVIEW_TEMPLATE](../REVIEW_TEMPLATE.md).
 Update STATUS.md honestly and stop at this task's boundary.
+
+## Execution evidence (2026-10-10)
+
+See [T09 result](../results/T09_RESULT.md), [source self-review PASS](../results/T09_REVIEW.md) and [policy operations / T10 handoff](../T09_POLICY_OPERATIONS.md). 213 focused cases and the full source gate passed. Current print-target results are immutable preflight pins for T10; HTTP print stays denied. Live configuration/durable audit history across restart/device evidence is NOT RUN. T07 NEEDS_REPLAN and T06 browser BLOCKED remain unchanged; T10 was not started.

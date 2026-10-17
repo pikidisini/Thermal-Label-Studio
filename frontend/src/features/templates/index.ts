@@ -2,4 +2,5 @@ export { useTemplateManager } from './hooks/useTemplateManager';
 export { TemplateSelector } from './ui/TemplateSelector';
 export { default as SaveTemplateModal } from './ui/SaveTemplateModal';
 export { layoutApi } from './api/layoutApi';
+export type { PersistedLayoutSummary } from './api/layoutApi';
 export { validateLocalSvg, type ValidatedSvg } from './lib/validateLocalSvg';

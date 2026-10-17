@@ -8,7 +8,7 @@
     "build": "vite build",
     "typecheck:core": "tsc -p tsconfig.strict-core.json",
     "preview": "vite preview",
-    "test": "tsx --test tests/test_frontend.mjs tests/barcode_payload.mjs tests/snapping_engine.mjs tests/ui_layers.mjs tests/graphics_feature_structure.mjs tests/fixture_simulation.mjs tests/playwright_configuration.mjs tests/studio_preview.mjs tests/preferences.mjs tests/object_geometry.mjs tests/label_data.mjs",
+    "test": "tsx --test tests/test_frontend.mjs tests/barcode_payload.mjs tests/snapping_engine.mjs tests/ui_layers.mjs tests/graphics_feature_structure.mjs tests/fixture_simulation.mjs tests/playwright_configuration.mjs tests/studio_preview.mjs tests/preferences.mjs tests/object_geometry.mjs tests/label_data.mjs tests/template_metadata.mjs tests/text_binding.mjs tests/symbol_binding.mjs tests/image_upload.mjs tests/studio_shortcuts.mjs",
     "test:e2e": "playwright test",
     "test:ui": "playwright test --ui",
     "record": "playwright codegen http://127.0.0.1:8002/studio --viewport-size=1440,900 --output=tests/browser/ui/recorded_session.spec.js",
@@ -18,9 +18,9 @@
   },
   "dependencies": {
     "fabric": "^7.4.0",
-    "jsbarcode": "^3.11.6",
+    "jsbarcode": "3.12.3",
     "lucide-react": "^0.475.0",
-    "qrcode": "^1.5.4",
+    "qrcode": "1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zustand": "^5.0.15"

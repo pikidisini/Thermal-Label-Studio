@@ -1,0 +1,79 @@
+.label-print-content { width: 100%; padding: var(--ui-space-3); }
+.label-print-heading, .label-print-results-heading, .label-print-card-footer, .label-print-submit, .label-print-agent { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--ui-space-3); }
+.label-print-heading { margin-bottom: var(--ui-space-2); }
+.label-print-heading .application-back { margin-bottom: 0; }
+.label-print-check { display: inline-flex; align-items: center; gap: var(--ui-space-2); }
+.label-print-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 260px); gap: var(--ui-space-3); align-items: start; }
+.label-print-sidebar, .label-print-results { min-width: 0; }
+.label-print-sidebar .batch-entry { margin-top: 0; padding: var(--ui-space-4); }
+.label-print-sidebar > .label-print-settings:first-child { margin-top: 0; margin-bottom: var(--ui-space-4); }
+.label-print-settings { margin-top: var(--ui-space-3); padding: var(--ui-space-3); border: var(--ui-border-width) solid var(--ui-border-default); background: var(--ui-surface-low); display: grid; gap: var(--ui-space-2); }
+.label-print-pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ui-space-3); }
+.label-print-settings h2, .label-print-results h1, .label-print-empty h2 { font-size: var(--ui-font-title); font-weight: var(--ui-weight-control); }
+.label-print-settings select, .label-print-settings input { width: 100%; min-width: 0; }
+.label-print-muted, .label-print-results-heading p, .label-print-status, .label-print-submit { color: var(--ui-text-secondary); }
+.label-print-demo-note { padding: var(--ui-space-2); margin-top: var(--ui-space-2); background: var(--ui-surface-low); color: var(--ui-warning); }
+.label-print-empty { padding: var(--ui-space-4); display: grid; justify-items: center; text-align: center; gap: var(--ui-space-2); color: var(--ui-text-secondary); }
+.label-print-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: var(--ui-space-3); margin-top: var(--ui-space-2); align-items: start; }
+.label-print-card { min-width: 0; border: var(--ui-border-width) solid var(--ui-border-default); background: var(--ui-surface-low); }
+.label-print-image { padding: var(--ui-space-2); background: var(--ui-surface-base); }
+.label-print-image img { display: block; width: auto; height: auto; max-width: 100%; max-height: 180px; margin: 0 auto; }
+.label-print-card-footer { padding: var(--ui-space-2); }
+.label-print-card details { padding: 0 var(--ui-space-2) var(--ui-space-2); }
+.label-print-card summary { color: var(--ui-primary); }
+.label-print-card summary svg { display: inline; margin-right: var(--ui-space-2); }
+.label-print-card dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--ui-space-2); margin-top: var(--ui-space-3); }
+.label-print-card dt { color: var(--ui-text-secondary); }
+.label-print-card dd { overflow-wrap: anywhere; }
+.label-print-submit { margin-top: var(--ui-space-4); border-top: var(--ui-border-width) solid var(--ui-border-default); padding-top: var(--ui-space-4); }
+.label-print-status { margin-top: var(--ui-space-2); }
+.label-print-printer-tools { display: flex; align-items: center; flex-wrap: wrap; gap: var(--ui-space-3); }
+.label-print-printer-tools a { color: var(--ui-primary); }
+.label-print-printer-address { font-family: var(--ui-font-mono); overflow-wrap: anywhere; }
+@media(max-width: 800px) { .label-print-layout { grid-template-columns: 1fr; } }
+@media(max-width: 480px) { .label-print-gallery { grid-template-columns: 1fr; } }
+
+.label-print-failure { display: grid; gap: var(--ui-space-3); overflow-wrap: anywhere; }
+.label-print-failure strong { color: var(--ui-danger); }
+.label-print-progress ol { margin-top: var(--ui-space-3); display: grid; gap: var(--ui-space-2); }
+.label-print-progress li { display: flex; justify-content: space-between; gap: var(--ui-space-3); }
+.label-print-progress li[data-status="PASSED"] strong { color: var(--ui-success); }
+.label-print-progress li[data-status="FAILED"] strong { color: var(--ui-danger); }
+.label-print-progress li[data-status="NOT_RUN"] { color: var(--ui-text-secondary); }
+
+.label-print-operation-fields { border: 0; min-width: 0; padding: 0; margin: 0; }
+.label-print-local-agent { display: grid; gap: var(--ui-space-3); }
+.label-print-job-results { margin-top: var(--ui-space-4); overflow-wrap: anywhere; }
+
+.label-print-title { margin-bottom: var(--ui-space-2); }
+.label-print-title h1 { font-size: calc(var(--ui-font-title) * 1.5); font-weight: var(--ui-weight-control); }
+.label-print-title p { color: var(--ui-text-secondary); margin-top: var(--ui-space-1); }
+.label-print-intake { margin-bottom: var(--ui-space-3); border: var(--ui-border-width) solid var(--ui-border-default); background: var(--ui-surface-low); }
+.label-print-intake-heading { padding: var(--ui-space-2) var(--ui-space-3); border-bottom: var(--ui-border-width) solid var(--ui-border-default); }
+.label-print-intake-heading h2 { font-size: var(--ui-font-title); font-weight: var(--ui-weight-control); }
+.label-print-intake-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-3); }
+.label-print-intake.is-collapsed .label-print-intake-body { display: none; }
+.label-print-intake .label-print-intake-body { display: grid; grid-template-columns: minmax(200px, 220px) minmax(0, 1fr); gap: var(--ui-space-3); padding: var(--ui-space-3); align-items: start; }
+.label-print-source-fields { min-width: 0; display: grid; gap: var(--ui-space-2); align-content: start; }
+.label-print-source-fields > div { display: grid; gap: var(--ui-space-2); }
+.label-print-source-fields .label-print-settings { margin: 0; padding: 0; border: 0; }
+.label-print-sidebar .label-print-settings { margin: 0; }
+.label-print-card-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-2); padding: var(--ui-space-2); flex-wrap: wrap; }
+.label-print-batch { font-family: var(--ui-font-mono); overflow-wrap: anywhere; }
+.label-print-card.is-selected { border-color: var(--ui-primary); }
+.label-print-card.is-selected .label-print-card-heading { background: var(--ui-surface-base); }
+.label-print-card.is-expanded { grid-column: 1 / -1; }
+.label-print-card.is-expanded img { width: 100%; max-width: 900px; max-height: none; margin: 0 auto; }
+.label-print-card-footer { color: var(--ui-text-secondary); }
+.label-print-results-heading h2 { font-size: var(--ui-font-title); font-weight: var(--ui-weight-control); }
+.label-print-submit { display: grid; gap: var(--ui-space-2); padding: var(--ui-space-3); margin-top: 0; border: var(--ui-border-width) solid var(--ui-border-default); border-top: 0; background: var(--ui-surface-low); }
+.label-print-submit > span { font-variant-numeric: tabular-nums; }
+.label-print-process { display: flex; align-items: start; gap: var(--ui-space-3); padding: var(--ui-space-4); margin-top: var(--ui-space-3); border: var(--ui-border-width) solid var(--ui-border-default); background: var(--ui-surface-low); }
+.label-print-process h2 { font-size: var(--ui-font-title); font-weight: var(--ui-weight-control); }
+.label-print-process p { color: var(--ui-text-secondary); margin-top: var(--ui-space-2); }
+.label-print-spinner { display: inline-flex; flex-shrink: 0; animation: label-print-spin 1s linear infinite; }
+.label-print-placeholder { padding: var(--ui-space-3); display: grid; gap: var(--ui-space-2); min-height: 120px; overflow-wrap: anywhere; color: var(--ui-text-secondary); }
+.label-print-skeleton { height: 32px; background: var(--ui-surface-base); }
+@keyframes label-print-spin { to { transform: rotate(360deg); } }
+@media(prefers-reduced-motion: reduce) { .label-print-spinner { animation: none; } }
+@media(max-width: 800px) { .label-print-layout, .label-print-intake .label-print-intake-body { grid-template-columns: 1fr; } }

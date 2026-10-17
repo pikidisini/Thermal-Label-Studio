@@ -1,3 +1,5 @@
+// The canvas barrel reaches this hook through drawing tools -> barcode preview -> QR.
+import { creationSymbolSpec } from '../../canvas/svg/bindingMetadata';
 import { useCallback } from 'react';
 import * as fabric from 'fabric';
 import { qrGenerator } from '../model/qrGenerator';
@@ -35,6 +37,7 @@ export function useQrActions({
             scaleY: 0.6,
             isBarcode: true,
             barcodeType: 'qrcode',
+            symbolSpec: creationSymbolSpec('qrcode'),
             barcodeValue: initialValue,
             payloadTemplate: initialValue,
           } as any);

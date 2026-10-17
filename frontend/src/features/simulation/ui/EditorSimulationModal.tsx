@@ -1,3 +1,4 @@
+import type { EditorOutputSnapshot } from '../../canvas';
 import { translate as t, useTranslation } from "../../../shared/i18n";
 import React from 'react';
 import { Button, Dialog, DialogFooter, DialogHeader, ErrorState, IconButton } from '../../../shared/ui';
@@ -6,14 +7,14 @@ import { editorPreviewUrl, runEditorPreview, type EditorPreviewResult } from '..
 export interface EditorSimulationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  getSvg: () => string;
+  getSnapshot: (copies?: number) => EditorOutputSnapshot;
   widthMm: number;
   heightMm: number;
   dpi: number;
-  validate?: () => string[];
+
 }
 
-export function EditorSimulationModal({ isOpen, onClose, getSvg, widthMm, heightMm, dpi, validate }: EditorSimulationModalProps) {
+export function EditorSimulationModal({ isOpen, onClose, getSnapshot, widthMm, heightMm, dpi }: EditorSimulationModalProps) {
   useTranslation();
   const [encoder, setEncoder] = React.useState<"IPL">("IPL");
   const [loading, setLoading] = React.useState(false);
@@ -23,31 +24,26 @@ export function EditorSimulationModal({ isOpen, onClose, getSvg, widthMm, height
 
   React.useEffect(() => () => controller.current?.abort(), []);
   React.useEffect(() => {
-    if (isOpen) return;
     controller.current?.abort();
     controller.current = null;
     setLoading(false);
     setError(null);
     setResult(null);
-  }, [isOpen]);
+  }, [isOpen, getSnapshot, widthMm, heightMm, dpi]);
 
   const preview = async () => {
     setResult(null);
-    const errors = validate?.() || [];
-    if (errors.length) { setError(`Label data is incomplete or invalid: ${errors.join(' ')}`); return; }
-    const svg = getSvg();
-    if (!svg) {
-      setError('Add an element to the canvas before running a simulation.');
-      return;
-    }
+    let snapshot: EditorOutputSnapshot;
+    try { snapshot = getSnapshot(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Simulation preview failed.'); return; }
     controller.current?.abort();
     const active = new AbortController();
     controller.current = active;
     setLoading(true);
     setError(null);
     try {
-      const next = await runEditorPreview({ svg, widthMm, heightMm, dpi, encoder }, active.signal);
-      if (!active.signal.aborted) setResult(next);
+      const next = await runEditorPreview({ ...snapshot, encoder }, active.signal, 'simulation');
+      if (!active.signal.aborted && JSON.stringify(getSnapshot()) === JSON.stringify(snapshot)) setResult(next);
     } catch (cause) {
       if (!active.signal.aborted) setError(cause instanceof Error ? cause.message : 'Simulation preview failed.');
     } finally {
@@ -67,7 +63,7 @@ export function EditorSimulationModal({ isOpen, onClose, getSvg, widthMm, height
           <IconButton label={t("Close simulation")} onClick={onClose}>×</IconButton>
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-auto p-5 space-y-4">
-          <p className="text-sm text-on-surface-variant">{t("The server receives the current SVG canvas and returns a 1-bit PNG bitmap. Nothing is sent to a printer.")}</p>
+          <p className="text-sm text-on-surface-variant">{t("Preview uses the current design and label data. Nothing is sent to a printer.")}</p>
           <label className="flex items-center gap-3 text-sm">
             <span>{t("Output language")}</span>
             <select aria-label={t("Output language")} value={encoder} onChange={() => setEncoder("IPL")} disabled={loading} data-ui-field="true" className="rounded border border-outline-variant bg-surface px-3 py-2 text-on-surface">

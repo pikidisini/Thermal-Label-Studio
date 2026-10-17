@@ -1,3 +1,4 @@
+import type { EditorOutputSnapshot } from '../../canvas';
 import React from 'react';
 import { Info, Minus, Plus, Printer } from 'lucide-react';
 import { translate as t, useTranslation } from '../../../shared/i18n';
@@ -6,8 +7,8 @@ import { getPrintTarget, printEditorLabel, PrintFailure, type EditorPrintResult 
 import { isNumericPrinterHost, loadPrinterTarget, rememberPrinterTarget, targetFromFields } from '../model/printerTarget';
 
 interface EditorPrintModalProps {
-  isOpen: boolean; onClose: () => void; getSvg: () => string;
-  widthMm: number; heightMm: number; dpi: number; validate?: () => string[];
+  isOpen: boolean; onClose: () => void; getSnapshot: (copies: number) => EditorOutputSnapshot;
+  widthMm: number; heightMm: number; dpi: number;
 }
 const failureMessages = {
   unavailable: 'Enter a printer IP address and TCP port.',
@@ -18,7 +19,7 @@ const failureMessages = {
   uncertain: 'Delivery is uncertain. Check the printer before sending again to avoid duplicate labels.',
 };
 
-export function EditorPrintModal({ isOpen, onClose, getSvg, widthMm, heightMm, dpi, validate }: EditorPrintModalProps) {
+export function EditorPrintModal({ isOpen, onClose, getSnapshot, widthMm, heightMm, dpi }: EditorPrintModalProps) {
   useTranslation();
   const [host, setHost] = React.useState('');
   const [port, setPort] = React.useState('9100');
@@ -66,15 +67,14 @@ export function EditorPrintModal({ isOpen, onClose, getSvg, widthMm, heightMm, d
   const print = async () => {
     if (sending.current || attemptedRef.current || !target || copiesInvalid) return;
     setError(null); setResult(null);
-    const errors = validate?.() || [];
-    if (errors.length) { setError('The current canvas cannot be printed. Check the layout and label data.'); return; }
-    const svg = getSvg();
-    if (!svg) { setError('Add an element to the canvas before printing.'); return; }
+    let snapshot: EditorOutputSnapshot;
+    try { snapshot = getSnapshot(Number(copies)); }
+    catch { setError(failureMessages.invalid); return; }
     sending.current = true; attemptedRef.current = true;
     rememberPrinterTarget(target);
     setBusy(true); setAttempted(true);
     try {
-      setResult(await printEditorLabel({ svg, widthMm, heightMm, dpi, encoder, target, copies: Number(copies) }));
+      setResult(await printEditorLabel({ ...snapshot, encoder, target }));
       attemptedRef.current = false; setAttempted(false);
     } catch (cause) {
       const kind = cause instanceof PrintFailure ? cause.kind : 'uncertain';

@@ -25,6 +25,14 @@ class Database:
         elif "SELECT id" in sql:
             self.description = True
             self.result = self.rows.get(str(args[0])) if args else list(self.rows.values())
+        elif 'UPDATE label_studio.studio_sample_datasets' in sql:
+            self.description = True
+            name, filename, payload, updated, identifier, expected = args
+            old = self.rows.get(str(identifier))
+            self.result = None
+            if old and old[4] == expected:
+                self.rows[str(identifier)] = (old[0], name, filename, old[3], updated, deepcopy(payload))
+                self.result = self.rows[str(identifier)][:5]
     def fetchone(self): return self.result
     def fetchall(self): return [row[:5] for row in self.result]
 

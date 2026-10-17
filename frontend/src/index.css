@@ -1,6 +1,14 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+.ui-startup { min-height: 100dvh; display: grid; place-items: center; padding: var(--ui-space-4); background: var(--ui-region-workspace, var(--ui-surface-base)); }
+.ui-startup-content { display: flex; flex-direction: column; align-items: center; gap: var(--ui-space-4); text-align: center; max-width: 28rem; }
+.ui-startup-logo { color: var(--ui-on-primary-container); background: var(--ui-primary-container); padding: var(--ui-space-3); display: inline-flex; }
+.ui-startup-content h1 { font-size: var(--ui-font-title); font-weight: 600; }
+.ui-startup-content p { color: var(--ui-text-secondary); }
+.ui-startup-spinner { width: var(--ui-icon-24); height: var(--ui-icon-24); border: 2px solid var(--ui-outline); border-top-color: var(--ui-primary-container); border-radius: 50%; animation: ui-startup-spin 900ms linear infinite; }
+@keyframes ui-startup-spin { to { transform: rotate(360deg); } }
+
 @layer base {
   :root {
     /* Semantic UI foundation: graphite surfaces and desaturated steel/sage/ochre/brick accents. */
@@ -399,7 +407,7 @@ input[type="number"] {
 .custom-theme-preview-label { background: #ffffff; color: #000000; border: 1px solid #000000; }
 .custom-theme-preview-barcode { background: repeating-linear-gradient(90deg, #000000 0 2px, #ffffff 2px 4px, #000000 4px 5px, #ffffff 5px 8px); }
 /* Inspector interior surfaces inherit its chosen color only for custom palettes. */
-:root[data-custom-theme="true"] [data-ui-region="inspector"] { --ui-surface-low: var(--ui-region-inspector); --ui-surface-canvas: var(--ui-region-inspector); --ui-surface-base: var(--ui-region-inspector); }
+:root[data-custom-theme="true"] [data-ui-region="inspector"], :root[data-theme="label-studio-signature"] [data-ui-region="inspector"] { --ui-surface-low: var(--ui-region-inspector); --ui-surface-canvas: var(--ui-region-inspector); --ui-surface-base: var(--ui-region-inspector); }
 :root[data-theme="industrial-dark"] {
   --ui-surface-canvas: #14181b;
   --ui-surface-base: #191d20;
@@ -430,7 +438,7 @@ input[type="number"] {
   --ui-on-warning-container: #282218;
   --ui-text-disabled: #839098;
 }
-:root[data-theme="industrial-light"] {
+:root[data-theme="industrial-light"], :root[data-theme="label-studio-signature"] {
   --ui-shadow-overlay: 0 12px 32px rgb(25 37 54 / 0.2);
   --ui-shadow-chrome: 0 2px 8px rgb(25 37 54 / 0.12);
   --ui-surface-canvas: #dce0dc;
