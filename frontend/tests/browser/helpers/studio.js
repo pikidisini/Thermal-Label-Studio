@@ -1,4 +1,20 @@
 import { expect } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+// Current checkout assets, isolated from the backend at the existing loopback origin.
+export async function mockBuiltApplication(page) {
+  const dist = fileURLToPath(new URL('../../../dist/', import.meta.url));
+  await page.route('**/api/**', route => route.fulfill({ status: 503, json: { detail: 'Unmocked API request' } }));
+  await page.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
+  await page.route('https://fonts.gstatic.com/**', route => route.abort());
+  await page.route('**/studio', route => route.fulfill({ path: path.join(dist, 'index.html') }));
+  await page.route('**/assets/**', route => {
+    const asset = path.resolve(dist, `.${decodeURIComponent(new URL(route.request().url()).pathname)}`);
+    if (!asset.startsWith(path.join(dist, 'assets') + path.sep)) return route.abort();
+    return route.fulfill({ path: asset });
+  });
+}
 
 export async function openStudio(page) {
   await page.goto('/studio');

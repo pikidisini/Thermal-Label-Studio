@@ -27,6 +27,7 @@ COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY --from=renderer-builder /renderer/resvg /usr/local/bin/resvg
 COPY backend/app /app/backend/app
+COPY backend/schema /app/backend/schema
 COPY --from=frontend-builder /build/frontend/dist /app/frontend/dist
 ENV TLS_BIND_HOST=0.0.0.0 \
     PYTHONPATH=/app/backend \

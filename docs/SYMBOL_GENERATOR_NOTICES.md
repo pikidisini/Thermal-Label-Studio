@@ -1,0 +1,9 @@
+# Symbol generator dependency and adaptation notices
+
+T05 pins the actual installed Studio generators: JsBarcode3.12.3 and node-qrcode1.5.4 in package.json and package-lock.json. Backend pins python-barcode0.16.1 for standard module tables/EAN, qrcode8.2 for standard QR data/ECC/matrix placement, and test decoder zxing-cpp3.1.1. Application/test Python dependencies share requirements.txt.
+
+Python native auto Code128/QR decisions are not treated as equivalent to Studio decisions. backend/app/template_binding/barcode.py adapts the printable subset of JsBarcode's CODE128 auto.js/CODE128.js policy, including initial pairs, four-digit AB switches and tie choices. Code39 adds the exact terminal-gap profile. qr.py adapts node-qrcode segments.js graph construction and dijkstrajs stable tie order, plus mask-pattern.js scoring with real format bits and ceil dark proportion. Standard encodings and error correction remain library-owned.
+
+Adapted algorithm sources are MIT licensed. Full notices are retained in [SYMBOL_GENERATOR_LICENSES](../backend/app/template_binding/SYMBOL_GENERATOR_LICENSES.txt), inside the backend package so the existing image COPY includes them. Source upstreams: [JsBarcode](https://github.com/lindell/JsBarcode), [node-qrcode](https://github.com/soldair/node-qrcode). Existing installed source/lock are the actual inspected references, not latest upstream HEAD.
+
+The actual-JavaScript oracle captures module arrays, effective QR version/mask, native PNG dimensions and decoded RGBA SHA256. Tests regenerate the captures from Studio generators and compare backend pixels independently. PNG compression bytes are not an equivalence criterion. Independent decoder tests compare exact payload bytes/type; diagnostic padding is explicitly separate from production symbol margins.

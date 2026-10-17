@@ -56,15 +56,6 @@ export function useCanvasActions(
   });
 
 
-  const graphicActions = useGraphicActions({
-    canvasRef,
-    pxPerMm,
-    triggerRenderSimulation,
-    syncSelection,
-    saveCanvasHistory,
-    getStrategicPlacement,
-  });
-
   const imageActions = useImageActions({
     canvasRef,
     pxPerMm,
@@ -73,6 +64,8 @@ export function useCanvasActions(
     saveCanvasHistory,
     getStrategicPlacement,
   });
+
+  const graphicActions = useGraphicActions({ addImageFile: imageActions.handleAddImageFile });
 
   const handleDropElement = useCallback((data: unknown) => {
     if (!data || typeof data !== 'object') return;

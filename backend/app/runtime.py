@@ -1,7 +1,7 @@
 """Explicit fixture runtime serving and dependency-presence readiness."""
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import Settings
@@ -28,7 +28,11 @@ def configure_fixture_serving(app: FastAPI, settings: Settings) -> None:
 
     @app.get("/", include_in_schema=False)
     def fixture_home():
-        return RedirectResponse("/studio", status_code=307)
+        return FileResponse(directory / "index.html", media_type="text/html")
+
+    @app.get("/print", include_in_schema=False)
+    def label_print_page():
+        return FileResponse(directory / "index.html", media_type="text/html")
 
     @app.get("/studio", include_in_schema=False)
     def studio_page():
@@ -36,6 +40,10 @@ def configure_fixture_serving(app: FastAPI, settings: Settings) -> None:
 
     @app.get("/fixture-simulation", include_in_schema=False)
     def fixture_page():
+        return FileResponse(directory / "index.html", media_type="text/html")
+
+    @app.get("/management", include_in_schema=False)
+    def management_page():
         return FileResponse(directory / "index.html", media_type="text/html")
 
 

@@ -73,20 +73,16 @@ def test_http_rejects_invalid_titles(managed, title):
         assert client.patch("/layouts/example", json={"title": title}).status_code == 422
     assert not managed._database.sql
 
-def test_http_rename_delete_and_not_found(managed):
+def test_direct_metadata_endpoints_cannot_bypass_management_audit(managed):
     application = FastAPI(); application.include_router(router); application.state.layout_service = managed
     with TestClient(application) as client:
-        response = client.patch("/layouts/example", json={"title": "  New name  "})
-        assert response.status_code == 200
-        assert response.json()["title"] == "New name"
-        assert client.delete("/layouts/example").status_code == 204
-        assert client.patch("/layouts/example", json={"title": "Again"}).status_code == 404
-        assert client.delete("/layouts/example").status_code == 404
-        managed._database.fail = True
-        assert client.delete("/layouts/example").status_code == 503
+        assert client.patch('/layouts/example', json={'title': 'New name'}).status_code == 410
+        assert client.delete('/layouts/example').status_code == 410
+    assert not managed._database.sql and not managed._database.deleted
 
-def test_management_without_persistence_fails_closed():
+
+def test_direct_endpoints_never_mutate_without_persistence():
     application = FastAPI(); application.include_router(router)
     with TestClient(application) as client:
-        assert client.patch("/layouts/example", json={"title": "New"}).status_code == 503
-        assert client.delete("/layouts/example").status_code == 503
+        assert client.patch('/layouts/example', json={'title': 'New'}).status_code == 410
+        assert client.delete('/layouts/example').status_code == 410

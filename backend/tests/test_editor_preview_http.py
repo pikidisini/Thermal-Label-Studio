@@ -14,7 +14,7 @@ from app.protocols import registry
 from app.protocols.ipl.errors import IplError
 
 
-VALID_SVG = '<svg xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="10" height="10" fill="black"/></svg>'
+VALID_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="80mm" height="200mm" viewBox="0 0 320 800"><rect x="0" y="0" width="10" height="10" fill="black"/></svg>'
 PNG = b"\x89PNG\r\n\x1a\nfixture"
 
 
@@ -31,7 +31,7 @@ def test_editor_preview_renders_a_server_bitmap(monkeypatch):
 
     monkeypatch.setattr(pipeline, "render_svg_bitmap", render)
     response = editor_http.simulate_editor_preview(editor_http.EditorPreviewRequest(
-        svg=VALID_SVG, width_mm=80, height_mm=200, dpi=203.2,
+        draft=dict(svg=VALID_SVG, width_mm=80, height_mm=200, dpi=203.2, binding_version=1), data={}, encoder="IPL", copies=1,
     ))
     assert (response.width_px, response.height_px, response.dpi) == (640, 1600, 203.2)
     with Image.open(BytesIO(base64.b64decode(response.png_base64))) as image:
@@ -51,7 +51,7 @@ def test_editor_preview_rejects_active_or_external_svg(monkeypatch, svg):
     monkeypatch.setattr(pipeline, "render_svg_bitmap", lambda *args: pytest.fail("must not render"))
     with pytest.raises(HTTPException) as raised:
         editor_http.simulate_editor_preview(editor_http.EditorPreviewRequest(
-            svg=svg, width_mm=80, height_mm=200, dpi=203.2,
+            draft=dict(svg=svg, width_mm=80, height_mm=200, dpi=203.2, binding_version=1), data={}, encoder="IPL", copies=1,
         ))
     assert raised.value.status_code == 422
     assert raised.value.detail == {"code": "invalid_editor_layout"}
@@ -61,7 +61,7 @@ def test_editor_preview_rejects_unbounded_media_before_renderer(monkeypatch):
     monkeypatch.setattr(pipeline, "render_svg_bitmap", lambda *args: pytest.fail("must not render"))
     with pytest.raises(HTTPException) as raised:
         editor_http.simulate_editor_preview(editor_http.EditorPreviewRequest(
-            svg=VALID_SVG, width_mm=500, height_mm=500, dpi=600,
+            draft=dict(svg=VALID_SVG, width_mm=500, height_mm=500, dpi=600, binding_version=1), data={}, encoder="IPL", copies=1,
         ))
     assert raised.value.status_code == 422
 
@@ -87,7 +87,7 @@ def test_editor_response_comes_from_exact_encoded_payload(monkeypatch):
         return b"decoder result"
 
     monkeypatch.setattr(registry, "decode_png", decode)
-    request = editor_http.EditorPreviewRequest(svg=VALID_SVG, width_mm=10, height_mm=10, dpi=203.2)
+    request = editor_http.EditorPreviewRequest(draft=dict(svg=VALID_SVG.replace("80mm", "10mm").replace("200mm", "10mm").replace("320 800", "40 40"), width_mm=10, height_mm=10, dpi=203.2, binding_version=1), data={}, encoder="IPL", copies=1)
     response = editor_http.simulate_editor_preview(request)
     assert seen == [payload] and seen[0] is payload
     assert base64.b64decode(response.png_base64) == b"decoder result"

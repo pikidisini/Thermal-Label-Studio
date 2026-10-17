@@ -36,23 +36,22 @@ export default function SaveTemplateModal({
   const handleNameChange = (e) => {
     const val = e.target.value;
     setTemplateName(val);
-    const slug = val.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_');
-    setTemplateId(slug);
   };
 
+  const validCode = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(templateId);
   const isExisting = existingTemplates.some(t => t.id === templateId && !t.is_draft);
   const matchedTemplate = existingTemplates.find(t => t.id === templateId && !t.is_draft);
 
   const handleSubmit = async (e) => {
     e?.preventDefault();
-    if (!templateId || !templateId.trim()) {
-      setErrorMsg('Template ID cannot be empty');
+    if (!validCode) {
+      setErrorMsg(t('Label code must contain 1–128 letters, digits, underscores or hyphens, starting with a letter or digit.'));
       return;
     }
     setIsSubmitting(true);
     setErrorMsg('');
     try {
-      await onSave(templateId.trim(), templateName.trim());
+      await onSave(templateId, templateName.trim());
       onClose();
     } catch (err) {
       setErrorMsg(err.message || 'Failed to save template');
@@ -109,7 +108,7 @@ export default function SaveTemplateModal({
           {/* System Template ID / Slug */}
           <div className="space-y-1.5">
             <label data-ui-label="true" className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant flex items-center justify-between">
-              <span>{t("System Slug / Filename")}</span>
+              <span>{t("Label code")}</span>
               <span className="text-[9px] text-outline">{t("API & Batch Dispatch ID")}</span>
             </label>
             <div className="flex items-center">
@@ -117,7 +116,13 @@ export default function SaveTemplateModal({
               <Input
                 type="text"
                 value={templateId}
-                onChange={(e) => setTemplateId(e.target.value.toLowerCase().replace(/[^a-z0-9_-]+/g, '_'))}
+                aria-label={t("Label code")}
+                required
+                maxLength={128}
+                pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,127}"
+                autoCapitalize="none"
+                spellCheck={false}
+                onChange={(e) => setTemplateId(e.target.value)}
                 placeholder={t("label_custom_name")}
                 className="flex-1 h-8"
               />
@@ -157,7 +162,7 @@ export default function SaveTemplateModal({
              variant="default">{t("Cancel")} </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || !templateId.trim()}
+              disabled={isSubmitting || !validCode}
               tone="success" className="h-8 uppercase tracking-wider flex items-center gap-1.5"
              variant="default">
               {isSubmitting ? (

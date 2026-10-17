@@ -1,7 +1,6 @@
 import { getFieldLabel, hasFieldValue } from './fieldPresentation';
 import { compositionFields } from './composition';
-import { resolvePayloadTemplate } from '../../barcode/model/barcodePayload';
-import { validatePreviewPayload } from '../../barcode/model/barcodePreview';
+import { resolvePayloadTemplate, validatePreviewPayload } from '../../barcode';
 
 /** Recheck actual bound data before preview, including bindings inside groups. */
 export function bindingErrors(objects: any[], data: Record<string, unknown>, descriptions: Record<string, string> = {}): string[] {

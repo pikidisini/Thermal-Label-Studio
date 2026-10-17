@@ -11,3 +11,6 @@ export { importDataset } from './model/importDataset';
 export { studioDatasetApi } from './api/studioDatasetApi';
 export type { StudioDatasetSummary } from './api/studioDatasetApi';
 export { readLocalSapJsonSource } from './model/localSapJsonParser';
+export { parseBoundedJson } from './model/canonicalLabelData';
+
+export { labelTokenKeys, isLabelFieldKey, getLabelField } from './model/labelFieldCatalog';

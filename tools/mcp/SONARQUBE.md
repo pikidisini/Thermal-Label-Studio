@@ -1,10 +1,16 @@
 # SonarQube MCP tooling
 
-`Start-SonarMcp.ps1` launches the existing pinned SonarSource MCP image as a
-temporary STDIO container. Unlike the Python servers in this directory, it
-requires PowerShell 7 and Docker. It mounts no workspace, application storage
-or Docker socket. The launcher does not start/restart SonarQube, create users,
-change permissions, scan source or provision volumes.
+`Start-SonarMcp.ps1` ensures one pinned SonarSource Streamable HTTP container
+is running on loopback, then launches a short-lived local Python STDIO bridge
+for the connecting client. Repeated Codex sessions therefore reuse
+`tls-sonar-mcp-shared` rather than accumulating one container per session. The
+bridge supplies the USER token from the ignored local file only to the fixed
+`http://127.0.0.1:9005/mcp` upstream endpoint, filters the ten approved
+read-only tools, and never exposes credentials in client configuration.
+
+The shared container mounts no workspace, application storage or Docker socket.
+The launcher does not start/restart SonarQube, create users, change permissions,
+scan source or provision volumes.
 
 ## Local configuration
 
@@ -31,9 +37,9 @@ not audit remote permissions or authenticate when running `-ValidateOnly`.
 ```
 
 The image `sonarsource/sonarqube-mcp:1.19.0.2785` must already be installed;
-`--pull never` avoids silently pulling another runtime. Container execution is
-a separately authorized action. A valid local file does not prove the service
-is reachable or that the token can read the project.
+the Compose launcher uses `--pull never` and does not silently upgrade it.
+Container execution is a separately authorized action. A valid local file does
+not prove the service is reachable or that the token can read the project.
 
 ## Codex configuration and portability
 
@@ -92,3 +98,28 @@ pointing to this checkout's launcher with an explicit allowlist of those ten
 tools. Tokens remain outside the client configuration. Restart/reload the Codex
 MCP connection to load this registration into an existing session. Registration
 is specific to this device and must be generated again after moving the checkout.
+
+## Shared runtime verification (2026-10-10)
+
+The shared loopback service returned `200` from `/health`, reported the exact
+version `1.19.0.2785` from `/info`, and rejected unauthenticated `/mcp` requests
+with `401`. An SDK `ClientSession` HTTP handshake discovered the approved ten
+read-only tools and fetched the project quality gate successfully. The hardened
+read-only filesystem, tmpfs and dropped capabilities remained compatible with
+that verification. This is runtime evidence for the shared MCP layer, not a
+new SonarQube scan or a claim about production access.
+
+Independent review also verified two concurrent SDK clients through the actual
+PowerShell STDIO launcher: both discovered ten tools and retrieved the stored
+`thermal-label-studio` gate (`OK`). The full MCP test suite passed: 82 tests.
+The initial sandbox run denied Windows subprocess pipe access; the bounded
+unsandboxed rerun passed without changing implementation to bypass that error.
+
+Fifteen legacy `tls-sonar-mcp-<12hex>` containers were checked for the pinned
+image, open STDIO, automatic removal and zero mounts, then stopped. Automatic
+removal left one `tls-sonar-mcp-shared` container, using approximately 160 MiB
+at the verification snapshot with a 512 MiB limit. Core container IDs, images
+and states matched before and after cleanup; application volumes were untouched.
+The live Codex MCP connection reconnected through the new launcher and fetched
+the gate successfully after the old transport closed. These checks retrieved
+existing analysis results; they did not trigger a source scan.

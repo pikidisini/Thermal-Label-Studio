@@ -1,7 +1,7 @@
 # T03 — Define and validate Studio template binding metadata
 
 TASK_ID: T03
-Status: PENDING
+Status: DONE (independent review PASS; see ../results/T03_REVIEW.md)
 Depends on: T01, T02
 Execution size: One bounded AI task; do not start successors automatically.
 

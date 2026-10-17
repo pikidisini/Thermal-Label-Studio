@@ -9,6 +9,9 @@ class PrintInputError(ValueError):
 class PrintSubmissionError(RuntimeError):
     """Submission failed or is uncertain; no retry or delivery confirmation."""
 
+class PrintBeforeSendError(PrintSubmissionError):
+    """Trusted transport proves payload submission was never entered."""
+
 class BitmapTransport(Protocol):
     def submit(self, payload: bytes) -> None:
         """Return on local acceptance; never establish device delivery."""
@@ -29,6 +32,8 @@ def submit_prepared_output(output: PreparedOutput, transport: BitmapTransport) -
     try:
         if transport.submit(output.payload) is not None:
             raise ValueError()
+    except PrintBeforeSendError:
+        raise
     except Exception:
         raise PrintSubmissionError("Submission failed or is uncertain; delivery is unconfirmed.") from None
     return PrintSubmission(output)

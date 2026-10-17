@@ -1,188 +1,347 @@
 # Thermal Label Studio
 
-Thermal Label Studio designs SVG layouts and renders thermal label bitmaps.
-Product UI and active technical documentation use English.
+Thermal Label Studio digunakan untuk mengedit template SVG, mengikat data label
+kanonis, menghasilkan PNG monokrom, dan mengodekan output IPL. Antarmuka mendukung
+bahasa Inggris sebagai default serta Bahasa Indonesia. Pengaturan bahasa tidak
+mengubah key SAP/JSON, isi label yang dibuat, atau payload hasil encoding.
+README dan panduan proyek menggunakan Bahasa Indonesia; kontrak teknis terdahulu
+tersedia dalam bahasa aslinya.
 
-## Current implementation
+Mulai dari [indeks dokumentasi](docs/README.md) dan
+[panduan utama proyek](docs/PROJECT_HANDBOOK.md) untuk memahami keseluruhan aplikasi.
+[Referensi source](docs/SOURCE_REFERENCE.md) memetakan route, modul, dan konfigurasi.
 
-The local checkpoint scope is Studio without authentication, layout editing,
-local SVG import/export, local JSON exploration, versioned layout save/open,
-Preview, Label Simulation PNG and fixture simulation. Global graphics, shared
-access authentication, SAP intake, job orchestration, physical printers and
-production operations are follow-up work. Planned global graphics, data/protocol
-export and print controls explain their status without calling unavailable APIs.
+[Design MCP](tools/mcp/DESIGN.md) bersifat opsional dan mendukung pembuatan SVG
+melalui AI, validasi, pratinjau PNG, serta penyimpanan template berversi yang
+diaktifkan secara eksplisit melalui API aplikasi lokal. Desain tersimpan dapat
+dibuka melalui kontrol Open yang sudah tersedia di Studio.
 
+## Implementasi dan status penerimaan
 
-The local Studio at `/studio` edits SVG and previews a server-produced 1-bit
-PNG. P8C adds versioned layout save/list/open: PostgreSQL owns metadata and
-active versions; MinIO owns immutable SVG artifacts. Versions, checksums and
-object keys are server-owned. The dated P8C result records local save/open,
-preview and application-restart evidence; it is not production approval.
+- Label Print mengirim artefak pratinjau terpilih langsung dari server ke printer
+  LAN aktif yang terdaftar di Application Management menggunakan TCP/RAW IPL.
+  Pencetakan LAN tidak memerlukan agen lokal atau token pairing browser. Print
+  memakai ulang bitmap pratinjau tanpa panggilan SAP tambahan; jumlah salinan
+  dikodekan sekali. Hasil gagal/tidak pasti mengunci pencetakan browser sampai
+  ditinjau operator. Penerimaan printer fisik tetap terpisah. ZPL belum tersedia.
+  Paket mandiri `local_agent` tetap dipertahankan secara terpisah dan tidak
+  digunakan oleh alur LAN ini.
 
-Studio has no login, session or role controls; it is intended for local use.
-The Python runtime defaults to 127.0.0.1. The image explicitly sets
-TLS_BIND_HOST=0.0.0.0 inside its bridge network; Compose publishes host ports
-only on 127.0.0.1. This does not authorize a shared deployment.
+- SAP Get Data di Label Print terhubung ke worker RFC terkonfigurasi untuk
+  operasi `label_json` dengan satu input batch bertipe string. Alur ini memakai
+  layout tersimpan dan pratinjau hasil dekode IPL bersama, menampilkan kegagalan
+  per batch, dan tidak mengirim pekerjaan cetak. Aktivasi target/fungsi SAP aktual
+  serta runtime native memerlukan konfigurasi eksplisit; verifikasi mock/source
+  tidak membuktikan eksekusi SAP nyata.
 
-The same application exposes `/fixture-simulation`, using application-owned
-synthetic data. The standard Compose stack enables persistence. Source tests
-can exercise the API without storage configuration; layout calls then return
-503 and storage drivers are not imported. The fixture entry loads
-independently of the Studio and diagnostics entry.
+- Label Print menampilkan printer terdaftar dari konfigurasi Application
+  Management. Tujuan nonaktif tidak dapat dipilih; IP/port dan dukungan
+  IPL/Ethernet/TCP RAW ditampilkan. Pemuatan katalog serta pemilihan printer
+  tidak memeriksa kesiapan, menghubungi perangkat, atau dengan sendirinya
+  mengaktifkan pencetakan nyata.
 
-SAP intake, physical delivery, authentication for the current layout API,
-job orchestration, migrations and production operations remain incomplete.
-Retired auth/session, operator simulation, print/export and old API clients
-are archived. Remaining graphics clients and root `engine/` modules do not prove
-those features work against the current backend.
+- Application Management -> Test Data mendukung pengeditan tabel bertipe,
+  impor/ekspor JSON kanonis, serta pembaruan dataset contoh dengan pemeriksaan
+  revisi. Sumber Test Data di Label Print menampilkan batch tersebut menggunakan
+  layout Studio tersimpan melalui binding dan dekode IPL bersama. Alur ini tidak
+  memerlukan migrasi skema atau penghapusan data; dataset yang ada dipertahankan.
+  Pengeditan dan pratinjau Test Data tidak menimbulkan efek SAP atau printer.
+  Tindakan Print eksplisit atas pratinjaunya dapat menghubungi printer nyata.
 
-## Workspace
+- `/` membuka menu aktivitas dengan Label Studio (`/studio`), Application
+  Management (`/management`), kontrol Preference bersama, dan Label Print
+  (`/print`). Label Print mendukung input batch bernomor secara lokal dan tempel
+  massal satu kolom dengan peringatan duplikat. SAP Get Data memakai operasi RFC
+  label terkonfigurasi ketika runtime native aktif. Pencetakan LAN memerlukan
+  akses jaringan server ke printer terdaftar.
 
-| Path | Ownership |
+- Integrations mendukung pengeditan koneksi SAP, parameter RFC, dan pemetaan hasil.
+  Backend memiliki pengujian regresi sintetis serta penanganan
+  `EV_STATUS`/`EV_MESSAGE`/`EV_JSON` untuk `Z_TLS_GET_LABEL_DATA` tanpa mewajibkan
+  pemetaan per field. Management dapat mengambil respons RFC aktual secara
+  eksplisit melalui worker PyRFC native yang diaktifkan tersendiri serta daftar
+  target/fungsi yang diizinkan server. Verifikasi MCP terpisah dari eksekusi
+  aplikasi. Label Print memakai rutin eksekusi yang sama untuk operasi label
+  yang memenuhi kontrak.
+
+- Workspace Print menyediakan pengaturan lokal dan mode Demo yang dipilih
+  eksplisit untuk gambar ilustratif, detail, pemilihan, dan simulasi pencetakan.
+  Gambar Demo bukan hasil dekode IPL/ZPL atau hasil SAP. Menu sumber operator
+  hanya memuat SAP dan Test Data. Test Data memanggil
+  `/api/v1/label-print/preview` dengan dataset tersimpan yang dipilih; data fixture
+  bawaan tetap menjadi pendukung regresi backend di luar menu tersebut. Home
+  dan Print tidak memuat editor atau diagnostik Studio.
+
+- Studio mendukung pengeditan kanvas, impor/ekspor SVG, penjelajah template,
+  Save/Open berversi, Rename/Delete, eksplorasi JSON, dan dataset contoh JSONB
+  PostgreSQL. PostgreSQL menyimpan metadata template; MinIO menyimpan artefak SVG
+  yang tidak diubah setelah dibuat. Dataset contoh terpisah dari identitas
+  permintaan intake.
+
+- Metadata template berversi mendukung binding teks, barcode, dan QR dengan batas
+  yang ditentukan. Key yang tidak ada, null, dan string kosong tetap dibedakan;
+  nilai pengganti output dijelaskan pada bagian akhir README ini. Nol dan false
+  tetap merupakan nilai. Profil dinamis yang tidak didukung ditolak tanpa
+  pendekatan diam-diam.
+
+- Preview dan Label Simulation memakai `/api/v1/simulation/editor-preview`.
+  Studio Print memakai `/api/v1/printing/editor`; persiapan, raster, dan output
+  IPL bersama digunakan oleh simulasi maupun transport. Print eksplisit dapat
+  menghubungi tujuan yang tervalidasi satu kali; membuka dialog tidak membuat
+  koneksi. Tidak ada percobaan ulang otomatis setelah pengiriman tidak pasti.
+  Penerimaan printer fisik merupakan gerbang pemeriksaan tersendiri.
+
+- `/api/v1/label-intake` mengimplementasikan validasi kanonis, kebijakan,
+  penguncian versi template, simulasi, identitas/replay permanen, serta alur print
+  yang dibatasi izin. Kredensial, kebijakan, serta ledger/skema eksplisit wajib
+  tersedia. Startup penyimpanan Studio biasa tidak memberikan izin intake atau
+  mengaktifkan skema intake.
+
+- `/fixture-simulation` adalah halaman sintetis milik aplikasi, bukan stack lain.
+
+[Status pipeline](docs/implementation/universal-label-pipeline/STATUS.md) menjadi
+rujukan penerimaan dan mencatat T06 untuk penerimaan mock browser aplikasi saat
+ini sebagai `BLOCKED`, serta T07/T10/T11 sebagai `NEEDS_REPLAN` terkait pembatalan
+paksa/batas memori native yang wajib dipenuhi dan sisa bukti runtime/siklus hidup.
+Simulasi/replay lokal template tersimpan `sample_roll` tercatat di sana; bukti
+tersebut tidak menutup gerbang yang masih terbuka. Penerimaan fisik T12 berstatus
+`BLOCKED` dan bersifat opsional, bukan gerbang wajib penerimaan perangkat lunak.
+
+Studio belum memiliki kontrol login/sesi/peran. Keamanan produksi, integrasi SAP
+ECC aktual, penerimaan operasional paket, dan pencetakan fisik tetap merupakan
+pekerjaan terpisah. Graphics mendukung pustaka lokal PNG/JPEG/WebP dengan
+penyisipan salinan tertanam setelah provisioning PostgreSQL eksplisit. Graphic
+Update Center dan ekspor data/protokol belum tersedia. Lihat
+[kontrak Graphics](docs/GRAPHICS_CONTRACT.md).
+
+## Struktur source dan tanggung jawab
+
+| Path | Tanggung jawab |
 | --- | --- |
-| `backend/app/` | Active API, layout persistence, rendering and simulation |
-| `backend/tests/` | Local source tests and synthetic fixtures |
-| `backend/schema/` | Job schema foundation; separate from P8C layout startup DDL |
-| `frontend/src/features/` | Feature code; shared primitives live in `shared/` |
-| `engine/` | Retained engine and local renderer binary; new backend rendering lives in `backend/app/engine/` |
-| `docs/` | Five active contracts and phase-specific evidence |
-| `scripts/check_project.py` | Local source gate; no deployment |
-| `.tmp/` | Disposable local runs and uncommitted environment files |
-| `.archive/` | Historical reference; excluded from Docker build context |
+| `backend/app/` | Komposisi API dan modul fitur |
+| `backend/app/label_data/` | Kontrak data dan skalar kanonis |
+| `backend/app/template_binding/` | Validasi metadata serta binding data dengan batas yang ditentukan |
+| `backend/app/engine/` | Persiapan bersama, raster, dan output hasil encoding |
+| `backend/app/label_intake/` | Validasi awal, kebijakan, identitas permanen, dan eksekusi intake |
+| `backend/schema/` | Artefak skema eksplisit; packaging tidak menerapkan migrasi intake |
+| `backend/tests/`, `tests/contracts/` | Pengujian source dan fixture kontrak sintetis bersama |
+| `frontend/src/features/` | UI/model/API milik fitur; komponen dasar bersama berada di `shared/` |
+| `engine/bin/` | Binary renderer lokal terpasang yang diabaikan Git |
+| `scripts/` | Pengembangan, validasi, dan operasi dengan cakupan eksplisit |
+| `tools/` | Stack kualitas terpisah dan perangkat inspeksi MCP opsional |
+| `docs/` | Kontrak aktif, operasional, dan bukti bertanggal |
+| `.tmp/` | Direktori pengujian/laporan unik yang dapat dibuang; bukan penyimpanan operasional |
 
-## One standard launch
+## Pengembangan dengan hot reload
 
-One application, one standard way to run it:
+Jalankan perintah Python dari root repositori ini dan perintah npm dari
+`frontend/`. Pasang `requirements.txt` pada root ke environment Python yang
+dipilih, lalu pasang dependensi berdasarkan lockfile frontend terlebih dahulu.
+Startup default memerlukan Docker Desktop, layanan PostgreSQL/MinIO yang sudah
+ada dan diizinkan, `.env` pada root yang diabaikan Git, serta aplikasi Compose
+dalam keadaan berhenti.
 
-- `Dockerfile` builds the application image.
-- `docker-compose.yml` starts app, PostgreSQL and MinIO together.
-- Root `requirements.txt` is the only Python dependency manifest, used by both
-  the image and local development. Test tools are intentionally included.
-- `.env.example` documents configuration; copy it to ignored root `.env` and
-  supply local credentials plus an independently verified renderer checksum.
+```powershell
+python -B scripts/dev.py --check
+python -B scripts/dev.py
+```
 
-After prerequisites and authorization for the named local target:
+Di Windows, klik dua kali `run-dev.bat` atau jalankan `./run-dev.bat` dari
+PowerShell. Berkas ini memilih direktori proyek dan memanggil launcher `dev.py`
+yang sama menggunakan Python dari PATH atau virtual environment aktif. Argumen
+diteruskan, misalnya `./run-dev.bat --check`. Jika startup gagal, jendela tetap
+terbuka agar kesalahan dapat dibaca. Biarkan jendela terbuka selama menggunakan
+Studio; Ctrl+C menghentikan proses pengembangan.
+
+Jika port terpakai di Windows, startup interaktif mengidentifikasi PID/proses dan
+meminta `[y/N]` sebelum menghentikan server pengembangan yang telah diverifikasi
+berasal dari checkout ini. Aplikasi lain tidak dihentikan otomatis. `--check`
+hanya melakukan diagnosis.
+
+Buka [Studio lokal](http://127.0.0.1:5173/studio). Vite memperbarui perubahan
+frontend; Uvicorn memuat ulang perubahan `backend/app` pada port 8000. Biarkan
+terminal terbuka; Ctrl+C menghentikan keduanya. Jika salah satu proses anak
+berhenti, launcher menghentikan proses pasangannya. Jangan memulai launcher kedua
+pada port yang masih terpakai. Untuk proses latar belakang, verifikasi kepemilikan
+proyek sebelum menghentikan pohon proses; jangan menghentikan semua proses
+Python berdasarkan nama executable.
+
+Startup default membaca konfigurasi Compose tanpa menampilkan rahasia dan
+memetakan penyimpanan ke port loopback host. `--compose-storage` memilih perilaku
+yang sama secara eksplisit. `--persistence` memakai pengaturan shell lengkap.
+`--no-storage` menonaktifkan penyimpanan sehingga Save/Open template mengembalikan
+503. Pratinjau native memerlukan renderer dan font; startup Windows memilih
+`engine/bin/resvg.exe` yang sudah terpasang, kecuali diganti melalui
+`TLS_RENDERER_PATH`. Executable Linux tidak dapat berjalan langsung di Windows.
+
+Untuk simulasi intake lokal yang dikonfigurasi eksplisit, gunakan
+`scripts/start-intake-simulation.ps1` dan README SAP-Simulator di direktori saudara.
+Alur ini memakai launcher pengembangan yang sama dan konfigurasi lokal tepercaya
+yang diabaikan Git. Alur tersebut tidak otomatis melakukan provisioning ledger
+atau memberikan izin printer.
+
+## Aplikasi dalam paket container
+
+Satu `Dockerfile`, `docker-compose.yml`, `requirements.txt`, dan `.env.example`
+pada root menentukan aplikasi paket standar. Setelah target bernama diotorisasi
+dan prasyarat dipenuhi, dengan pengembangan lokal sudah dihentikan:
 
 ```powershell
 docker compose up --build -d
 ```
 
-Studio is at `http://127.0.0.1:8002/studio` by default. Fixture simulation is a
-page in the same application, not a separate deployment mode. Host ports bind
-only loopback. The standard stack always configures layout persistence.
+Studio dalam paket secara default tersedia di
+[http://127.0.0.1:8002/studio](http://127.0.0.1:8002/studio). Port host memakai
+loopback. Volume eksternal PostgreSQL/MinIO mempertahankan data yang sudah ada
+dan harus tersedia terlebih dahulu. Penggantian container bukan penggantian
+volume atau backup. Penyimpanan layout terkonfigurasi menginisialisasi
+skema/bucket saat startup; aktivasi ledger intake merupakan operasi eksplisit
+terpisah. Build memerlukan checksum arsip renderer yang telah diverifikasi
+secara independen. Hindari penulis lokal dan aplikasi paket yang bersaing pada
+penyimpanan yang sama.
 
-The Compose project is `thermal-label-studio`. Existing physical volume names
-are explicitly preserved as external volumes; no empty replacement database is
-created implicitly. Follow [Development](docs/DEVELOPMENT.md) for prerequisites,
-new-volume provisioning and an authorized cutover from older containers. Source
-checks do not start services, stop old writers or migrate data.
+Gunakan hot reload untuk iterasi source, lalu lakukan build dan uji singkat image
+untuk bukti packaging. Lihat [Pengembangan](docs/DEVELOPMENT.md) untuk siklus hidup
+dan pemulihan.
 
-Superseded split configuration is preserved in
-`.archive/split-configuration-2026-10-06/`; phase and prototype archives remain
-historical reference. The installed local Jenkins quality gate is documented in
-[Local SonarQube](docs/SONARQUBE.md); it performs no checkout or deployment.
+## Validasi
 
-## Processing contract
-
-```text
-SAP/API -> validate label_code -> resolve layout -> bind SVG -> raster bitmap
-                                                               |
-                                                    shared encoded payload
-                                                               |
-                                          simulation sink OR print transport
-```
-
-This is the target flow. Current simulation returns PNG only. The IPL output
-boundary is fake-tested; shared payload orchestration and real transport are
-not wired. The actual SAP JSON contract remains unfinalized.
-
-## Development checks
-
-For editing with live reload, from the repository root run:
+Dari root repositori ini:
 
 ```powershell
-python -B scripts/dev.py
+python -B scripts/check_project.py
+python -B scripts/check_project.py --run-source-checks
 ```
 
-Open `http://127.0.0.1:5173/studio`. Vite updates frontend changes automatically;
-Uvicorn restarts for changes under backend/app. Ctrl+C stops both processes.
-This uses the same source and dependency manifests as Docker. It starts no
-containers and uses existing authorized Compose storage by default, with Save/Open
-and the installed Windows renderer. Stop the Compose app first. Use `--no-storage`
-only for editing without database access. See [Development](docs/DEVELOPMENT.md)
-for setup, renderer prerequisites and explicitly enabled storage. Build the
-Docker image for final packaging validation after the editing iteration.
+Perintah pertama menampilkan rencana. Perintah kedua menjalankan regresi backend,
+TypeScript frontend penuh, build frontend baru, dan regresi frontend tanpa
+memulai layanan atau memasang dependensi. Laporan ditempatkan dalam subdirektori
+unik `.tmp/source-checks-*`. `typecheck:core` saja tidak mencakup seluruh fitur.
+PASS source tidak membuktikan kesiapan deployment.
 
-Install Python dependencies with `python -m pip install -r requirements.txt`
-when installation is authorized. Docker installs this same file. There are no
-runtime/dev or phase-specific requirement files in the active project. Frontend
-dependencies remain in `frontend/package.json` and `frontend/package-lock.json`.
-
-From `web_app`, `python -B scripts/check_project.py` prints the check plan.
-`--run-source-checks` runs backend/frontend regression, full TypeScript checks
-and frontend build. Reports are saved under unique `.tmp/source-checks-*`
-children. Source PASS does not establish runtime readiness.
-
-## Active documentation
-
-- [Architecture](docs/ARCHITECTURE.md)
-- [Product flow](docs/PRODUCT_FLOW.md)
-- [API contract](docs/API_CONTRACT.md)
-- [Development](docs/DEVELOPMENT.md)
-- [Decisions](docs/DECISIONS.md)
-
-Follow [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).
-Phase task results are dated evidence, not a substitute for these current
-contracts. The Phase 7L baseline records an earlier freeze, not the current
-workspace inventory.
-
-## Browser tests
-
-One frontend/playwright.config.js targets the already running standard application
-at http://127.0.0.1:8002 (E2E_BASE_URL may select another HTTP loopback port).
-Playwright starts no Python/Vite/container servers and seeds no legacy users.
-After the named application target is authorized and running, from frontend:
+Dari `frontend/`, setelah target yang diizinkan berjalan:
 
 ```powershell
 npm run test:e2e:ui
 npm run test:e2e:integration
 ```
 
-`ui` tests mock every API request and cover current Studio tools, save/open,
-storage error and preview presentation. They do not prove storage or rendering.
-`integration` uses actual health/layout routes and Studio. The save/open/preview
-case is skipped unless E2E_ALLOW_STORAGE_WRITES=true after explicit authorization
-for that target. It creates one uniquely named synthetic layout and retains it;
-no delete API or automatic storage cleanup exists. Never enable this for business
-data merely to obtain a passing test. npm run test:e2e selects both projects;
-the write opt-in still applies. npm run test:ui opens Playwright's interactive UI.
+Satu `playwright.config.js` mengatur browser dan tidak memulai server.
+`E2E_BASE_URL` default adalah `http://127.0.0.1:8002`; gunakan
+`http://127.0.0.1:5173` untuk pengembangan. Pengujian UI memakai mock API;
+integrasi memakai aplikasi aktual. `E2E_ALLOW_STORAGE_WRITES=true` memerlukan
+izin target bernama dan mempertahankan layout sintetis. Laporan, screenshot,
+dan trace ditempatkan dalam subdirektori `.tmp` unik. Pemeriksaan browser tidak
+mengotorisasi cetak fisik. Scan kualitas serta coverage merupakan gerbang terpisah.
 
-Use npm run test:e2e -- --list to inspect selection without starting a browser
-or accessing the app. Historical browser specs, including F4 operator/simulation
-and tests importing Vite /src modules, are preserved with migration notes under
-.archive/playwright-prototype-2026-10-06/. Their old feature coverage is not claimed
-by the current browser inventory. A missing app/browser is BLOCKED, not PASS.
+## Dokumentasi proyek
 
-## Checkpoint scope
+Dokumentasi proyek dalam Bahasa Indonesia tersedia melalui
+[indeks dokumentasi](docs/README.md), [panduan utama proyek](docs/PROJECT_HANDBOOK.md),
+dan [referensi source](docs/SOURCE_REFERENCE.md).
+[Tinjauan dokumentasi 17 Oktober 2026](docs/DOCUMENTATION_REVIEW_2026-10-17.md)
+mencatat pembaruan berdasarkan source serta batas verifikasinya.
 
-Local Studio editing, versioned layout save/open and current-canvas PNG preview
-are the implemented scope. Preview view and Label Simulation use the same API.
-Failed layout saves preserve uncertain immutable artifacts; subsequent saves
-allocate fresh versions with bounded conflict probes. Version gaps and orphan
-reconciliation are described in Architecture/Development.
+[Audit dokumentasi 12 Oktober 2026](docs/PROJECT_AUDIT_2026-10-12.md) mencatat
+pemeriksaan pada pembaruan terdahulu. Dokumen tersebut merupakan snapshot
+bertanggal, bukan rujukan penerimaan pipeline yang terus berjalan.
 
-The planned new repository is [Thermal-Label-Studio](https://github.com/pikidisini/Thermal-Label-Studio);
-the legacy repository is [Thermal-Label-Studio-legacy](https://github.com/pikidisini/Thermal-Label-Studio-legacy).
-This repository starts from the reviewed source-only local application checkpoint.
-The initial checkpoint retains the job/schema foundation for future development.
-.tmp, secrets, operational data and historical archives are excluded.
+- [Arsitektur](docs/ARCHITECTURE.md)
+- [Alur produk](docs/PRODUCT_FLOW.md)
+- [Kontrak API](docs/API_CONTRACT.md)
+- [Kontrak binding template](docs/TEMPLATE_BINDING_CONTRACT.md)
+- [Pemberitahuan generator simbol](docs/SYMBOL_GENERATOR_NOTICES.md)
+- [Pengembangan](docs/DEVELOPMENT.md)
+- [Keputusan](docs/DECISIONS.md)
+- [Status pipeline](docs/implementation/universal-label-pipeline/STATUS.md)
+- [SonarQube](docs/SONARQUBE.md) dan [perangkat MCP opsional](tools/mcp/README.md)
+- [Kontribusi](CONTRIBUTING.md) dan [aturan agen](AGENTS.md)
 
-Playwright screenshots/traces and HTML reports use unique .tmp/playwright-*
-children. No generated test results belong in frontend or docs.
+Source dan status terkini didahulukan dari laporan historis. Pertahankan riwayat
+dan bedakan penerimaan source/fake, mock browser, penyimpanan, runtime paket,
+kualitas, SAP, serta perangkat fisik. Repositori source adalah
+[Thermal-Label-Studio](https://github.com/pikidisini/Thermal-Label-Studio);
+riwayat lama hanya sebagai referensi. Kredensial, data operasional, dependensi,
+binary, dan laporan hasil pemeriksaan tidak boleh masuk Git.
 
-Studio also supports PostgreSQL JSONB storage for user-uploaded sample datasets,
-with a saved dataset list and reopening all items/descriptions. Sample datasets
-are separate from SAP rendering requests and SVG templates in MinIO. Preview
-edits remain local; dataset editing is future work.
-This source capability requires authorized persistence schema initialization for
-real storage; fake/source checks alone do not verify a live database deployment.
+## Pemeriksaan status printer LAN eksplisit (16 Oktober 2026)
+
+Label Print menyediakan Check status untuk printer Management terpilih yang
+aktif. Hanya tombol tersebut yang memanggil `POST /api/v1/label-print/printer-status`
+dengan `target_id`, `expected_host`, dan `expected_port`; tujuan yang dikendalikan
+pemanggil tidak diterima. Route memeriksa kembali konfigurasi tersimpan
+(409 jika berubah/nonaktif), memakai pembatas loopback/origin dan JSON terbatas
+yang sama dengan LAN Print, mengembalikan `no-store`, serta berjalan bergantian
+dengan pengiriman LAN (429 saat sibuk). Tidak ada polling latar belakang, probe
+saat pemilihan, akses SAP, payload cetak, reset, atau perintah konfigurasi.
+
+Server mengirim satu byte IPL ENQ (`0x05`) ke tujuan TCP numerik tersimpan, dengan
+batas tiga detik untuk koneksi dan anggaran I/O tambahan tiga detik, maksimal
+16 byte respons awal, serta pembacaan respons berbingkai yang dibatasi.
+Tidak ada percobaan ulang. `RESPONDING` berarti respons dikenali, bukan proses
+fisik selesai. DC1 standar berarti ready/printing/skipping; US menggabungkan
+kesalahan jalur label/ribbon. UI mempertahankan ambiguitas ini dan menampilkan
+`ATTENTION`, `UNREACHABLE`, atau `UNAVAILABLE` masing-masing untuk gangguan,
+kegagalan koneksi, dan respons tidak ada/tidak dikenal. Koneksi ditolak atau
+timeout tidak membuktikan printer mati. Data tidak dikenal tidak dapat dianggap
+`READY`.
+
+Respons memuat timestamp UTC server `checked_at`, target, metode `IPL_ENQ`, dan
+`confirmed=false`. UI membersihkan hasil ketika printer berubah, saat refresh,
+atau ketika memilih Demo, serta mengabaikan respons terlambat. Hasil merupakan
+snapshot terpisah dari hasil job cetak. Pemeriksaan status tidak membuka kunci
+job yang tidak pasti atau memberikan izin cetak. Dukungan perangkat, firmware,
+dan protokol tetap memerlukan penerimaan target bernama tersendiri. Fitur ini
+belum mengimplementasikan SNMP.
+
+Referensi protokol yang digunakan:
+
+- [Honeywell IPL Command Reference — Status Enquiry](https://prod-edam.honeywell.com/content/dam/honeywell-edam/sps/ppr/en-us/public/products/printers/common/documents/sps-ppr-ipl-en-cr.pdf)
+- [ITE Programmer's Reference — Printer Status Query Responses](https://automation.honeywell.com/content/dam/honeywell-edam/sps/ppr/en-us/public/products/discontinued/software/sps-ppr-937-015.pdf)
+
+## Riwayat operasional Label Print (16 Oktober 2026)
+
+Activity Log yang diaktifkan eksplisit kini mencakup
+`POST /api/v1/label-print/preview`, `/label-print/print`, dan
+`/label-print/printer-status`. Fitur ini memakai ulang tabel JSONB
+`app_management.activity_log` yang telah diprovisikan, tanpa migrasi atau DDL
+saat startup. Catatan memuat trace ID buatan server, waktu permintaan UTC, status
+HTTP, durasi, origin `label_print`, mode preview/print/status, dan kode kesalahan
+yang diizinkan.
+
+Log preview menyimpan jenis sumber, jumlah item, tahap berindeks, serta jumlah
+hasil. HTTP 200 masih dapat memuat hasil preview FAILED/PARTIAL. Log print
+menyimpan ID target terdaftar, copies, hasil pengiriman berindeks, dan
+`confirmed=false`. Log status menyimpan kode keadaan/alasan perangkat yang tetap;
+`CHECKED` berarti kueri selesai, termasuk `UNREACHABLE`/`UNAVAILABLE`, bukan
+kesiapan fisik perangkat.
+
+Jangan mencatat identitas batch, field SAP, body permintaan/respons mentah,
+token, ID artefak, SVG, PNG, atau IPL. Kegagalan penulisan log tidak mengubah
+pengiriman atau memicu percobaan ulang. Sanitasi kesalahan HTTP global
+mempertahankan `preview_busy`/`print_busy` dan kode validasi awal Label Print
+lainnya dengan pesan statis serta ID korelasi. Activity Log menampilkan Label
+Print sebagai sumber dan menyediakan filter mode preview/status.
+
+Pencatatan dilakukan saat selesai dan bersifat best-effort: permintaan yang
+masih berjalan atau macet belum menjadi baris tersimpan. Fitur ini bukan monitor
+job langsung atau antrean permintaan permanen. Permintaan lama yang tidak
+tercatat tidak dapat direkonstruksi dari catatan baru tersebut.
+
+## Output binding ketika data tidak tersedia
+
+Field teks menampilkan ` - ` untuk null/string kosong dan `N/A` untuk key persis
+yang tidak ada. Barcode/QR dengan token sumber tidak tersedia menampilkan kotak
+polos bergaris dengan ` N/A ` di tengah, mempertahankan area dan transformasi
+template. Binding bersama menerapkannya pada output Studio, Label Print, dan
+intake tersimpan. Perilaku ini tidak mengubah data tersimpan, contoh pada Design,
+validasi status RFC, atau kontrol printer. Lihat
+[kontrak binding](docs/TEMPLATE_BINDING_CONTRACT.md).
+
+## Tujuan printer logis per transaksi
+
+Intake eksternal mendukung `target_id` logis opsional per transaksi dalam mode
+print. Izin sumber Management menyediakan pilihan printer tambahan yang diizinkan;
+IP/port tetap dikelola server. Lihat [kontrak API](docs/API_CONTRACT.md) dan
+`PRINTER_TEST.md` milik simulator di direktori saudara untuk prosedur penerimaan
+loopback dua stasiun.

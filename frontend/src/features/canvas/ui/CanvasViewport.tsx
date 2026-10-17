@@ -96,8 +96,11 @@ export function CanvasViewport({
         ref={canvasContainerRef}
         id="canvas-container-root"
         data-testid="canvas-container"
-        className="absolute top-1/2 left-1/2 bg-white"
+        className="absolute bg-white"
         style={{
+          // Center within the workspace after the 24px left and 20px top rulers.
+          left: 'calc(50% + 12px)',
+          top: 'calc(50% + 10px)',
           width:     `${canvasWidthPx  * zoom}px`,
           height:    `${canvasHeightPx * zoom}px`,
           transform: `translate(-50%, -50%) translate3d(${panOffset.x}px, ${panOffset.y}px, 0)`,

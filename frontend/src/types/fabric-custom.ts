@@ -17,6 +17,8 @@ export const CANVAS_SERIALIZE_PROPS = [
   'barcodeType',
   'barcodeValue',
   'payloadTemplate',
+  'symbolSpec',
+  'bindingMetadataError',
   'isEditorGroup',
   'selectable',
   'evented'
@@ -50,6 +52,8 @@ export interface CustomFabricProps {
   barcodeValue?: string;
   /** Declarative literal/token composition used by barcode/QR rendering. */
   payloadTemplate?: string;
+  symbolSpec?: import('../features/canvas/svg/bindingMetadata').SymbolSpec;
+  bindingMetadataError?: string;
   previewOverride?: boolean;
   validationError?: string;
   isEditorGroup?: boolean;

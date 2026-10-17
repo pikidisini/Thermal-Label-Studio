@@ -25,6 +25,10 @@ class LayoutPersistenceError(RuntimeError):
     pass
 
 
+class LayoutArtifactError(LayoutPersistenceError):
+    """An existing artifact failed integrity or safe-SVG validation."""
+
+
 LAYOUT_SCHEMA_SQL = """
 CREATE SCHEMA IF NOT EXISTS label_studio;
 CREATE TABLE IF NOT EXISTS label_studio.layouts (
@@ -104,7 +108,25 @@ class LayoutService:
         except Exception as exc:
             raise LayoutPersistenceError("Layout persistence is unavailable.") from exc
 
-    def get_layout(self, label_code: str) -> StoredLayout:
+    def list_versions(self, label_code: str) -> list[LayoutSummary]:
+        try:
+            with self._database.connect(self.settings.database_url) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute("""SELECT v.label_code, v.title, v.version, v.width_mm, v.height_mm,
+                        v.dpi, v.svg_sha256, v.object_key, v.created_at
+                        FROM label_studio.layouts l JOIN label_studio.layout_versions v
+                        ON v.label_code = l.label_code WHERE l.label_code = %s AND l.deleted_at IS NULL
+                        ORDER BY v.version DESC""", (label_code,))
+                    rows = cursor.fetchall()
+            if not rows:
+                raise LayoutNotFoundError("Layout was not found.")
+            return [self._summary(row) for row in rows]
+        except LayoutNotFoundError:
+            raise
+        except Exception as exc:
+            raise LayoutPersistenceError("Layout persistence is unavailable.") from exc
+
+    def get_layout(self, label_code: str, version: int | None = None) -> StoredLayout:
         query = """
             SELECT v.label_code, COALESCE(l.title_override, v.title), v.version, v.width_mm, v.height_mm,
                    v.dpi, v.svg_sha256, v.object_key, v.created_at
@@ -116,25 +138,64 @@ class LayoutService:
         try:
             with self._database.connect(self.settings.database_url) as connection:
                 with connection.cursor() as cursor:
-                    cursor.execute(query, (label_code,))
+                    if version is None:
+                        cursor.execute(query, (label_code,))
+                    else:
+                        cursor.execute(query.replace('v.version = l.active_version', 'v.version = %s'), (version, label_code))
                     row = cursor.fetchone()
             if row is None:
                 raise LayoutNotFoundError("Layout was not found.")
             summary = self._summary(row)
             response = self.client.get_object(self.settings.minio_bucket, summary.object_key)
             try:
-                svg_bytes = response.read()
+                svg_bytes = response.read(512 * 1024 + 1)
             finally:
                 response.close()
                 response.release_conn()
             if len(svg_bytes) > 512 * 1024 or hashlib.sha256(svg_bytes).hexdigest() != summary.svg_sha256:
-                raise LayoutPersistenceError("Stored layout artifact is invalid.")
-            svg = validate_safe_svg(svg_bytes.decode("utf-8"))
+                raise LayoutArtifactError("Stored layout artifact is invalid.")
+            try:
+                svg = svg_bytes.decode("utf-8")
+                validate_safe_svg(svg)
+            except (ValueError, UnicodeError) as exc:
+                raise LayoutArtifactError("Stored layout artifact is invalid.") from exc
+            # Return the exact checksum-verified artifact, not a second XML
+            # serialization whose bytes no longer identify the stored version.
             return StoredLayout(**summary.model_dump(), svg=svg)
-        except LayoutNotFoundError:
+        except (LayoutNotFoundError, LayoutArtifactError):
             raise
         except Exception as exc:
             raise LayoutPersistenceError("Layout persistence is unavailable.") from exc
+
+    def manage_template(self, cursor, label_code, *, version, checksum, previous_title, title=None, new_code=None, delete=False):
+        """Metadata and audit share the caller's PostgreSQL transaction; SVG keys never move."""
+        for code in sorted({label_code, new_code or label_code}):
+            cursor.execute('SELECT pg_advisory_xact_lock(hashtext(%s))', (code,))
+        cursor.execute("""SELECT l.active_version, v.svg_sha256, COALESCE(l.title_override, v.title)
+            FROM label_studio.layouts l JOIN label_studio.layout_versions v
+            ON v.label_code = l.label_code AND v.version = l.active_version
+            WHERE l.label_code = %s AND l.deleted_at IS NULL FOR UPDATE OF l""", (label_code,))
+        row = cursor.fetchone()
+        if row is None:
+            raise LayoutNotFoundError('Layout was not found.')
+        if row[0] != version or row[1] != checksum or row[2] != previous_title:
+            raise LayoutConflictError('Template changed. Refresh before saving again.')
+        before = dict(label_code=label_code, title=row[2], version=row[0], svg_sha256=row[1])
+        if delete:
+            cursor.execute('UPDATE label_studio.layouts SET deleted_at = now(), updated_at = now() WHERE label_code = %s', (label_code,))
+            return before, dict(before, deleted=True)
+        if new_code != label_code:
+            cursor.execute('SELECT label_code FROM label_studio.layouts WHERE label_code = %s', (new_code,))
+            if cursor.fetchone() is not None:
+                raise LayoutConflictError('Label code already exists or was previously used.')
+            cursor.execute("""INSERT INTO label_studio.layouts(label_code, active_version, created_at, updated_at, title_override)
+                SELECT %s, active_version, created_at, now(), %s FROM label_studio.layouts WHERE label_code = %s""", (new_code, title, label_code))
+            cursor.execute('UPDATE label_studio.layout_versions SET label_code = %s WHERE label_code = %s', (new_code, label_code))
+            # Reserve the old identity so stale external requests cannot resolve a different label.
+            cursor.execute('UPDATE label_studio.layouts SET deleted_at = now(), updated_at = now() WHERE label_code = %s', (label_code,))
+        else:
+            cursor.execute('UPDATE label_studio.layouts SET title_override = %s, updated_at = now() WHERE label_code = %s', (title, label_code))
+        return before, dict(before, label_code=new_code, title=title)
 
     def rename_layout(self, label_code: str, title: str) -> LayoutSummary:
         return self._manage_layout(label_code, title)

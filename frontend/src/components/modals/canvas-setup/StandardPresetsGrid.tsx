@@ -31,6 +31,7 @@ export function StandardPresetsGrid({
             <button
               key={p.id}
               type="button"
+              aria-pressed={isSelected}
               onClick={() => onSelectPreset(p.widthMm, p.heightMm)}
               className={`flex flex-col items-center justify-center gap-1 h-[64px] relative`}
              data-ui-control="button" data-variant="compact" data-selected={isSelected} data-tone="neutral">
@@ -40,7 +41,7 @@ export function StandardPresetsGrid({
               <Icon size={18} glyph={getPresetIcon(p.widthMm, p.heightMm)} />
               <span className="font-mono text-[10px] font-medium leading-none">
                 {p.widthMm}×{p.heightMm} {t("mm")} </span>
-              <span className="text-[9px] text-outline truncate max-w-full px-1">
+              <span className={`text-[9px] ${isSelected ? 'text-inherit' : 'text-outline'} truncate max-w-full px-1`}>
                 {p.name}
               </span>
             </button>

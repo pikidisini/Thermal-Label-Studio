@@ -1,4 +1,5 @@
 /** Canonical data validation; no output or storage side effects. */
+import { isLabelFieldKey } from './labelFieldCatalog';
 import type { JsonObject } from '../../../types/api';
 export const MAX_LABEL_DATA_BYTES = 2 * 1024 * 1024;
 export type LabelMode = 'simulation' | 'print';
@@ -20,7 +21,7 @@ function shape(value: unknown, required: string[], optional: string[] = []): ass
 function fields(value: unknown, descriptions = false) {
   if (!object(value) || Object.keys(value).length > 200) fail();
   for (const [key, entry] of Object.entries(value)) {
-    if (!/^[A-Za-z0-9_-]{1,128}(?![\s\S])/.test(key) || forbidden.has(key)) fail();
+    if (!isLabelFieldKey(key)) fail();
     if (descriptions) text(entry, 256, 1024);
     else if (typeof entry === 'string') text(entry);
     else if (typeof entry === 'number') { if (!Number.isFinite(entry) || Number.isInteger(entry) && !Number.isSafeInteger(entry)) fail(); }
@@ -28,11 +29,15 @@ function fields(value: unknown, descriptions = false) {
   }
 }
 export function validateCanonicalLabelData(value: unknown): JsonObject {
-  shape(value, ['sender', 'request_id', 'mode', 'items'], ['field_descriptions']);
+  shape(value, ['sender', 'request_id', 'mode', 'items'], ['field_descriptions', 'target_id']);
   shape(value.sender, ['system']);
   const identity = (input: unknown, regex = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}(?![\s\S])/) => { text(input, 128, 128); if (!regex.test(input)) fail(); };
   identity(value.sender.system); identity(value.request_id);
   if (value.mode !== 'simulation' && value.mode !== 'print') throw new Error('mode must be either simulation or print.');
+  if (Object.prototype.hasOwnProperty.call(value, 'target_id')) {
+    if (value.mode !== 'print') fail();
+    identity(value.target_id);
+  }
   if (value.field_descriptions !== undefined) fields(value.field_descriptions, true);
   if (!Array.isArray(value.items) || value.items.length < 1 || value.items.length > 100) fail();
   const seen = new Set<string>();

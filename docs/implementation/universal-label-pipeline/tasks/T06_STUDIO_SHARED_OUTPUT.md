@@ -1,7 +1,7 @@
 # T06 — Move Studio output to the shared server binding path
 
 TASK_ID: T06
-Status: PENDING
+Status: BLOCKED (source implementation complete; current-app mock browser gate unavailable)
 Depends on: T02, T04, T05
 Execution size: One bounded AI task; do not start successors automatically.
 
@@ -53,12 +53,12 @@ Update existing editor endpoint/client request contracts atomically for current 
 
 ## Acceptance criteria
 
-- [ ] Studio preview and manual print invoke the same template_binding service and existing engine pipeline.
-- [ ] Editing data, then immediately previewing/printing cannot use an older embedded dynamic image or captured sample text.
-- [ ] Unsaved draft changes are respected; no save is required for preview/print and no storage writes are introduced.
-- [ ] Backend rejects missing/invalid binding even when UI checks are bypassed.
-- [ ] Same-input parity covers multiline/composition/barcode/QR/group/rotation and null/empty/zero/false cases.
-- [ ] Print opens without network effects; uncertain delivery stays locked and no automatic retry is introduced.
+- [x] Studio preview and manual print invoke the same template_binding service and existing engine pipeline.
+- [x] Editing data, then immediately previewing/printing cannot use an older embedded dynamic image or captured sample text.
+- [x] Unsaved draft changes are respected; no save is required for preview/print and no storage writes are introduced.
+- [x] Backend rejects missing/invalid binding even when UI checks are bypassed.
+- [x] Same-input parity covers multiline/composition/barcode/QR/group/rotation and null/empty/zero/false cases.
+- [x] Print opens without network effects; uncertain delivery stays locked and no automatic retry is introduced.
 - [ ] Existing preview URLs and manual output UX remain functional under the revised contract.
 
 ## Required validation
@@ -82,3 +82,7 @@ For source implementation choices within scope, proceed with documented judgment
 Write parity evidence that T07 can reuse. Do not call an external sender or deliver to a real printer.
 Write results/T06_RESULT.md using [RESULT_TEMPLATE](../RESULT_TEMPLATE.md); request/record review via [REVIEW_TEMPLATE](../REVIEW_TEMPLATE.md).
 Update STATUS.md honestly and stop at this task's boundary.
+
+## Executed T06 status
+
+Source/client/React-mounted/native-raster/recorded-transport evidence is complete for the declared profile. Full current-app mock browser acceptance remains BLOCKED: the initial target served an old request contract; the final attempt to127.0.0.1:8002 returned ERR_CONNECTION_REFUSED. See results/T06_RESULT.md and T06_REVIEW.md. No server/container/storage/printer was started. T07 remains pending; do not promote this task to DONE from source evidence alone.

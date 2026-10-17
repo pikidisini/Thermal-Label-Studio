@@ -1,0 +1,10 @@
+.application-page { height: 100dvh; overflow: auto; display: flex; flex-direction: column; background: var(--ui-region-workspace); color: var(--ui-text-primary); }
+.application-header { display: flex; align-items: center; justify-content:space-between; flex-wrap:wrap; gap: var(--ui-space-3); min-height:40px; padding: var(--ui-space-2) var(--ui-space-4); background: var(--ui-region-menu); border-bottom: var(--ui-border-width) solid var(--ui-border-default); font-size: var(--ui-font-control); font-weight: var(--ui-weight-control); }
+.application-brand { display:flex; align-items:center; gap:var(--ui-space-2); }
+.application-content { width: 100%; max-width: 900px; margin: auto; padding: calc(var(--ui-space-4) * 4) calc(var(--ui-space-4) * 2); }
+.application-content h1 { font-size: calc(var(--ui-font-title) * 2); font-weight: 600; margin: var(--ui-space-2) 0 var(--ui-space-3); }
+.application-content p { color: var(--ui-text-secondary); }
+.application-back:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: var(--ui-space-1); }
+.application-footer { padding: var(--ui-space-4) calc(var(--ui-space-4) * 2); border-top: 1px solid var(--ui-border-default); color: var(--ui-text-secondary); }
+.application-back { display: inline-flex; align-items: center; gap: var(--ui-space-2); color: var(--ui-primary); margin-bottom: calc(var(--ui-space-4) * 2); }
+@media (max-width: 760px) { .application-content { padding: calc(var(--ui-space-4) * 2) var(--ui-space-4); } }

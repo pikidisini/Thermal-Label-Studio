@@ -1,5 +1,5 @@
-import { validatePreviewPayload } from './barcodePreview';
-import { hasFieldValue, getFieldLabel } from '../../data-tokens/model/fieldPresentation';
+import { validatePreviewPayload } from './symbolPayload';
+import { hasFieldValue, getFieldLabel } from '../../data-tokens';
 
 export interface PayloadResolution { value: string | null; error: string | null; }
 

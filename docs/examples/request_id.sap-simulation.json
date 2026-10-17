@@ -1,0 +1,20 @@
+{
+  "sender": {"system": "SAP_ECC"},
+  "request_id": "SAP-550E8400E29B41D4A716446655440000",
+  "mode": "simulation",
+  "items": [
+    {
+      "item_id": "ITEM-001",
+      "label_code": "A013",
+      "copies": 1,
+      "data": {
+        "batch_number": "0000317326",
+        "material_number": "EXAMPLE-MATERIAL",
+        "roll_number": "EXAMPLE-ROLL-001",
+        "ZZWIDTH": 695,
+        "ZZLENGTH": 8000,
+        "production_date": "2026-10-15"
+      }
+    }
+  ]
+}

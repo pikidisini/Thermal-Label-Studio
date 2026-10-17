@@ -3,7 +3,9 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 const dist = fileURLToPath(new URL('../../../dist/', import.meta.url));
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, testInfo) => {
+  // Existing regressions intentionally exercise the original Dark choice.
+  if (!/Signature default|malformed and denied|legacy custom palette/.test(testInfo.title)) await page.addInitScript(() => { if (!localStorage.getItem('thermal-label-studio.preferences.v1')) localStorage.setItem('thermal-label-studio.preferences.v1', JSON.stringify({ language: 'en', theme: 'dark' })); });
   await page.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
   await page.route('https://fonts.gstatic.com/**', route => route.abort());
   await page.route('**/studio', route => route.fulfill({ path: path.join(dist, 'index.html'), contentType: 'text/html' }));
@@ -22,6 +24,34 @@ async function settings(page) {
   await page.getByTestId('preferences-button').click();
   await expect(page.getByTestId('preferences-dialog')).toBeVisible();
 }
+
+test('Signature default and explicit selection use exact builtin palette and preserve exported label', async ({ page }, testInfo) => {
+  await page.addInitScript(() => localStorage.removeItem('thermal-label-studio.preferences.v1'));
+  await page.goto('/studio');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'label-studio-signature');
+  await expect(page.locator('html')).toHaveAttribute('data-custom-theme', 'false');
+  await page.getByTestId('btn-add-text').click();
+  const before = await svg(page, testInfo, 'signature-before.svg');
+  await settings(page);
+  await expect(page.getByTestId('preferences-theme')).toHaveValue('label-studio-signature');
+  await expect(page.getByTestId('preferences-theme').locator('option[value="label-studio-signature"]')).toHaveText('Label Studio Signature');
+  await expect(page.getByTestId('custom-hex-bar')).toHaveValue('#ededed');
+  await page.getByTestId('preferences-language').selectOption('id');
+  await expect(page.getByTestId('preferences-theme').locator('option[value="label-studio-signature"]')).toHaveText('Label Studio Signature');
+  await page.getByTestId('preferences-language').selectOption('en');
+  await page.getByTestId('custom-hex-bar').fill('#123456');
+  await expect(page.getByTestId('preferences-theme')).toHaveValue('custom');
+  await page.getByTestId('custom-theme-apply').click();
+  await settings(page);
+  await page.getByTestId('preferences-theme').selectOption('label-studio-signature');
+  await expect(page.getByTestId('custom-hex-bar')).toHaveValue('#ededed');
+  await page.getByTestId('preferences-close').click();
+  await settings(page);
+  await expect(page.getByTestId('custom-hex-bar')).toHaveValue('#ededed');
+  await page.getByTestId('preferences-close').click();
+  expect(await page.locator('html').evaluate(node => ['--ui-region-menu', '--ui-region-toolbar', '--ui-region-inspector', '--ui-region-status', '--ui-region-workspace', '--ui-viewport-dot', '--ui-text-primary', '--ui-primary-container', '--ui-on-primary-container', '--ui-warning', '--ui-warning-container', '--ui-on-warning-container'].map(token => getComputedStyle(node).getPropertyValue(token).trim()))).toEqual(['#ededed', '#ffffff', '#ffffff', '#ededed', '#ededed', '#9e9e9e', '#030303', '#749faa', '#ffffff', '#89806c', '#89806c', '#ffffff']);
+  expect(await svg(page, testInfo, 'signature-after.svg')).toBe(before);
+});
 async function svg(page, testInfo, name) {
   await page.getByTestId('topbar-menu-btn-file').click();
   const download = page.waitForEvent('download');
@@ -93,7 +123,7 @@ test('system follows OS changes and fixed theme ignores them, with trapped focus
 test('malformed and denied storage leave preferences usable', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('thermal-label-studio.preferences.v1', '{broken'));
   await page.goto('/studio');
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'label-studio-signature');
   await settings(page);
   await page.getByTestId('preferences-language').selectOption('id');
   await expect(page.getByTestId('preferences-dialog')).toContainText('Preferensi');

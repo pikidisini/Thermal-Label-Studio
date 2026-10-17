@@ -1,6 +1,6 @@
 """HTTP endpoints for the concrete persisted-layout feature."""
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Request, Response, Query
 
 from app.config import get_settings
 from app.observability import current_request_id
@@ -40,31 +40,32 @@ def save_layout(payload: SaveLayoutRequest, request: Request) -> LayoutSummary:
 
 
 @router.get("/layouts/{label_code}", response_model=StoredLayout)
-def get_layout(label_code: str, request: Request) -> StoredLayout:
+def get_layout(label_code: str, request: Request, version: int | None = Query(default=None, ge=1)) -> StoredLayout:
     try:
-        return service(request).get_layout(label_code)
+        return service(request).get_layout(label_code) if version is None else service(request).get_layout(label_code, version)
     except LayoutNotFoundError:
         raise HTTPException(status_code=404, detail={"code": "layout_not_found"}) from None
     except LayoutPersistenceError:
         raise HTTPException(status_code=503, detail={"code": "layout_persistence_unavailable"}) from None
+
+
+@router.get('/layouts/{label_code}/versions', response_model=list[LayoutSummary])
+def list_versions(label_code: str, request: Request):
+    try:
+        return service(request).list_versions(label_code)
+    except LayoutNotFoundError:
+        raise HTTPException(status_code=404, detail={'code': 'layout_not_found'}) from None
+    except LayoutPersistenceError:
+        raise HTTPException(status_code=503, detail={'code': 'layout_persistence_unavailable'}) from None
 
 
 @router.patch("/layouts/{label_code}", response_model=LayoutSummary)
 def rename_layout(label_code: str, payload: RenameLayoutRequest, request: Request) -> LayoutSummary:
-    try:
-        return service(request).rename_layout(label_code, payload.title)
-    except LayoutNotFoundError:
-        raise HTTPException(status_code=404, detail={"code": "layout_not_found"}) from None
-    except LayoutPersistenceError:
-        raise HTTPException(status_code=503, detail={"code": "layout_persistence_unavailable"}) from None
+    raise HTTPException(status_code=410, detail={"code": "template_management_required",
+        "message": "Use Application Management template commands for audited changes."})
 
 
 @router.delete("/layouts/{label_code}", status_code=204)
 def delete_layout(label_code: str, request: Request) -> Response:
-    try:
-        service(request).delete_layout(label_code)
-        return Response(status_code=204)
-    except LayoutNotFoundError:
-        raise HTTPException(status_code=404, detail={"code": "layout_not_found"}) from None
-    except LayoutPersistenceError:
-        raise HTTPException(status_code=503, detail={"code": "layout_persistence_unavailable"}) from None
+    raise HTTPException(status_code=410, detail={"code": "template_management_required",
+        "message": "Use Application Management template commands for audited changes."})

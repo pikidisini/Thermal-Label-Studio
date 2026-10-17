@@ -1,6 +1,7 @@
 import { translate as t, useTranslation } from "../../../shared/i18n";
 import { useFieldLabel } from '../model/useFieldLabel';
 import React from 'react';
+import { labelTokenKeys, isLabelFieldKey, getLabelField } from '../model/labelFieldCatalog';
 import { compileComposition, parseComposition } from '../model/composition';
 
 export function FieldComposer({ template, fields, onChange }: {
@@ -11,8 +12,8 @@ export function FieldComposer({ template, fields, onChange }: {
   const [field, setField] = React.useState('');
   const [literal, setLiteral] = React.useState('');
   const parts = parseComposition(template);
-  const available = Array.from(new Set([...fields, ...parts.filter((part) => part.kind === 'field').map((part) => part.value)]))
-    .filter((key) => /^[A-Za-z0-9_-]+$/.test(key)).sort();
+  const available = labelTokenKeys({}, new Set([...fields, ...parts.filter((part) => part.kind === 'field').map((part) => part.value)]))
+    .filter((key) => isLabelFieldKey(key) && getLabelField(key)?.bindingSupported !== false).sort();
   return <div className="space-y-2" data-testid="field-composer">
     <p className="text-[10px] text-on-surface-variant">{t("Build the content in order with data fields and fixed text.")}</p>
     <div className="flex flex-wrap gap-1" data-testid="composition-parts">

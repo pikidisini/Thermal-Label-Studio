@@ -1,7 +1,7 @@
 # T11 — Main software acceptance and separate runtime verification
 
 TASK_ID: T11
-Status: PENDING
+Status: NEEDS_REPLAN (mandatory T07/T10 resource boundary; runtime portion PARTIAL)
 Depends on: T02, T03, T04, T05, T06, T07, T08, T09, T10
 Execution size: One bounded AI task; do not start successors automatically.
 
@@ -59,14 +59,14 @@ Run the full relevant source gate, assess fresh quality when available, and perf
 
 ## Acceptance criteria
 
-- [ ] Full source gate passes on the current working tree; any failure has a concrete resolution or correctly blocks the dependent acceptance.
-- [ ] Parity matrix covers real Studio-exported synthetic templates and changing data, not only handcrafted fixture SVG.
-- [ ] Prepared-bitmap/decoded-IPL pixels match, independent codec fixtures pass, and recorded transport proves exact bytes, one submit and native copies.
-- [ ] Software acceptance requires no physical printer. Unexecuted optional T12 checks do not block this software gate and do not imply device readiness.
+- [x] Full source gate passes on the current working tree; any failure has a concrete resolution or correctly blocks the dependent acceptance.
+- [x] Parity matrix covers real Studio-exported synthetic templates and changing data, not only handcrafted fixture SVG.
+- [x] Prepared-bitmap/decoded-IPL pixels match, independent codec fixtures pass, and recorded transport proves exact bytes, one submit and native copies.
+- [x] Software acceptance requires no physical printer. Unexecuted optional T12 checks do not block this software gate and do not imply device readiness.
 - [ ] Runtime/persistence/ledger restart proofs have named targets and evidence, including stale/duplicate/uncertain paths.
 - [ ] Packaged image contains required binder/code-generation dependencies and renders the agreed font/media correctly.
-- [ ] No printer delivery, LAN publication or operational volume deletion occurs.
-- [ ] Fresh quality PASS is distinguished from not-run/unavailable scans.
+- [x] No printer delivery, LAN publication or operational volume deletion occurs.
+- [x] Fresh quality PASS is distinguished from not-run/unavailable scans.
 - [ ] If external authorization is absent, complete local checks and leave this task PARTIAL with exact runtime gates NOT RUN. Report the software gate independently; do not claim runtime acceptance.
 
 ## Required validation
@@ -90,3 +90,8 @@ For source implementation choices within scope, proceed with documented judgment
 Write separate software and runtime acceptance results and list remaining gates. T12 is optional and is not a prerequisite for software acceptance; execute it only when requested, relevant T11 runtime gates pass and named physical authorization exists.
 Write results/T11_RESULT.md using [RESULT_TEMPLATE](../RESULT_TEMPLATE.md); request/record review via [REVIEW_TEMPLATE](../REVIEW_TEMPLATE.md).
 Update STATUS.md honestly and stop at this task's boundary.
+
+
+## Executed evidence (2026-10-10)
+
+See [result](../results/T11_RESULT.md), [review CHANGES_REQUIRED](../results/T11_REVIEW.md), [software acceptance](../T11_SOFTWARE_ACCEPTANCE.md) and [runtime acceptance](../T11_RUNTIME_ACCEPTANCE.md). Local checks do not satisfy the missing hard resource boundary or standard ledger/configuration lifecycle. Named operational checks remain NOT RUN; T12 stays optional/unstarted. Original criteria above are preserved rather than waived.

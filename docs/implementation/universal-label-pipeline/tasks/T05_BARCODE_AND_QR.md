@@ -1,7 +1,7 @@
 # T05 — Implement server barcode and QR binding
 
 TASK_ID: T05
-Status: PENDING
+Status: DONE
 Depends on: T03, T04
 Execution size: One bounded AI task; do not start successors automatically.
 
@@ -49,12 +49,12 @@ Add template_binding barcode/qr and extend service validation with the approved 
 
 ## Acceptance criteria
 
-- [ ] Changing source values changes encoded barcode/QR payload; invalid/missing source produces no successful output.
-- [ ] Text plus barcode/QR compositions use exact keys and literal data without arbitrary code.
-- [ ] Supported Studio type/options and geometry are preserved; unrecognized types/settings are rejected.
-- [ ] Payload-semantic checks and visual/pixel checks are both recorded; a successful scan alone does not prove layout parity.
-- [ ] Unsupported features remain explicit failures. No fallback to old embedded dynamic image, invented default URL or data placeholder occurs.
-- [ ] Shared renderer/codec/transport remains unchanged unless a demonstrated contract defect is separately reviewed.
+- [x] Changing source values changes encoded barcode/QR payload; invalid/missing source produces no successful output.
+- [x] Text plus barcode/QR compositions use exact keys and literal data without arbitrary code.
+- [x] Supported Studio type/options and geometry are preserved; unrecognized types/settings are rejected.
+- [x] Payload-semantic checks and visual/pixel checks are both recorded; a successful scan alone does not prove layout parity.
+- [x] Unsupported features remain explicit failures. No fallback to old embedded dynamic image, invented default URL or data placeholder occurs.
+- [x] Shared renderer/codec/transport remains unchanged unless a demonstrated contract defect is separately reviewed.
 
 ## Required validation
 
@@ -76,3 +76,5 @@ For source implementation choices within scope, proceed with documented judgment
 Provide complete binder feature/parity evidence for T06. If visual parity cannot be satisfied, stop that cutover with NEEDS_REPLAN instead of accepting an unexplained mismatch.
 Write results/T05_RESULT.md using [RESULT_TEMPLATE](../RESULT_TEMPLATE.md); request/record review via [REVIEW_TEMPLATE](../REVIEW_TEMPLATE.md).
 Update STATUS.md honestly and stop at this task's boundary.
+
+Acceptance evidence: [T05_RESULT](../results/T05_RESULT.md), [source self-review PASS](../results/T05_REVIEW.md). Completion applies to the explicit proven profiles; unsupported aspect/fractional/crop/filter/stroke profiles remain replan gates. No T06 execution or independent reviewer claim.

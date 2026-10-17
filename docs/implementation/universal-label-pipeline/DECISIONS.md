@@ -9,7 +9,7 @@ T01 distinguishes user-approved requirements from selected technical defaults be
 | --- | --- |
 | D01 | Latest Studio JSON is the data-contract basis; do not make external senders use the fixture facts envelope. |
 | D02 | Require request-level mode: simulation or print. |
-| D03 | Strict per-item copies range 1–999. |
+| D03 | Strict per-item copies range 1â€“999. |
 | D04 | Return clear per-item processing results; accepted alone is insufficient for synchronous completed processing. |
 | D05 | Universal naming: label_intake instead of SAP-specific intake. sender.system identifies the source. |
 | D06 | Data Tokens does not receive external requests and import never triggers printing. |
@@ -118,3 +118,38 @@ Dependency compatibility assessment: [python-barcode supported formats](https://
 Current JS QR generator uses automatic segmentation/mask selection, while target v1 proposes byte segmentation and explicit reproducible options. Code128 optimizer and QR mask choice can diverge across libraries. T05 must prove module/grid and canvas raster parity with same options, or record NEEDS_REPLAN and revise the generation profile with review before T06. Routing Studio canvas generation through the same authoritative server profile is permitted only as a reviewed scoped implementation, preserving WYSIWYG. Do not silently normalize, pad, fall back or accept equivalent decoded payload alone as pixel PASS. Nondefault current generator options must be represented/proven or rejected explicitly.
 
 No consequential business requirement is awaiting clarification in T01. Later implementation gates are explicit: exact metadata allowlist fixtures T03, dependency/canvas parity T05, durable storage/recovery T08/T11, source/approval policy T09, authorized runtime target T11. Their PENDING/NOT RUN state does not invalidate documentation freeze; inability to meet a frozen requirement triggers NEEDS_REPLAN rather than silent scope reduction.
+
+## T03 â€” Explicit serialization/profile refinements
+
+New Studio metadata records actual creation options; QR auto segmentation is explicitly distinct from the target byte-only profile. T05 must prove/align parity or NEEDS_REPLAN before T06. Root data-editor-coordinate-profile=fabric7 identifies centered Fabric7 matrix provenance independently of binding-version semantics; ordinary authored SVG without marker uses native geometry. Dynamic symbol owner is exactly one immediate image. Font metrics reject CSS/attribute conflicts and dynamic rich text overrides. Legacy incomplete dynamic SVG is rejected before canvas mutation, never inferred from samples. Dynamic rich text/wrapped Textbox require NEEDS_REPLAN if required; no silent acceptance reduction. Safety admits narrowly bounded local style URL references and enforces iterative node/depth bounds before XML normalization. See [implemented contract](../../TEMPLATE_BINDING_CONTRACT.md) and [T03 review PASS](results/T03_REVIEW.md).
+
+
+## T04 — Pure text preparation and origin metadata
+
+Additive data-text-layout records Fabric7 origin/character spacing and object-local displacement coefficients; old T03 exports retain centered SVG geometry. Text resolves exact raw scalar values before trusted-font metrics and returns immutable SVG/media/checksum evidence without renderer/codec/sinks. Significant whitespace is valid. Pinned font-table metrics replace inaccurate Pillow BASIC measurement; 84 actual Fabric fixtures prove declared Windows Arial geometry, not packaged-font/raster/IPL parity. Dynamic background/path/rich text/wrapped Textbox, unproven shaping/fallback and symbols fail explicitly; required unsupported features are NEEDS_REPLAN before cutover. Review is actual primary-agent source self-review, following direct implementation; no independent second-agent assessment is claimed. See results/T04_RESULT.md and results/T04_REVIEW.md.
+
+
+## T05 - Proven symbol generation and explicit aspect
+
+Pin actual Studio generators JsBarcode3.12.3/node-qrcode1.5.4. Standard Python libraries own barcode tables/EAN and QR ECC/placement; narrow MIT-attributed policy adaptations reproduce Studio code-set/segmentation/mask decisions. Both byte target and existing auto QR profile are proven independently, not converted. New dynamic image exports declare preserveAspectRatio=none; omitted old aspect requires explicit working-copy re-export/new saved version or NEEDS_REPLAN. Fractional native linear raster metrics and dynamic crop/filter/stroke remain NEEDS_REPLAN if required; no unproven browser anti-aliasing or saved preview fallback. Existing final engine remains unchanged. Tests establish asset pixels and SVG placement; T06/T11 must establish final label-raster/IPL equivalence. See results/T05_RESULT.md and results/T05_REVIEW.md.
+
+## T07 execution record (2026-10-10)
+
+Explicit user instruction authorized local T07 work while preserving T06 browser BLOCKED. Intake naming is universal, storage pins and shared Studio pipeline are implemented, and external admission/print stay denied. T08/T09/T10 were not started. Result metadata reserves 128 KiB for 100 maximal identifiers/pins, above the frozen minimum. T07 is NEEDS_REPLAN for a cancellable hard-deadline/native-memory execution boundary; no accepted resource requirement is changed.
+
+## T08 execution decision (2026-10-10)
+
+Explicit user authorization advances the T08 source/fake slice while retaining T07 NEEDS_REPLAN and T06 browser BLOCKED. Select the concrete independent PostgreSQL ledger with a fresh connection factory, dedicated namespace and protected result table. Existing jobs remain unchanged. Key-version verifiers prevent forgotten/replaced secrets from opening identity reuse. Schema/permissions/keys/maintenance/lifecycle and actual concurrency/restart acceptance are unapplied T11 operations; T08 creates no sender or device effect.
+
+## T09 execution decision (2026-10-10)
+
+Explicit user execution permits source/fake T09 despite outstanding T07/T06 gates. Implement C11/C12 with strict immutable server environment policy, per-source bearer secret references and explicit permissions. Print approval is an append-history administrative event matching sender/code/version/checksum/copies and one numeric server target. Simulation needs source/mode/code permission, not a printer approval. Process reload checks retained audit prefix and changed revision; durable protected history across restarts/worker coordination remain explicit T11 operations. T10 owns all-batch preflight result assembly and per-claim revalidation/one-attempt sink. HTTP print remains denied and no operational source/target was provisioned.
+
+## T10 explicit source execution (2026-10-10)
+
+The user authorized T10 source/fake implementation while T07 remains NEEDS_REPLAN and T06 browser BLOCKED. Wire print into the existing universal endpoint, with all-batch pin/policy/preparation gates before committed per-item claims and existing one-attempt sink. T08 metadata gains bounded detailed preflight errors and proven no-submit claim settlement; no schema/lifecycle operation is added. Preserve manual Studio's conservative superclass error handling. T10 overall acceptance is NEEDS_REPLAN for the mandatory T07 execution-resource boundary despite functional source PASS; T11 remains unstarted.
+
+
+## T11 verification decision
+
+Execute the explicitly requested local T11 source/native/mock scope; preserve mandatory T07/T10 NEEDS_REPLAN and historical T06 current-app gate. Separate exact same-profile Studio/intake equality from Canvas and cross-platform font comparisons. Record standard ledger/configuration/history gaps rather than silently provisioning operational targets. See [T11 review](results/T11_REVIEW.md); no successor is automatically started.

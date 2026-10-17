@@ -1,0 +1,33 @@
+name: thermal-label-sonar-mcp
+
+# One loopback-only, pinned upstream MCP HTTP server shared by short-lived
+# local STDIO bridge processes. The ignored env file is the sole token source.
+services:
+  sonar-mcp:
+    image: sonarsource/sonarqube-mcp:1.19.0.2785
+    container_name: tls-sonar-mcp-shared
+    env_file:
+      - .env.sonar
+    environment:
+      SONARQUBE_TRANSPORT: http
+      SONARQUBE_HTTP_HOST: 0.0.0.0
+      SONARQUBE_HTTP_PORT: "8080"
+      SONARQUBE_READ_ONLY: "true"
+      SONARQUBE_TOOLSETS: issues,quality-gates,rules,measures,coverage
+      SONARQUBE_LOG_TO_FILE_DISABLED: "true"
+      TELEMETRY_DISABLED: "true"
+      JAVA_TOOL_OPTIONS: -Xmx256m
+    ports:
+      - "127.0.0.1:9005:8080"
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    restart: unless-stopped

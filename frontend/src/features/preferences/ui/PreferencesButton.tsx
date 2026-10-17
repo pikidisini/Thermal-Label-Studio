@@ -8,6 +8,7 @@ import { usePreferencesStore } from '../model/usePreferencesStore';
 import type { Language, Theme } from '../model/preferences';
 import { COLOR_KEYS, isHexColor, newCustomTheme } from '../model/customTheme';
 import { CustomThemeEditor } from './CustomThemeEditor';
+import { signatureDraft } from '../model/signatureTheme';
 export function PreferencesButton() {
   const [open, setOpen] = React.useState(false);
   const t = useTranslation();
@@ -17,9 +18,9 @@ export function PreferencesDialog({ open, onClose }: { open: boolean; onClose: (
   const t = useTranslation();
   const preferences = usePreferencesStore();
   const [selectedTheme, setSelectedTheme] = React.useState<Theme>(preferences.theme);
-  const [draft, setDraft] = React.useState(() => preferences.customTheme ?? newCustomTheme());
+  const [draft, setDraft] = React.useState(() => preferences.theme === 'label-studio-signature' ? signatureDraft() : preferences.customTheme ?? newCustomTheme());
   React.useEffect(() => {
-    if (open) { setSelectedTheme(preferences.theme); setDraft(preferences.customTheme ?? newCustomTheme()); }
+    if (open) { setSelectedTheme(preferences.theme); setDraft(preferences.theme === 'label-studio-signature' ? signatureDraft() : preferences.customTheme ?? newCustomTheme()); }
   }, [open]);
   const dialogRef = useModalA11y(open, onClose);
   return <>
@@ -34,7 +35,7 @@ export function PreferencesDialog({ open, onClose }: { open: boolean; onClose: (
         <DialogHeader><h2 id="preferences-title">{t('Preference')}</h2></DialogHeader>
         <DialogBody className="space-y-4">
           <Field label={t('Language')}><Select data-testid="preferences-language" value={preferences.language} onChange={event => preferences.setLanguage(event.target.value as Language)}><option value="en">English</option><option value="id">Bahasa Indonesia</option></Select></Field>
-          <Field label={t('Theme')}><Select data-testid="preferences-theme" value={selectedTheme} onChange={event => { const value = event.target.value as Theme; setSelectedTheme(value); if (value !== 'custom') preferences.setTheme(value); }}><option value="dark">{t('Dark')}</option><option value="light">{t('Light')}</option><option value="industrial-dark">{t('Industrial Dark')}</option><option value="industrial-light">{t('Industrial Light')}</option><option value="system">{t('System')}</option><option value="custom">{t('Custom')}</option></Select></Field>
+          <Field label={t('Theme')}><Select data-testid="preferences-theme" value={selectedTheme} onChange={event => { const value = event.target.value as Theme; setSelectedTheme(value); if (value === 'label-studio-signature') setDraft(signatureDraft()); if (value !== 'custom') preferences.setTheme(value); }}><option value="label-studio-signature">Label Studio Signature</option><option value="dark">{t('Dark')}</option><option value="light">{t('Light')}</option><option value="industrial-dark">{t('Industrial Dark')}</option><option value="industrial-light">{t('Industrial Light')}</option><option value="system">{t('System')}</option><option value="custom">{t('Custom')}</option></Select></Field>
           <CustomThemeEditor draft={draft} onChange={value => { setDraft(value); setSelectedTheme('custom'); }} />
           <p className="text-xs text-on-surface-variant">{t('Preferences are saved in this browser. Label content and exports are unchanged.')}</p>
         </DialogBody>

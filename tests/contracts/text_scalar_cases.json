@@ -1,0 +1,86 @@
+[
+  {
+    "value": 0,
+    "expected": "0"
+  },
+  {
+    "value": 0,
+    "expected": "0"
+  },
+  {
+    "value": true,
+    "expected": "true"
+  },
+  {
+    "value": false,
+    "expected": "false"
+  },
+  {
+    "value": 1,
+    "expected": "1"
+  },
+  {
+    "value": 1,
+    "expected": "1"
+  },
+  {
+    "value": 1.25,
+    "expected": "1.25"
+  },
+  {
+    "value": 0.000001,
+    "expected": "0.000001"
+  },
+  {
+    "value": 1e-7,
+    "expected": "1e-7"
+  },
+  {
+    "value": 1e-8,
+    "expected": "1e-8"
+  },
+  {
+    "value": 1.2345678901234567,
+    "expected": "1.2345678901234567"
+  },
+  {
+    "value": 9007199254740991,
+    "expected": "9007199254740991"
+  },
+  {
+    "value": -9007199254740991,
+    "expected": "-9007199254740991"
+  },
+  {
+    "value": 5e-324,
+    "expected": "5e-324"
+  },
+  {
+    "value": 1.2345e-100,
+    "expected": "1.2345e-100"
+  },
+  {
+    "value": 0.30000000000000004,
+    "expected": "0.30000000000000004"
+  },
+  {
+    "value": 1.0000000000000002,
+    "expected": "1.0000000000000002"
+  },
+  {
+    "value": 1000000000000000.5,
+    "expected": "1000000000000000.5"
+  },
+  {
+    "value": "  A&B <tag>  ",
+    "expected": "  A&B <tag>  "
+  },
+  {
+    "value": "é Δ é",
+    "expected": "é Δ é"
+  },
+  {
+    "value": "  ",
+    "expected": "  "
+  }
+]

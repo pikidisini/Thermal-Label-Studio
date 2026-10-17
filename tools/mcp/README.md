@@ -1,11 +1,15 @@
 # MCP tooling
 
+For AI SVG authoring, validation, image preview and opt-in template save through
+the application API, see [Design MCP](DESIGN.md).
+
 The PostgreSQL server is documented below. For the separate MinIO server,
 reader policy and configuration, see [MinIO MCP tooling](MINIO.md).
 For Jenkins reader account provisioning and its separate inspection server,
 see [Jenkins MCP tooling](JENKINS.md).
-The container-based [SonarQube MCP launcher](SONARQUBE.md) is also maintained here;
-it uses its own `.env.sonar` and does not depend on the Python tooling environment.
+The [SonarQube MCP launcher](SONARQUBE.md) is also maintained here. It uses one
+loopback-only shared upstream container plus a local Python STDIO bridge from
+this tooling environment; its token remains only in `.env.sonar`.
 
 This optional local STDIO server exposes PostgreSQL inspection tools to an MCP
 client such as Codex. Its source travels with the repository. Each device needs

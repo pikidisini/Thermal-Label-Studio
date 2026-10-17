@@ -1,0 +1,26 @@
+.batch-entry { min-width: 0; display: grid; gap: var(--ui-space-2); align-content: start; }
+.batch-entry-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-4); }
+.batch-entry-heading h2 { font-size: var(--ui-font-title); font-weight: var(--ui-weight-control); }
+.batch-entry-heading span { color: var(--ui-text-secondary); }
+.batch-entry > p { margin: 0; }
+.batch-entry-table { width: 100%; table-layout: fixed; border-collapse: collapse; border: var(--ui-border-width) solid var(--ui-border-default); background: var(--ui-surface-base); }
+.batch-entry-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) 36px; align-items: start; }
+.batch-entry-header { padding: var(--ui-space-2) 0; background: var(--ui-surface-low); color: var(--ui-text-secondary); }
+.batch-entry-header span:first-child { text-align: center; }
+.batch-entry-scroll { max-height: 220px; overflow-y: auto; }
+.batch-entry-scroll .batch-entry-row { border-top: var(--ui-border-width) solid var(--ui-border-default); }
+.batch-entry-number { padding-top: var(--ui-space-2); text-align: center; color: var(--ui-text-secondary); font-family: var(--ui-font-mono); }
+.batch-entry-cell { min-width: 0; padding: var(--ui-space-1); }
+.batch-entry-cell input { width: 100%; min-width: 0; font-family: var(--ui-font-mono); }
+.batch-entry-duplicate { color: var(--ui-warning); padding: var(--ui-space-1); }
+.batch-entry-actions { display: flex; justify-content: flex-end; }
+.batch-entry .batch-entry-status { padding: var(--ui-space-3); border-left: 2px solid var(--ui-primary); background: var(--ui-surface-base); margin-bottom: 0; }
+.batch-entry-table th { text-align: left; padding: var(--ui-space-2); font-weight: var(--ui-weight-control); color: var(--ui-text-secondary); background: var(--ui-surface-low); }
+.batch-entry-table td { border-top: var(--ui-border-width) solid var(--ui-border-default); }
+.batch-entry-table .batch-entry-number { width: 38px; padding-top: 0; text-align: center; }
+.batch-entry-table .batch-entry-result { width: 130px; padding: var(--ui-space-2); overflow-wrap: anywhere; color: var(--ui-text-secondary); }
+.batch-entry-table .batch-entry-delete { width: 48px; text-align: center; }
+.batch-entry-tools, .batch-entry-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-3); flex-wrap: wrap; }
+.batch-entry-tools > button { display: inline-flex; align-items: center; gap: var(--ui-space-2); }
+.batch-entry-hint, .batch-entry-actions > span { color: var(--ui-text-secondary); }
+@media(max-width: 480px) { .batch-entry-table .batch-entry-result { width: 84px; } .batch-entry-table .batch-entry-number { width: 30px; } }

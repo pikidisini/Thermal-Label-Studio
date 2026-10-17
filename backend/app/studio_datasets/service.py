@@ -18,6 +18,7 @@ CREATE INDEX IF NOT EXISTS studio_sample_datasets_created_idx
 
 class DatasetPersistenceError(RuntimeError): pass
 class DatasetNotFoundError(ValueError): pass
+class DatasetConflictError(ValueError): pass
 
 class StudioDatasetService:
     def __init__(self, settings):
@@ -64,3 +65,16 @@ class StudioDatasetService:
             FROM label_studio.studio_sample_datasets WHERE id = %s""", (identifier,))
         if row is None: raise DatasetNotFoundError("Sample dataset was not found.")
         return {**self._summary(row), "payload": row[5]}
+
+    def update(self, identifier, name, original_filename, payload, expected_updated_at):
+        from app.label_data import validate_payload
+        payload = validate_payload(payload)
+        now = datetime.now(timezone.utc)
+        row = self._execute("""UPDATE label_studio.studio_sample_datasets
+            SET name=%s, original_filename=%s, payload=%s, updated_at=%s
+            WHERE id=%s AND updated_at=%s
+            RETURNING id, name, original_filename, created_at, updated_at""",
+            (name, original_filename, self._jsonb(payload), now, identifier, expected_updated_at))
+        if row is None:
+            raise DatasetConflictError('Dataset changed. Reload before saving.')
+        return self._summary(row)

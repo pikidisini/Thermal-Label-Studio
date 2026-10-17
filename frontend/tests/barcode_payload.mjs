@@ -41,7 +41,7 @@ test('field composition preserves literal spacing and exact dynamic keys', () =>
   assert.equal(resolvePayloadTemplate(template, { ZZTHICKNESS: 15, ZZWIDTH: 695 }, 'text').value, '15 micron × 695 mm');
   assert.equal(resolvePayloadTemplate('{{zero}}/{{flag}}', { zero: 0, flag: false }, 'text').value, '0/false');
   assert.equal(resolvePayloadTemplate('{{width}}', { WIDTH: 695 }, 'text').value, null);
-  assert.equal(getFieldLabel('ZZWIDTH'), 'ZZWIDTH');
+  assert.equal(getFieldLabel('ZZWIDTH'), 'Width');
   assert.equal(getFieldLabel('XYZNEW'), 'XYZNEW');
   assert.equal(getFieldStatus(undefined), 'Not supplied');
   assert.equal(getFieldStatus(null), 'Null value');

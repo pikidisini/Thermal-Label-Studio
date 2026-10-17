@@ -2,7 +2,7 @@
 
 import importlib.util
 from pathlib import Path
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, call
 
 import pytest
 
@@ -10,6 +10,98 @@ spec = importlib.util.spec_from_file_location(
     "dev_launcher", Path(__file__).resolve().parents[2] / "scripts/dev.py")
 dev = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(dev)
+
+
+def server_owner():
+    return dict(pid=123, name="python.exe", created="123456",
+                command=f'python -m uvicorn app.main:app --reload-dir "{dev.ROOT / "backend/app"}" --port 8000')
+
+
+def test_summary_displays_both_ports_without_prompting(capsys):
+    with patch.object(dev, 'wait_for_port', side_effect=[False, True]), \
+         patch.object(dev, 'port_owner', return_value=server_owner()), \
+         patch('builtins.input') as prompt, patch.object(dev, 'stop_verified_owner') as stop:
+        dev.show_port_summary()
+        output = capsys.readouterr().out
+        assert 'Backend: 8000 - occupied; PID: 123' in output
+        assert 'Frontend: 5173 - available' in output
+        prompt.assert_not_called()
+        stop.assert_not_called()
+
+
+def test_port_owner_must_match_project_and_server_role():
+    assert dev.is_project_server(server_owner())
+    owner = server_owner()
+    owner['command'] = 'python unrelated.py'
+    assert not dev.is_project_server(owner)
+    owner['command'] = 'python -m uvicorn app.main:app --reload-dir C:\\other\\backend\\app'
+    assert not dev.is_project_server(owner)
+
+
+@pytest.mark.parametrize('answer', ['', 'n', 'no', 'anything'])
+def test_conflict_refusal_never_stops_process(answer):
+    with patch.object(dev, 'port_owner', return_value=server_owner()), \
+         patch.object(dev.sys.stdin, 'isatty', return_value=True), \
+         patch('builtins.input', return_value=answer), \
+         patch.object(dev, 'stop_verified_owner') as stop:
+        assert not dev.resolve_port_conflict(8000, True)
+        stop.assert_not_called()
+
+
+def test_confirmation_is_required_before_stop():
+    owner = server_owner()
+    with patch.object(dev, 'port_owner', return_value=owner), \
+         patch.object(dev.sys.stdin, 'isatty', return_value=True), \
+         patch('builtins.input', return_value='yes'), \
+         patch.object(dev, 'stop_verified_owner') as stop:
+        assert dev.resolve_port_conflict(8000, True)
+        stop.assert_called_once_with(owner)
+
+
+def test_check_mode_never_prompts_or_stops():
+    with patch.object(dev, 'port_owner', return_value=server_owner()), \
+         patch('builtins.input') as prompt, patch.object(dev, 'stop_verified_owner') as stop:
+        assert not dev.resolve_port_conflict(8000, False)
+        prompt.assert_not_called()
+        stop.assert_not_called()
+
+
+def test_unrelated_owner_never_prompts_or_stops():
+    owner = dict(pid=321, name='other.exe', command='other.exe', created='123')
+    with patch.object(dev, 'port_owner', return_value=owner), \
+         patch('builtins.input') as prompt, patch.object(dev, 'stop_verified_owner') as stop:
+        assert not dev.resolve_port_conflict(8000, True)
+        prompt.assert_not_called()
+        stop.assert_not_called()
+
+
+def test_revalidation_failure_does_not_report_success():
+    with patch.object(dev, 'powershell_json', side_effect=ValueError('identity changed')):
+        with pytest.raises(ValueError, match='identity changed'):
+            dev.stop_verified_owner(server_owner())
+
+
+def test_restart_waits_for_companion_frontend_shutdown():
+    with patch.object(dev, 'show_port_summary'), patch.object(dev.shutil, 'which', return_value='node'), \
+         patch.object(dev.Path, 'is_file', return_value=True), \
+         patch.object(dev.importlib.util, 'find_spec', return_value=object()), \
+         patch.object(dev, 'wait_for_port', side_effect=[False, True, True]) as wait, \
+         patch.object(dev, 'resolve_port_conflict', return_value=True) as resolve:
+        assert dev.check_prerequisites(True) == 'node'
+        assert wait.call_args_list == [
+            call(8000, 0), call(8000, 10), call(5173, 10)]
+        resolve.assert_called_once_with(8000, True)
+
+
+def test_disappearing_owner_is_rechecked_without_termination():
+    with patch.object(dev, 'show_port_summary'), patch.object(dev.shutil, 'which', return_value='node'), \
+         patch.object(dev.Path, 'is_file', return_value=True), \
+         patch.object(dev.importlib.util, 'find_spec', return_value=object()), \
+         patch.object(dev, 'wait_for_port', side_effect=[False, True, True]), \
+         patch.object(dev, 'resolve_port_conflict', return_value=False), \
+         patch.object(dev, 'stop_verified_owner') as stop:
+        assert dev.check_prerequisites(True) == 'node'
+        stop.assert_not_called()
 
 
 def test_default_environment_removes_storage_without_changing_parent():

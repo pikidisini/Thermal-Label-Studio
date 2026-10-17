@@ -1,0 +1,460 @@
+{
+  "task": "T12",
+  "status": "PREPARED_ONLY",
+  "authorized": false,
+  "target": null,
+  "external_source": null,
+  "physical_status": "NOT RUN",
+  "prerequisite": "Resolve T11 required resource/runtime gates before paired intake/device execution",
+  "renderer_profile": "Installed Windows resvg/Arial, 203 DPI; not device evidence",
+  "maximum_proposed_new_submissions": 18,
+  "maximum_proposed_labels": 22,
+  "maximum_proposed_replay_requests": 9,
+  "replay_expected_new_labels": 0,
+  "tolerances": {
+    "status": "PROPOSED_NOT_APPROVED",
+    "fiducial_position_mm": 0.5,
+    "reference_length_mm": 0.5,
+    "tile_seam_extra_gap_or_overlap_dots": 0,
+    "scan_value": "exact including Unicode and significant spaces",
+    "quantity": "exact"
+  },
+  "cases": [
+    {
+      "case_id": "P01",
+      "purpose": "Text baseline and composition",
+      "category": "text",
+      "template_file": "fixtures/t12/P01.svg",
+      "svg_sha256": "1f8d1ccd6eb603808d2fd1f13bc7f8ec7efbce76a50d779a14c070e484532f5a",
+      "saved_version": null,
+      "media": {
+        "width_mm": 80,
+        "height_mm": 60,
+        "dpi": 203
+      },
+      "expected_scan_values": [],
+      "copies_per_path": 1,
+      "expected_pair_labels": 2,
+      "authorized": false,
+      "graphic_slots": [
+        64
+      ],
+      "format_slot": 90,
+      "local": {
+        "status": "PASS",
+        "width_px": 639,
+        "height_px": 480,
+        "payload_sha256": "7e7c137e1fca091f866fe820b08b0624f791f219a0ccd6587a6491b838f7bceb",
+        "payload_bytes": 62924,
+        "preview_file": ".tmp/t12-6717a439eb/local/P01/preview.png",
+        "ipl_file": ".tmp/t12-6717a439eb/local/P01/payload.ipl"
+      },
+      "intake_request_example": {
+        "sender": {
+          "system": "T12_SYNTHETIC_PENDING"
+        },
+        "request_id": "T12-6717a439eb-P01",
+        "mode": "print",
+        "items": [
+          {
+            "item_id": "P01",
+            "label_code": "T12_P01",
+            "copies": 1,
+            "data": {
+              "KEY": " A&B <one> ",
+              "ZERO": 0,
+              "FLAG": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "P02",
+      "purpose": "Nested transformed multiline text",
+      "category": "text",
+      "template_file": "fixtures/t12/P02.svg",
+      "svg_sha256": "beb489a209df39029d45e8334383c4ceb5b032c6f5d380181e5ffd614a472c2c",
+      "saved_version": null,
+      "media": {
+        "width_mm": 80,
+        "height_mm": 60,
+        "dpi": 203
+      },
+      "expected_scan_values": [],
+      "copies_per_path": 1,
+      "expected_pair_labels": 2,
+      "authorized": false,
+      "graphic_slots": [
+        64
+      ],
+      "format_slot": 90,
+      "local": {
+        "status": "PASS",
+        "width_px": 639,
+        "height_px": 480,
+        "payload_sha256": "9cfd6ee06ac809ae74b8d54ac1d18376e6a48aef6b35a39bc986a8f395435de9",
+        "payload_bytes": 63084,
+        "preview_file": ".tmp/t12-6717a439eb/local/P02/preview.png",
+        "ipl_file": ".tmp/t12-6717a439eb/local/P02/payload.ipl"
+      },
+      "intake_request_example": {
+        "sender": {
+          "system": "T12_SYNTHETIC_PENDING"
+        },
+        "request_id": "T12-6717a439eb-P02",
+        "mode": "print",
+        "items": [
+          {
+            "item_id": "P02",
+            "label_code": "T12_P02",
+            "copies": 1,
+            "data": {
+              "KEY": "é Å Cyrillic Ж",
+              "ZERO": 1e-07,
+              "FLAG": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "P03",
+      "purpose": "Code128",
+      "category": "code128",
+      "template_file": "fixtures/t12/P03.svg",
+      "svg_sha256": "fbf0cd489e695b126f995ad84be6be680fa11349881ffb79f014b4220a5582a4",
+      "saved_version": null,
+      "media": {
+        "width_mm": 80,
+        "height_mm": 60,
+        "dpi": 203
+      },
+      "expected_scan_values": [
+        "A1234567890 / 0"
+      ],
+      "copies_per_path": 1,
+      "expected_pair_labels": 2,
+      "authorized": false,
+      "graphic_slots": [
+        64
+      ],
+      "format_slot": 90,
+      "local": {
+        "status": "PASS",
+        "width_px": 639,
+        "height_px": 480,
+        "payload_sha256": "a26e8f65005b6bfe9f7e795a4642cc2acece567bd5fb242d4aa8be61683bd239",
+        "payload_bytes": 63432,
+        "preview_file": ".tmp/t12-6717a439eb/local/P03/preview.png",
+        "ipl_file": ".tmp/t12-6717a439eb/local/P03/payload.ipl"
+      },
+      "intake_request_example": {
+        "sender": {
+          "system": "T12_SYNTHETIC_PENDING"
+        },
+        "request_id": "T12-6717a439eb-P03",
+        "mode": "print",
+        "items": [
+          {
+            "item_id": "P03",
+            "label_code": "T12_P03",
+            "copies": 1,
+            "data": {
+              "KEY": "A1234567890 / 0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "P04",
+      "purpose": "Code39",
+      "category": "code39",
+      "template_file": "fixtures/t12/P04.svg",
+      "svg_sha256": "66ec4a604379e74c60239d6b17b3e593551cfdef610b6d5bd85c867b3bf242b5",
+      "saved_version": null,
+      "media": {
+        "width_mm": 80,
+        "height_mm": 60,
+        "dpi": 203
+      },
+      "expected_scan_values": [
+        "A1234567890 / 0"
+      ],
+      "copies_per_path": 1,
+      "expected_pair_labels": 2,
+      "authorized": false,
+      "graphic_slots": [
+        64
+      ],
+      "format_slot": 90,
+      "local": {
+        "status": "PASS",
+        "width_px": 639,
+        "height_px": 480,
+        "payload_sha256": "b201ead662bfc396ab686b0b7975ef6afea3ea1ffeec6493938a8e54bd6b2a27",
+        "payload_bytes": 63264,
+        "preview_file": ".tmp/t12-6717a439eb/local/P04/preview.png",
+        "ipl_file": ".tmp/t12-6717a439eb/local/P04/payload.ipl"
+      },
+      "intake_request_example": {
+        "sender": {
+          "system": "T12_SYNTHETIC_PENDING"
+        },
+        "request_id": "T12-6717a439eb-P04",
+        "mode": "print",
+        "items": [
+          {
+            "item_id": "P04",
+            "label_code": "T12_P04",
+            "copies": 1,
+            "data": {
+              "KEY": "A1234567890 / 0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "P05",
+      "purpose": "EAN13",
+      "category": "ean13",
+      "template_file": "fixtures/t12/P05.svg",
+      "svg_sha256": "fc9dfb220a9926d79ebf43f18e643b81ffcdab608691d72e55b8b365d5f47104",
+      "saved_version": null,
+      "media": {
+        "width_mm": 80,
+        "height_mm": 60,
+        "dpi": 203
+      },
+      "expected_scan_values": [
+        "5901234123457"
+      ],
+      "copies_per_path": 1,
+      "expected_pair_labels": 2,
+      "authorized": false,
+      "graphic_slots": [
+        64
+      ],
+      "format_slot": 90,
+      "local": {
+        "status": "PASS",
+        "width_px": 639,
+        "height_px": 480,
+        "payload_sha256": "f75e3278ef3cd00c9af15f35bc6fb107dcf35f3f6e5901bffc63d6ff9c2008d4",
+        "payload_bytes": 63696,
+        "preview_file": ".tmp/t12-6717a439eb/local/P05/preview.png",
+        "ipl_file": ".tmp/t12-6717a439eb/local/P05/payload.ipl"
+      },
+      "intake_request_example": {
+        "sender": {
+          "system": "T12_SYNTHETIC_PENDING"
+        },
+        "request_id": "T12-6717a439eb-P05",
+        "mode": "print",
+        "items": [
+          {
+            "item_id": "P05",
+            "label_code": "T12_P05",
+            "copies": 1,
+            "data": {
+              "KEY": "5901234123457"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "P06",
+      "purpose": "UTF8 QR",
+      "category": "qrcode",
+      "template_file": "fixtures/t12/P06.svg",
+      "svg_sha256": "611289f1cd0f167fa20d62519ce1d7e9267aef8da7c8275ec0bb883c708305ef",
+      "saved_version": null,
+      "media": {
+        "width_mm": 80,
+        "height_mm": 60,
+        "dpi": 203
+      },
+      "expected_scan_values": [
+        "Lot é 日本 😀 / 1234567890"
+      ],
+      "copies_per_path": 1,
+      "expected_pair_labels": 2,
+      "authorized": false,
+      "graphic_slots": [
+        64
+      ],
+      "format_slot": 90,
+      "local": {
+        "status": "PASS",
+        "width_px": 639,
+        "height_px": 480,
+        "payload_sha256": "e8ae715982fdf63c4bdbc99efcb3ee951cf88ec3eeb400015eec5485ef1338fe",
+        "payload_bytes": 66560,
+        "preview_file": ".tmp/t12-6717a439eb/local/P06/preview.png",
+        "ipl_file": ".tmp/t12-6717a439eb/local/P06/payload.ipl"
+      },
+      "intake_request_example": {
+        "sender": {
+          "system": "T12_SYNTHETIC_PENDING"
+        },
+        "request_id": "T12-6717a439eb-P06",
+        "mode": "print",
+        "items": [
+          {
+            "item_id": "P06",
+            "label_code": "T12_P06",
+            "copies": 1,
+            "data": {
+              "KEY": "Lot é 日本 😀 / 1234567890"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "P07",
+      "purpose": "Axis, border and physical dimensions",
+      "category": "axis",
+      "template_file": "fixtures/t12/P07.svg",
+      "svg_sha256": "8882c38fdbaacce1cba5a894bc0f68ab55e68392ff18cd1ff8670222c58d3243",
+      "saved_version": null,
+      "media": {
+        "width_mm": 80,
+        "height_mm": 60,
+        "dpi": 203
+      },
+      "expected_scan_values": [],
+      "copies_per_path": 1,
+      "expected_pair_labels": 2,
+      "authorized": false,
+      "graphic_slots": [
+        64
+      ],
+      "format_slot": 90,
+      "local": {
+        "status": "PASS",
+        "width_px": 639,
+        "height_px": 480,
+        "payload_sha256": "5494216c9a3b43bf26bd913a270f5369105da95f8b7aae44fc0562f4e2e0ecce",
+        "payload_bytes": 64984,
+        "preview_file": ".tmp/t12-6717a439eb/local/P07/preview.png",
+        "ipl_file": ".tmp/t12-6717a439eb/local/P07/payload.ipl"
+      },
+      "intake_request_example": {
+        "sender": {
+          "system": "T12_SYNTHETIC_PENDING"
+        },
+        "request_id": "T12-6717a439eb-P07",
+        "mode": "print",
+        "items": [
+          {
+            "item_id": "P07",
+            "label_code": "T12_P07",
+            "copies": 1,
+            "data": {}
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "P08",
+      "purpose": "Two-axis IPL tile seams",
+      "category": "tile",
+      "template_file": "fixtures/t12/P08.svg",
+      "svg_sha256": "8e1dc19d54a85cf3a46c4bf51afe9737f367f8edee80c67aba1c6178047671e7",
+      "saved_version": null,
+      "media": {
+        "width_mm": 120,
+        "height_mm": 120,
+        "dpi": 203
+      },
+      "expected_scan_values": [],
+      "copies_per_path": 1,
+      "expected_pair_labels": 2,
+      "authorized": false,
+      "graphic_slots": [
+        64,
+        65,
+        66,
+        67
+      ],
+      "format_slot": 90,
+      "local": {
+        "status": "PASS",
+        "width_px": 959,
+        "height_px": 959,
+        "payload_sha256": "49b7b5bb8ee08931b9d79e5a2b1caae631b66bb0b3a95cab1cf3c09ec68973b0",
+        "payload_bytes": 196365,
+        "preview_file": ".tmp/t12-6717a439eb/local/P08/preview.png",
+        "ipl_file": ".tmp/t12-6717a439eb/local/P08/payload.ipl"
+      },
+      "intake_request_example": {
+        "sender": {
+          "system": "T12_SYNTHETIC_PENDING"
+        },
+        "request_id": "T12-6717a439eb-P08",
+        "mode": "print",
+        "items": [
+          {
+            "item_id": "P08",
+            "label_code": "T12_P08",
+            "copies": 1,
+            "data": {}
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "P09",
+      "purpose": "Native quantity three",
+      "category": "code128",
+      "template_file": "fixtures/t12/P03.svg",
+      "svg_sha256": "fbf0cd489e695b126f995ad84be6be680fa11349881ffb79f014b4220a5582a4",
+      "saved_version": null,
+      "media": {
+        "width_mm": 80,
+        "height_mm": 60,
+        "dpi": 203
+      },
+      "expected_scan_values": [
+        "A1234567890 / 0"
+      ],
+      "copies_per_path": 3,
+      "expected_pair_labels": 6,
+      "authorized": false,
+      "graphic_slots": [
+        64
+      ],
+      "format_slot": 90,
+      "local": {
+        "status": "PASS",
+        "width_px": 639,
+        "height_px": 480,
+        "payload_sha256": "486132297160c8c45a6dca171d3d00c6779cd177b96527b6ca7b163aaa4f2049",
+        "payload_bytes": 63432,
+        "preview_file": ".tmp/t12-6717a439eb/local/P09/preview.png",
+        "ipl_file": ".tmp/t12-6717a439eb/local/P09/payload.ipl"
+      },
+      "intake_request_example": {
+        "sender": {
+          "system": "T12_SYNTHETIC_PENDING"
+        },
+        "request_id": "T12-6717a439eb-P09",
+        "mode": "print",
+        "items": [
+          {
+            "item_id": "P09",
+            "label_code": "T12_P03",
+            "copies": 3,
+            "data": {
+              "KEY": "A1234567890 / 0"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

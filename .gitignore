@@ -54,3 +54,7 @@ frontend/.auth/
 
 # Disposable pytest directories left by interrupted local runs.
 /pytest-cache-files-*/
+
+# Workstation-specific local agent configuration and durable job state
+/local_agent/*.local.json
+/local_agent/*.sqlite3*

@@ -91,7 +91,7 @@ def test_readiness_never_renders_or_contacts_external_services(monkeypatch):
 def test_api_only_configuration_does_not_add_frontend_routes():
     app = FastAPI()
     configure_fixture_serving(app, get_settings({}))
-    assert not any(route.path in {"/", "/studio", "/fixture-simulation", "/assets"} for route in app.routes)
+    assert not any(route.path in {"/", "/studio", "/print", "/management", "/fixture-simulation", "/assets"} for route in app.routes)
 
 
 def test_fixture_serving_has_only_explicit_page_and_static_asset_routes(monkeypatch):
@@ -110,7 +110,10 @@ def test_fixture_serving_has_only_explicit_page_and_static_asset_routes(monkeypa
     settings = runtime_settings()
     configure_fixture_serving(app, settings)
     routes = {route.path: route for route in app.routes}
-    assert routes["/"].endpoint().headers["location"] == "/studio"
+    for path in ("/", "/print", "/management"):
+        response = routes[path].endpoint()
+        assert response.path == settings.frontend_dist / "index.html"
+        assert response.media_type == "text/html" and response.status_code == 200
     studio = routes["/studio"].endpoint()
     assert studio.path == settings.frontend_dist / "index.html"
     page = routes["/fixture-simulation"].endpoint()

@@ -5,8 +5,7 @@ import { useTemplateStore } from '../../../store/useTemplateStore';
 import { useContractStore } from '../../../store/useContractStore';
 import { useStudioStore } from '../../../store/useStudioStore';
 import { runEditorPreview, editorPreviewUrl } from '../api/editorPreviewApi';
-import { exportFabricToSvg } from '../../canvas';
-import { bindingErrors } from '../../data-tokens/model/bindingValidation';
+import { captureEditorOutput } from '../../canvas';
 
 export function useThermalSimulation(
   canvasRef: React.MutableRefObject<fabric.Canvas | null>,
@@ -21,7 +20,7 @@ export function useThermalSimulation(
     setRenderError,
   } = useSimulationStore();
   const { labelWidthMm, labelHeightMm } = useTemplateStore();
-  const { jsonData, outputBlocked } = useContractStore();
+  const { jsonData, tokenMap, outputBlocked } = useContractStore();
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDirtyRef = useRef<boolean>(true);
@@ -45,7 +44,19 @@ export function useThermalSimulation(
       return;
     }
 
+    setPreviewImage(null);
+    setThermalImage(null);
+    setInspectionData(null);
+    let snapshot;
+    try { snapshot = captureEditorOutput(canvasRef.current); }
+    catch (cause) {
+      setRenderError(cause instanceof Error ? cause.message : 'Preview rendering failed.');
+      setIsRendering(false);
+      return;
+    }
+    const selectedData = useContractStore.getState().tokenMap;
     debounceTimerRef.current = setTimeout(async () => {
+      if (generation !== requestGenerationRef.current) return;
       if (!canvasRef.current) return;
       setIsRendering(true);
       setRenderError(null);
@@ -53,18 +64,12 @@ export function useThermalSimulation(
       setThermalImage(null);
       setInspectionData(null);
       try {
-        if (useContractStore.getState().outputBlocked) throw new Error('Create a canonical working copy before output.');
-        const errors = bindingErrors(canvasRef.current.getObjects(), useContractStore.getState().tokenMap, useContractStore.getState().fieldDescriptions);
-        if (errors.length) throw new Error(`Label data is incomplete or invalid: ${errors.join(' ')}`);
-        const svgStr = exportFabricToSvg(canvasRef.current, labelWidthMm, labelHeightMm, pxPerMm);
-        if (!svgStr) return;
-
         const controller = new AbortController();
         controllerRef.current = controller;
         const admittedData = useContractStore.getState().jsonData;
-        const result = await runEditorPreview({ svg: svgStr, widthMm: labelWidthMm, heightMm: labelHeightMm, dpi }, controller.signal);
+        const result = await runEditorPreview(snapshot, controller.signal);
         if (!mountedRef.current || generation !== requestGenerationRef.current
-          || useContractStore.getState().jsonData !== admittedData || useContractStore.getState().outputBlocked) return;
+          || useContractStore.getState().tokenMap !== selectedData || useContractStore.getState().jsonData !== admittedData || useContractStore.getState().outputBlocked) return;
         const url = editorPreviewUrl(result);
         setPreviewImage(url);
         setThermalImage(url);
@@ -99,7 +104,7 @@ export function useThermalSimulation(
     setPreviewImage(null);
     setThermalImage(null);
     setIsRendering(false);
-  }, [jsonData, outputBlocked, setPreviewImage, setThermalImage, setIsRendering]);
+  }, [jsonData, tokenMap, outputBlocked, labelWidthMm, labelHeightMm, dpi, setPreviewImage, setThermalImage, setIsRendering]);
 
   useEffect(() => {
     mountedRef.current = true;

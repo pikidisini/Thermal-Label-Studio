@@ -1,3 +1,4 @@
+import { isEditorKeyboardBlocked } from '../../shared/keyboard/keyboardContext';
 import * as fabric from 'fabric';
 import { barcodeGenerators } from '../../features/barcode';
 import { useStudioStore } from '../../store/useStudioStore';
@@ -188,7 +189,8 @@ export function attachDrawingToolListeners({
 
   const cancelLineDrawing = (preserveTool = false) => { if (previewShape) fabricCanvas.remove(previewShape); previewShape = null; pendingLineBeforeState = null; isDrawing = false; armedLineAnchor = null; smartGuideOverlay?.clear(); fabricCanvas.discardActiveObject(); fabricCanvas.selection = !preserveTool; if (!preserveTool) fabricCanvas.skipTargetFind = linePreviousSkipTargetFind; fabricCanvas.requestRenderAll(); if (!preserveTool) optionsRef.current.setActiveTool('select'); };
   const onEscapeWithLine = (event: KeyboardEvent) => {
-    if (event.key === 'Escape' && optionsRef.current.activeTool === 'line') {
+    if (isEditorKeyboardBlocked(event)) return;
+    if (event.key === 'Escape' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && optionsRef.current.activeTool === 'line') {
       event.preventDefault();
       if (isDrawing || armedLineAnchor) { armedLineAnchor = null; cancelLineDrawing(true); renderLineAnchors(); }
       else cancelLineDrawing(false);

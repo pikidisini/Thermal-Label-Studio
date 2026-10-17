@@ -1,4 +1,4 @@
-import { API_BASE } from '../../../shared/api';
+import { API_BASE, HttpError, responseError } from '../../../shared/api';
 
 export interface PersistedLayoutSummary {
   label_code: string;
@@ -28,20 +28,35 @@ export interface SaveLayoutInput {
 
 async function checked<T>(response: Response): Promise<T> {
   if (response.ok) return response.json() as Promise<T>;
-  const body = await response.json().catch(() => null) as { detail?: { message?: string } } | null;
-  throw new Error(body?.detail?.message || (response.status === 404 ? 'Template no longer exists. Refresh the explorer.' : 'Layout storage is unavailable.'));
+  throw await responseError(response, response.status === 404 ? 'Template no longer exists. Refresh the explorer.' : 'Layout storage is unavailable.');
+}
+
+export type TemplateIdentity = Pick<PersistedLayoutSummary, 'label_code' | 'title' | 'version' | 'svg_sha256'>;
+
+async function manageTemplate(revision: string, template: TemplateIdentity, action: 'update' | 'delete', title: string, new_code: string): Promise<unknown> {
+  return fetch(`${API_BASE}/management/templates/${encodeURIComponent(template.label_code)}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ revision, label_code: template.label_code, version: template.version, svg_sha256: template.svg_sha256, previous_title: template.title, action, title, new_code }),
+  }).then(checked<unknown>);
+}
+
+async function manageFromStudio(code: string, action: 'update' | 'delete', title?: string, expected?: TemplateIdentity) {
+  const template = expected ?? await layoutApi.get(code);
+  const snapshot = await fetch(`${API_BASE}/management/snapshot`).then(checked<{ writable: boolean; document: { policy: { revision: string } } }>);
+  if (!snapshot.writable) throw new HttpError('Management changes are unavailable.', 503);
+  await manageTemplate(snapshot.document.policy.revision, template, action, title ?? template.title, code);
 }
 
 export const layoutApi = {
   list: () => fetch(`${API_BASE}/layouts`).then(checked<PersistedLayoutSummary[]>),
-  get: (labelCode: string) => fetch(`${API_BASE}/layouts/${encodeURIComponent(labelCode)}`).then(checked<PersistedLayout>),
-  rename: (labelCode: string, title: string) => fetch(`${API_BASE}/layouts/${encodeURIComponent(labelCode)}`, {
-    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }),
-  }).then(checked<PersistedLayoutSummary>),
-  delete: async (labelCode: string) => {
-    const response = await fetch(`${API_BASE}/layouts/${encodeURIComponent(labelCode)}`, { method: 'DELETE' });
-    if (!response.ok) await checked<never>(response);
+  get: (labelCode: string, version?: number) => fetch(`${API_BASE}/layouts/${encodeURIComponent(labelCode)}${version === undefined ? '' : `?version=${version}`}`).then(checked<PersistedLayout>),
+  versions: (labelCode: string) => fetch(`${API_BASE}/layouts/${encodeURIComponent(labelCode)}/versions`).then(checked<PersistedLayoutSummary[]>),
+  manage: manageTemplate,
+  rename: async (labelCode: string, title: string, expected?: TemplateIdentity) => {
+    await manageFromStudio(labelCode, 'update', title, expected);
+    return layoutApi.get(labelCode);
   },
+  delete: (labelCode: string, expected?: TemplateIdentity) => manageFromStudio(labelCode, 'delete', undefined, expected),
   save: (input: SaveLayoutInput) => fetch(`${API_BASE}/layouts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -24,6 +24,13 @@ services:
     restart: "no"
     environment:
       TLS_DATABASE_URL: postgresql://thermal_label:${TLS_DB_PASSWORD:?Set a local database password}@postgres:5432/thermal_label_studio
+      TLS_MANAGEMENT_ENABLED: ${TLS_MANAGEMENT_ENABLED:-false}
+      TLS_ACTIVITY_ENABLED: ${TLS_ACTIVITY_ENABLED:-false}
+      TLS_MANAGEMENT_KEY_ENCRYPTION: ${TLS_MANAGEMENT_KEY_ENCRYPTION:-}
+      TLS_SAP_RFC_ENABLED: ${TLS_SAP_RFC_ENABLED:-false}
+      TLS_SAP_RFC_PYTHON: ${TLS_SAP_RFC_PYTHON:-}
+      TLS_SAP_RFC_TARGETS: ${TLS_SAP_RFC_TARGETS:-}
+      TLS_SAP_RFC_FUNCTIONS: ${TLS_SAP_RFC_FUNCTIONS:-}
       TLS_MINIO_ENDPOINT: minio:9000
       TLS_MINIO_ACCESS_KEY: ${TLS_MINIO_ACCESS_KEY:?Set a local MinIO access key}
       TLS_MINIO_SECRET_KEY: ${TLS_MINIO_SECRET_KEY:?Set a local MinIO secret key}
@@ -31,6 +38,10 @@ services:
       TLS_MINIO_SECURE: "false"
       TLS_PRINTER_HOST: ${TLS_PRINTER_HOST:-}
       TLS_PRINTER_PORT: ${TLS_PRINTER_PORT:-9100}
+      # Explicit opt-in ledger; schema is applied separately on a named target.
+      TLS_INTAKE_LEDGER_JSON: ${TLS_INTAKE_LEDGER_JSON:-}
+      TLS_INTAKE_DATABASE_URL: ${TLS_INTAKE_DATABASE_URL:-}
+      TLS_INTAKE_HMAC_K1: ${TLS_INTAKE_HMAC_K1:-}
     depends_on:
       postgres:
         condition: service_healthy

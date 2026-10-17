@@ -111,7 +111,7 @@ def test_acceptance_has_no_files_network_or_process_effects(monkeypatch, mode) -
 
 def test_foundation_imports_only_implemented_in_memory_dependencies() -> None:
     # Acceptance modules remain isolated. The main composition root may include
-    # implemented HTTP routers; no foundation service gains those dependencies.
+    # implemented HTTP routers and the pure bounded editor admission middleware; no foundation service gains those dependencies.
     app_root = Path(__file__).resolve().parents[1] / "app"
     foundation_modules = (
         app_root / "config.py",
@@ -133,7 +133,7 @@ def test_foundation_imports_only_implemented_in_memory_dependencies() -> None:
                 assert all(alias.name in allowed or (source.name == "config.py" and alias.name == "ipaddress") for alias in node.names), source
             elif isinstance(node, ast.ImportFrom):
                 assert node.module in allowed or (
-                        source.name == "main.py" and node.module in {"simulation.http", "simulation.editor_http", "observability", "runtime", "layouts.http", "layouts.service", "studio_datasets.http", "studio_datasets.service", "printing.http"}
+                            source.name == "main.py" and node.module in {"simulation.http", "simulation.editor_http", "simulation.design_http", "observability", "runtime", "layouts.http", "layouts.service", "studio_datasets.http", "studio_datasets.service", "printing.http", "label_print.http", "engine.editor_request", "label_intake.http", "label_intake.results", "label_intake.runtime", "management.router", "management.errors", "management.middleware", "activity.middleware", "graphics.http", "graphics.service"}
                 ), source
             elif isinstance(node, ast.Call):
                 assert not (

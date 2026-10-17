@@ -371,20 +371,20 @@ test('History Stack (Undo / Redo) and Viewport Calculations', async (t) => {
 
   await t.test('handleResetFit resets pan offset to {0, 0} and applies bounded auto-fit zoom', () => {
     const calculateAutoFit = (viewportW, viewportH, labelWMm, labelHMm, pxPerMm = 4) => {
-      const availableW = Math.max(100, viewportW - 48);
-      const availableH = Math.max(100, viewportH - 48);
+      const availableW = Math.max(1, viewportW - 24 - 48);
+      const availableH = Math.max(1, viewportH - 20 - 48);
       const targetW = labelWMm * pxPerMm;
       const targetH = labelHMm * pxPerMm;
       const fitX = availableW / targetW;
       const fitY = availableH / targetH;
       const clamped = Math.min(4.0, Math.max(0.15, Math.min(fitX, fitY)));
-      return Math.round(clamped * 20) / 20;
+      return Math.max(0.15, Math.floor(clamped * 20) / 20);
     };
 
     // Viewport 1200x800, Label 200x80 (target 800x320)
     const fitZoom = calculateAutoFit(1200, 800, 200, 80);
     assert.ok(fitZoom > 1.0, 'Fit zoom must scale up for spacious viewport');
-    assert.equal(fitZoom, 1.45, 'Calculated auto fit is exactly 1.45x');
+    assert.equal(fitZoom, 1.4, 'Calculated auto fit is exactly 1.4x');
 
     // Resetting fit must always restore panOffset to {0, 0}
     const state = { panOffset: { x: -450, y: 220 }, zoom: 2.5 };
@@ -394,7 +394,7 @@ test('History Stack (Undo / Redo) and Viewport Calculations', async (t) => {
     };
     resetFit();
     assert.deepEqual(state.panOffset, { x: 0, y: 0 }, 'Pan offset must reset to 0,0');
-    assert.equal(state.zoom, 1.45, 'Zoom must reset to auto-fit scale');
+    assert.equal(state.zoom, 1.4, 'Zoom must reset to auto-fit scale');
   });
 
   await t.test('handleOuterMouseDown deselects active object when clicking outside canvas container', () => {

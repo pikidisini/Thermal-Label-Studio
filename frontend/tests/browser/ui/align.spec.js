@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { openStudio } from '../helpers/studio.js';
+import { openStudio, mockBuiltApplication } from '../helpers/studio.js';
 
 // Disposable browser context; every API request is mocked, including writes.
 test('Align buttons center rotated objects, align edges, and preserve geometry when changing origin', async ({ page }) => {
   test.setTimeout(60000);
   page.on('pageerror', error => { throw error; });
+  await mockBuiltApplication(page);
   await page.route(url => url.pathname.startsWith('/api/'), route => route.fulfill({ json: [] }));
   await openStudio(page);
   await page.getByTestId('inspector-tab-btn-transform').click();

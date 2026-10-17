@@ -1,0 +1,7 @@
+{
+  "allowed_origins": ["http://127.0.0.1:5173"],
+  "printers": [
+    {"target_id": "PLANT_ETHERNET", "language": "IPL", "connection": "Ethernet", "host": "192.0.2.44", "port": 9100},
+    {"target_id": "PLANT_USB", "language": "IPL", "connection": "USB", "queue": "REPLACE_WITH_WINDOWS_QUEUE_NAME"}
+  ]
+}

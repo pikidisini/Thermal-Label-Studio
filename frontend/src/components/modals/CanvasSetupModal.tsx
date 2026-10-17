@@ -151,14 +151,16 @@ export function CanvasSetupModal({
                 ].map((item) => {
                   const isActive = Math.abs(dpi - item.value) < 1;
                   return (
-                    <button
+                    <Button
                       key={item.value}
                       type="button"
                       onClick={() => setDpi(item.value)}
-                      className={`flex-1 flex items-center justify-center`}
-                     data-ui-control="button" data-variant="default">
+                      selected={isActive}
+                      aria-pressed={isActive}
+                      className="flex-1 flex items-center justify-center"
+                      variant="toggle">
                       {item.label}
-                    </button>
+                    </Button>
                   );
                 })}
               </div>

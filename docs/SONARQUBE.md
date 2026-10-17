@@ -140,9 +140,10 @@ there manually. Validate it without starting the MCP server:
 ```
 
 The launcher accepts only `http://host.docker.internal:9004` and
-`SONARQUBE_READ_ONLY=true`, passes the ignored env file to the pinned
-`sonarsource/sonarqube-mcp:1.19.0.2785` container, and mounts no workspace,
-application data, or Docker socket. Register this launcher in Codex after validating
+`SONARQUBE_READ_ONLY=true`, starts/reuses the pinned
+`sonarsource/sonarqube-mcp:1.19.0.2785` singleton at loopback-only port 9005,
+and launches a local STDIO bridge. Neither layer mounts a workspace, application
+data, or Docker socket. Register this launcher in Codex after validating
 the credentials; its presence in the repository does not establish a connection.
 Keep the token in `tools/mcp/.env.sonar`, never in Codex configuration or source
 control. See [SonarQube MCP setup](../tools/mcp/SONARQUBE.md) for the portable
