@@ -148,3 +148,16 @@ server-rendered output.
 Invalid nonempty symbol payloads, invalid types, malformed metadata, unsupported
 profiles, unknown layouts, SAP status failures and resource limits still reject.
 These fallbacks do not relax RFC input/envelope validation or printer permission.
+
+
+## Studio Design samples for template-only keys
+
+With synthetic startup data (`demo-defaults`), Design retains the authored text
+sample when an exact template key is absent from the default SAP catalog. This
+also applies to grouped text and compositions. If the saved sample is empty,
+contains unresolved placeholders or old `no data` feedback, Design uses `Sample`.
+The local draft/history retains the sample independently of the displayed value.
+Explicit empty/null edits and imported datasets retain ordinary missing-data
+feedback. No aliases or additional business facts are synthesized. This display
+fallback does not supply data to server Preview, simulation, or Print; those
+continue to use exact selected facts and the shared output fallback contract.

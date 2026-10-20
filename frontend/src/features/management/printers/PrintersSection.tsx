@@ -34,7 +34,7 @@ export function PrintersSection({ management }: { management: ManagementControll
         </div>
         <div className="management-source-rows">
           {printers.map(printer => {
-            const assigned = policy?.sources.filter(source => source.print_target_id === printer.target_id).length ?? 0;
+            const assigned = policy?.sources.filter(source => (source.allowed_print_target_ids ?? []).includes(printer.target_id)).length ?? 0;
             return <Button key={printer.target_id} className="management-source-row" data-testid={`management-printer-${printer.target_id}`} data-source-selected={selected === printer.target_id} aria-pressed={selected === printer.target_id} aria-label={`${t('Details')} · ${printer.target_id}`} disabled={saving} onClick={() => open({ kind: 'printer', existing: true, value: { ...printer } })}>
               <span className="management-source-line"><span className="management-printer-identity"><Icon component={Printer} /><strong>{printer.target_id}</strong></span><Badge>{t(printer.enabled ? 'Enabled' : 'Disabled')}</Badge></span>
               <span className="management-printer-address font-mono">{printer.host.includes(':') ? `[${printer.host}]` : printer.host}:{printer.port}</span>

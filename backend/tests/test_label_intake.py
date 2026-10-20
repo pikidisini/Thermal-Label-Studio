@@ -14,7 +14,7 @@ from PIL import Image
 from app.main import app
 from app.label_intake import http, service
 from app.label_intake.results import IntakeRequest
-from app.label_intake.policy import Admission, Policy, Source
+from app.label_intake.policy import Admission, Policy, Source, Target
 from app.layouts.models import StoredLayout
 from app.layouts.service import LayoutArtifactError, LayoutNotFoundError, LayoutPersistenceError
 from app.engine.bitmap import RenderedLabel
@@ -52,7 +52,7 @@ class Layouts:
 
 
 def envelope(codes=('A', 'B'), copies=1):
-    return dict(sender={'system': 'EXTERNAL_DEMO'}, request_id='REQ-001', mode='simulation',
+    return dict(sender={'system': 'EXTERNAL_DEMO'}, request_id='REQ-001', mode='simulation', target_id='PRINTER_DEMO',
         items=[dict(item_id=f'I{i}', label_code=code, copies=copies, data={}) for i, code in enumerate(codes)])
 
 
@@ -63,8 +63,8 @@ def process(body=None, layouts=None):
 @pytest.fixture
 def admitted(monkeypatch):
     source = Source(identity='EXTERNAL_DEMO', credential_env='TLS_INTAKE_TOKEN_DEMO',
-                    enabled=True, modes=('simulation',), label_codes=('A', 'B', 'UNKNOWN'))
-    policy = Policy(revision='test', sources=(source,), targets=(), audit=())
+                    enabled=True, modes=('simulation',), allowed_print_target_ids=('PRINTER_DEMO',), label_codes=('A', 'B', 'UNKNOWN'))
+    policy = Policy(revision='test', sources=(source,), targets=(Target(target_id='PRINTER_DEMO',host='127.0.0.1',port=19100,enabled=True),), audit=())
     app.dependency_overrides[http.authorized_sender] = lambda: Admission(policy, source, b'x' * 32)
     layouts = Layouts()
     app.dependency_overrides[http.stored_layouts] = lambda: layouts
@@ -157,7 +157,7 @@ def test_schema_distinct_and_canonical_envelope_rejection(admitted, prepared):
     schema = app.openapi()
     reference = schema['paths']['/api/v1/label-intake']['post']['requestBody']['content']['application/json']['schema']['$ref']
     assert reference.endswith('/IntakeRequest')
-    assert set(schema['components']['schemas']['IntakeRequest']['required']) == {'sender','request_id','mode','items'}
+    assert set(schema['components']['schemas']['IntakeRequest']['required']) == {'sender','request_id','mode','items','target_id'}
     body = envelope(); body['items'][0]['facts'] = {}
     assert TestClient(app).post('/api/v1/label-intake', json=body).status_code == 422
     body = envelope(); body['mode'] = 'invalid'

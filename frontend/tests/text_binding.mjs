@@ -96,3 +96,27 @@ test('dynamic text background geometry rejects until its profile is proven',{ski
   assert.equal(exportFabricToSvg(c,80,60),'');
   c.dispose();
 });
+
+
+test('Design import retains template samples for missing fields, including grouped compositions', async () => {
+  const source = new fabric.StaticCanvas(null, {width:320,height:240});
+  const sample = new fabric.FabricText('1200 mm', {fontFamily, fontSize:14, payloadTemplate:'{{width_mm}} mm'});
+  source.add(new fabric.Group([sample], {isEditorGroup:true}));
+  const svg = exportFabricToSvg(source,80,60);
+  const target = new fabric.StaticCanvas(null,{width:320,height:240});
+  await new Promise((resolve,reject)=>importSvgIntoFabricCanvas(target,svg,320,240,resolve,()=>true,()=>{},()=>undefined,reject));
+  const restored = target.getObjects()[0].getObjects()[0];
+  assert.equal(restored.text,'1200 mm');
+  assert.equal(restored.designPreviewText,'1200 mm');
+  assert.equal(restored.payloadTemplate,'{{width_mm}} mm');
+  source.dispose(); target.dispose();
+});
+
+test('Design sample fallback is limited to absent startup keys', async () => {
+  const {designPreviewSample,shouldUseDesignPreviewSample} = await import('../src/features/data-tokens/model/designPreview.ts');
+  assert.equal(designPreviewSample('roll_no — no data'),'Sample');
+  assert.equal(designPreviewSample('00001234'),'00001234');
+  assert.equal(shouldUseDesignPreviewSample('demo-defaults',['width_mm'],{ZZWIDTH:'1200'}),true);
+  for (const key of ['local:1','stored:1']) assert.equal(shouldUseDesignPreviewSample(key,['width_mm'],{}),false);
+  for (const value of [null,'',0,false]) assert.equal(shouldUseDesignPreviewSample('demo-defaults',['width_mm'],{width_mm:value}),false);
+});

@@ -11,6 +11,7 @@ export const CANVAS_SERIALIZE_PROPS = [
   'dataPlaceholder',
   'data-placeholder',
   'previewOverride',
+  'designPreviewText',
   'validationError',
   'isDynamic',
   'isBarcode',
@@ -55,6 +56,7 @@ export interface CustomFabricProps {
   symbolSpec?: import('../features/canvas/svg/bindingMetadata').SymbolSpec;
   bindingMetadataError?: string;
   previewOverride?: boolean;
+  designPreviewText?: string;
   validationError?: string;
   isEditorGroup?: boolean;
 }

@@ -53,7 +53,7 @@ def test_print_validation_rolls_back_source_and_key(runtime, encryption_config):
     assert create(client, store, modes=['print'], print_target_id='MISSING').status_code == 422
     assert store.read().policy.revision == 'P1' and len(store.read().policy.sources) == 1
     assert database.events == []
-    assert create(client, store, modes=['print'], print_target_id='P_DEMO').status_code == 200
+    assert create(client, store, modes=['print'], allowed_print_target_ids=['P_DEMO']).status_code == 200
 
 
 @pytest.mark.parametrize('configured', ['', 'bad', base64.urlsafe_b64encode(b'x' * 16).decode('ascii')])

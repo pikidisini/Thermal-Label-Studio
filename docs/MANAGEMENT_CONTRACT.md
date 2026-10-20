@@ -159,11 +159,29 @@ are pinned and rechecked before each durable claim. Manual Studio Print remains 
 separate workflow.
 
 Name and label code are editable identity fields. Template updates lock the active
-version and reject stale names/checksums/versions/revisions or any reused code. Renaming a
-code moves every version's database reference while keeping immutable object keys
-and SVG bytes. Configured source permissions update in the same transaction.
-External callers must use the new code. The old identity is reserved as a deleted
-record, so old callers cannot accidentally resolve another design later.
+version and reject stale names/checksums/versions/revisions or a code belonging to
+another active template or a deleted template with retained versions. Renaming a
+code copies every version to `layouts/{new_code}/v{version}/layout.svg`, verifies
+its SHA-256 and updates its database reference without changing SVG bytes or
+version numbers. Configured source permissions update in the same transaction.
+External callers must use the new code. After a successful rename, the old code
+is available for another template, including a rename back to the original code.
+An external request using a reassigned code resolves its current template.
+Empty reservations left by earlier renames are released transactionally when that
+code is selected for rename or Save; no bulk cleanup or schema migration is needed.
+The code lock, revision check, source-reference update and audit remain atomic.
+Version records, SVG bytes/checksums and historical audit events are preserved.
+The audit records each source/destination object key. A metadata update with the
+same code also normalizes paths left by earlier renames. Destination objects are
+never overwritten; only identical unreferenced copies from an interrupted action
+can be reused. Conflicting bytes or another version's reference reject the update.
+After an acknowledged database/audit commit, cleanup locks both prefixes,
+rechecks references and both checksums, then removes unused source objects.
+Readers hold the code lock until their SVG download completes. Copy/commit failures
+or ambiguous acknowledgements retain original objects; no automatic retry or
+rollback deletion occurs. Cleanup failure leaves extra copies and emits a bounded
+server warning while the committed new references remain valid. Object-key
+allocation on a subsequent Save still skips any retained objects.
 
 Deletion removes the template and its versions from application listing/resolution
 through a tombstone; it does not destroy version files. The UI asks the user to type

@@ -850,3 +850,19 @@ test('default catalog fields can be linked and composed before a dataset is load
   // Composition uses the same exact SAP field catalog.
   await expect(page.getByLabel('Composition field', {exact:true}).locator('option[value="ZZLENGTH"]')).toHaveCount(1);
 });
+
+
+test('Design opens template-only fields with authored samples and respects imported data', async ({ page }) => {
+  await openStudio(page);
+  const spec = Buffer.from(JSON.stringify({version:1,font_size:14,line_height:1.16,text_align:'left'})).toString('base64');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" data-binding-version="1" width="80mm" height="60mm" viewBox="0 0 320 240"><text x="20" y="40" data-field="width_mm" data-text-spec="${spec}" font-size="14">1200</text></svg>`;
+  await page.locator('input[accept=".svg,image/svg+xml"]').setInputFiles({name:'design-default.svg',mimeType:'image/svg+xml',buffer:Buffer.from(svg)});
+  await page.getByTestId('inspector-tab-btn-layers').click();
+  await page.getByTestId('layer-select-0').click();
+  await page.getByTestId('inspector-tab-btn-properties').click();
+  await expect(page.getByTestId('inspector-input-token-value')).toHaveValue('1200');
+  await page.getByTestId('dock-btn-sap').click();
+  const payload = {sender:{system:'SAP_TEST'},request_id:'DESIGN_SAMPLE_TEST',mode:'simulation',items:[{item_id:'I1',label_code:'A013',copies:1,data:{ZZWIDTH:'800'}}]};
+  await page.getByTestId('input-local-sap-json').setInputFiles({name:'actual.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(payload))});
+  await expect(page.getByTestId('inspector-input-token-value')).toHaveValue('width_mm — no data');
+});

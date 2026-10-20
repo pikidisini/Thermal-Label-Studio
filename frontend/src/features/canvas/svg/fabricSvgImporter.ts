@@ -1,3 +1,4 @@
+import { designPreviewSample } from '../../data-tokens/model/designPreview';
 import { decodeSpec, validateMetadataDocument } from './bindingMetadata';
 import * as fabric from 'fabric';
 
@@ -238,16 +239,19 @@ export function importSvgIntoFabricCanvas(
         canvas.clear();
         canvas.backgroundColor = '#ffffff'; canvas.requestRenderAll();
 
-        items.forEach((obj) => {
-          if (!obj) return;
+        const refreshText = (obj: fabric.FabricObject) => {
+          (obj as fabric.Group).getObjects?.().forEach(refreshText);
           if (obj.type === 'text' || obj.type === 'i-text') {
             const textObj = obj as fabric.FabricText;
+            textObj.designPreviewText = designPreviewSample(textObj.text);
             const field = (obj as any).dataPlaceholder || (obj as any).dataField;
             const resolved = field ? resolveFieldValue(field) : undefined;
-            if (field && resolved !== undefined) textObj.set('text', resolved);
+            if (field) textObj.set('text', resolved ?? textObj.designPreviewText);
             if (typeof (obj as any).payloadTemplate === 'string') {
-              textObj.set('text', (obj as any).payloadTemplate.replace(/\{\{\s*([A-Za-z0-9_-]+)\s*\}\}/g,
-                (_match: string, key: string) => resolveFieldValue(key) ?? 'No data'));
+              let missing = false;
+              const text = (obj as any).payloadTemplate.replace(/\{\{\s*([A-Za-z0-9_-]+)\s*\}\}/g,
+                (_match: string, key: string) => { const value = resolveFieldValue(key); if (value === undefined) missing = true; return value ?? ''; });
+              textObj.set('text', missing ? textObj.designPreviewText : text);
             }
             if (textObj.stroke && (!textObj.fill || textObj.fill === 'none' || textObj.fill === 'transparent')) {
               textObj.set({
@@ -257,6 +261,10 @@ export function importSvgIntoFabricCanvas(
               });
             }
           }
+        };
+        items.forEach((obj) => {
+          if (!obj) return;
+          refreshText(obj);
           obj.scaleX = (obj.scaleX || 1) * fitScale;
           obj.scaleY = (obj.scaleY || 1) * fitScale;
           obj.left = (obj.left || 0) * fitScale;

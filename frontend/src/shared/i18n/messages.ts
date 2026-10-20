@@ -1,5 +1,8 @@
 // English source messages are stable dictionary keys. Unknown messages fall back to English.
 export const indonesian = {
+  'Permitted printers': 'Printer yang diizinkan',
+  'The sender must specify a permitted target for simulation and print. No default printer is used.': 'Pengirim wajib menentukan target yang diizinkan untuk simulasi dan cetak. Tidak ada printer default.',
+  'Workstation mapping belongs to the sender. Printer addresses remain server-owned.': 'Mapping stasiun dikelola pengirim. Alamat printer tetap dikelola server.',
   'Additional permitted printers': 'Printer tambahan yang diizinkan',
   'Permit printer': 'Izinkan printer',
   'Requests may select the default destination or an explicitly permitted printer. Addresses remain server-owned.': 'Transaksi dapat memilih tujuan default atau printer yang diizinkan secara eksplisit. Alamat tetap dikelola server.',
@@ -745,7 +748,7 @@ export const indonesian = {
   'Version history': 'Riwayat versi',
   'Version history is unavailable.': 'Riwayat versi tidak tersedia.',
   'Manage stored templates and application configuration.': 'Kelola template tersimpan dan konfigurasi aplikasi.',
-  'Configured source references will use the new code. External senders must also use the new code; the previous code will stop resolving.': 'Referensi sumber terkonfigurasi akan memakai kode baru. Pengirim eksternal juga perlu memakai kode baru; kode sebelumnya tidak dapat digunakan lagi.',
+  'Configured source references will use the new code. Update external senders too. The previous code becomes available for another template.': 'Referensi sumber terkonfigurasi akan memakai kode baru. Perbarui juga pengirim eksternal. Kode sebelumnya tersedia kembali untuk template lain.',
   'Open in Studio': 'Buka di Studio',
   "API Sources": "Sumber API",
   "SAP Connections": "Koneksi SAP",

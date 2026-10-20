@@ -57,7 +57,7 @@ export function TemplateDetailsDialog({ management }: { management: ManagementCo
         <Field label={t('Label code')}><Input aria-label={t('Label code')} required maxLength={128} pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,127}" value={labelCode} disabled={!writable} onChange={event => setLabelCode(event.target.value)} /></Field>
       </div>
       <p className="management-muted management-printer-note"><Icon component={Info} /><span>{t('Identity changes apply to the stored template. Label content is edited in Studio.')}</span></p>
-      {labelCode !== active.label_code && <p className="management-notice">{t('Configured source references will use the new code. External senders must also use the new code; the previous code will stop resolving.')}</p>}
+      {labelCode !== active.label_code && <p className="management-notice">{t('Configured source references will use the new code. Update external senders too. The previous code becomes available for another template.')}</p>}
       <details className="management-template-artifact-details"><summary>{t('Artifact details')}</summary><div className="management-template-artifact-grid"><span>{t('Selected version')}</span><span>v{selected.version}</span><span>{t('Stored versions')}</span><span>{versions.length || '—'}</span><span>{t('SVG checksum')}</span><code className="management-checksum">{selected.svg_sha256}</code></div></details>
     {confirmDelete && <div className="management-notice" role="group" aria-label={t('Delete template confirmation')}>
       <p>{t('Delete this template and all its versions from the application?')} <strong>{active.title}</strong> · <code>{active.label_code}</code> · {versions.length || '—'} {t('versions')}</p>

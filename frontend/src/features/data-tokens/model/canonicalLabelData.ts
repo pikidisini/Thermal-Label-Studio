@@ -35,7 +35,6 @@ export function validateCanonicalLabelData(value: unknown): JsonObject {
   identity(value.sender.system); identity(value.request_id);
   if (value.mode !== 'simulation' && value.mode !== 'print') throw new Error('mode must be either simulation or print.');
   if (Object.prototype.hasOwnProperty.call(value, 'target_id')) {
-    if (value.mode !== 'print') fail();
     identity(value.target_id);
   }
   if (value.field_descriptions !== undefined) fields(value.field_descriptions, true);

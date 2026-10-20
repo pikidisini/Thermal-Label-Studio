@@ -215,7 +215,7 @@ def simulate_request(request: IntakeRequest, layouts, trace_id: str, *, on_pinne
         finally:
             prepared = bitmap = png = output_request = None
     counts = {status: sum(item.status == status for item in results) for status in ('SIMULATED', 'FAILED', 'SKIPPED')}
-    return IntakeResponse(request_id=request.request_id, trace_id=trace_id, original_trace_id=trace_id,
+    return IntakeResponse(request_id=request.request_id, trace_id=trace_id, original_trace_id=trace_id, target_id=request.target_id,
         status='COMPLETED' if counts['SIMULATED'] == len(results) else 'PARTIAL' if counts['SIMULATED'] else 'FAILED',
         summary=Summary(total=len(results), simulated=counts['SIMULATED'], failed=counts['FAILED'], skipped=counts['SKIPPED']),
         results=results)

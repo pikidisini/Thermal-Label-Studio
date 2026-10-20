@@ -23,7 +23,7 @@ TOKEN = 'synthetic_management_token_000000000001'
 
 def seed():
     return Document(policy=Policy(revision='P1', sources=(Source(identity='SAP_DEMO',
-        credential_env='TLS_INTAKE_TOKEN_DEMO', enabled=True, modes=('simulation', 'print'), label_codes=('A',), print_target_id='P_DEMO', print_max_copies=10),),
+        credential_env='TLS_INTAKE_TOKEN_DEMO', enabled=True, modes=('simulation', 'print'), label_codes=('A',), print_target_id=None, allowed_print_target_ids=('P_DEMO',), print_max_copies=10),),
         targets=(Target(target_id='P_DEMO', host='192.0.2.44', port=9100, enabled=True),), audit=()))
 
 
@@ -69,6 +69,10 @@ class Database:
                             self.rows = [(item['version'], item['checksum'], item['title'])] if item and not item['deleted'] else []
                         elif query.startswith('SELECT label_code'):
                             self.rows = [(params[0],)] if params[0] in connection.layouts else []
+                        elif query.startswith('DELETE FROM label_studio.layouts'):
+                            item = connection.layouts.get(params[0])
+                            if item and item['deleted'] and params[0] not in connection.version_codes:
+                                del connection.layouts[params[0]]
                         elif query.startswith('INSERT INTO label_studio.layouts'):
                             connection.layouts[params[0]] = dict(connection.layouts[params[2]], title=params[1])
                         elif query.startswith('UPDATE label_studio.layout_versions'):
@@ -103,6 +107,8 @@ def runtime(monkeypatch):
     monkeypatch.setattr(app.state, 'management_store', store, raising=False)
     layouts = LayoutService.__new__(LayoutService)
     layouts.settings = SimpleNamespace(database_url='synthetic-only')
+    # Object transfer is covered separately with verified in-memory SVG objects.
+    layouts._relocate_template_objects = lambda *args: []
     layouts.get_layout = lambda _: SimpleNamespace(version=1, svg_sha256='a' * 64)
     monkeypatch.setattr(app.state, 'layout_service', layouts, raising=False)
     return TestClient(app, client=('127.0.0.1', 12345)), database, store
@@ -138,10 +144,10 @@ def test_historical_review_evidence_is_preserved_but_routing_controls_print(runt
     request = SimpleNamespace(app=app)
     policy = configured_policy(request)
     admission = authenticate(policy, 'Bearer ' + TOKEN, {'TLS_INTAKE_TOKEN_DEMO': TOKEN})
-    assert preflight_print(admission, 'A', TemplateEvidence(version=1, svg_sha256='a' * 64), 10).target_id == 'P_DEMO'
+    assert preflight_print(admission, 'A', TemplateEvidence(version=1, svg_sha256='a' * 64), 10, 'P_DEMO').target_id == 'P_DEMO'
     revoked = decision(client, approved.json(), 'revoke')
     assert revoked.status_code == 200
-    assert preflight_print(authenticate(store.read().policy, 'Bearer ' + TOKEN, {'TLS_INTAKE_TOKEN_DEMO': TOKEN}), 'A', TemplateEvidence(version=1, svg_sha256='a' * 64), 1).target_id == 'P_DEMO'
+    assert preflight_print(authenticate(store.read().policy, 'Bearer ' + TOKEN, {'TLS_INTAKE_TOKEN_DEMO': TOKEN}), 'A', TemplateEvidence(version=1, svg_sha256='a' * 64), 1, 'P_DEMO').target_id == 'P_DEMO'
     audit = client.get('/api/v1/management/audit').json()
     assert len(audit) == 3 and audit[0]['action'] == 'review.revoke'
     assert all(event['actor'] == 'DEVELOPMENT_UNAUTHENTICATED' for event in audit)
@@ -233,21 +239,22 @@ def test_unprovisioned_credential_and_secret_in_body_rejected(runtime):
     assert response.status_code == 422 and TOKEN not in response.text and database.events == []
 
 
-@pytest.mark.parametrize('route', [None, 'UNKNOWN'])
+@pytest.mark.parametrize('route', ['P_DEMO', 'UNKNOWN'])
 def test_print_source_requires_existing_destination_and_can_correct_validation(runtime, route):
     client, database, store = runtime
     source = seed().policy.sources[0].model_dump(mode='json') | {'print_target_id': route}
     response = client.put('/api/v1/management/sources', json=dict(revision='P1', note='Route source', source=source))
     assert response.status_code == 422 and database.events == []
     assert store.read().policy.revision == 'P1'
-    source['print_target_id'] = 'P_DEMO'
+    source['print_target_id'] = None
+    source['allowed_print_target_ids'] = ['P_DEMO']
     source['print_max_copies'] = 3
     source['simulation_all_label_codes'] = True
     source['label_codes'] = []
     response = client.put('/api/v1/management/sources', json=dict(revision='P1', note='Correct route', source=source))
     assert response.status_code == 200
     saved = store.read().policy.sources[0]
-    assert saved.print_target_id == 'P_DEMO' and saved.print_max_copies == 3
+    assert saved.print_target_id is None and saved.allowed_print_target_ids == ('P_DEMO',) and saved.print_max_copies == 3
     assert saved.simulation_all_label_codes is True and saved.label_codes == ()
     assert len(database.events) == 1
 
@@ -308,12 +315,38 @@ def test_template_rename_updates_all_versions_references_and_atomic_audit(runtim
     client, database, _ = runtime
     response = client.post('/api/v1/management/templates/A', json=template_command())
     assert response.status_code == 200, response.text
-    assert database.layouts['A']['deleted'] and database.layouts['ROLL_PRODUCTION']['title'] == 'Readable production roll'
+    assert 'A' not in database.layouts and database.layouts['ROLL_PRODUCTION']['title'] == 'Readable production roll'
     assert database.version_codes == ['ROLL_PRODUCTION']
     assert response.json()['policy']['sources'][0]['label_codes'] == ['ROLL_PRODUCTION']
     assert database.events[0]['before']['label_code'] == 'A'
     assert database.events[0]['after']['label_code'] == 'ROLL_PRODUCTION'
     assert client.post('/api/v1/management/reviews', json={}).status_code == 404
+
+
+@pytest.mark.parametrize('failure', ['audit', 'commit', 'committed_ack_lost'])
+def test_uncertain_or_failed_identity_commit_never_cleans_source_objects(runtime, failure):
+    client, database, _ = runtime
+    layouts = app.state.layout_service
+    layouts._relocate_template_objects = lambda *args: [dict(source='old', target='new')]
+    cleaned = []
+    layouts.cleanup_relocated_objects = lambda moves: cleaned.extend(moves)
+    database.fail = failure
+    assert client.post('/api/v1/management/templates/A', json=template_command()).status_code == 503
+    assert cleaned == []
+
+
+def test_cleanup_failure_does_not_report_committed_rename_as_failed(runtime):
+    client, database, _ = runtime
+    layouts = app.state.layout_service
+    layouts._relocate_template_objects = lambda *args: [dict(source='old', target='new')]
+
+    def fail_cleanup(moves):
+        assert database.layouts.get('ROLL_PRODUCTION')
+        raise RuntimeError('synthetic deletion failure')
+
+    layouts.cleanup_relocated_objects = fail_cleanup
+    assert client.post('/api/v1/management/templates/A', json=template_command()).status_code == 200
+    assert database.events[0]['after']['object_moves'] == [dict(source='old', target='new')]
 
 
 @pytest.mark.parametrize('changes', [dict(version=2), dict(svg_sha256='b' * 64), dict(new_code='TAKEN'), dict(previous_title='Stale name')])

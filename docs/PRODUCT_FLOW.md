@@ -581,3 +581,13 @@ transaction before sending. Mapping context remains sender-side; the envelope
 contains `target_id`, never a supplied printer network address. Existing requests
 without this selection continue using the source default. Simulation cannot
 include a print target. Retry retains both payload and request ID.
+
+
+## 2026-10-18 - Sender-owned workstation routing
+
+SAP/ABAP and SAP Simulator resolve workstation/station mapping before fetching
+label facts and submitting intake. Both simulation and print explicitly carry
+`target_id`. Application Management owns target addresses and one permitted-target
+list per source. Intake validates mode, target registration/enabled state and
+source permission without default fallback. Simulation reports its validated
+target while remaining free of printer transport effects. See API_CONTRACT.md.

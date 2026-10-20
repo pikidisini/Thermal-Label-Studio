@@ -93,8 +93,6 @@ def validate_payload(payload):
     if type(payload["mode"]) is not str or payload["mode"] not in ("simulation","print"):
         raise LabelDataError("invalid_mode")
     if 'target_id' in payload:
-        if payload['mode'] != 'print':
-            raise LabelDataError()
         identity(payload['target_id'])
     if "field_descriptions" in payload:
         fields(payload["field_descriptions"],True)

@@ -43,7 +43,7 @@ MESSAGES = {
     'access_key_duplicate': 'This access key is already assigned to another source.',
     'legacy_key_unavailable': 'The previous server key is unavailable. Create a new access key.',
     'source_not_found': 'Source no longer exists. Refresh the list.',
-    'invalid_print_route': 'Choose a configured printer; an enabled print source requires an enabled printer.',
+    'invalid_print_route': 'Use explicit permitted printer IDs; a default printer is not supported.',
     'management_unavailable': 'Management storage is unavailable. Provision the management schema before enabling changes.',
     'management_conflict': 'Configuration changed. Refresh before submitting again.',
     'management_local_only': 'Application Management is available on loopback during development.',

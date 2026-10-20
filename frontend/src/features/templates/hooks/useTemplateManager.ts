@@ -9,6 +9,7 @@ import { useHistoryStore } from '../../../store/useHistoryStore';
 import { layoutApi } from '../api/layoutApi';
 import { exportFabricToSvg, importSvgIntoFabricCanvas } from '../../canvas';
 import { CANVAS_SERIALIZE_PROPS } from '../../../types/fabric-custom';
+import { shouldUseDesignPreviewSample } from '../../data-tokens/model/designPreview';
 import { resolveSapTokenDisplayValue } from '../../data-tokens';
 
 export function useTemplateManager(
@@ -69,7 +70,9 @@ export function useTemplateManager(
         canvas.clear();
         canvas.backgroundColor = '#ffffff'; canvas.requestRenderAll();
       }, (field) => {
-        return resolveSapTokenDisplayValue(tokenMap[field], field, fieldDescriptions);
+        const state = useContractStore.getState();
+        if (shouldUseDesignPreviewSample(state.activeContractKey, [field], state.tokenMap)) return undefined;
+        return resolveSapTokenDisplayValue(state.tokenMap[field], field, state.fieldDescriptions);
       }, (message) => window.alert(t("SVG could not be imported: {error}", { error: t(message) })));
     }, [canvasRef, pxPerMm, calculateAutoFitZoom, viewMode, tokenMap, fieldDescriptions, updateUsedTokensFromCanvas, clearHistory, pushState, triggerRenderSimulation, triggerFit]
   );

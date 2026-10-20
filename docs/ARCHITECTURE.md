@@ -241,6 +241,13 @@ schema `label_studio` stores active versions and history. MinIO stores immutable
 SVG under server-owned `layouts/{label_code}/v{version}/layout.svg` keys. The server
 owns version, checksum and object key; no caller storage path is accepted.
 
+Template code changes relocate every version to that code's prefix, preserving
+SVG bytes and version numbers. Verified copies precede the atomic metadata/audit
+commit. Only acknowledged commits permit cleanup of checksum-verified unused
+source objects under code locks. Uncertain operations preserve originals and
+copies for investigation. Reads hold the code lock through the object download.
+Metadata updates also normalize legacy paths without a schema migration.
+
 A save acquires a per-label PostgreSQL advisory transaction lock before allocating
 its version. Existing immutable object keys are skipped, with at most 32 probes.
 Successful saves publish metadata and make the matching version active. Version
@@ -555,3 +562,13 @@ ID into each transaction. It does not administer the receiving printer registry.
 Absent target IDs retain existing canonical digests. Selected IDs enter the
 request digest and preflight/claim pin. No label storage migration is required:
 additional permissions use the existing Management policy document.
+
+
+## 2026-10-18 - Sender-owned workstation routing
+
+SAP/ABAP and SAP Simulator resolve workstation/station mapping before fetching
+label facts and submitting intake. Both simulation and print explicitly carry
+`target_id`. Application Management owns target addresses and one permitted-target
+list per source. Intake validates mode, target registration/enabled state and
+source permission without default fallback. Simulation reports its validated
+target while remaining free of printer transport effects. See API_CONTRACT.md.

@@ -24,6 +24,9 @@ class SQL:
     def __exit__(self, *a): pass
     def cursor(self): return self
     def execute(self, sql, parameters):
+        if 'pg_advisory_xact_lock' in sql:
+            assert parameters == ('A',)
+            return
         assert 'deleted_at IS NULL' in sql and parameters == ('A',)
     def fetchone(self): return self.row
 
@@ -56,12 +59,15 @@ def test_historical_reader_selects_requested_version_and_checks_exact_artifact()
     calls = []
     def execute(sql, params):
         calls.append((sql, params))
+        if 'pg_advisory_xact_lock' in sql:
+            assert params == ('A',)
+            return
         assert 'v.version = %s' in sql and 'deleted_at IS NULL' in sql
         assert params == (4, 'A')
     service._database.execute = execute
     result = service.get_layout('A', 4)
     assert result.version == 4 and result.svg.encode() == SVG
-    assert len(calls) == 1 and stream.closed
+    assert len(calls) == 2 and 'pg_advisory_xact_lock' in calls[0][0] and stream.closed
 
 
 def test_version_history_returns_original_titles_in_descending_order():

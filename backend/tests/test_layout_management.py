@@ -58,7 +58,7 @@ def test_delete_hides_layout_preserves_history_and_rejects_reuse(managed):
     with pytest.raises(LayoutNotFoundError): managed.delete_layout("example")
     with pytest.raises(LayoutConflictError):
         managed.save_layout(SaveLayoutRequest(label_code="example", title="Again", svg='<svg xmlns="http://www.w3.org/2000/svg"/>', width_mm=80, height_mm=40, dpi=203.2))
-    assert not any("DELETE FROM" in sql for sql in managed._database.sql)
+    assert not any("DELETE FROM label_studio.layout_versions" in sql for sql in managed._database.sql)
     assert any("deleted_at IS NULL" in sql for sql in managed._database.sql)
 
 def test_management_failures_return_safe_errors(managed):

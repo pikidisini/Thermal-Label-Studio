@@ -23,7 +23,7 @@ EVIDENCE = TemplateEvidence(version=1, svg_sha256='a' * 64)
 
 def source(**changes):
     return Source(**dict(identity='EXTERNAL_DEMO', credential_env=ENV, enabled=True,
-                         modes=('simulation', 'print'), label_codes=('A', 'B'), print_target_id='PRINTER_DEMO', print_max_copies=999) | changes)
+                         modes=('simulation', 'print'), label_codes=('A', 'B'), print_target_id=None, allowed_print_target_ids=('PRINTER_DEMO',), print_max_copies=999) | changes)
 
 
 def event(**changes):
@@ -114,7 +114,7 @@ def test_all_templates_allowed_for_both_modes_independent_of_legacy_scope(legacy
     for mode in ('simulation', 'print'):
         body['mode'] = mode
         authorize(admission, IntakeRequest.model_validate(body))
-    assert preflight_print(admission, 'NEW_TEMPLATE', EVIDENCE, 1).label_code == 'NEW_TEMPLATE'
+    assert preflight_print(admission, 'NEW_TEMPLATE', EVIDENCE, 1, 'PRINTER_DEMO').label_code == 'NEW_TEMPLATE'
     body['sender']['system'] = 'OTHER'
     denial('sender_not_allowed', lambda: authorize(admission, IntakeRequest.model_validate(body)))
     print_only = auth(policy(sources=(source(modes=('print',)),)))
@@ -201,9 +201,9 @@ def test_preflight_target_deterministic_and_no_effects(monkeypatch, host, copies
     monkeypatch.setattr(socket,'create_connection',lambda *a:pytest.fail('socket'))
     monkeypatch.setattr(service,'prepare_draft_output',lambda *a:pytest.fail('render'))
     p=policy(targets=(Target(target_id='PRINTER_DEMO',host=host,port=9100,enabled=True),))
-    pin=preflight_print(auth(p),'A',EVIDENCE,copies)
+    pin=preflight_print(auth(p),'A',EVIDENCE,copies, 'PRINTER_DEMO')
     assert pin.target.host==host and pin.target_id=='PRINTER_DEMO' and pin.policy_revision=='P1'
-    assert pin==preflight_print(auth(p),'A',EVIDENCE,copies)
+    assert pin==preflight_print(auth(p),'A',EVIDENCE,copies, 'PRINTER_DEMO')
     assert revalidate_claim(pin,auth(p),p,{ENV:TOKEN})==pin
 
 
@@ -213,14 +213,14 @@ def test_preflight_target_deterministic_and_no_effects(monkeypatch, host, copies
     (policy(sources=(source(print_max_copies=10),)),EVIDENCE,11,'copies_not_allowed'),
     (policy(),EVIDENCE,True,'copies_not_allowed'),
     (policy(),EVIDENCE,1000,'copies_not_allowed'),
-    (policy(sources=(source(print_target_id=None),)),EVIDENCE,1,'target_not_allowed'),
+    (policy(sources=(source(allowed_print_target_ids=()),)),EVIDENCE,1,'target_not_allowed'),
     (policy(targets=()),EVIDENCE,1,'target_not_allowed'),
     (policy(targets=(Target(target_id='PRINTER_DEMO',host='192.0.2.44',port=9100,enabled=False),)),EVIDENCE,1,'target_not_allowed')])
 def test_unconfigured_or_unavailable_preflight_zero_operations(monkeypatch,p,template,copies,code):
     before=p.model_dump_json()
     monkeypatch.setattr(service,'prepare_draft_output',lambda *a:pytest.fail('render'))
     monkeypatch.setattr(socket,'create_connection',lambda *a:pytest.fail('socket'))
-    denial(code,lambda:preflight_print(auth(p),'A',template,copies))
+    denial(code,lambda:preflight_print(auth(p),'A',template,copies, 'PRINTER_DEMO'))
     assert p.model_dump_json()==before
 
 
@@ -238,7 +238,7 @@ def test_payload_network_values_are_label_data_only():
     body=envelope(('A',));body['mode']='print'
     body['items'][0]['data']={'host':'203.0.113.99','port':1234,'target_id':'UNTRUSTED'}
     request=IntakeRequest.model_validate(body);admission=auth();authorize(admission,request)
-    pin=preflight_print(admission,'A',EVIDENCE,1)
+    pin=preflight_print(admission,'A',EVIDENCE,1, 'PRINTER_DEMO')
     assert pin.target.host=='192.0.2.44' and pin.target.port==9100
     body['items'][0]['target']={'host':'203.0.113.99','port':1234}
     with pytest.raises(ValueError): IntakeRequest.model_validate(body)
@@ -246,11 +246,11 @@ def test_payload_network_values_are_label_data_only():
 
 @pytest.mark.parametrize('change', ['revision','address','port','revoke','capability','token'])
 def test_changed_policy_or_credential_stops_claim(change):
-    original=auth();pin=preflight_print(original,'A',EVIDENCE,999);p=policy();values={ENV:TOKEN}
+    original=auth();pin=preflight_print(original,'A',EVIDENCE,999, 'PRINTER_DEMO');p=policy();values={ENV:TOKEN}
     if change=='revision':p=policy(revision='P2')
     elif change in ('address','port'):
         p=policy(targets=(Target(target_id='PRINTER_DEMO',host='2001:db8::9' if change=='address' else '192.0.2.44',port=9999 if change=='port' else 9100,enabled=True),))
-    elif change=='revoke':p=policy(sources=(source(print_target_id=None),))
+    elif change=='revoke':p=policy(sources=(source(allowed_print_target_ids=()),))
     elif change=='capability':p=policy(sources=(source(modes=('simulation',)),))
     else:values={ENV:'rotated_synthetic_unit_test_token_0002'}
     denial('target_not_allowed' if change in ('revision','address','port','revoke') else 'template_not_allowed',
@@ -305,7 +305,7 @@ def test_missing_policy_valid_bearer_denies_before_storage(runtime, monkeypatch)
 def test_policy_pin_passes_to_committed_ledger_without_bypassing_claim():
     from uuid import uuid4
     from app.label_intake.ledger import Receipt
-    original=auth();pin=preflight_print(original,'A',EVIDENCE,999)
+    original=auth();pin=preflight_print(original,'A',EVIDENCE,999, 'PRINTER_DEMO')
     body=envelope(('A',),copies=999);body['mode']='print'
     request=IntakeRequest.model_validate(body)
     ledger=LedgerDatabase().ledger()
@@ -330,16 +330,16 @@ def test_documentation_example_loads_without_credential_and_cannot_print():
     p=load_policy({'TLS_INTAKE_POLICY_JSON':raw})
     assert p.sources[0].modes==('simulation',) and not p.targets[0].enabled
     assert TOKEN not in text and '192.168.' not in text
-    denial('template_not_allowed',lambda:preflight_print(auth(p),'ROLL_DEMO',EVIDENCE,1))
+    denial('template_not_allowed',lambda:preflight_print(auth(p),'ROLL_DEMO',EVIDENCE,1, 'PRINTER_DEMO'))
 
 
 def test_configured_routing_needs_no_approval_for_any_valid_stored_version():
     for evidence in (EVIDENCE, TemplateEvidence(version=7, svg_sha256='b' * 64)):
         configured = policy(audit=())
-        pin = preflight_print(auth(configured), 'A', evidence, 10)
+        pin = preflight_print(auth(configured), 'A', evidence, 10, 'PRINTER_DEMO')
         assert pin.template == evidence and pin.target_id == 'PRINTER_DEMO'
         historical = policy(audit=(event(), event(event_id='E2', action='revoke')))
-        assert preflight_print(auth(historical), 'A', evidence, 10).target_id == pin.target_id
+        assert preflight_print(auth(historical), 'A', evidence, 10, 'PRINTER_DEMO').target_id == pin.target_id
 
 
 @pytest.mark.parametrize('changes', [dict(print_max_copies=True), dict(print_max_copies=0), dict(print_max_copies=1000), dict(print_target_id='bad id')])

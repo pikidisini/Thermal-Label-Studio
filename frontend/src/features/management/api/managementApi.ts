@@ -38,11 +38,11 @@ export const managementApi = {
   printer: (revision: string, target: Printer) => request<ManagementDocument>('/printers', undefined, { revision, target }, 'PUT'),
   source: (revision: string, source: Source) => request<ManagementDocument>('/sources', undefined, { revision, source: {
     identity: source.identity, enabled: source.enabled,
-    modes: source.modes, print_target_id: source.print_target_id ?? null, allowed_print_target_ids: source.allowed_print_target_ids ?? [], print_max_copies: source.print_max_copies ?? 1,
+    modes: source.modes, print_target_id: null, allowed_print_target_ids: source.allowed_print_target_ids ?? [], print_max_copies: source.print_max_copies ?? 1,
   } }, 'PUT'),
   createSource: (revision: string, source: Source) => request<KeyResult>('/sources', undefined, { revision, create_key: true, source: {
     identity: source.identity, enabled: source.enabled, modes: source.modes,
-    print_target_id: source.print_target_id ?? null, allowed_print_target_ids: source.allowed_print_target_ids ?? [], print_max_copies: source.print_max_copies ?? 1,
+    print_target_id: null, allowed_print_target_ids: source.allowed_print_target_ids ?? [], print_max_copies: source.print_max_copies ?? 1,
   } }, 'PUT'),
   key: (revision: string, identity: string, action: KeyAction, signal?: AbortSignal) => request<KeyResult>(`/sources/${encodeURIComponent(identity)}/key`, signal, { revision, action }, 'POST'),
   template: layoutApi.manage,

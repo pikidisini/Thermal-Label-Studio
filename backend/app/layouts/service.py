@@ -138,22 +138,18 @@ class LayoutService:
         try:
             with self._database.connect(self.settings.database_url) as connection:
                 with connection.cursor() as cursor:
+                    # Keep an acknowledged rename's cleanup from removing the
+                    # selected old object between metadata lookup and download.
+                    cursor.execute('SELECT pg_advisory_xact_lock(hashtext(%s))', (label_code,))
                     if version is None:
                         cursor.execute(query, (label_code,))
                     else:
                         cursor.execute(query.replace('v.version = l.active_version', 'v.version = %s'), (version, label_code))
                     row = cursor.fetchone()
-            if row is None:
-                raise LayoutNotFoundError("Layout was not found.")
-            summary = self._summary(row)
-            response = self.client.get_object(self.settings.minio_bucket, summary.object_key)
-            try:
-                svg_bytes = response.read(512 * 1024 + 1)
-            finally:
-                response.close()
-                response.release_conn()
-            if len(svg_bytes) > 512 * 1024 or hashlib.sha256(svg_bytes).hexdigest() != summary.svg_sha256:
-                raise LayoutArtifactError("Stored layout artifact is invalid.")
+                    if row is None:
+                        raise LayoutNotFoundError("Layout was not found.")
+                    summary = self._summary(row)
+                    svg_bytes = self._verified_object_bytes(summary.object_key, summary.svg_sha256)
             try:
                 svg = svg_bytes.decode("utf-8")
                 validate_safe_svg(svg)
@@ -167,8 +163,8 @@ class LayoutService:
         except Exception as exc:
             raise LayoutPersistenceError("Layout persistence is unavailable.") from exc
 
-    def manage_template(self, cursor, label_code, *, version, checksum, previous_title, title=None, new_code=None, delete=False):
-        """Metadata and audit share the caller's PostgreSQL transaction; SVG keys never move."""
+    def manage_template(self, cursor, label_code, *, version, checksum, previous_title, title=None, new_code=None, delete=False, relocations=None):
+        """Copy verified SVGs before committing their new references and audit."""
         for code in sorted({label_code, new_code or label_code}):
             cursor.execute('SELECT pg_advisory_xact_lock(hashtext(%s))', (code,))
         cursor.execute("""SELECT l.active_version, v.svg_sha256, COALESCE(l.title_override, v.title)
@@ -185,17 +181,103 @@ class LayoutService:
             cursor.execute('UPDATE label_studio.layouts SET deleted_at = now(), updated_at = now() WHERE label_code = %s', (label_code,))
             return before, dict(before, deleted=True)
         if new_code != label_code:
+            self._release_renamed_code(cursor, new_code)
             cursor.execute('SELECT label_code FROM label_studio.layouts WHERE label_code = %s', (new_code,))
             if cursor.fetchone() is not None:
                 raise LayoutConflictError('Label code already exists or was previously used.')
+        moves = self._relocate_template_objects(cursor, label_code, new_code)
+        if relocations is not None:
+            relocations.extend(moves)
+        if new_code != label_code:
             cursor.execute("""INSERT INTO label_studio.layouts(label_code, active_version, created_at, updated_at, title_override)
                 SELECT %s, active_version, created_at, now(), %s FROM label_studio.layouts WHERE label_code = %s""", (new_code, title, label_code))
             cursor.execute('UPDATE label_studio.layout_versions SET label_code = %s WHERE label_code = %s', (new_code, label_code))
-            # Reserve the old identity so stale external requests cannot resolve a different label.
+            # All versions now belong to the new identity; release the old code.
             cursor.execute('UPDATE label_studio.layouts SET deleted_at = now(), updated_at = now() WHERE label_code = %s', (label_code,))
+            self._release_renamed_code(cursor, label_code)
         else:
             cursor.execute('UPDATE label_studio.layouts SET title_override = %s, updated_at = now() WHERE label_code = %s', (title, label_code))
-        return before, dict(before, label_code=new_code, title=title)
+        after = dict(before, label_code=new_code, title=title)
+        if moves:
+            after['object_moves'] = moves
+        return before, after
+
+    def _verified_object_bytes(self, object_key, checksum):
+        response = self.client.get_object(self.settings.minio_bucket, object_key)
+        try:
+            payload = response.read(512 * 1024 + 1)
+        finally:
+            response.close()
+            response.release_conn()
+        if len(payload) > 512 * 1024 or hashlib.sha256(payload).hexdigest() != checksum:
+            raise LayoutArtifactError('Stored layout artifact is invalid.')
+        return payload
+
+    def _relocate_template_objects(self, cursor, label_code, new_code):
+        """Never overwrite an existing object or remove a source before commit.
+
+        Identical unreferenced destinations from an interrupted copy may be reused.
+        Different bytes or another version's reference are always a conflict.
+        """
+        cursor.execute('SELECT version, object_key, svg_sha256 FROM label_studio.layout_versions WHERE label_code = %s ORDER BY version', (label_code,))
+        moves = []
+        for version, source, checksum in cursor.fetchall():
+            target = f'layouts/{new_code}/v{version}/layout.svg'
+            if source == target:
+                continue
+            cursor.execute('SELECT label_code FROM label_studio.layout_versions WHERE object_key = %s', (target,))
+            if cursor.fetchone() is not None:
+                raise LayoutConflictError('Destination object belongs to another template version.')
+            payload = self._verified_object_bytes(source, checksum)
+            try:
+                self._put_immutable(target, payload)
+            except LayoutConflictError:
+                # A previous interrupted operation may have left this exact copy.
+                if self._verified_object_bytes(target, checksum) != payload:
+                    raise LayoutConflictError('Destination object content differs.') from None
+            self._verified_object_bytes(target, checksum)
+            moves.append(dict(version=version, source=source, target=target, svg_sha256=checksum))
+        for move in moves:
+            cursor.execute('UPDATE label_studio.layout_versions SET object_key = %s WHERE label_code = %s AND version = %s',
+                           (move['target'], label_code, move['version']))
+        return moves
+
+    def cleanup_relocated_objects(self, moves):
+        """After an acknowledged commit, remove only checksum-verified unused sources.
+
+        Lock both prefixes just like rename/save and recheck references under the
+        locks. On uncertain commit this method must not be invoked. Cleanup can
+        be incomplete without invalidating the committed destination references.
+        """
+        with self._database.connect(self.settings.database_url) as connection:
+            with connection.cursor() as cursor:
+                codes = {move[key].split('/')[1] for move in moves for key in ('source', 'target')}
+                for code in sorted(codes):
+                    cursor.execute('SELECT pg_advisory_xact_lock(hashtext(%s))', (code,))
+                for move in moves:
+                    cursor.execute('SELECT label_code FROM label_studio.layout_versions WHERE object_key = %s', (move['source'],))
+                    if cursor.fetchone() is not None:
+                        continue
+                    cursor.execute('SELECT label_code FROM label_studio.layout_versions WHERE object_key = %s AND svg_sha256 = %s',
+                                   (move['target'], move['svg_sha256']))
+                    if cursor.fetchone() is None:
+                        continue
+                    self._verified_object_bytes(move['target'], move['svg_sha256'])
+                    self._verified_object_bytes(move['source'], move['svg_sha256'])
+                    self.client.remove_object(self.settings.minio_bucket, move['source'])
+
+    @staticmethod
+    def _release_renamed_code(cursor, label_code):
+        """Release only empty rename reservations, retaining actual deleted histories.
+
+        Also handles reservations created before code reuse was supported. Callers
+        hold the code's advisory lock and commit this with their normal operation.
+        Immutable SVG objects and management audit evidence are never removed.
+        """
+        cursor.execute("""DELETE FROM label_studio.layouts
+            WHERE label_code = %s AND deleted_at IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM label_studio.layout_versions
+                WHERE label_studio.layout_versions.label_code = label_studio.layouts.label_code)""", (label_code,))
 
     def rename_layout(self, label_code: str, title: str) -> LayoutSummary:
         return self._manage_layout(label_code, title)
@@ -247,6 +329,7 @@ class LayoutService:
             with self._database.connect(self.settings.database_url) as connection:
                 with connection.cursor() as cursor:
                     cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (stored_request.label_code,))
+                    self._release_renamed_code(cursor, stored_request.label_code)
                     cursor.execute(
                         "SELECT COALESCE(MAX(version), 0) + 1 FROM label_studio.layout_versions WHERE label_code = %s",
                         (stored_request.label_code,),

@@ -454,7 +454,17 @@ are retired and return 410 `template_management_required`. Studio Explorer and
 Application Management both use `POST /api/v1/management/templates/{label_code}`
 with policy revision, exact current version/checksum, previous title. Change reason is optional and omitted by the current UI.
 Name/code changes and soft deletion commit with source-reference changes and audit
-in one transaction. Deleted identities remain reserved; version objects are retained.
+in one transaction. Rename releases the previous code for reuse by another
+template. Empty reservations from older renames are reclaimed inside the next
+rename/Save transaction; deleted identities with retained versions remain reserved.
+Rename copies all SVG versions to `layouts/{new_code}/v{version}/layout.svg`,
+verifies checksums, and commits new references plus object-move audit evidence.
+SVG bytes, version numbers and historical audit remain intact. A same-code metadata
+update normalizes paths left by earlier renames. Unreferenced source copies are
+removed only after acknowledged commit and a locked reference/checksum recheck.
+Failures or uncertain commits preserve source objects; cleanup failure retains
+extra copies without reporting the committed identity change as failed.
+Existing destination bytes are never overwritten when a freed code is used again.
 See [management contract](MANAGEMENT_CONTRACT.md).
 Startup schema initialization adds nullable title_override and deleted_at columns
 idempotently to existing layout headers. This requires normal authorized persistence
@@ -625,7 +635,7 @@ The source PostgreSQL ledger exposes committed preparation/claim/outcome and exp
 
 Only POST `/api/v1/label-intake` declares HTTP bearer security in OpenAPI. `TLS_INTAKE_POLICY_JSON` and source-referenced `TLS_INTAKE_TOKEN_<NAME>` are explicitly mapped server environment, with no automatic .env loader or runtime bypass. Duplicate Authorization headers, invalid/missing identity, disallowed source/mode and unavailable config are denied using static admission errors; 401 includes WWW-Authenticate: Bearer. Exact asserted identity is required. Current source permission is rechecked before ledger replay.
 
-Print authorization requires an enabled authenticated source and print mode. All valid stored templates are available; no per-source template allowlist is enforced. Each source selects default `print_target_id`, additional `allowed_print_target_ids` (unique logical IDs, default empty), and `print_max_copies` (1..999); absent destinations default to no print route. Print requests may select the default or an additional permitted logical target; see the 2026-10-17 extension below. The selected target must exist and be enabled. Historical approve/revoke records remain retained but do not participate in authorization. Preflight pins the actual stored immutable template version/checksum, policy revision, destination and copies before render. Each durable send claim rechecks credentials, permissions, routing and the original revision; changes deny sending rather than silently rerouting. POLICY errors include `template_not_allowed`, `copies_not_allowed` and `target_not_allowed`. Request data cannot choose an address/port. Simulation requires enabled source identity and mode authorization and can use every valid stored template. See [configuration and routing](implementation/universal-label-pipeline/T09_POLICY_OPERATIONS.md).
+Print authorization requires an enabled authenticated source and print mode. All valid stored templates are available; no per-source template allowlist is enforced. Each source declares `allowed_print_target_ids` (unique logical IDs, default empty) and `print_max_copies` (1..999). Both simulation and print requests must select an explicit permitted target; there is no default route. See the 2026-10-18 contract below. The selected target must exist and be enabled. Historical approve/revoke records remain retained but do not participate in authorization. Preflight pins the actual stored immutable template version/checksum, policy revision, destination and copies before render. Each durable send claim rechecks credentials, permissions, routing and the original revision; changes deny sending rather than silently rerouting. POLICY errors include `template_not_allowed`, `copies_not_allowed` and `target_not_allowed`. Request data cannot choose an address/port. Simulation requires enabled source identity, mode authorization and an explicit enabled permitted target, and can use every valid stored template without printer transport. See [configuration and routing](implementation/universal-label-pipeline/T09_POLICY_OPERATIONS.md).
 
 ## T10 print results and uncertainty
 
@@ -784,7 +794,7 @@ The request, limits, errors and explicit provisioning procedure are defined in
 template updates remain unsupported.
 
 
-## 2026-10-17 - Per-transaction logical print target
+## Historical 2026-10-17 - Optional logical print target (superseded below)
 
 Canonical print envelopes may include top-level `target_id` using the existing
 ASCII identity syntax (1..128 characters). Explicit null/empty values and IP/URL
@@ -804,3 +814,36 @@ replays the retained result without sending again. Destination addresses, ports,
 permissions and policy revision are rechecked before each durable send claim;
 policy changes never silently reroute a retained transaction. `SUBMITTED` with
 `confirmed:false` remains transport handoff, not proof of physical output.
+
+
+## 2026-10-18 - Explicit target in simulation and print
+
+External `POST /api/v1/label-intake` requires top-level `target_id` in both
+`simulation` and `print`. Missing, null, empty or malformed targets return 422.
+The authenticated source must permit the requested mode and list the exact ID
+in `allowed_print_target_ids`; the registered target must exist and be enabled.
+Unknown, disabled or unpermitted targets return 403 `target_not_allowed` before
+ledger lookup, layout resolution or rendering. Addresses/ports remain server-owned.
+There is no target fallback and no implicit permission from `print_target_id`.
+
+The sender (ABAP program or SAP Simulator) owns workstation-to-target mapping.
+It must reject a missing/inactive/incomplete station mapping before RFC reads
+or HTTP submission, then include the selected target in either mode. The label
+server does not discover operator workstations or choose replacement printers.
+Simulation validates routing but never constructs/submits a printer transport;
+its response includes the validated top-level `target_id`, also retained on replay.
+It does not establish printer reachability or physical printing.
+
+Management sources use one `allowed_print_target_ids` list for both modes. A
+non-null `print_target_id` is rejected on source writes. This nullable legacy
+field remains readable solely for persisted historical configuration; routing
+ignores it. Authorized administrators must explicitly move any intended old
+default permission into the allowed list and clear the old field. There is no
+automatic configuration migration. Empty allowed lists grant no target access.
+Printer assigned-source counts and lists include every allowed source reference.
+
+Target remains part of the canonical request/HMAC. Never add a target to an old
+request ID silently, mutate ledger entries, or resend an uncertain transaction.
+A new target-bearing transaction is distinct from historical targetless requests.
+The generic Studio dataset format still accepts targetless data; this mandatory
+field belongs to the external intake contract, not editor preview or RFC data.

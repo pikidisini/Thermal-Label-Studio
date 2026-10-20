@@ -9,7 +9,7 @@ async function fixture(page, writable = true, language = 'en') {
   await page.route('**/health', route => route.fulfill({ json: { status: 'ok' } }));
   await page.route('**/api/v1/layouts', route => route.fulfill({ json: [] }));
   const document = { policy: { revision: 'P1', audit: [], targets: [{ target_id: 'DEMO_PRINTER', enabled: true, host: '192.0.2.1', port: 9100 }, { target_id: 'SECOND_PRINTER', enabled: true, host: '192.0.2.2', port: 9100 }], sources: [
-    { identity: 'SAP_ECC', enabled: true, modes: ['simulation', 'print'], key_status: 'active', print_target_id: 'DEMO_PRINTER', print_max_copies: 5, access_key: { key_id: 'K1', state: 'active', reveal_available: true, updated_at: '2026-10-13T00:00:00Z' } },
+    { identity: 'SAP_ECC', enabled: true, modes: ['simulation', 'print'], key_status: 'active', print_target_id: null, allowed_print_target_ids:['DEMO_PRINTER'], print_max_copies: 5, access_key: { key_id: 'K1', state: 'active', reveal_available: true, updated_at: '2026-10-13T00:00:00Z' } },
     { identity: 'SIMULATOR', enabled: true, modes: ['simulation'], key_status: 'active' },
     { identity: 'QA_TOOL', enabled: false, modes: ['simulation'], key_status: 'missing' },
   ] }, reviews: [] };
@@ -36,7 +36,8 @@ test('source list, combined filters and conditional print settings preserve read
   const requests = await fixture(page);
   await page.getByTestId('integration-source-SAP_ECC').press('Enter');
   await expect(page.getByTestId('integration-source-SAP_ECC')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByLabel('Print destination', { exact: true })).toHaveValue('DEMO_PRINTER');
+  await expect(page.getByLabel('Print destination', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Permit printer DEMO_PRINTER',{exact:true})).toBeChecked();
   await page.getByLabel('Modes filter').selectOption('print');
   await expect(page.locator('.management-source-row')).toHaveCount(1);
   await page.getByLabel('Configuration filter').selectOption('disabled');
@@ -57,7 +58,7 @@ test('explicit printer permission is included when saving a source', async ({ pa
   await page.getByLabel('Permit printer SECOND_PRINTER', { exact: true }).check();
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();
   expect(requests).toHaveLength(1);
-  expect(requests[0].source.allowed_print_target_ids).toEqual(['SECOND_PRINTER']);
+  expect(requests[0].source.allowed_print_target_ids).toEqual(['DEMO_PRINTER','SECOND_PRINTER']);
 });
 
 test('switching source, filtering and Escape clear a deliberately revealed key', async ({ page }) => {
@@ -144,7 +145,7 @@ test('inline key disclosure retains edits, clears secrets and confirmation, and 
 test('desktop and narrow source panels fit and all new controls support Indonesian', async ({ page }, testInfo) => {
   await fixture(page, true, 'id');
   await page.getByTestId('integration-source-SAP_ECC').click();
-  await expect(page.getByRole('heading', { name: 'Izin cetak', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Printer yang diizinkan', exact: true })).toBeVisible();
   for (const width of [1440, 955, 390]) {
     await page.setViewportSize({ width, height: 1000 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

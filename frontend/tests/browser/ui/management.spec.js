@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { mockBuiltApplication, openStudio } from '../helpers/studio.js';
 
 const template = { label_code: 'A', title: 'Synthetic roll', version: 1, width_mm: 80, height_mm: 200, dpi: 203.2, svg_sha256: 'a'.repeat(64), status: 'published', object_key: 'synthetic.svg', created_at: '2026-10-12T00:00:00Z' };
-const policy = { revision: 'P1', sources: [{ identity: 'SAP_DEMO', key_status: 'legacy', credential_env: 'TLS_INTAKE_TOKEN_DEMO', enabled: true, modes: ['simulation', 'print'], label_codes: ['A'], simulation_all_label_codes: true, print_target_id: 'P_DEMO', print_max_copies: 10 }], targets: [{ target_id: 'P_DEMO', host: '192.0.2.44', port: 9100, enabled: true }], audit: [] };
+const policy = { revision: 'P1', sources: [{ identity: 'SAP_DEMO', key_status: 'legacy', credential_env: 'TLS_INTAKE_TOKEN_DEMO', enabled: true, modes: ['simulation', 'print'], label_codes: ['A'], simulation_all_label_codes: true, print_target_id: null, allowed_print_target_ids:['P_DEMO'], print_max_copies: 10 }], targets: [{ target_id: 'P_DEMO', host: '192.0.2.44', port: 9100, enabled: true }], audit: [] };
 
 async function mockManagement(page, writable = true) {
   await mockBuiltApplication(page);
@@ -270,13 +270,14 @@ test('print source saves routing and copies without template selection or reason
   const requests = await mockManagement(page);
   await page.goto('/management?section=integrations');
   await page.getByRole('button', { name: /^Details(?: \u00b7 .+)?$/ }).click();
-  await expect(page.getByLabel('Print destination', { exact: true })).toHaveValue('P_DEMO');
+  await expect(page.getByLabel('Print destination', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Permit printer P_DEMO',{exact:true})).toBeChecked();
   await expect(page.getByLabel('Change reason')).toHaveCount(0);
   await expect(page.getByRole('group', { name: 'Allowed templates', exact: true })).toHaveCount(0);
   await page.getByLabel('Maximum copies', { exact: true }).fill('3');
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();
   await expect(page.getByText('Changes saved.', { exact: true })).toBeVisible();
-  expect(requests[0].source).toMatchObject({ print_target_id: 'P_DEMO', print_max_copies: 3 });
+  expect(requests[0].source).toMatchObject({ print_target_id: null, allowed_print_target_ids:['P_DEMO'], print_max_copies: 3 });
   expect(requests[0]).not.toHaveProperty('note');
   expect(requests[0].source).not.toHaveProperty('label_codes');
 });

@@ -2,6 +2,7 @@
   "sender": {"system": "SAP_ECC"},
   "request_id": "SAP-550E8400E29B41D4A716446655440000",
   "mode": "simulation",
+  "target_id": "PRINTER_DEMO",
   "items": [
     {
       "item_id": "ITEM-001",

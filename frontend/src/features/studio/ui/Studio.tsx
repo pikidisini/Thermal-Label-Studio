@@ -33,6 +33,9 @@ import CanvasSetupModal from '../../../components/modals/CanvasSetupModal';
 import ShortcutHelpModal from './ShortcutHelpModal';
 import { AiDiagnosticsModal } from '../../diagnostics';
 
+import { designPreviewSample, shouldUseDesignPreviewSample } from '../../data-tokens/model/designPreview';
+import { compositionFields } from '../../data-tokens/model/composition';
+
 // Feature helpers
 import { resolveSapTokenDisplayValue, readLocalSapJson, readLocalSapJsonSource, parseLocalSapJson, createCanonicalWorkingCopy, importDataset, studioDatasetApi, type StudioDatasetSummary } from '../../data-tokens';
 import { generatePreviewDataUrl, replaceSymbolImage, resolvePayloadTemplate, validatePreviewPayload } from '../../barcode';
@@ -227,14 +230,20 @@ export function Studio() {
     objects.forEach((object: any) => {
       if (!object.isBarcode && typeof object.payloadTemplate === 'string') {
         if (object.previewOverride) return;
-        const resolved = resolvePayloadTemplate(object.payloadTemplate, tokenMap, 'text', fieldDescriptions);
+        object.designPreviewText ??= designPreviewSample(object.text);
+        const resolved = shouldUseDesignPreviewSample(activeContractKey, compositionFields(object.payloadTemplate), tokenMap)
+          ? { value: object.designPreviewText, error: null }
+          : resolvePayloadTemplate(object.payloadTemplate, tokenMap, 'text', fieldDescriptions);
         if (object.text === (resolved.value ?? 'Text content â€” no data') && object.validationError === (resolved.error || undefined)) return;
         object.set('text', resolved.value ?? 'Text content â€” no data');
         object.validationError = resolved.error || undefined;
         changed = true; return;
       }
       if (!object.dataField || object.previewOverride || typeof object.set !== 'function') return;
-      const nextValue = resolveSapTokenDisplayValue(tokenMap[object.dataField], object.dataField, fieldDescriptions);
+      object.designPreviewText ??= designPreviewSample(object.text);
+      const nextValue = shouldUseDesignPreviewSample(activeContractKey, [object.dataField], tokenMap)
+        ? object.designPreviewText
+        : resolveSapTokenDisplayValue(tokenMap[object.dataField], object.dataField, fieldDescriptions);
       if (object.text === nextValue) return;
       object.set('text', nextValue);
       changed = true;
@@ -278,7 +287,7 @@ export function Studio() {
       if (validatePreviewPayload(type, value)) return;
       void generatePreviewDataUrl(type, value, object.symbolSpec).then(apply);
     });
-  }, [canvasRef, tokenMap, fieldDescriptions, actions.saveCanvasHistory, actions.syncSelection, triggerRenderSimulation]);
+  }, [canvasRef, tokenMap, fieldDescriptions, activeContractKey, actions.saveCanvasHistory, actions.syncSelection, triggerRenderSimulation]);
 
 
   React.useEffect(() => {

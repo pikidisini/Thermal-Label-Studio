@@ -19,6 +19,7 @@ class IntakeRequest(LabelDataRequest):
         'required': ['system'], 'additionalProperties': False})
     request_id: str = Field(min_length=1, max_length=128, pattern=r'^[A-Za-z0-9][A-Za-z0-9_.:-]*$')
     items: list[IntakeItem] = Field(min_length=1, max_length=100)
+    target_id: str = Field(min_length=1, max_length=128, pattern=r'^[A-Za-z0-9][A-Za-z0-9_.:-]*$')
 
 
 MESSAGES = {
@@ -142,6 +143,7 @@ class IntakeResponse(PublicModel):
     status: Literal['COMPLETED', 'PARTIAL', 'FAILED']
     summary: Summary
     results: list[ItemResult] = Field(max_length=100)
+    target_id: str | None = Field(default=None, min_length=1, max_length=128)
 
     @model_validator(mode='after')
     def consistent(self):

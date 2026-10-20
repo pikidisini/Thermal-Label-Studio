@@ -69,7 +69,7 @@ def test_create_rotate_reveal_and_revoke(runtime, monkeypatch):
     assert second != first
     denied(store.read().policy, first)
     admission = authenticate(store.read().policy, 'Bearer ' + second, {})
-    pin = preflight_print(admission, 'ANY_TEMPLATE', TemplateEvidence(version=1, svg_sha256='a' * 64), 1)
+    pin = preflight_print(admission, 'ANY_TEMPLATE', TemplateEvidence(version=1, svg_sha256='a' * 64), 1, 'P_DEMO')
     revoked = key_command(client, store, 'revoke')
     assert revoked.status_code == 200 and revoked.json()['key'] is None
     assert store.read().policy.sources[0].access_key.sha256 is None
@@ -90,7 +90,7 @@ def test_migration_preserves_sender_key_and_cannot_restore_revoked_env(runtime, 
     client, database, store = runtime
     assert client.get('/api/v1/management/snapshot').json()['document']['policy']['sources'][0]['key_status'] == 'legacy'
     original = authenticate(store.read().policy, 'Bearer ' + TOKEN)
-    pin = preflight_print(original, 'A', TemplateEvidence(version=1, svg_sha256='a' * 64), 1)
+    pin = preflight_print(original, 'A', TemplateEvidence(version=1, svg_sha256='a' * 64), 1, 'P_DEMO')
     migrated = key_command(client, store, 'migrate')
     assert migrated.status_code == 200 and migrated.json()['key'] is None
     assert key_command(client, store, 'reveal').json()['key'] == TOKEN
@@ -175,6 +175,7 @@ def test_managed_key_http_admission_replay_rotation_and_revocation(runtime, prep
     first = key_command(client, store, 'rotate').json()['key']
     body = envelope(('A',))
     body['sender']['system'] = 'SAP_DEMO'
+    body['target_id'] = 'P_DEMO'
     app.dependency_overrides[http.stored_layouts] = lambda: Layouts()
     ledger = LedgerDatabase().ledger()
     app.dependency_overrides[http.durable_ledger] = lambda: ledger
@@ -205,7 +206,7 @@ def test_delete_source_removes_keys_and_blocks_identity_reuse(runtime):
     assert created.status_code == 200
     secret = TOKEN
     policy = store.read().policy
-    pin = preflight_print(authenticate(policy, 'Bearer ' + secret), 'A', TemplateEvidence(version=1, svg_sha256='a' * 64), 1)
+    pin = preflight_print(authenticate(policy, 'Bearer ' + secret), 'A', TemplateEvidence(version=1, svg_sha256='a' * 64), 1, 'P_DEMO')
     stale = client.request('DELETE', '/api/v1/management/sources/SAP_DEMO', json={'revision': 'P1'})
     assert stale.status_code == 409
     removed = client.request('DELETE', '/api/v1/management/sources/SAP_DEMO', json={'revision': policy.revision})

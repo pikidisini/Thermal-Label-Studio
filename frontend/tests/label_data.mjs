@@ -6,12 +6,12 @@ import { parseLocalSapJson, createCanonicalWorkingCopy, readLocalSapJsonSource }
 import { useContractStore } from '../src/store/useContractStore.ts';
 import { importDataset } from '../src/features/data-tokens/model/importDataset.ts';
 const cases=JSON.parse(fs.readFileSync(new URL('../../tests/contracts/label_data_cases.json',import.meta.url),'utf8'));
-test('logical target is retained for print, rejected for simulation/null/raw address',()=>{
+test('logical target is retained for print and simulation, rejected for null/raw address',()=>{
   const original=JSON.parse(cases.find(c=>c.valid).raw);
   const value={...original,mode:'print',target_id:'TCP_TEST_A'};
   assert.equal(validateCanonicalLabelData(value).target_id,'TCP_TEST_A');
   for(const target_id of [null,'','http://127.0.0.1:19100']) assert.throws(()=>validateCanonicalLabelData({...value,target_id}));
-  assert.throws(()=>validateCanonicalLabelData({...value,mode:'simulation'}));
+  assert.equal(validateCanonicalLabelData({...value,mode:'simulation'}).target_id,'TCP_TEST_A');
 });
 for(const entry of cases) test(`shared canonical: ${entry.name}`,()=>{
   const run=()=>validateCanonicalLabelData(parseBoundedJson(entry.raw));

@@ -124,7 +124,7 @@ def test_whole_batch_failure_never_constructs_transport(setup,prepare,monkeypatc
     database,ledger,layouts,recorder,p=setup;value=body()
     if problem=='unknown':value=body(('A','UNKNOWN','B'))
     elif problem=='route_missing':
-        monkeypatch.setenv('TLS_INTAKE_POLICY_JSON',p.model_copy(update={'sources':(source(label_codes=('A','B','UNKNOWN'),print_target_id=None),)}).model_dump_json())
+        monkeypatch.setenv('TLS_INTAKE_POLICY_JSON',p.model_copy(update={'sources':(source(label_codes=('A','B','UNKNOWN'),allowed_print_target_ids=()),)}).model_dump_json())
     elif problem=='target':
         monkeypatch.setenv('TLS_INTAKE_POLICY_JSON',p.model_copy(update={'targets':()}).model_dump_json())
     elif problem=='binding':value['items'][1]['data']={'FAIL':True}
@@ -133,7 +133,12 @@ def test_whole_batch_failure_never_constructs_transport(setup,prepare,monkeypatc
     elif problem=='pixels':monkeypatch.setattr(print_service,'MAX_PIXELS',1)
     elif problem=='memory':monkeypatch.setattr(print_service,'MAX_WORKING',1)
     else:monkeypatch.setattr(print_service,'MAX_IPL',1)
-    response=post(value);assert response.status_code==200,response.text
+    response=post(value)
+    if problem in ('route_missing','target'):
+        assert response.status_code==403
+        assert recorder.calls==recorder.constructed==[] and prepare==[]
+        return
+    assert response.status_code==200,response.text
     result=response.json();assert result['status']=='FAILED' and result['summary']['failed']>=1
     assert result['summary']['submitted']==0 and len(result['results'])==len(value['items'])
     assert all(i['status'] in ('FAILED','SKIPPED') and i['error'] for i in result['results'])
@@ -172,7 +177,7 @@ def test_policy_revoked_during_batch_stops_later_claims(setup,prepare,monkeypatc
     def update(index):
         if index!=0:return
         updates={'revision':'P2'}
-        if change=='route':updates['sources']=(source(label_codes=('A','B','UNKNOWN'),print_target_id=None),)
+        if change=='route':updates['sources']=(source(label_codes=('A','B','UNKNOWN'),allowed_print_target_ids=()),)
         elif change=='target':updates['targets']=()
         elif change=='source':updates['sources']=(source(enabled=False,label_codes=('A','B','UNKNOWN')),)
         elif change=='credential':monkeypatch.setenv(ENV,'rotated_synthetic_unit_test_token_0002')

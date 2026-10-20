@@ -17,10 +17,8 @@ def upsert_source(document, source):
     if previous:
         source = source.model_copy(update={'access_key': previous.access_key,
             'credential_env': source.credential_env or previous.credential_env})
-    if source.enabled and 'print' in source.modes:
-        target = next((target for target in document.policy.targets if target.target_id == source.print_target_id), None)
-        if target is None or (source.enabled and not target.enabled):
-            raise ManagementError('invalid_print_route', 422)
+    if source.print_target_id is not None:
+        raise ManagementError('invalid_print_route', 422)
     if any(identity not in {t.target_id for t in document.policy.targets} for identity in source.allowed_print_target_ids):
         raise ManagementError('invalid_print_route', 422)
     if source.enabled:

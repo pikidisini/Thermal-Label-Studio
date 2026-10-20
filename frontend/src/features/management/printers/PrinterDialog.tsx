@@ -14,7 +14,7 @@ export function PrinterDialog({ management }: { management: ManagementController
   const printer = editor.value;
   const saved = policy?.targets.find(target => target.target_id === printer.target_id);
   const dirty = !editor.existing || !saved || printer.host !== saved.host || printer.port !== saved.port || printer.enabled !== saved.enabled;
-  const assigned = editor.existing ? policy?.sources.filter(source => source.print_target_id === printer.target_id) ?? [] : [];
+  const assigned = editor.existing ? policy?.sources.filter(source => (source.allowed_print_target_ids ?? []).includes(printer.target_id)) ?? [] : [];
   const update = (changes: Partial<Printer>) => setEditor({ ...editor, value: { ...printer, ...changes } });
   return <form className="management-source-form" onSubmit={event => { event.preventDefault(); if (policy && dirty) void mutate(() => managementApi.printer(policy.revision, printer)); }}>
     <section className="management-source-group">

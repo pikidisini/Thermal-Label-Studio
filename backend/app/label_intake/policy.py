@@ -47,6 +47,7 @@ class Source(PolicyModel):
     # Retained for reading existing policy snapshots; template scope is unrestricted.
     label_codes: tuple[str, ...] = Field(default=(), max_length=1000)
     simulation_all_label_codes: bool = False
+    # Legacy persisted metadata only: ignored by routing and rejected on source writes.
     print_target_id: str | None = Field(default=None, pattern=ID)
     allowed_print_target_ids: tuple[str, ...] = Field(default=(), max_length=1000)
     print_max_copies: int = Field(default=1, ge=1, le=999)
@@ -209,19 +210,16 @@ def authorize(admission: Admission, request: IntakeRequest):
         raise IntakeAdmissionError(403, 'sender_not_allowed')
     if request.mode not in source.modes:
         raise IntakeAdmissionError(403, 'mode_not_allowed')
-    if request.mode == 'print' and request.target_id is not None:
-        try:
-            select_print_target(admission, request.target_id)
-        except PolicyDenied:
-            raise IntakeAdmissionError(403, 'target_not_allowed') from None
+    try:
+        select_print_target(admission, request.target_id)
+    except PolicyDenied:
+        raise IntakeAdmissionError(403, 'target_not_allowed') from None
 
 
 def select_print_target(admission: Admission, requested_target_id: str | None = None):
     source = admission.source
-    selected = requested_target_id if requested_target_id is not None else source.print_target_id
+    selected = requested_target_id
     permitted = set(source.allowed_print_target_ids)
-    if source.print_target_id is not None:
-        permitted.add(source.print_target_id)
     if selected not in permitted:
         raise PolicyDenied('target_not_allowed')
     target = next((t for t in admission.policy.targets if t.target_id == selected and t.enabled), None)
