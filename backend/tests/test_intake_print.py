@@ -6,7 +6,7 @@ from io import BytesIO
 from threading import Barrier
 from uuid import uuid4
 import pytest
-from fastapi.testclient import TestClient
+from .auth_test_support import TestClient
 from PIL import Image
 from app.main import app
 from app.label_intake import http, print_service

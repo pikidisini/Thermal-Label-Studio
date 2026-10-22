@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
+from .auth_test_support import TestClient
 from app.simulation.design_http import router
 from app.engine.editor_request import EditorBodyMiddleware
 

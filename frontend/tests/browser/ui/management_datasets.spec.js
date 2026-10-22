@@ -1,3 +1,4 @@
+import { mockAccountSession } from '../helpers/studio.js';
 import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -10,7 +11,8 @@ for (const lang of ['en', 'id']) test(`test dataset table preserves types and ha
   const writes = [];
   let conflict = false;
   await page.route('**/*', async route => {
-    const url = new URL(route.request().url()); const method = route.request().method();
+    const url = new URL(route.request().url());
+    if (url.pathname.startsWith('/api/v1/auth/')) return route.fallback(); const method = route.request().method();
     if (url.pathname.endsWith(`/studio-sample-datasets/${identifier}`)) {
       if (method === 'GET') return route.fulfill({ json: dataset });
       const body = route.request().postDataJSON(); writes.push(body);
@@ -48,3 +50,6 @@ for (const lang of ['en', 'id']) test(`test dataset table preserves types and ha
   await expect(page.getByText(id ? 'Dataset telah berubah. Muat ulang sebelum menyimpan.' : 'Dataset changed. Reload before saving.', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: id ? 'Simpan perubahan' : 'Save changes', exact: true })).toBeDisabled();
 });
+
+// Browser feature fixtures authenticate independently of their mocked feature APIs.
+test.beforeEach(async ({ page }) => { await mockAccountSession(page); });

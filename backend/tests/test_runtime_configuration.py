@@ -110,7 +110,7 @@ def test_fixture_serving_has_only_explicit_page_and_static_asset_routes(monkeypa
     settings = runtime_settings()
     configure_fixture_serving(app, settings)
     routes = {route.path: route for route in app.routes}
-    for path in ("/", "/print", "/management"):
+    for path in ("/", "/login", "/print", "/management"):
         response = routes[path].endpoint()
         assert response.path == settings.frontend_dist / "index.html"
         assert response.media_type == "text/html" and response.status_code == 200
@@ -120,7 +120,7 @@ def test_fixture_serving_has_only_explicit_page_and_static_asset_routes(monkeypa
     assert page.path == settings.frontend_dist / "index.html"
     assert calls == [{"directory": settings.frontend_dist / "assets", "follow_symlink": False}]
     assert not any("path:" in path for path in routes)
-    assert "/api" not in routes and "/login" not in routes
+    assert "/api" not in routes and "/login" in routes
 
 
 def test_configured_frontend_missing_dependencies_rejects_startup(monkeypatch):
@@ -158,6 +158,7 @@ def test_renderer_uses_server_configured_paths_and_font(monkeypatch):
 def test_runtime_entry_is_bounded_and_logging_is_stdout_only(monkeypatch):
     from app import run
     monkeypatch.delenv("TLS_BIND_HOST", raising=False)
+    monkeypatch.delenv("TLS_TRUSTED_PROXY_IPS", raising=False)
     from io import StringIO
     output = StringIO()
     monkeypatch.setattr(run.sys, "stdout", output)
@@ -171,7 +172,22 @@ def test_runtime_entry_is_bounded_and_logging_is_stdout_only(monkeypatch):
     logger.info('{"event":"REQUEST_RECEIVED"}')
     assert output.getvalue() == '{"event":"REQUEST_RECEIVED"}\n'
     assert calls == [(('app.main:app',), {"host": "127.0.0.1", "port": 8000, "workers": 1,
-                                         "access_log": False, "proxy_headers": False, "server_header": False})]
+                                             "access_log": False, "proxy_headers": False, "forwarded_allow_ips": [], "server_header": False})]
+
+
+def test_runtime_proxy_trust_requires_explicit_numeric_peers(monkeypatch):
+    from app import run
+    calls = []
+    monkeypatch.setattr(run.uvicorn, 'run', lambda *args, **kwargs: calls.append(kwargs))
+    monkeypatch.setenv('TLS_TRUSTED_PROXY_IPS', '127.0.0.1,::1')
+    run.main()
+    assert calls[0]['proxy_headers'] is True
+    assert calls[0]['forwarded_allow_ips'] == ['127.0.0.1', '::1']
+    for value in ['*', 'proxy.example.test']:
+        monkeypatch.setenv('TLS_TRUSTED_PROXY_IPS', value)
+        with pytest.raises(ValueError):
+            run.main()
+    assert len(calls) == 1
 
 
 def test_fixture_image_does_not_copy_prototype_runtime_or_persistent_data():

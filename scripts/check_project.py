@@ -65,7 +65,9 @@ def source_checks(root: Path = ROOT) -> tuple[Check, ...]:
     )
 
 
-def execute_checks(checks: tuple[Check, ...], root: Path = ROOT) -> dict:
+def execute_checks(checks: tuple[Check, ...], root: Path = ROOT, *, timeout_seconds: int = 600) -> dict:
+    if type(timeout_seconds) is not int or not 1 <= timeout_seconds <= 3600:
+        raise ValueError('Per-check timeout must be from 1 to 3600 seconds.')
     env = dict(os.environ)
     # Source regression uses disposable/local fixtures, never operator paths.
     for key in tuple(env):
@@ -77,7 +79,7 @@ def execute_checks(checks: tuple[Check, ...], root: Path = ROOT) -> dict:
     for check in checks:
         try:
             result = subprocess.run(check.command, cwd=check.cwd, env=env,
-                                    capture_output=True, timeout=600, shell=False)
+                                    capture_output=True, timeout=timeout_seconds, shell=False)
             entry = {"check": check.name, "status": "PASS" if result.returncode == 0 else "FAIL",
                      "exit_code": result.returncode}
             if result.returncode != 0:
@@ -87,6 +89,7 @@ def execute_checks(checks: tuple[Check, ...], root: Path = ROOT) -> dict:
         results.append(entry)
     passed = all(entry["status"] == "PASS" for entry in results) and bool(results)
     return {"source_gate": "PASS" if passed else "FAIL", "checks": results,
+            "per_check_timeout_seconds": timeout_seconds,
             "deployment_ready": False,
             "runtime_gates": [{"check": name, "status": "NOT RUN"} for name in PENDING_RUNTIME]}
 
@@ -104,14 +107,19 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-source-checks", action="store_true",
                         help="Run existing local tests/typecheck/build; no dependency installation.")
+    parser.add_argument('--timeout-seconds', type=int, default=600,
+                        help='Explicit per-check execution budget, 1..3600 seconds (default 600). Checks and failure rules stay unchanged.')
     args = parser.parse_args(argv)
+    if not 1 <= args.timeout_seconds <= 3600:
+        parser.error('--timeout-seconds must be from 1 to 3600.')
     checks = source_checks()
     if not args.run_source_checks:
         print(json.dumps({"source_gate": "NOT RUN", "deployment_ready": False,
+                          "per_check_timeout_seconds": args.timeout_seconds,
                           "planned_checks": [check.name for check in checks],
                           "runtime_gates": [{"check": name, "status": "NOT RUN"} for name in PENDING_RUNTIME]}, indent=2))
         return 0
-    report = execute_checks(checks)
+    report = execute_checks(checks, timeout_seconds=args.timeout_seconds)
     report = save_report(report)
     serialized = json.dumps(report, indent=2)
     print(serialized)

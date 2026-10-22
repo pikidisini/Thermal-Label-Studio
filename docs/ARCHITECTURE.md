@@ -119,7 +119,7 @@ uses managed key state before legacy environment references, with no fallback
 after revocation. Local development access remains separate from browser login.
 
 Utilities opens `/management`, with feature-owned UI and API under
-`features/management` and `app/management`. Local account login is deferred.
+`features/management` and `app/management`. Local account login is implemented independently in `app/auth`; see AUTH_CONTRACT.md.
 The optional PostgreSQL managed-policy snapshot and append-only audit require
 explicit schema provisioning; normal startup does not apply it. Default read-only
 management preserves environment intake policy. See [management contract](MANAGEMENT_CONTRACT.md)
@@ -156,9 +156,10 @@ render-time lookup or template asset metadata. See GRAPHICS_CONTRACT.md.
 
 
 One application serves `/studio`, `/fixture-simulation`, compiled frontend assets,
-and the active API. Studio has no login, session, CSRF client or simulated user
-role. It is a local development application; server authentication, authorization
-and admission controls are prerequisites for a future shared deployment.
+and the active API. `app/auth` owns real PostgreSQL-backed accounts, sessions,
+CSRF and route/method permissions. `shared/auth` gates pages and feature HTTP
+clients. AUTH_CONTRACT.md defines explicit provisioning and HTTPS LAN activation;
+implemented access controls alone do not establish shared-deployment acceptance.
 
 `backend/app/main.py` composes the API. `config.py` validates server settings,
 `runtime.py` serves the frontend and dependency-presence readiness, and
@@ -482,7 +483,7 @@ Label Print offers Check status for the selected enabled Management printer.
 Only that button calls POST /api/v1/label-print/printer-status with target_id,
 expected_host and expected_port; no caller-controlled destination is accepted.
 The route rechecks saved configuration (409 if changed/disabled), uses the same
-loopback/origin and bounded JSON admission as LAN Print, returns no-store and
+authenticated role/origin and bounded JSON admission as LAN Print, returns no-store and
 serializes with LAN delivery (429 while busy). There is no background polling,
 selection probe, SAP access, print payload, reset or configuration command.
 The server sends one IPL ENQ byte (0x05) to the saved numeric TCP target, with

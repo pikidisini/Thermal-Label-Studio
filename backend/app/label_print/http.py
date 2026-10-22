@@ -71,20 +71,8 @@ class BatchPreviewResponse(BaseModel):
     items: list[PreviewItem]
 
 def local_preview_access(request: Request):
-    try:
-        if request.client is None or not ipaddress.ip_address(request.client.host).is_loopback:
-            raise ValueError()
-        origin = request.headers.get('origin')
-        if origin:
-            parsed = urlsplit(origin)
-            if (parsed.scheme not in ('http', 'https') or parsed.username or parsed.password
-                    or parsed.path or parsed.query or parsed.fragment
-                    or (parsed.hostname != 'localhost' and not ipaddress.ip_address(parsed.hostname).is_loopback)):
-                raise ValueError()
-        if request.headers.get('sec-fetch-site') == 'cross-site':
-            raise ValueError()
-    except (ValueError, TypeError):
-        raise HTTPException(403, detail={'code': 'preview_local_only'}) from None
+    from app.management.access import local_access
+    local_access(request)
 
 @router.get('/label-print/printers')
 def configured_printers(request: Request):
@@ -232,7 +220,7 @@ def preview_batches(body: BatchPreviewRequest, request: Request, response: Respo
                     next(step for step in item.steps if step.stage == 'ACCEPT_PREVIEW').status = 'FAILED'
         for item in items:
             if item.status == 'PREVIEWED' and body.source != 'fixture':
-                item.print_artifact = artifacts.put(prepared_items[item.index])
+                item.print_artifact = artifacts.put(prepared_items[item.index], request.state.auth_user['id'])
         label_preview_outcome(items)
         return BatchPreviewResponse(source=body.source, operation_id=body.operation_id, operation_revision=body.revision, dataset_updated_at=str(stamp) if stamp is not None else None, items=items)
     finally:
@@ -259,7 +247,7 @@ def print_package(body: PrintPackageRequest, request: Request, response: Respons
     if any(len(identity) != 43 for identity in body.artifacts):
         raise HTTPException(422, detail={'code': 'invalid_print_artifact'})
     try:
-        outputs = artifacts.get_many(body.artifacts, body.copies)
+        outputs = artifacts.get_many(body.artifacts, body.copies, request.state.auth_user['id'])
     except KeyError:
         raise HTTPException(410, detail={'code': 'preview_expired'}) from None
     if sum(len(output.payload) for output in outputs) > 12 * 1024 * 1024:
@@ -356,3 +344,9 @@ def registered_printer_status(body: PrinterStatusRequest, request: Request, resp
         return {**result, 'target_id': target['target_id'], 'host': target['host'], 'port': target['port']}
     finally:
         _server_print_lock.release()
+
+
+@router.get('/label-print/operations')
+def operator_operations(request: Request):
+    from app.management.integrations.sap_http import operation_catalog
+    return operation_catalog(request)

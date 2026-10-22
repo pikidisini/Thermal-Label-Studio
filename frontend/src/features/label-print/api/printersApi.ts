@@ -1,3 +1,4 @@
+import { authFetch as fetch } from '../../../shared/auth/client';
 import { API_BASE } from '../../../shared/api';
 
 export type ConfiguredPrinter = { target_id: string; host: string; port: number; enabled: boolean; language: 'IPL'; connection: 'Ethernet'; transport: 'TCP/RAW' };

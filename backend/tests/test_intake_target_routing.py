@@ -2,7 +2,7 @@
 import json
 from dataclasses import replace
 import pytest
-from fastapi.testclient import TestClient
+from .auth_test_support import TestClient
 from app.main import app
 from app.label_intake import http, print_service
 from app.label_intake.identity import LedgerKeys, canonical_json

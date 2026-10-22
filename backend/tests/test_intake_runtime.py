@@ -6,7 +6,7 @@ import json
 import sys
 from types import SimpleNamespace
 import pytest
-from fastapi.testclient import TestClient
+from .auth_test_support import TestClient
 from app.label_intake.runtime import create_runtime_ledger
 from app.label_intake.ledger import LedgerUnavailable
 from tests.intake_ledger_fake import LedgerDatabase

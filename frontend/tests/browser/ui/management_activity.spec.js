@@ -29,24 +29,66 @@ async function setup(page, activity) {
   return writes;
 }
 
+test('Activity columns show sender, historical targets and submitted batch counts without counting copies or replay', async ({page}, testInfo) => {
+  const cases = [
+    { ...entry, trace_id:'mixed', status:'PARTIAL', items:[
+      {label_code:'A',status:'SUBMITTED',copies:9,target_id:'OLD_PRINTER'},
+      {label_code:'A',status:'SUBMITTED',copies:3,target_id:'OLD_PRINTER'},
+      {label_code:'B',status:'UNCERTAIN',target_id:'SECOND_PRINTER'},
+      {label_code:'C',status:'FAILED',target_id:'SECOND_PRINTER'},
+      {label_code:'D',status:'SKIPPED'},
+    ]},
+    {...entry,trace_id:'replay',replayed:true,items:[{status:'SUBMITTED',target_id:'OLD_PRINTER'}]},
+    {...entry,trace_id:'label-print',origin:'label_print',source:undefined,target_id:'LAN',items:[{status:'SUBMITTED'},{status:'NOT_ATTEMPTED'}]},
+    {...entry,trace_id:'preview',origin:'studio',source:undefined,mode:'preview',items:undefined},
+    {...entry,trace_id:'legacy',origin:'studio',source:undefined,target:{host:'192.0.2.1',port:9100},items:undefined},
+    {...entry,trace_id:'summary',items:undefined,summary:{submitted:4}},
+  ];
+  const writes = await setup(page,{json:{enabled:true,entries:cases}});
+  await page.goto('/management?section=activity');
+  for (const name of ['Sender','Target printer','Batch count']) {
+    await expect(page.getByRole('columnheader',{name,exact:true})).toBeVisible();
+  }
+  const expected = [
+    ['API Intake','SAP_TEST','OLD_PRINTER, SECOND_PRINTER','2'],
+    ['API Intake','SAP_TEST','OLD_PRINTER','0'],
+    ['Label Print','—','LAN','1'],
+    ['Studio','—','—','0'],
+    ['Studio','—','192.0.2.1:9100','—'],
+    ['API Intake','SAP_TEST','—','4'],
+  ];
+  const rows = page.locator('.management-activity-table tbody tr');
+  await expect(rows).toHaveCount(expected.length);
+  for (let i=0; i<expected.length; i++) {
+    for (let column=0; column<4; column++) {
+      await expect(rows.nth(i).getByRole('cell').nth(column+1)).toHaveText(expected[i][column]);
+    }
+  }
+  await expect(page.getByText('Batch count is the number of submitted items', {exact:false})).toBeVisible();
+  await page.screenshot({path:testInfo.outputPath('activity-columns.png')});
+  expect(writes).toEqual([]);
+});
+
 test('Activity Log filters and reveals safe stages without requests to printers', async ({page},testInfo) => {
   const writes = await setup(page,{json:{enabled:true,entries:[entry,{...entry,trace_id:'22222222-2222-4222-8222-222222222222',origin:'studio',source:undefined,mode:'simulation',operation:'preview',status:'SIMULATED',items:[]}]}});
   await page.goto('/management?section=activity');
   await expect(page.getByRole('heading',{name:'Activity Log',exact:true})).toBeVisible();
   await page.getByLabel('Search activity').fill('ROLL_TEST');
-  await expect(page.getByRole('button',{name:'Details',exact:true})).toHaveCount(1);
-  await page.getByRole('button',{name:'Details',exact:true}).click();
+  await expect(page.locator('.management-log-table tbody tr')).toHaveCount(1);
+  await page.locator('.management-log-table tbody tr').click();
   await expect(page.getByRole('heading',{name:'Activity details'})).toBeVisible();
+  await page.getByRole('dialog').getByText('Item 1 (2)',{exact:true}).click();
   await expect(page.getByText('SUBMITTING',{exact:true})).toBeVisible();
+  await page.getByRole('dialog').getByText('Request metadata',{exact:true}).click();
   await expect(page.getByText('"confirmed": false',{exact:false})).toBeVisible();
   await page.getByRole('button',{name:'Close',exact:true}).click();
   await page.getByLabel('Search activity').fill('');
   await page.getByLabel('Modes filter').selectOption('simulation');
-  await expect(page.getByRole('button',{name:'Details',exact:true})).toHaveCount(1);
+  await expect(page.locator('.management-log-table tbody tr')).toHaveCount(1);
   await page.getByLabel('Activity status').selectOption('UNCERTAIN');
   await expect(page.getByText('No activity matches these filters.')).toBeVisible();
   await page.getByLabel('Modes filter').selectOption('');
-  await expect(page.getByRole('button',{name:'Details',exact:true})).toHaveCount(1);
+  await expect(page.locator('.management-log-table tbody tr')).toHaveCount(1);
   await page.getByLabel('From',{exact:true}).fill('2026-10-14T00:00');
   await expect(page.getByText('No activity matches these filters.')).toBeVisible();
   await page.getByLabel('From',{exact:true}).fill('');
@@ -74,18 +116,22 @@ test('Activity Log identifies Label Print and filters preview and printer status
   await page.goto('/management?section=activity');
   await expect(page.getByRole('cell',{name:'Label Print',exact:true})).toHaveCount(2);
   await page.getByLabel('Modes filter').selectOption('preview');
-  await expect(page.getByRole('button',{name:'Details',exact:true})).toHaveCount(1);
-  await page.getByRole('button',{name:'Details',exact:true}).click();
+  await expect(page.locator('.management-log-table tbody tr')).toHaveCount(1);
+  await page.locator('.management-log-table tbody tr').click();
+  await page.getByRole('dialog').getByText('Request metadata',{exact:true}).click();
   await expect(page.locator('.management-activity-metadata')).toContainText('preview_busy');
   await expect(page.locator('.management-activity-metadata')).toContainText('429');
   await page.getByRole('button',{name:'Close',exact:true}).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByLabel('Modes filter').selectOption('status');
-  await expect(page.getByRole('button',{name:'Details',exact:true})).toHaveCount(1);
-  await page.getByRole('button',{name:'Details',exact:true}).click();
+  await expect(page.locator('.management-log-table tbody tr')).toHaveCount(1);
+  await page.locator('.management-log-table tbody tr').click();
+  await page.getByRole('dialog').getByText('Request metadata',{exact:true}).click();
   await expect(page.locator('.management-activity-metadata')).toContainText('media_out');
   await page.getByRole('button',{name:'Close',exact:true}).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByLabel('Modes filter').selectOption('');
   await page.getByLabel('Search activity').fill('label_print');
-  await expect(page.getByRole('button',{name:'Details',exact:true})).toHaveCount(2);
+  await expect(page.locator('.management-log-table tbody tr')).toHaveCount(2);
   expect(writes).toEqual([]);
 });

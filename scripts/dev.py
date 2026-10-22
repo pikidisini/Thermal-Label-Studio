@@ -108,7 +108,7 @@ def compose_storage_environment(config: dict) -> dict[str, str]:
     result["TLS_MINIO_ENDPOINT"] = "127.0.0.1:" + port("minio", 9000)
     result["TLS_MINIO_SECURE"] = str(values.get("TLS_MINIO_SECURE", "false"))
     # Carry an explicitly configured Compose target; an empty host stays disabled.
-    for key in ("TLS_PRINTER_HOST", "TLS_PRINTER_PORT", "TLS_MANAGEMENT_ENABLED", "TLS_MANAGEMENT_KEY_ENCRYPTION", "TLS_ACTIVITY_ENABLED", "TLS_SAP_RFC_ENABLED", "TLS_SAP_RFC_PYTHON", "TLS_SAP_RFC_TARGETS", "TLS_SAP_RFC_FUNCTIONS"):
+    for key in ("TLS_AUTH_ORIGINS", "TLS_AUTH_LOCAL_HTTP", "TLS_TRUSTED_PROXY_IPS", "TLS_PRINTER_HOST", "TLS_PRINTER_PORT", "TLS_MANAGEMENT_ENABLED", "TLS_MANAGEMENT_KEY_ENCRYPTION", "TLS_ACTIVITY_ENABLED", "TLS_SAP_RFC_ENABLED", "TLS_SAP_RFC_PYTHON", "TLS_SAP_RFC_TARGETS", "TLS_SAP_RFC_FUNCTIONS"):
         if key in values:
             result[key] = str(values[key])
     return result

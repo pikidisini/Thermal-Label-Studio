@@ -1,3 +1,4 @@
+import { authFetch as fetch } from '../../../shared/auth/client';
 import { API_BASE, HttpError, responseError } from '../../../shared/api';
 
 export interface PersistedLayoutSummary {

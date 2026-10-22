@@ -1,9 +1,14 @@
 # API contract
 
+Interactive APIs require account sessions, CSRF and explicit roles. See
+[AUTH_CONTRACT](AUTH_CONTRACT.md) for login/users interfaces and provisioning.
+Machine intake retains its independent bearer admission.
+
 ## Prepared preview artifacts and standalone agent package
 
 Successful SAP/Test Data previews additionally return opaque `print_artifact`
-identifiers. Failed, discarded and regression-fixture results do not grant a
+identifiers owned by the authenticated account. Cross-account artifact use is
+denied before transport, using the same 410 response as expired output. Failed, discarded and regression-fixture results do not grant a
 print artifact. Artifacts expire after 15 minutes, process restart or eviction
 from a 64 MiB/256-entry cache. This preview cache is not an intake/job ledger.
 
@@ -12,7 +17,7 @@ from a 64 MiB/256-entry cache. This preview cache is not an intake/job ledger.
 printer is enabled and returns its current numeric host/port. Missing/disabled
 printer returns 409 `printer_configuration_changed`. Standalone agent clients
 can check Ethernet mapping against their agent catalog. The endpoint uses existing
-local-preview/origin and bounded JSON admission, returns no-store and never
+authenticated role/origin and bounded JSON admission, returns no-store and never
 contacts SAP or a printer. Unknown/expired artifacts return 410 `preview_expired`.
 It returns `{language: "IPL", copies, target: {target_id, host, port}, items:
 [{payload_base64, sha256}]}`. One copy reuses encoded preview bytes; other copy
@@ -105,7 +110,7 @@ identical to Management. Storage failures remain failures, not an empty catalog.
 `expected_updated_at` returned by list/get. It validates the full canonical
 envelope and performs one PostgreSQL UPDATE conditioned on id/timestamp.
 Conflict returns 409 `dataset_conflict`; no automatic retry is allowed. The
-endpoint uses the development management loopback/origin guard, JSON media
+endpoint uses authenticated role admission and exact trusted origins, JSON media
 and the existing bounded duplicate-aware decoder. It returns updated summary
 metadata. No schema migration or old-data deletion is required. Existing
 POST/list/get contracts remain valid. Dataset storage is separate from the
@@ -434,8 +439,8 @@ with bounded fresh-version allocation, rather than exposing a blocked retry as 4
 
 ## Current Studio entry and layout failure recovery
 
-Studio has no login/session/CSRF controls; retired frontend auth is not an API
-security boundary. Both Preview view and Label Simulation send the current
+Studio uses mandatory local-account sessions, CSRF and role checks as specified
+in [AUTH_CONTRACT](AUTH_CONTRACT.md). Retired frontend auth stays archived. Both Preview view and Label Simulation send the current
 draft SVG/media/DPI plus explicit data/encoder/copies to /api/v1/simulation/editor-preview. The Preview panels
 share its PNG; no legacy render/parse-raw request is part of this flow.
 
@@ -732,7 +737,7 @@ Label Print offers Check status for the selected enabled Management printer.
 Only that button calls POST /api/v1/label-print/printer-status with target_id,
 expected_host and expected_port; no caller-controlled destination is accepted.
 The route rechecks saved configuration (409 if changed/disabled), uses the same
-loopback/origin and bounded JSON admission as LAN Print, returns no-store and
+authenticated role/origin and bounded JSON admission as LAN Print, returns no-store and
 serializes with LAN delivery (429 while busy). There is no background polling,
 selection probe, SAP access, print payload, reset or configuration command.
 The server sends one IPL ENQ byte (0x05) to the saved numeric TCP target, with

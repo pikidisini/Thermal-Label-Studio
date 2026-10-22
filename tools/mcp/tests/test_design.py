@@ -16,7 +16,7 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
 
-@pytest.mark.parametrize('url', ['https://127.0.0.1:8000', 'http://example.com:8000',
+@pytest.mark.parametrize('url', ['ftp://127.0.0.1:8000', 'http://example.com:8000',
     'http://127.0.0.1', 'http://user:password@127.0.0.1:8000', 'http://127.0.0.1:8000/api',
     'http://127.0.0.1:8000?x=1'])
 def test_target_restriction(url):
@@ -92,7 +92,10 @@ def test_redirects_and_oversized_responses_are_rejected(monkeypatch):
 @pytest.mark.parametrize('save', [False, True])
 def test_stdio_discovery_contract_and_no_save_by_default(save):
     async def check():
-        params = StdioServerParameters(command=sys.executable, args=['-B', str(SERVER)],
+        # Protocol regression with an isolated client. Operational main requires a
+        # protected, explicitly authenticated session; this test never reads one.
+        script = "import sys; sys.path.insert(0, sys.argv[1]); from design_server import DesignClient, create_server; create_server(DesignClient('http://127.0.0.1:1', allow_save=sys.argv[2]=='true')).run(transport='stdio')"
+        params = StdioServerParameters(command=sys.executable, args=['-B', '-c', script, str(SERVER.parent), str(save).lower()],
             env={**os.environ, 'TLS_MCP_DESIGN_URL': 'http://127.0.0.1:1',
                  'TLS_MCP_DESIGN_ALLOW_SAVE': str(save).lower()})
         async with stdio_client(params) as (reader, writer):
@@ -108,3 +111,25 @@ def test_stdio_discovery_contract_and_no_save_by_default(save):
                 failure = await session.call_tool('list_templates', {})
                 assert failure.isError
     asyncio.run(check())
+
+
+def test_explicit_login_csrf_activity_and_revocation_without_retry():
+    calls = []
+    def handler(request):
+        calls.append(request.url.path)
+        if request.url.path.endswith('/auth/session'):
+            return httpx.Response(200, json={'csrf_token': 'initial'})
+        assert request.headers['origin'] == 'https://studio.example.test'
+        if request.url.path.endswith('/auth/login'):
+            assert request.headers['x-csrf-token'] == 'initial'
+            return httpx.Response(200, headers={'set-cookie': 'tls_session=synthetic; Path=/; Secure; HttpOnly'},
+                json={'csrf_token': 'authenticated', 'user': {'role': 'Designer', 'must_change_password': False}})
+        assert request.headers['x-csrf-token'] == 'authenticated'
+        assert request.headers['cookie'] == 'tls_session=synthetic'
+        return httpx.Response(401, json={'detail': {'code': 'unauthenticated'}})
+    client = module.DesignClient('https://studio.example.test', transport=httpx.MockTransport(handler))
+    client.login('designer', 'synthetic password')
+    with pytest.raises(ValueError, match='unauthenticated'):
+        client.request('POST', 'layouts', {})
+    assert calls == ['/api/v1/auth/session', '/api/v1/auth/login', '/api/v1/auth/activity']
+    client.http.close()

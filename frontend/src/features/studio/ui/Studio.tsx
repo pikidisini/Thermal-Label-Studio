@@ -1,3 +1,4 @@
+import { currentAccount } from '../../../shared/auth/client';
 import { translate as t, useTranslation } from "../../../shared/i18n";
 import React, { useRef, useCallback } from 'react';
 import type * as fabric from 'fabric';
@@ -154,7 +155,7 @@ export function Studio() {
   const { triggerRenderSimulation } = useThermalSimulation(canvasRef, pxPerMm);
   const actions = useCanvasActions(canvasRef, pxPerMm, triggerRenderSimulation);
   const templateMgr = useTemplateManager(canvasRef, calculateAutoFitZoom, triggerRenderSimulation, pxPerMm);
-  const draft = useEditorDraftRecovery('phase7-local-studio', canvasRef, { templateId: activeTemplateId, widthMm: labelWidthMm, heightMm: labelHeightMm, viewMode });
+  const draft = useEditorDraftRecovery(currentAccount()?.id ?? null, canvasRef, { templateId: activeTemplateId, widthMm: labelWidthMm, heightMm: labelHeightMm, viewMode });
   const draftScheduleRef = React.useRef(draft.schedule);
   draftScheduleRef.current = draft.schedule;
   const restoredDraftRef = React.useRef(false);
@@ -527,8 +528,8 @@ export function Studio() {
       </div>
 
       <StatusBar />
-      {draft.status === 'restored' && <div data-testid="editor-draft-restored" className="absolute bottom-7 left-3 z-[var(--ui-layer-toast)] rounded bg-emerald-950/90 px-2 py-1 text-[10px] text-emerald-200">{t("Session draft restored. Upload local JSON again to preview the same data.")}</div>}
-      {draft.status === 'quota' && <div data-testid="editor-draft-storage-warning" className="absolute bottom-7 left-3 z-[var(--ui-layer-toast)] rounded bg-amber-950/90 px-2 py-1 text-[10px] text-amber-200">{t("Session draft cannot be saved in this browser.")}</div>}
+      {draft.status === 'restored' && <div data-testid="editor-draft-restored" className="absolute bottom-7 left-3 z-[var(--ui-layer-toast)] rounded bg-tertiary-container/90 px-2 py-1 text-[10px] text-[var(--ui-on-success-container)]">{t("Session draft restored. Upload local JSON again to preview the same data.")}</div>}
+      {draft.status === 'quota' && <div data-testid="editor-draft-storage-warning" className="absolute bottom-7 left-3 z-[var(--ui-layer-toast)] rounded bg-secondary-container/90 px-2 py-1 text-[10px] text-on-secondary">{t("Session draft cannot be saved in this browser.")}</div>}
 
       <CanvasSetupModal
         isOpen={isCanvasModalOpen}

@@ -40,7 +40,7 @@ test('fixture review displays empty, loading, safe error, bitmap and failure evi
   assert.equal(fixturePreviewUrl(failed.items[0]), null);
 });
 
-test('fixture page is clearly a development fixture and has no auth gate', async () => {
+test('fixture page remains a development fixture within the shared account gate', async () => {
   const markup = await render(React.createElement(FixtureSimulationPage));
   assert.match(markup, /Fixture simulation/);
   assert.match(markup, /Development fixture/);
@@ -77,7 +77,7 @@ test('fixture API posts only scenario to the new route and preserves backend bit
     calls++;
     assert.equal(url, '/api/v1/simulation/fixture');
     assert.equal(options.method, 'POST');
-    assert.equal(options.credentials, 'omit');
+    assert.equal(options.credentials, 'same-origin');
     assert.equal(options.body, '{"scenario":"sample"}');
     return new Response(JSON.stringify(response()), { headers: { 'Content-Type': 'application/json' } });
   };

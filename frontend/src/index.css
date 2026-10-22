@@ -154,6 +154,8 @@ input[type="number"] {
   --ui-backdrop-blur: 2px;
   --ui-transition-duration: 120ms;
   --ui-transition-easing: ease-out;
+  --ui-panel-slide-duration: 300ms;
+  --ui-panel-slide-easing: ease-in-out;
 }
 :root[data-theme="light"] {
   --ui-text-disabled: #65758c;
@@ -407,7 +409,7 @@ input[type="number"] {
 .custom-theme-preview-label { background: #ffffff; color: #000000; border: 1px solid #000000; }
 .custom-theme-preview-barcode { background: repeating-linear-gradient(90deg, #000000 0 2px, #ffffff 2px 4px, #000000 4px 5px, #ffffff 5px 8px); }
 /* Inspector interior surfaces inherit its chosen color only for custom palettes. */
-:root[data-custom-theme="true"] [data-ui-region="inspector"], :root[data-theme="label-studio-signature"] [data-ui-region="inspector"] { --ui-surface-low: var(--ui-region-inspector); --ui-surface-canvas: var(--ui-region-inspector); --ui-surface-base: var(--ui-region-inspector); }
+:root[data-custom-theme="true"]:not([data-independent-surfaces="true"]) [data-ui-region="inspector"], :root[data-theme="label-studio-signature"] [data-ui-region="inspector"] { --ui-surface-low: var(--ui-region-inspector); --ui-surface-canvas: var(--ui-region-inspector); --ui-surface-base: var(--ui-region-inspector); }
 :root[data-theme="industrial-dark"] {
   --ui-surface-canvas: #14181b;
   --ui-surface-base: #191d20;

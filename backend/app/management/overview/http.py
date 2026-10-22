@@ -7,4 +7,9 @@ router = APIRouter()
 @router.get('/snapshot')
 def snapshot(request: Request):
     local_access(request)
-    return read_snapshot(configured_store(request))
+    result = read_snapshot(configured_store(request))
+    if request.state.auth_user['role'] == 'Designer':
+        # Studio identity changes need a revision, never source/key/SAP configuration.
+        return {'writable': result['writable'], 'policy_origin': result['policy_origin'],
+                'document': {'policy': {'revision': result['document']['policy']['revision']}}}
+    return result

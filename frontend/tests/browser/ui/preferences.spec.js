@@ -1,3 +1,4 @@
+import { mockAccountSession, mockBuiltApplication } from '../helpers/studio.js';
 import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -15,12 +16,12 @@ test.beforeEach(async ({ page }, testInfo) => {
     if (!file.startsWith(path.join(dist, 'assets') + path.sep)) return route.abort();
     return route.fulfill({ path: file });
   });
-  await page.route('**/api/**', route => route.fulfill({ status: 503, json: { detail: { message: 'Unexpected mocked API request.' } } }));
-  await page.route('**/api/v1/layouts', route => route.fulfill({ json: [] }));
-  await page.route('**/api/v1/studio-sample-datasets', route => route.fulfill({ json: [] }));
+  await page.route('**/api/**', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ status: 503, json: { detail: { message: 'Unexpected mocked API request.' } } }));
+  await page.route('**/api/v1/layouts', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: [] }));
+  await page.route('**/api/v1/studio-sample-datasets', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: [] }));
 });
 async function settings(page) {
-  if (new URL(page.url()).pathname === '/studio') await page.getByTestId('topbar-menu-btn-view').click();
+  await page.getByTestId('topbar-menu-btn-view').click();
   await page.getByTestId('preferences-button').click();
   await expect(page.getByTestId('preferences-dialog')).toBeVisible();
 }
@@ -360,9 +361,10 @@ test('custom palette drafts cancel, reset, validate and persist without changing
   await expect(page.getByTestId('custom-hex-bar')).toHaveAttribute('aria-invalid', 'true');
   await page.getByTestId('custom-hex-bar').fill('#123456');
   await page.getByTestId('custom-hex-tools').fill('#234567');
-  await page.getByRole('tab', { name: 'Workspace', exact: true }).click();
+  await page.getByRole('tab', { name: 'Surfaces & workspace', exact: true }).click();
   await page.getByTestId('custom-hex-workspace').fill('#345678');
-  await page.getByRole('tab', { name: 'Text & controls', exact: true }).click();
+  await page.getByRole('tab', { name: 'Actions', exact: true }).click();
+  await page.getByRole('tab', { name: 'Actions', exact: true }).click();
   await page.getByTestId('custom-hex-action').fill('#abcdef');
   await page.getByTestId('custom-hex-actionText').fill('#000000');
   await page.getByTestId('custom-theme-apply').click();
@@ -389,7 +391,7 @@ test('custom palette drafts cancel, reset, validate and persist without changing
 });
 
 for (const language of ['en', 'id']) {
-  test(`custom theme tabs stay in one row at desktop and 320px in ${language}`, async ({ page }, testInfo) => {
+  test(`custom theme tabs fit without horizontal overflow at desktop and 320px in ${language}`, async ({ page }, testInfo) => {
     await page.goto('/studio');
     await settings(page);
     await page.getByTestId('preferences-language').selectOption(language);
@@ -397,12 +399,19 @@ for (const language of ['en', 'id']) {
     for (const width of [1440, 320]) {
       await page.setViewportSize({ width, height: 900 });
       const dialog = page.getByTestId('preferences-dialog');
+      const tabs = dialog.getByRole('tab');
+      await tabs.first().focus();
+      await page.keyboard.press('End');
+      await expect(tabs.last()).toBeFocused();
+      await expect(tabs.last()).toHaveAttribute('aria-selected', 'true');
+      await page.keyboard.press('ArrowRight');
+      await expect(tabs.first()).toBeFocused();
       const boxes = await dialog.getByRole('tab').evaluateAll(nodes => nodes.map(node => {
         const box = node.getBoundingClientRect();
         return { y: box.y, left: box.left, right: box.right, scrollWidth: node.scrollWidth, clientWidth: node.clientWidth };
       }));
-      expect(boxes).toHaveLength(3);
-      expect(new Set(boxes.map(box => box.y)).size).toBe(1);
+      expect(boxes).toHaveLength(5);
+      expect(new Set(boxes.map(box => box.y)).size).toBeLessThanOrEqual(3);
       for (const box of boxes) { expect(box.left).toBeGreaterThanOrEqual(0); expect(box.right).toBeLessThanOrEqual(width); expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth); }
       expect(await dialog.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
       const reset = page.getByTestId('custom-theme-reset');
@@ -432,15 +441,18 @@ test('legacy custom palette reloads and warning edits reach version status witho
   await page.getByTestId('btn-add-text').click();
   const before = await svg(page, testInfo, 'warning-before.svg');
   await settings(page);
-  await page.getByRole('tab', { name: 'Text & controls', exact: true }).click();
+  await page.getByRole('tab', { name: 'Actions', exact: true }).click();
+  await page.getByRole('tab', { name: 'Status colors', exact: true }).click();
   await expect(page.getByTestId('custom-hex-warning')).toHaveValue('#c4b79b');
   await expect(page.getByTestId('custom-hex-warningFill')).toHaveValue('#a49478');
   await expect(page.getByTestId('custom-hex-warningText')).toHaveValue('#282218');
   await page.getByTestId('custom-hex-warning').fill('#ffcc00');
   await page.getByTestId('custom-hex-warningFill').fill('#765432');
   await page.getByTestId('custom-hex-warningText').fill('#ffffff');
+  await page.getByRole('tab', { name: 'Actions', exact: true }).click();
   await page.getByTestId('custom-hex-action').fill('#abcdef');
   await page.getByTestId('custom-hex-actionText').fill('#112233');
+  await page.getByTestId('custom-hex-actionHover').fill('#abcdef');
   await page.getByTestId('custom-theme-apply').click();
   const selectedPair = locator => locator.evaluate(node => ({ background: getComputedStyle(node).backgroundColor, color: getComputedStyle(node).color }));
   const snap = page.getByTestId('ribbon-toggle-snap');
@@ -491,9 +503,11 @@ test('shared Material and Lucide icons resize through tokens and logo inherits c
   await page.locator('html').evaluate(node => node.style.setProperty('--ui-icon-scale', '1.25'));
   await expect(lucide).toHaveCSS('width', '20px');
   await expect(lucide).toHaveCSS('height', '20px');
-  await page.getByRole('tab', { name: 'Text & controls', exact: true }).click();
+  await page.getByRole('tab', { name: 'Actions', exact: true }).click();
+  await page.getByRole('tab', { name: 'Actions', exact: true }).click();
   await page.getByTestId('custom-hex-action').fill('#abcdef');
   await page.getByTestId('custom-hex-actionText').fill('#112233');
+  await page.getByTestId('custom-hex-actionHover').fill('#abcdef');
   await page.getByTestId('custom-theme-apply').click();
   await expect(material).toHaveCSS('width', '20px');
   await expect(material).toHaveCSS('font-size', '20px');
@@ -514,3 +528,50 @@ test('shared Material and Lucide icons resize through tokens and logo inherits c
   expect(after).toBe(before);
   await page.getByTestId('topbar-brand-logo').screenshot({ path: testInfo.outputPath('studio-logo-custom-pair.png') });
 });
+
+// Browser feature fixtures authenticate independently of their mocked feature APIs.
+test.beforeEach(async ({ page }) => { await mockAccountSession(page); });
+
+
+for (const route of ['/', '/studio', '/management', '/print']) {
+  test(`expanded palette reaches real shared controls and surfaces on ${route}`, async ({ page }) => {
+    await mockBuiltApplication(page);
+    await page.goto('/studio');
+    await settings(page);
+    await page.getByTestId('preferences-custom-base').selectOption('industrial-dark');
+    await page.getByRole('tab', { name: 'Surfaces & workspace', exact: true }).click();
+    for (const [key, value] of Object.entries({ workspace: '#132435', baseSurface: '#102030', inputSurface: '#203040', dialogSurface: '#304050', overlaySurface: '#405060', tooltipSurface: '#506070' })) await page.getByTestId(`custom-hex-${key}`).fill(value);
+    await page.getByRole('tab', { name: 'Text & borders', exact: true }).click();
+    for (const [key, value] of Object.entries({ text: '#fafafa', textSecondary: '#bbccdd', textDisabled: '#778899', border: '#617283', outline: '#8293a4', focus: '#eeddcc' })) await page.getByTestId(`custom-hex-${key}`).fill(value);
+    await page.getByRole('tab', { name: 'Actions', exact: true }).click();
+    await page.getByTestId('custom-hex-actionHover').fill('#426384');
+    await page.getByTestId('custom-theme-apply').click();
+    await page.goto(route);
+    await page.reload();
+    const surface = route === '/' ? page.locator('.home-page') : route === '/print' ? page.locator('.label-print-page') : page.getByTestId(route === '/studio' ? 'app-root-container' : 'management-page');
+    await expect(surface).toHaveCSS('background-color', route === '/' ? 'rgb(19, 36, 53)' : 'rgb(16, 32, 48)');
+    if (route === '/studio') {
+      await page.getByTestId('btn-add-text').click();
+      await expect(page.getByTestId('inspector-input-token-value')).toHaveCSS('background-color', 'rgb(32, 48, 64)');
+    }
+    await page.getByTestId('topbar-menu-btn-view').click();
+    await page.getByTestId('preferences-button').click();
+    const dialog = page.getByTestId('preferences-dialog');
+    await expect(dialog).toHaveCSS('background-color', 'rgb(48, 64, 80)');
+    await expect(dialog).toHaveCSS('border-top-color', 'rgb(97, 114, 131)');
+    await expect(dialog.locator('[data-ui-section="dialog-header"]')).toHaveCSS('background-color', 'rgb(64, 80, 96)');
+    const select = page.getByTestId('preferences-language');
+    await expect(select).toHaveCSS('background-color', 'rgb(32, 48, 64)');
+    await expect(select).toHaveCSS('color', 'rgb(250, 250, 250)');
+    await select.focus();
+    await expect(select).toHaveCSS('outline-color', 'rgb(238, 221, 204)');
+    await page.getByRole('tab', { name: 'Actions', exact: true }).click();
+    const selectedTab = page.getByRole('tab', { name: 'Actions', exact: true });
+    await selectedTab.hover();
+    await expect(selectedTab).toHaveCSS('background-color', 'rgb(66, 99, 132)');
+    await page.getByRole('tab', { name: 'Bars & panels', exact: true }).click();
+    await page.getByTestId('custom-hex-bar').fill('invalid');
+    await expect(page.getByTestId('custom-theme-apply')).toHaveCSS('color', 'rgb(119, 136, 153)');
+    await expect(page.getByTestId('custom-theme-apply')).toBeDisabled();
+  });
+}

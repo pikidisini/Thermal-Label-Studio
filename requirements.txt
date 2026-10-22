@@ -27,3 +27,6 @@ pytest==9.1.1
 zxing-cpp==3.1.1
 httpx==0.28.1
 coverage==7.16.2
+
+# Local account password hashing.
+argon2-cffi==25.1.0

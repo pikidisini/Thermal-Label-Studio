@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 import pytest
 from fastapi import FastAPI, Request
-from fastapi.testclient import TestClient
+from .auth_test_support import TestClient
 from starlette.responses import JSONResponse
 from app.activity.context import (current_activity, intake_identity, intake_outcome,
                                   stage, studio_identity, studio_outcome)

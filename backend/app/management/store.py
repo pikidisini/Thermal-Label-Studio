@@ -1,4 +1,5 @@
 """Shared PostgreSQL snapshot, revision locking and transactional audit."""
+from app.auth.service import actor_id
 from datetime import datetime, timezone
 import json
 import os
@@ -62,7 +63,7 @@ class ManagementStore:
                         raise ManagementError('management_capacity', 409)
                     validate_transition(previous.policy, updated.policy)
                     event = dict(event_id=uuid4().hex, at=datetime.now(timezone.utc).isoformat(),
-                                 actor='DEVELOPMENT_UNAUTHENTICATED', action=action,
+                                 actor=actor_id.get() or 'DEVELOPMENT_UNAUTHENTICATED', action=action,
                                  object_id=object_id, note=note, revision=updated.policy.revision,
                                  before=audit_view(previous, action, object_id),
                                  after=audit_view(updated, action, object_id))

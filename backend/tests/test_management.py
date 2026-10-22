@@ -7,7 +7,7 @@ import pytest
 import httpx
 from app.management.access import require_store
 from app.layouts.service import LayoutService
-from fastapi.testclient import TestClient
+from .auth_test_support import TestClient
 from app.main import app
 from app.management.models import Document
 from app.management.templates.models import DecisionCommand, ReviewCommand
@@ -117,7 +117,7 @@ def runtime(monkeypatch):
 def submit(client, revision='P1', **changes):
     """Historical document rules remain testable without exposing retired review routes."""
     try:
-        store = require_store(SimpleNamespace(app=app, client=SimpleNamespace(host='127.0.0.1'), headers={}))
+        store = require_store(SimpleNamespace(app=app, state=SimpleNamespace(auth_user={'id': 'synthetic-admin', 'role': 'Admin'}), client=SimpleNamespace(host='127.0.0.1'), headers={}))
         command = ReviewCommand(revision=revision, note='Review exact version', label_code='A', version=1, svg_sha256='a' * 64, **changes) if not changes else ReviewCommand(**(dict(revision=revision, note='Review exact version', label_code='A', version=1, svg_sha256='a' * 64) | changes))
         if command.version != 1: raise ManagementError('layout_changed', 409)
         result = store.change(command.revision, 'review.submit', command.label_code, command.note, lambda document: submit_review(document, command))
@@ -290,6 +290,21 @@ def test_non_loopback_denied(runtime):
     assert client.get('/api/v1/management/snapshot').status_code == 403
 
 
+def test_designer_template_identity_updates_return_revision_without_admin_configuration(runtime, monkeypatch):
+    client, _, _ = runtime
+    repo = app.state._feature_test_auth.store.repo
+    principal = repo.get('users', 'synthetic-admin')
+    monkeypatch.setitem(repo.data['users'], 'synthetic-admin', {**principal, 'role': 'Designer'})
+    snapshot = client.get('/api/v1/management/snapshot')
+    assert snapshot.status_code == 200
+    assert set(snapshot.json()['document']['policy']) == {'revision'}
+    assert client.get('/api/v1/management/audit').status_code == 403
+    updated = client.post('/api/v1/management/templates/A', json=template_command())
+    assert updated.status_code == 200, updated.text
+    assert set(updated.json()) == {'policy'}
+    assert set(updated.json()['policy']) == {'revision'}
+
+
 def test_duplicate_json_and_body_limit(runtime):
     client, database, _ = runtime
     assert client.put('/api/v1/management/printers', content='{"revision":"P1","revision":"P2"}', headers={'Content-Type': 'application/json'}).status_code == 400
@@ -320,7 +335,7 @@ def test_template_rename_updates_all_versions_references_and_atomic_audit(runtim
     assert response.json()['policy']['sources'][0]['label_codes'] == ['ROLL_PRODUCTION']
     assert database.events[0]['before']['label_code'] == 'A'
     assert database.events[0]['after']['label_code'] == 'ROLL_PRODUCTION'
-    assert client.post('/api/v1/management/reviews', json={}).status_code == 404
+    assert client.post('/api/v1/management/reviews', json={}).status_code == 403
 
 
 @pytest.mark.parametrize('failure', ['audit', 'commit', 'committed_ack_lost'])

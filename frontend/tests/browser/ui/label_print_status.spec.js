@@ -1,3 +1,4 @@
+import { mockAccountSession } from '../helpers/studio.js';
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,6 +7,7 @@ for (const lang of ['en', 'id']) test(`printer status is explicit and scoped to 
   const id = lang === 'id'; let checks = 0; let mode = 'responding'; let delayed;
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
+    if (url.pathname.startsWith('/api/v1/auth/')) return route.fallback();
     if (url.pathname === '/api/v1/label-print/printers') return route.fulfill({ json: { policy_origin:'management', printers:['LAN','OTHER'].map(target_id => ({target_id, host:'192.0.2.44',port:9100,enabled:true,language:'IPL',connection:'Ethernet',transport:'TCP/RAW'})) } });
     if (url.pathname === '/api/v1/label-print/printer-status') {
       checks++; const body = route.request().postDataJSON();
@@ -45,3 +47,6 @@ for (const lang of ['en', 'id']) test(`printer status is explicit and scoped to 
   await expect(page.getByRole('button',{name:id?'Periksa status':'Check status',exact:true})).toHaveCount(0);
   expect(checks).toBe(7);
 });
+
+// Browser feature fixtures authenticate independently of their mocked feature APIs.
+test.beforeEach(async ({ page }) => { await mockAccountSession(page); });

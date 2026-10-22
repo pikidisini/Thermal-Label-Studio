@@ -1,3 +1,4 @@
+import { mockAccountSession } from '../helpers/studio.js';
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +12,7 @@ for (const lang of ['en', 'id']) test(`test data preview HTTP results and stale 
   let png;
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
+    if (url.pathname.startsWith('/api/v1/auth/')) return route.fallback();
     if (url.pathname === '/api/v1/label-print/printers') return route.fulfill({ json: { policy_origin: 'management', printers: [] } });
     if (url.pathname.endsWith('/studio-sample-datasets')) return route.fulfill({ json: [{ id: '00000000-0000-0000-0000-000000000001', name: 'Saved rolls' }] });
     if (url.pathname === '/api/v1/label-print/preview') {
@@ -83,3 +85,6 @@ for (const lang of ['en', 'id']) test(`test data preview HTTP results and stale 
   expect(requests.at(-1).source).toBe('dataset');
   expect(requests.at(-1).dataset_id).toBe('00000000-0000-0000-0000-000000000001');
 });
+
+// Browser feature fixtures authenticate independently of their mocked feature APIs.
+test.beforeEach(async ({ page }) => { await mockAccountSession(page); });

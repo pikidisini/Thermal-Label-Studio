@@ -21,7 +21,7 @@ def setup(client, monkeypatch):
     monkeypatch.setattr(http, 'execute_operation', forbidden)
     monkeypatch.setattr(http, 'prepare_draft_output', forbidden)
     output = PreparedOutput(RenderedLabel('test', '1', 1, 1, 203.2, b'PNG'), PAYLOAD, 'IPL')
-    ids = [cache.put(output) for _ in range(3)]
+    ids = [cache.put(output, 'synthetic-admin') for _ in range(3)]
     calls = []
     class Transport:
         def __init__(self, target): assert target.host == '192.0.2.44' and target.port == 9100
@@ -72,7 +72,7 @@ def test_disabled_and_cross_origin_targets_never_send(client, setup):
 
 def test_invalid_later_payload_prevents_all_delivery(client, setup):
     body, calls, _, cache = setup
-    identity = cache.put(PreparedOutput(RenderedLabel('test', '1', 1, 1, 203.2, b'PNG'), b'invalid', 'IPL'))
+    identity = cache.put(PreparedOutput(RenderedLabel('test', '1', 1, 1, 203.2, b'PNG'), b'invalid', 'IPL'), 'synthetic-admin')
     body['artifacts'][-1] = identity
     assert client.post('/api/v1/label-print/print', json=body).status_code == 422
     assert calls == []

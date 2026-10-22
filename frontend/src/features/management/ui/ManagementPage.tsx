@@ -1,8 +1,9 @@
+import { ApplicationHeader } from '../../../shared/ui/ApplicationHeader';
+import { UsersSection } from '../users/UsersSection';
 import { useState } from 'react';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
-import { ApplicationBrand, Button, Icon } from '../../../shared/ui';
+import { Button, Icon } from '../../../shared/ui';
 import { useTranslation } from '../../../shared/i18n';
-import { PreferencesButton } from '../../preferences';
 import { useManagement } from '../hooks/useManagement';
 import { sections } from '../model/navigation';
 import { ManagementSidebar } from './ManagementSidebar';
@@ -24,15 +25,16 @@ export function ManagementPage() {
   const { section, saving, loading, errors, snapshot, needsRefresh, message, refresh, setMessage, policy } = management;
   const sectionName = sections.find(s => s.id === section)!.label;
   return <div data-ui-root data-testid="management-page" className="management-page">
-    <header className="management-brand"><ApplicationBrand home disabled={saving} testId="management-brand-home" /><span>{t('Utilities')} / {t('Application Management')}</span><PreferencesButton /></header>
+    <ApplicationHeader className="management-brand" disabled={saving} testId="management-brand-home"><span>{t('Utilities')} / {t('Application Management')}</span></ApplicationHeader>
     <div className="management-header"><div className="management-header-title"><div><div className="management-muted">{t('Workspace')}</div><h1>{t('Application Management')}</h1></div></div><Button onClick={() => { window.location.href = '/studio'; }} disabled={saving}><Icon component={ArrowLeft} /> {t('Back to Studio')}</Button></div>
     <div className="management-layout" data-ui-motion data-sidebar-collapsed={!sidebarExpanded}><ManagementSidebar management={management} expanded={sidebarExpanded} onToggle={() => setSidebarExpanded(expanded => !expanded)} />
     <main className="management-main"><div className="management-heading"><h2>{t(sectionName)}</h2><div className="management-heading-actions">{section !== 'graphics' && <Button onClick={() => { setMessage(''); void refresh(); }} disabled={loading || saving}><Icon component={RefreshCw} /> {t('Refresh')}</Button>}{section === 'printers' && <AddPrinterButton management={management} />}</div></div>
-      {loading && <p role="status">{t('Loading application managementâ€¦')}</p>}
-      {errors.map((error, i) => <p key={i} role="alert" className="management-error">{t(error)}</p>)}
-      {section !== 'datasets' && section !== 'graphics' && !loading && snapshot && !snapshot.writable && <p className="management-notice">{t('Management changes are unavailable until persistent management storage is provisioned. Existing configuration is shown read-only.')}</p>}
+      {section !== 'users' && loading && <p role="status">{t('Loading application management…')}</p>}
+      {section !== 'users' && errors.map((error, i) => <p key={i} role="alert" className="management-error">{t(error)}</p>)}
+      {section !== 'users' && section !== 'datasets' && section !== 'graphics' && !loading && snapshot && !snapshot.writable && <p className="management-notice">{t('Management changes are unavailable until persistent management storage is provisioned. Existing configuration is shown read-only.')}</p>}
       {needsRefresh && <p className="management-notice">{t('Refresh before making further changes. Your last submission will not be retried automatically.')}</p>}
       {message && <p role="status" className="management-notice">{t(message)}</p>}
+      {section === 'users' && <UsersSection />}
       {section === 'overview' && <OverviewSection management={management} />}
       {section === 'datasets' && <TestDataSection />}
       {section === 'graphics' && <div className="management-graphics"><p className="management-muted">{t('Browse and upload reusable images. Complete label designs are managed in Templates.')}</p><GraphicsSection /></div>}
@@ -47,6 +49,6 @@ export function ManagementPage() {
       {section === 'audit' && <AuditSection management={management} />}
       {section === 'activity' && <ActivitySection refreshKey={management.checkedAt} refreshing={loading} />}
       {section !== 'templates' && section !== 'integrations' && section !== 'printers' && <ManagementEditor management={management} />}
-    </main></div><footer className="management-footer"><span>{t('Application Management')} / {t(sectionName)}</span><span>{t('Policy origin')}: {snapshot?.policy_origin ?? 'â€”'} Â· {policy?.revision ?? 'â€”'}</span></footer>
+    </main></div><footer className="management-footer"><span>{t('Application Management')} / {t(sectionName)}</span><span>{t('Policy origin')}: {snapshot?.policy_origin ?? '—'} · {policy?.revision ?? '—'}</span></footer>
   </div>;
 }

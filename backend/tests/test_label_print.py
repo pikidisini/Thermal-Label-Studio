@@ -5,7 +5,7 @@ from io import BytesIO
 
 import pytest
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
+from .auth_test_support import TestClient
 from PIL import Image
 from app.label_print import http
 from app.label_print.fixtures import TEMPLATE

@@ -37,4 +37,7 @@ def manage_template(label_code: str, command: TemplateCommand, request: Request)
             # Database commit succeeded. Preserve remaining copies for inspection;
             # never report the identity update as failed or retry it automatically.
             logging.getLogger(__name__).warning('Template object cleanup incomplete after committed identity update.')
+    if request.state.auth_user['role'] == 'Designer':
+        # A successful template mutation must not disclose administrative config.
+        return {'policy': {'revision': result['policy']['revision']}}
     return result

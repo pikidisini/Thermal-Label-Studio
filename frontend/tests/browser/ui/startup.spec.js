@@ -1,3 +1,4 @@
+import { mockAccountSession } from '../helpers/studio.js';
 import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -7,7 +8,7 @@ async function setup(page, appRoute) {
   await page.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
   await page.route('https://fonts.gstatic.com/**', route => route.abort());
   await page.route('**/studio', route => route.fulfill({ path: path.join(dist, 'index.html'), contentType: 'text/html' }));
-  await page.route('**/api/**', route => route.fulfill({ json: [] }));
+  await page.route('**/api/**', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: [] }));
   await page.route('**/assets/**', async route => {
     const file = path.resolve(dist, `.${decodeURIComponent(new URL(route.request().url()).pathname)}`);
     if (!file.startsWith(path.join(dist, 'assets') + path.sep)) return route.abort();
@@ -52,3 +53,6 @@ test('failed Studio module shows a localized recovery action and reload retries'
   await expect(page.getByTestId('application-startup')).toHaveCount(0);
   await expect(page.getByTestId('container-topbar-brand-row')).toBeVisible();
 });
+
+// Browser feature fixtures authenticate independently of their mocked feature APIs.
+test.beforeEach(async ({ page }) => { await mockAccountSession(page); });

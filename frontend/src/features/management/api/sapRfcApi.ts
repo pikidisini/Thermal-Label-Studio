@@ -1,3 +1,4 @@
+import { authFetch as fetch } from '../../../shared/auth/client';
 import { API_BASE, responseError } from '../../../shared/api';
 export interface SapConnection { connection_id: string; name: string; host: string; system_number: string; client: string; username: string; language: string; enabled: boolean; password_configured?: boolean; status?: string }
 export interface RfcParameter { name: string; label: string; kind: 'string' | 'integer' | 'decimal' | 'date' | 'boolean' | 'string_list'; required: boolean; source: 'operator' | 'constant'; constant: string | null }

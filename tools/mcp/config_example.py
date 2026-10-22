@@ -9,6 +9,7 @@ root = Path(__file__).resolve().parent
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--service', choices=('postgres', 'minio', 'jenkins', 'sonar', 'design'), default='postgres')
 parser.add_argument('--design-url', default='http://127.0.0.1:8000')
+parser.add_argument('--design-session-file')
 parser.add_argument('--allow-design-save', action='store_true')
 args = parser.parse_args()
 entries = {'postgres': ('server.py', ['list_tables', 'describe_table', 'read_table']),
@@ -42,3 +43,5 @@ if args.service == 'design':
     print('[mcp_servers.thermal_label_design.env]')
     print('TLS_MCP_DESIGN_URL = ' + json.dumps(args.design_url))
     print('TLS_MCP_DESIGN_ALLOW_SAVE = ' + json.dumps('true' if args.allow_design_save else 'false'))
+    if args.design_session_file:
+        print('TLS_MCP_DESIGN_SESSION_FILE = ' + json.dumps(Path(args.design_session_file).as_posix()))

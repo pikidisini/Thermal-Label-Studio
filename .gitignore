@@ -50,6 +50,7 @@ test-results/
 frontend/playwright-report/
 frontend/test-results/
 frontend/.auth/
+/.auth/
 **/.last-run.json
 
 # Disposable pytest directories left by interrupted local runs.

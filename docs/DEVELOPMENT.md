@@ -69,8 +69,8 @@ docker compose up --build -d
 ```
 
 The app binds 127.0.0.1:8002 by default, PostgreSQL 5434 and MinIO 9002/9003.
-`/studio` has no authentication. Do not expose this local application as a shared
-service before implementing server access controls. `/fixture-simulation` is
+`/studio` requires login. Provision accounts explicitly and configure origins
+using AUTH_CONTRACT.md before authorized shared HTTPS exposure. `/fixture-simulation` is
 another page in the same application, not a separate deployment mode.
 
 Configured persistence initializes PostgreSQL schema/MinIO bucket on startup.
@@ -215,6 +215,13 @@ python -B scripts/check_project.py
 python -B scripts/check_project.py --run-source-checks
 ```
 
+Each check has a default 600-second execution budget. If the full native backend
+regression exceeds that budget on the selected host, use an explicit bounded
+budget, for example `python -B scripts/check_project.py --run-source-checks --timeout-seconds 1200`. The report records the chosen
+budget; all checks and failure rules remain unchanged. A timeout is BLOCKED,
+never PASS. No runtime/deployment acceptance is inferred.
+
+
 The first command prints a process-free plan. The second runs backend regression,
 full TypeScript, a fresh frontend build, then frontend regression. It saves its
 bounded JSON report to `.tmp/source-checks-<unique-id>/report.json`; the report
@@ -275,7 +282,8 @@ screenshots/traces and its sibling playwright-report for HTML. From frontend,
 use `npm run show-trace -- <absolute-trace.zip-path>` or
 `npm exec playwright show-report -- <absolute-report-directory>`.
 Browser tests include both Preview view and Label Simulation current-endpoint
-checks; no login/logout or legacy printer/SAP flows are claimed covered.
+checks. Current auth specs cover login/logout with fakes and browser mocks;
+legacy printer/SAP flows are not established by those checks.
 
 ## Persistent data and recovery
 
@@ -369,7 +377,8 @@ Custom. Original Dark/Light palettes remain available, and System follows them.
 Browser-local v1 preferences accept all theme IDs; authored canvas/export colors
 remain unchanged.
 Custom adds a draft editor under Preference with Industrial Light/Dark base,
-twelve allowlisted six-digit HEX colors, horizontal area tabs, a miniature preview,
+33 allowlisted six-digit HEX colors grouped into Bars & panels, Surfaces & workspace,
+Text & borders, Actions, and Status colors, a miniature preview with control-state samples,
 and an informational minimum contrast ratio. Apply persists the validated custom
 palette under the existing browser-local key; Cancel/backdrop/Escape discard the
 draft. Reset copies the chosen base colors. Builtin and language selection retain
@@ -383,6 +392,19 @@ values fail validation in both bootstrap and runtime. Region tokens affect actua
 backgrounds; viewport/grid tokens affect only the area outside the white label.
 Fabric objects/background, authored SVG, barcode payloads and exported pixels are
 outside this preference boundary.
+Expanded palettes separate primary/secondary/disabled text, action/hover/supporting
+accents, surfaces, border/outline/focus, success pairs and destructive status.
+These shared semantic tokens apply across Home, Studio, Management, Print and
+portal dialogs. Solid colors are editable; backdrop/shadow opacity and geometry
+remain fixed. Print/graphics thumbnails and authored output retain their colors.
+The browser preference storage key remains v1. An optional custom-palette
+`version: 2` marks independently editable inspector surfaces. Nine- and twelve-key
+palettes without that marker retain the legacy inspector surface alias until an
+explicit color edit or Reset. Missing split fields inherit the old text/action
+colors; other absent additions use the Industrial base. Supplied invalid values
+(including null) reject the palette. Signature retains its previous appearance.
+Every allowed token is cleared when switching back to an ordinary builtin theme.
+
 Mounted UI icons use the shared `Icon` primitive for Material glyphs and Lucide
 components. Icons inherit currentColor and token sizes; `--ui-icon-scale` changes
 both families together while control/dock/small and deliberate numeric size tokens
@@ -524,7 +546,7 @@ Label Print offers Check status for the selected enabled Management printer.
 Only that button calls POST /api/v1/label-print/printer-status with target_id,
 expected_host and expected_port; no caller-controlled destination is accepted.
 The route rechecks saved configuration (409 if changed/disabled), uses the same
-loopback/origin and bounded JSON admission as LAN Print, returns no-store and
+authenticated role/origin and bounded JSON admission as LAN Print, returns no-store and
 serializes with LAN delivery (429 while busy). There is no background polling,
 selection probe, SAP access, print payload, reset or configuration command.
 The server sends one IPL ENQ byte (0x05) to the saved numeric TCP target, with

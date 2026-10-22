@@ -1,3 +1,4 @@
+import { authFetch as fetch } from '../../../shared/auth/client';
 import type { SapConfiguration } from './sapRfcApi';
 import { API_BASE, responseError } from '../../../shared/api';
 import { layoutApi } from '../../templates';
@@ -13,9 +14,13 @@ export interface Snapshot { writable: boolean; policy_origin: string; document: 
 export interface AuditEvent { event_id: string; at: string; actor: string; action: string; object_id: string; note: string; revision: string; before: unknown; after: unknown }
 export interface ActivityEntry {
   trace_id: string; at: string; origin: 'studio' | 'intake' | 'label_print'; mode: 'simulation' | 'print' | 'preview' | 'status' | null;
-  operation?: string; source?: string; external_request_id?: string; original_trace_id?: string;
+  operation?: string; source?: string; actor?: string | null; external_request_id?: string; original_trace_id?: string;
   status: string; status_code: number; duration_ms: number; replayed?: boolean; error_code?: string;
-  items?: Array<{ label_code: string; status: string }>;
+  target_id?: string;
+  target?: { host: string; port: number };
+  summary?: { total?: number; submitted?: number; failed?: number; skipped?: number; simulated?: number; uncertain?: number; ready?: number; not_attempted?: number };
+  items?: Array<{ item_index?: number; label_code?: string; status: string; target_id?: string | null; copies?: number }>;
+  events_truncated?: boolean;
   events: Array<{ event: string; at: string; elapsed_ms: number; item_index?: number; error_code?: string }>;
 }
 export interface ActivitySnapshot { enabled: boolean; entries: ActivityEntry[] }

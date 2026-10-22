@@ -1,3 +1,4 @@
+import { mockAccountSession } from '../helpers/studio.js';
 import { test, expect } from '@playwright/test';
 import { openStudio, saveLayout, reopenLayout, mockBuiltApplication } from '../helpers/studio.js';
 import { fileURLToPath } from 'node:url';
@@ -16,7 +17,7 @@ test.beforeEach(async ({ page }) => {
 
 test('text positions survive repeated template reopen and page refresh', async ({ page }) => {
   let stored;
-  await page.route('**/api/**', route => route.fulfill({ status: 503, json: {} }));
+  await page.route('**/api/**', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ status: 503, json: {} }));
   await page.route('**/api/v1/layouts', route => {
     if (route.request().method() === 'POST') {
       stored = { ...route.request().postDataJSON(), version: 1, status: 'published',
@@ -25,7 +26,7 @@ test('text positions survive repeated template reopen and page refresh', async (
     }
     return route.fulfill({ json: stored ? [stored] : [] });
   });
-  await page.route('**/api/v1/layouts/text_geometry', route => route.fulfill({ json: stored }));
+  await page.route('**/api/v1/layouts/text_geometry', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: stored }));
   await openStudio(page);
   await page.locator('input[accept=".svg,image/svg+xml"]').setInputFiles({
     name: 'text-geometry.svg', mimeType: 'image/svg+xml',
@@ -77,3 +78,5 @@ test('text positions survive repeated template reopen and page refresh', async (
     for (const key of ['x', 'y', 'width', 'height']) expect(Math.abs(box[key] - original[index][key])).toBeLessThan(0.25);
   });
 });
+
+test.beforeEach(async ({ page }) => { await mockAccountSession(page); });

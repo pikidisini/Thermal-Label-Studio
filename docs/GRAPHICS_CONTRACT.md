@@ -31,9 +31,9 @@ Library changes cannot alter previously saved templates.
 
 ## HTTP contract
 
-All routes use the configured API prefix (normally `/api/v1`) and the existing
-loopback development access guard, including origin/cross-site checks. There is
-no shared-user authentication or permission model.
+All routes use the configured API prefix (normally `/api/v1`) and mandatory
+Admin/Designer session admission, including CSRF and trusted-origin checks.
+Operator access is denied. See [AUTH_CONTRACT](AUTH_CONTRACT.md).
 
 - `GET /graphics?q=<literal name substring>&offset=0`: at most 100 summaries,
   newest first with UUID tie-breaker. Case-insensitive literal substring search;

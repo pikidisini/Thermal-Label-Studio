@@ -1,3 +1,4 @@
+import { authFetch as fetch } from '../../../shared/auth/client';
 import { API_BASE } from '../../../shared/api';
 import type { SapSelection } from '../ui/SapOperationPicker';
 export const previewStages = ['FETCH_DATA', 'VALIDATE_DATA', 'RESOLVE_LAYOUT', 'BIND_TEMPLATE', 'RASTERIZE', 'ENCODE_IPL', 'DECODE_IPL', 'ACCEPT_PREVIEW'] as const;

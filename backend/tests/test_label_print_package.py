@@ -59,10 +59,10 @@ def test_artifact_budget_and_expiration(monkeypatch):
     monkeypatch.setattr(module, 'monotonic', lambda: clock[0])
     cache = PreviewArtifacts(budget=6, ttl=10)
     output = PreparedOutput(RenderedLabel('test', '1', 1, 1, 203.2, b'PNG'), b'IPL', 'IPL')
-    first = cache.put(output)
-    second = cache.put(output)
-    with pytest.raises(KeyError): cache.get_many([first], 1)
-    assert cache.get_many([second], 1)[0].payload == b'IPL'
+    first = cache.put(output, 'synthetic-admin')
+    second = cache.put(output, 'synthetic-admin')
+    with pytest.raises(KeyError): cache.get_many([first], 1, 'synthetic-admin')
+    assert cache.get_many([second], 1, 'synthetic-admin')[0].payload == b'IPL'
     clock[0] += 11
-    with pytest.raises(KeyError): cache.get_many([second], 1)
-    assert PreviewArtifacts(budget=1).put(output) is None
+    with pytest.raises(KeyError): cache.get_many([second], 1, 'synthetic-admin')
+    assert PreviewArtifacts(budget=1).put(output, 'synthetic-admin') is None

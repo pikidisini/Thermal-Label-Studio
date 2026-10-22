@@ -70,6 +70,28 @@ def test_gate_fails_closed_and_reports_remaining_checks(monkeypatch, failure):
 
 
 def test_explicit_run_returns_failure_exit_code(monkeypatch):
-    monkeypatch.setattr(gate, "execute_checks", lambda checks: {"source_gate": "FAIL"})
+    monkeypatch.setattr(gate, "execute_checks", lambda checks, **kwargs: {"source_gate": "FAIL"})
     monkeypatch.setattr(gate, "save_report", lambda report: report)
     assert gate.main(["--run-source-checks"]) == 1
+
+
+def test_explicit_budget_keeps_all_checks_and_failure_semantics(monkeypatch):
+    calls = []
+    def run(command, **kwargs):
+        calls.append(kwargs['timeout'])
+        return subprocess.CompletedProcess(command, 1 if len(calls) == 1 else 0)
+    monkeypatch.setattr(subprocess, 'run', run)
+    report = gate.execute_checks(gate.source_checks(), timeout_seconds=1200)
+    assert calls == [1200] * 4
+    assert report['source_gate'] == 'FAIL'
+    assert report['per_check_timeout_seconds'] == 1200
+    assert report['checks'][0]['status'] == 'FAIL'
+    assert report['deployment_ready'] is False
+
+
+@pytest.mark.parametrize('value', ['0', '-1', '3601', 'unbounded'])
+def test_invalid_execution_budget_never_starts_checks(monkeypatch, value):
+    monkeypatch.setattr(subprocess, 'run', lambda *args, **kwargs: pytest.fail('Invalid budget ran a process'))
+    with pytest.raises(SystemExit) as result:
+        gate.main(['--run-source-checks', '--timeout-seconds', value])
+    assert result.value.code == 2

@@ -1,3 +1,4 @@
+import { authFetch as fetch } from '../../../shared/auth/client';
 import React, { useEffect, useRef, useState } from 'react';
 import { API_BASE } from '../../../shared/api';
 import { useTranslation } from '../../../shared/i18n';

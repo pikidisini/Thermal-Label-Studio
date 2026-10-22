@@ -1,5 +1,14 @@
 # Decisions
 
+## 2026-10-21 - Local accounts and shared-browser access
+
+AUTH_CONTRACT.md supersedes earlier no-login/local-only browser assumptions.
+Interactive APIs require server sessions, CSRF and explicit Admin/Designer/Operator
+permissions. Sender bearer admission remains independent. Schema activation,
+bootstrap and HTTPS LAN acceptance are explicit named-target operations.
+Earlier dated decisions below remain historical.
+
+
 ## 2026-10-16 - AI SVG authoring through the application API
 
 Expose an optional local STDIO design MCP sidecar. Reuse application admission,

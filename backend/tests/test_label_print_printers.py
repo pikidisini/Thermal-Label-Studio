@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 import pytest
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
+from .auth_test_support import TestClient
 from app.label_print.http import router
 from app.management.models import Document
 from app.label_intake.policy import Policy, Target

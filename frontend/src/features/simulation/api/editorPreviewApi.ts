@@ -1,3 +1,4 @@
+import { authFetch as fetch } from '../../../shared/auth/client';
 import { API_BASE } from '../../../shared/api';
 
 import type { EditorOutputSnapshot } from '../../canvas';

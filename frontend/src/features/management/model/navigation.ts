@@ -1,8 +1,9 @@
-import { Activity, Files, Images, History, LayoutDashboard, Plug, Printer as PrinterIcon } from 'lucide-react';
+import { Users, Activity, Files, Images, History, LayoutDashboard, Plug, Printer as PrinterIcon } from 'lucide-react';
 import type { PersistedLayoutSummary } from '../../templates';
 import type { AuditEvent, Printer, Source } from '../api/managementApi';
 
 export const sections = [
+  { id: 'users', label: 'Users', icon: Users },
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'templates', label: 'Templates', icon: Files },
   { id: 'graphics', label: 'Graphics / Images', icon: Images },

@@ -3,7 +3,7 @@ import json
 from types import SimpleNamespace
 from uuid import uuid4
 import pytest
-from fastapi.testclient import TestClient
+from .auth_test_support import TestClient
 from app.main import app
 from app.label_print import http
 from app.label_print.artifacts import PreviewArtifacts
@@ -59,7 +59,7 @@ def test_delivery_outcomes_preserve_uncertainty_and_never_log_payloads(logged, m
     cache = PreviewArtifacts()
     monkeypatch.setattr(http,'artifacts',cache)
     payload = b'<STX><ESC>C<ETX>\r\n<STX><RS>1<ETX>\r\n<STX><ETB><ETX>\r\n'
-    artifact = cache.put(PreparedOutput(RenderedLabel('test','1',1,1,203.2,b'PNG'),payload,'IPL'))
+    artifact = cache.put(PreparedOutput(RenderedLabel('test','1',1,1,203.2,b'PNG'),payload,'IPL'), 'synthetic-admin')
     sends=[]
     def submit(data):
         sends.append(data)

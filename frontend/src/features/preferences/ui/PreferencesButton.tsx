@@ -8,12 +8,38 @@ import { usePreferencesStore } from '../model/usePreferencesStore';
 import type { Language, Theme } from '../model/preferences';
 import { COLOR_KEYS, isHexColor, newCustomTheme } from '../model/customTheme';
 import { CustomThemeEditor } from './CustomThemeEditor';
+import { AnchoredOverlay } from '../../../shared/ui/layers';
 import { signatureDraft } from '../model/signatureTheme';
 export function PreferencesButton() {
   const [open, setOpen] = React.useState(false);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const trigger = React.useRef<HTMLButtonElement>(null);
+  const overlay = React.useRef<HTMLDivElement>(null);
+  const item = React.useRef<HTMLButtonElement>(null);
   const t = useTranslation();
-  return <><Button data-testid="preferences-button" aria-haspopup="dialog" onClick={() => setOpen(true)}>{t('Preference')}</Button><PreferencesDialog open={open} onClose={() => setOpen(false)} /></>;
+  React.useEffect(() => {
+    if (!menuOpen) return;
+    const focusFrame = requestAnimationFrame(() => item.current?.focus());
+    const outside = (event: MouseEvent) => {
+      if (!trigger.current?.contains(event.target as Node) && !overlay.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setMenuOpen(false); trigger.current?.focus(); }
+      if (event.key === 'Tab') setMenuOpen(false);
+      if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) { event.preventDefault(); item.current?.focus(); }
+    };
+    document.addEventListener('mousedown', outside); document.addEventListener('keydown', key);
+    return () => { cancelAnimationFrame(focusFrame); document.removeEventListener('mousedown', outside); document.removeEventListener('keydown', key); };
+  }, [menuOpen]);
+  return <><Button ref={trigger} data-testid="topbar-menu-btn-view" variant="toolbar" aria-haspopup="menu" aria-expanded={menuOpen}
+    onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); setMenuOpen(true); } }}
+    onClick={() => setMenuOpen(value => !value)}>{t('View')}</Button>
+    {menuOpen && <AnchoredOverlay anchorRef={trigger} overlayRef={overlay}><div role="menu" aria-label={t('View')} className="min-w-44 border border-outline-variant bg-surface-container-lowest py-1 shadow-xl" data-ui-surface="flyout">
+      <Button ref={item} role="menuitem" variant="menu" className="block w-full text-left" data-testid="preferences-button" onClick={() => { trigger.current?.focus(); setMenuOpen(false); setOpen(true); }}>{t('Preference')}</Button>
+    </div></AnchoredOverlay>}
+    <PreferencesDialog open={open} onClose={() => setOpen(false)} /></>;
 }
+
 export function PreferencesDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const t = useTranslation();
   const preferences = usePreferencesStore();

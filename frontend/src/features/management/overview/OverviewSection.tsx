@@ -1,17 +1,47 @@
-import { Button } from '../../../shared/ui';
+import { Files, Plug, Printer } from 'lucide-react';
+import { Badge, Button, Icon } from '../../../shared/ui';
 import { useTranslation } from '../../../shared/i18n';
 import type { ManagementController } from '../hooks/useManagement';
-import { StatusBadge } from '../ui/StatusBadge';
 import type { Section } from '../model/navigation';
 
 export function OverviewSection({ management }: { management: ManagementController }) {
   const t = useTranslation();
-  const { templates, policy, snapshot, saving, navigate, services, checkedAt, audit, date } = management;
-  const badge = (value: string) => <StatusBadge value={value} />;
-  return (<>
-        <p className="management-muted">{t('Manage stored templates and application configuration.')}</p>
-        <div className="management-summary">{[['Stored templates', templates.length, 'templates'], ['Configured printers', policy?.targets.length ?? 0, 'printers'], ['Integration sources', policy?.sources.length ?? 0, 'integrations']].map(([label, count, destination]) => <div key={label} className="management-stat"><span>{t(String(label))}</span><strong>{snapshot ? count : '—'}</strong><Button disabled={saving} onClick={() => navigate(destination as Section)}>{t('View details')}</Button></div>)}</div>
-        <div className="management-columns"><section><h3>{t('Service status')}</h3><div className="management-line"><span>{t('Application')}</span>{badge(services.application ? 'Available' : 'Unavailable')}</div><div className="management-line"><span>{t('Layout metadata')}</span>{badge(services.layouts ? 'Available' : 'Unavailable')}</div><div className="management-line"><span>{t('MinIO artifact reads')}</span>{badge('Not checked')}</div><p className="management-muted">{t('Last checked')}: {checkedAt || '—'}</p></section></div>
-        <h3>{t('Recent changes')}</h3>{audit.slice(0, 3).map(event => <div key={event.event_id} className="management-line"><span>{event.action}<small>{event.object_id}</small></span><span>{date(event.at)}</span></div>)}{audit.length === 0 && <p>{t('No recorded changes.')}</p>}
-      </>);
+  const { templates, policy, snapshot, saving, loading, navigate, services, checkedAt, audit, auditError, date } = management;
+  const summaries = [
+    { label: 'Stored templates', count: templates.length, available: services.layouts, destination: 'templates', icon: Files },
+    { label: 'Configured printers', count: policy?.targets.length ?? 0, available: !!snapshot, destination: 'printers', icon: Printer },
+    { label: 'Integration sources', count: policy?.sources.length ?? 0, available: !!snapshot, destination: 'integrations', icon: Plug },
+  ];
+  const serviceBadge = (available: boolean) => {
+    const label = loading ? 'Checking…' : available ? 'Available' : 'Unavailable';
+    return <Badge tone={loading ? 'neutral' : available ? 'success' : 'danger'}>{t(label)}</Badge>;
+  };
+  return <div className="management-overview" aria-busy={loading}>
+    <p className="management-muted">{t('Manage stored templates and application configuration.')}</p>
+    <div className="overview-summary">
+      {summaries.map(({ label, count, available, destination, icon }) => <section key={label} className="overview-stat" aria-label={t(label)}>
+        <div className="overview-stat-label"><Icon component={icon} /><span>{t(label)}</span></div>
+        <div className="overview-stat-value"><strong>{loading || !available ? '—' : count}</strong><Button disabled={saving} onClick={() => navigate(destination as Section)}>{t('View details')}</Button></div>
+        {!loading && !available && <small>{t('Unavailable')}</small>}
+      </section>)}
+    </div>
+    <div className="overview-panels">
+      <section className="overview-panel" aria-labelledby="overview-services-title">
+        <h3 id="overview-services-title">{t('Service status')}</h3>
+        <div className="overview-service-row"><span>{t('Application')}</span>{serviceBadge(services.application)}</div>
+        <div className="overview-service-row"><span>{t('Layout metadata')}</span>{serviceBadge(services.layouts)}</div>
+        <div className="overview-service-row"><span>{t('MinIO artifact reads')}</span><Badge>{t('Not checked')}</Badge></div>
+        <p className="overview-checked management-muted">{t('Last checked')}: {loading ? '—' : checkedAt || '—'}</p>
+      </section>
+      <section className="overview-panel" aria-labelledby="overview-changes-title">
+        <h3 id="overview-changes-title">{t('Recent changes')}</h3>
+        {loading ? <p className="management-muted">{t('Loading recent changes…')}</p> : auditError ? <p className="management-muted">{t('Recent changes are unavailable.')}</p> : audit.length === 0 ? <p className="management-muted">{t('No recorded changes.')}</p> : <ul className="overview-changes">
+          {audit.slice(0, 3).map(event => <li key={event.event_id} className="overview-change-row">
+            <div className="overview-change-object"><span>{event.action}</span><small>{event.object_id}</small></div>
+            <time dateTime={event.at}>{date(event.at)}</time>
+          </li>)}
+        </ul>}
+      </section>
+    </div>
+  </div>;
 }

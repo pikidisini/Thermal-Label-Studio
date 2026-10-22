@@ -2,7 +2,7 @@
 import base64
 import hashlib
 import pytest
-from fastapi.testclient import TestClient
+from .auth_test_support import TestClient
 from app.main import app
 from app.config import PrinterTarget
 from app.engine.editor_request import EditorOutputRequest

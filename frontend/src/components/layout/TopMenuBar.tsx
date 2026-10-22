@@ -1,3 +1,4 @@
+import { AccountControls } from '../../shared/auth/AccountControls';
 import { useTranslation } from '../../shared/i18n';
 import React from 'react';
 import { ViewMode } from '../../types/label';
@@ -81,9 +82,9 @@ function BrandRow(props: Readonly<Pick<TopMenuBarProps, 'onOpenCanvasSetup' | 'o
     <div
       data-testid="container-topbar-brand-row"
       data-ui-region="menu"
-      className="h-10 px-4 flex items-center justify-between border-b border-outline-variant bg-surface-container-lowest"
+      className="studio-brand-row px-4 flex items-center justify-between border-b border-outline-variant bg-surface-container-lowest"
     >
-      <div className="flex items-center gap-3">
+      <div className="studio-brand-start flex items-center gap-3">
         {/* Wordmark */}
         <ApplicationBrand home compact testId="topbar-brand-logo" markTestId="topbar-brand-mark" />
 
@@ -102,6 +103,7 @@ function BrandRow(props: Readonly<Pick<TopMenuBarProps, 'onOpenCanvasSetup' | 'o
           ))}
         </div>
       </div>
+      <AccountControls />
       <PreferencesDialog open={preferencesOpen} onClose={() => setPreferencesOpen(false)} />
     </div>
   );

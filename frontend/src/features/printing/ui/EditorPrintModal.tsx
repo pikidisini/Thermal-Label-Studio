@@ -1,4 +1,5 @@
 import type { EditorOutputSnapshot } from '../../canvas';
+import { studioPrintLocked, lockStudioPrint, clearStudioPrint } from '../model/studioPrintLock';
 import React from 'react';
 import { Info, Minus, Plus, Printer } from 'lucide-react';
 import { translate as t, useTranslation } from '../../../shared/i18n';
@@ -40,7 +41,8 @@ export function EditorPrintModal({ isOpen, onClose, getSnapshot, widthMm, height
     const remembered = loadPrinterTarget();
     setHost(remembered?.host || ''); setPort(String(remembered?.port || 9100));
     edited.current = false; setTargetLoading(true); setTargetError(false);
-    setCopies('1'); setError(null); setResult(null); setAttempted(false); attemptedRef.current = false;
+    const locked = studioPrintLocked();
+    setCopies('1'); setError(locked ? failureMessages.uncertain : null); setResult(null); setAttempted(locked); attemptedRef.current = locked;
     void getPrintTarget(controller.signal).then(value => {
       if (!controller.signal.aborted && !edited.current && !remembered && value.available && value.host && value.port) {
         setHost(value.host); setPort(String(value.port));
@@ -65,7 +67,7 @@ export function EditorPrintModal({ isOpen, onClose, getSnapshot, widthMm, height
   const remember = () => { if (target) rememberPrinterTarget(target); };
   const close = () => { if (!sending.current) onClose(); };
   const print = async () => {
-    if (sending.current || attemptedRef.current || !target || copiesInvalid) return;
+    if (sending.current || attemptedRef.current || studioPrintLocked() || !target || copiesInvalid) return;
     setError(null); setResult(null);
     let snapshot: EditorOutputSnapshot;
     try { snapshot = getSnapshot(Number(copies)); }
@@ -74,12 +76,14 @@ export function EditorPrintModal({ isOpen, onClose, getSnapshot, widthMm, height
     rememberPrinterTarget(target);
     setBusy(true); setAttempted(true);
     try {
+      lockStudioPrint();
       setResult(await printEditorLabel({ ...snapshot, encoder, target }));
+      clearStudioPrint();
       attemptedRef.current = false; setAttempted(false);
     } catch (cause) {
       const kind = cause instanceof PrintFailure ? cause.kind : 'uncertain';
       setError(failureMessages[kind]);
-      if (kind !== 'uncertain') { attemptedRef.current = false; setAttempted(false); }
+      if (kind !== 'uncertain') { clearStudioPrint(); attemptedRef.current = false; setAttempted(false); }
     }
     finally { sending.current = false; setBusy(false); }
   };
@@ -94,6 +98,7 @@ export function EditorPrintModal({ isOpen, onClose, getSnapshot, widthMm, height
         <IconButton label={t('Close print dialog')} onClick={close} disabled={busy}>×</IconButton>
       </DialogHeader>
       <DialogBody className="grid gap-[15px] p-[var(--ui-space-4)]">
+        {attempted && !busy && <Button onClick={() => { try { clearStudioPrint(); attemptedRef.current = false; setAttempted(false); setError(null); } catch { setError(failureMessages.uncertain); } }}>{t('I checked the printer; clear print lock')}</Button>}
         <div><p className="text-on-surface-variant">{t('Label size')}</p>
           <p data-testid="print-layout-summary" className="font-medium tabular-nums">{widthMm} × {heightMm} mm <span className="font-normal text-on-surface-variant">· {dpi} DPI</span></p>
         </div>

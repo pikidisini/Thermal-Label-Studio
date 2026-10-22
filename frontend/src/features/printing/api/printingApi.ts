@@ -1,3 +1,4 @@
+import { authFetch as fetch } from '../../../shared/auth/client';
 import type { EditorOutputSnapshot } from '../../canvas';
 import { API_BASE } from '../../../shared/api';
 import { isNumericPrinterHost, type PrinterTarget } from '../model/printerTarget';

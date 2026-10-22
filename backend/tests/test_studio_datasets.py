@@ -3,7 +3,7 @@ from copy import deepcopy
 from types import SimpleNamespace
 import pytest
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
+from .auth_test_support import TestClient
 from app.studio_datasets.http import router
 from app.studio_datasets.service import StudioDatasetService, DatasetPersistenceError
 from app.label_data import validate_payload

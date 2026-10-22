@@ -4,7 +4,7 @@ import json
 import socket
 from types import SimpleNamespace
 import pytest
-from fastapi.testclient import TestClient
+from .auth_test_support import TestClient
 from pydantic import ValidationError
 from app.main import app
 from app.label_intake import http, service

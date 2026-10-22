@@ -8,7 +8,7 @@ import subprocess
 from threading import Barrier
 from uuid import uuid4
 import pytest
-from fastapi.testclient import TestClient
+from .auth_test_support import TestClient
 from app.main import app
 from app.label_intake import http, service
 from app.label_intake.identity import LedgerKeys, canonical_json

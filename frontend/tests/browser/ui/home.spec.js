@@ -1,12 +1,14 @@
+import { mockAccountSession } from '../helpers/studio.js';
 import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { mockBuiltApplication, openStudio } from '../helpers/studio.js';
 const dist = fileURLToPath(new URL('../../../dist/', import.meta.url));
 
-for (const language of ['en', 'id']) test(`home navigation and print placeholder in ${language}`, async ({ page }) => {
+for (const language of ['en', 'id']) test(`authenticated home navigation and print workspace in ${language}`, async ({ page }) => {
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
+    if (url.pathname.startsWith('/api/v1/auth/')) return route.fallback();
     if (url.pathname === '/api/v1/label-print/printers') return route.fulfill({ json: { policy_origin: 'management', printers: [] } });
     if (url.hostname !== '127.0.0.1') return route.abort();
     if (['/', '/print'].includes(url.pathname)) return route.fulfill({ path: path.join(dist, 'index.html'), contentType: 'text/html' });
@@ -21,16 +23,17 @@ for (const language of ['en', 'id']) test(`home navigation and print placeholder
   const apiRequests = [];
   page.on('request', request => {
     const url = request.url();
-    if (url.includes('/api/')) apiRequests.push(url);
+    if (url.includes('/api/') && !url.includes('/api/v1/auth/')) apiRequests.push(url);
     modules.push(url);
   });
   await page.goto('/');
   await expect(page.getByRole('heading', { name: language === 'id' ? 'Pilih aktivitas Anda' : 'Choose your activity' })).toBeVisible();
   await expect(page.locator('.home-card')).toHaveCount(3);
   await expect(page.locator('a[href="/management"]')).toBeVisible();
-  await expect(page.locator('a[href="/print"] [data-ui-badge]')).toBeVisible();
+  await expect(page.locator('a[href="/print"] [data-ui-badge]')).toHaveCount(0);
   await expect(page.locator('.home-card-icon svg')).toHaveCount(3);
   await expect(page.locator('.home-card-icon svg').first()).toHaveAttribute('data-ui-glyph', 'true');
+  await page.getByTestId('topbar-menu-btn-view').click();
   await page.getByTestId('preferences-button').click();
   await expect(page.getByTestId('preferences-dialog')).toBeVisible();
   await page.keyboard.press('Escape');
@@ -70,7 +73,7 @@ test('unknown route shows Not found without loading Studio or making API request
   await page.goto('/unknown-page');
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
   await expect(page.getByTestId('canvas-container')).toHaveCount(0);
-  expect(requests.some(url => url.includes('/api/') || url.includes('vendor-fabric'))).toBe(false);
+  expect(requests.some(url => (url.includes('/api/') && !url.includes('/api/v1/auth/')) || url.includes('vendor-fabric'))).toBe(false);
   await expect(page.getByRole('link', { name: 'Main menu' })).toHaveAttribute('href', '/');
 });
 
@@ -94,3 +97,6 @@ test('Studio and Management brand buttons open Home with keyboard activation', a
   await expect(page).toHaveURL(/:\d+\/$/);
   await expect(page.getByRole('heading', { name: 'Choose your activity' })).toBeVisible();
 });
+
+// Browser feature fixtures authenticate independently of their mocked feature APIs.
+test.beforeEach(async ({ page }) => { await mockAccountSession(page); });

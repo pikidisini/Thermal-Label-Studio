@@ -11,6 +11,53 @@ request status and local date/time filters apply to that loaded window only.
 Details expose safe request/item metadata and chronological stage timestamps
 with elapsed milliseconds. Refresh explicitly reloads; no polling or mutations.
 
+The Activity Log table separates origin (Studio, Label Print, API Intake) from
+authenticated sender (`source`, or an em dash when absent). Target printer shows
+distinct recorded item/request target IDs, falling back to a recorded Studio
+host:port; it never resolves historical records against current configuration.
+Batch count counts `SUBMITTED` items once each, independent of copies, with a
+recorded summary count fallback when items are absent. Non-print and replay
+requests show zero new submitted batches; print records without count evidence
+show an em dash. This count does not confirm physical printing or identify
+distinct SAP batch values, which are not retained in activity history.
+
+## Log inspection UI
+
+Audit and Activity use a side detail panel that slides in from right to left
+(shared motion tokens, disabled for reduced motion), and slides back out to the
+right before unmounting on Close or Escape. Reduced/zero motion closes without
+an animation delay.
+The global `frontend/src/index.css` tokens `--ui-panel-slide-duration: 300ms`
+and `--ui-panel-slide-easing: ease-in-out` control both directions, independently
+of the 120ms small-control transition. These are source settings, not preferences.
+Clicking a row or pressing
+Enter/Space opens or switches details without a separate Details button.
+Copy controls do not trigger row selection. The panel has a fixed header, independent
+scroll, selected-row feedback, Escape/Close and return focus to the invoking
+control without scrolling the list. The panel fills narrow screens. Compact
+tables have sticky headers and local pagination (25/50 rows). Timestamp cells
+separate date/time in the browser's declared time zone; durations use seconds
+above 1000 ms and retain exact milliseconds in a tooltip. IDs can be copied;
+technical JSON is initially collapsed. No polling or operational action is added.
+
+Audit search covers object/action/actor/note and supports object type, exact
+action and local date/time filters. Details show event identity, revision and
+changed fields before/after, distinguishing absent values from JSON null/empty.
+Unchanged fields remain available in full JSON. Technical action codes and the
+development unauthenticated actor attribution remain visible.
+
+Activity adds source, mode, status and local date/time filters, request/item
+outcomes, per-item metadata and events grouped by item or stage. Elapsed event
+time remains cumulative since request start. COMPLETED refers to processing;
+SUBMITTED remains unconfirmed transport handoff. Recording disabled, unavailable
+storage, no records and no matching records have distinct states.
+
+Filters, page and page size are bookmarkable using `audit_*` / `activity_*`
+query parameters and survive section navigation/refresh. Reset clears only the
+current log filters. Filtering and pagination never extend the latest-200 loaded
+window; result counts describe loaded records only. Full-history search/export
+and historical reconstruction are outside the API contract.
+
 `TLS_ACTIVITY_ENABLED=false` is the default. Recording requires existing Studio
 PostgreSQL configuration and separately provisioned `backend/schema/004_activity_log.sql`.
 `app_management.activity_log` has an identity sequence and bounded JSONB event.
@@ -48,9 +95,10 @@ gaps on process termination/storage failures and is not a durable delivery audit
 Activity failures remain local to the Activity Log page and do not disable
 configuration editing. No actual SAP/printer/database acceptance is implied.
 
-Source implementation: 2026-10-13. Account login/session/roles are deliberately
-deferred by user decision. No superuser label or simulated authenticated identity
-is shown. This is a local development feature, not shared-deployment access control.
+Management source checkpoint: 2026-10-13. The previous account deferral is
+superseded by the 2026-10-21 local-account implementation in AUTH_CONTRACT.md.
+Users management and configuration/log access require Admin; Designer receives
+only template identity revision metadata plus permitted design resources.
 
 ## Navigation and page
 
@@ -72,6 +120,14 @@ application reachability; successful layout listing indicates metadata access.
 Neither asserts MinIO artifact reads, successful rasterization, operational intake
 readiness or printer readiness. MinIO artifact reads stay Not checked in Overview.
 No synthetic dashboard data is shipped in application code.
+
+Overview presents three compact count cards above paired service-status and
+recent-change panels. Below 1100px the panels stack; below 640px the cards stack.
+Count placeholders and neutral checking badges distinguish loading from results.
+Failed count sources show unavailable rather than zero; audit read failures
+remain distinct from an empty history. Only the latest three loaded audit events
+are shown, with original action/object identifiers and browser-local timestamps.
+Status tones are specific to Overview and add no service or device checks.
 
 ## Persistence and activation
 
@@ -340,8 +396,8 @@ The sending application supplies `Authorization: Bearer <access key>` on
 Configure the new key in the sending HTTP client; changing it in this application
 does not change SAP automatically. Actual SAP setup and HTTPS/network deployment
 remain separately scoped. This server-side source credential is independent of
-the deferred browser account login/roles. Development management remains loopback
-guarded, not authenticated administration suitable for shared deployment.
+browser account login/roles. Management now requires authenticated role/CSRF
+admission; named-target HTTPS LAN deployment acceptance remains separate.
 
 ## Evidence boundary
 

@@ -1,3 +1,4 @@
+import { mockAccountSession } from '../helpers/studio.js';
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,3 +42,6 @@ for (const lang of ['en', 'id']) test(`registered printer selection is configura
   await expect(page.getByRole('link', { name: id ? 'Kelola printer' : 'Manage printers', exact: true })).toHaveAttribute('href', '/management?section=printers');
   expect(requests.every(request => request.path === '/api/v1/label-print/printers' && request.method === 'GET')).toBe(true);
 });
+
+// Browser feature fixtures authenticate independently of their mocked feature APIs.
+test.beforeEach(async ({ page }) => { await mockAccountSession(page); });

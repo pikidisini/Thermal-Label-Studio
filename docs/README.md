@@ -23,6 +23,7 @@ pendamping yang terpisah. Isinya tidak menyatakan suatu instalasi telah terverif
 | --- | --- |
 | [Arsitektur](ARCHITECTURE.md) | Batas komponen, persiapan output, penyimpanan, dan runtime |
 | [Kontrak API](API_CONTRACT.md) | Makna permintaan/respons, kesalahan, dan efek operasi |
+| [Login dan hak akses](AUTH_CONTRACT.md) | Akun lokal, sesi, peran, bootstrap/pemulihan Admin, dan aktivasi HTTPS LAN |
 | [Binding template](TEMPLATE_BINDING_CONTRACT.md) | Metadata SVG, key persis, teks, komposisi, barcode/QR, batas, dan nilai pengganti |
 | [Application Management](MANAGEMENT_CONTRACT.md) | Sumber, printer, konfigurasi RFC, key, revisi, audit, dan Activity Log |
 | [Graphics](GRAPHICS_CONTRACT.md) | Aset gambar yang tidak diubah setelah disimpan dan penyisipan salinan tertanam |

@@ -16,6 +16,7 @@ export function initializePreferences(): () => void {
       style.removeProperty(token);
       if (palette) style.setProperty(token, palette.colors[key]);
     }
+    document.documentElement.dataset.independentSurfaces = preferences.theme === 'custom' && customTheme?.version === 2 ? 'true' : 'false';
     document.documentElement.dataset.customTheme = preferences.theme === 'custom' && customTheme ? 'true' : 'false';
     document.documentElement.dataset.theme = theme;
     document.documentElement.lang = preferences.language;

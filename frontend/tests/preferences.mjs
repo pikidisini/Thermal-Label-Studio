@@ -6,12 +6,12 @@ import { DEFAULT_PREFERENCES, PREFERENCES_KEY, parsePreferences, loadPreferences
 import { translate, setTranslationLanguage } from '../src/shared/i18n/index.ts';
 import { initializePreferences } from '../src/features/preferences/model/theme.ts';
 import { usePreferencesStore } from '../src/features/preferences/model/usePreferencesStore.ts';
-import { COLOR_KEYS, COLOR_TOKENS, newCustomTheme, parseCustomTheme, contrastRatio } from '../src/features/preferences/model/customTheme.ts';
+import { COLOR_KEYS, COLOR_TOKENS, CUSTOM_PRESETS, LEGACY_COLOR_KEYS, newCustomTheme, parseCustomTheme, contrastRatio } from '../src/features/preferences/model/customTheme.ts';
 import { SIGNATURE_THEME, signatureDraft } from '../src/features/preferences/model/signatureTheme.ts';
 const fakeStyle = () => ({ setProperty(name, value) { this[name] = value; }, removeProperty(name) { delete this[name]; } });
 
 test('Signature default is immutable, exact and identical before paint and at runtime', () => {
-  const expected = { bar: '#ededed', tools: '#ffffff', panel: '#ffffff', status: '#ededed', workspace: '#ededed', grid: '#9e9e9e', text: '#030303', action: '#749faa', actionText: '#ffffff', warning: '#89806c', warningFill: '#89806c', warningText: '#ffffff' };
+  const expected = { ...CUSTOM_PRESETS['industrial-light'], textSecondary: '#030303', actionHover: '#749faa', actionFixed: '#749faa', bar: '#ededed', tools: '#ffffff', panel: '#ffffff', status: '#ededed', workspace: '#ededed', grid: '#9e9e9e', text: '#030303', action: '#749faa', actionText: '#ffffff', warning: '#89806c', warningFill: '#89806c', warningText: '#ffffff' };
   assert.deepEqual(SIGNATURE_THEME.colors, expected);
   assert.equal(SIGNATURE_THEME.base, 'industrial-light');
   assert.ok(Object.isFrozen(SIGNATURE_THEME) && Object.isFrozen(SIGNATURE_THEME.colors));
@@ -136,7 +136,7 @@ test('legacy nine-key custom palettes default only absent warning fields with bo
     const expected = newCustomTheme(base);
     const oldColors = Object.fromEntries(Object.entries(expected.colors).filter(([key]) => !key.startsWith('warning')));
     const old = { base, colors: oldColors };
-    assert.deepEqual(parseCustomTheme(old), expected);
+    assert.deepEqual(parseCustomTheme(old), { base, colors: expected.colors });
     const element = { dataset: {}, style: fakeStyle() };
     runInNewContext(script, { localStorage: { getItem: () => JSON.stringify({ theme: 'custom', customTheme: old }) }, document: { documentElement: element } });
     assert.equal(element.dataset.customTheme, 'true');
@@ -190,4 +190,56 @@ test('prepaint and runtime custom tokens agree and switching builtin removes eve
     assert.equal(element.dataset.theme, 'label-studio-signature');
     assert.equal(element.dataset.customTheme, 'false');
   }
+});
+
+
+test('nine/twelve-key palettes preserve split colors and reject invalid additions before paint', () => {
+  const script = readFileSync(new URL('../index.html', import.meta.url), 'utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
+  for (const base of ['industrial-light', 'industrial-dark']) for (const count of [9, 12]) {
+    const colors = Object.fromEntries(COLOR_KEYS.slice(0, count).map(key => [key, newCustomTheme(base).colors[key]]));
+    colors.text = '#123456'; colors.action = '#abcdef'; colors.panel = '#567890';
+    const old = { base, colors };
+    const parsed = parseCustomTheme(old);
+    assert.equal(parsed.version, undefined);
+    assert.equal(parsed.colors.textSecondary, colors.text);
+    assert.equal(parsed.colors.actionHover, colors.action);
+    assert.equal(parsed.colors.actionFixed, colors.action);
+    assert.equal(parsed.colors.inputSurface, CUSTOM_PRESETS[base].inputSurface);
+    const element = { dataset: {}, style: fakeStyle() };
+    runInNewContext(script, { localStorage: { getItem: () => JSON.stringify({ theme: 'custom', customTheme: old }) }, document: { documentElement: element } });
+    assert.equal(element.dataset.independentSurfaces, 'false');
+    for (const key of COLOR_KEYS) for (const token of COLOR_TOKENS[key]) assert.equal(element.style[token], parsed.colors[key]);
+    for (const key of COLOR_KEYS.slice(9)) {
+      const bad = { base, colors: { ...colors, [key]: null } };
+      assert.equal(parseCustomTheme(bad), undefined);
+      const badElement = { dataset: {}, style: fakeStyle() };
+      runInNewContext(script, { localStorage: { getItem: () => JSON.stringify({ theme: 'custom', customTheme: bad }) }, document: { documentElement: badElement } });
+      assert.equal(badElement.dataset.customTheme, 'false');
+    }
+  }
+});
+
+test('expanded palette roundtrip applies every independent color equally at bootstrap and runtime', () => {
+  const customTheme = newCustomTheme('industrial-dark');
+  COLOR_KEYS.forEach((key, index) => { customTheme.colors[key] = '#' + (0x123400 + index).toString(16); });
+  const raw = JSON.stringify({ theme: 'custom', language: 'id', customTheme });
+  assert.deepEqual(parsePreferences(raw).customTheme, customTheme);
+  const script = readFileSync(new URL('../index.html', import.meta.url), 'utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
+  const bootstrap = { dataset: {}, style: fakeStyle() };
+  runInNewContext(script, { localStorage: { getItem: () => raw }, document: { documentElement: bootstrap } });
+  const runtime = { dataset: {}, style: fakeStyle() };
+  const previous = { window: globalThis.window, document: globalThis.document };
+  let dispose;
+  try {
+    globalThis.window = { dispatchEvent: () => true };
+    globalThis.document = { documentElement: runtime };
+    usePreferencesStore.setState(parsePreferences(raw));
+    dispose = initializePreferences();
+    assert.deepEqual(runtime.dataset, bootstrap.dataset);
+    assert.equal(runtime.dataset.independentSurfaces, 'true');
+    for (const key of COLOR_KEYS) for (const token of COLOR_TOKENS[key]) {
+      assert.equal(runtime.style[token], customTheme.colors[key]);
+      assert.equal(bootstrap.style[token], customTheme.colors[key]);
+    }
+  } finally { dispose?.(); globalThis.window = previous.window; globalThis.document = previous.document; usePreferencesStore.setState({ ...DEFAULT_PREFERENCES, customTheme: undefined }); }
 });

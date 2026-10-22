@@ -11,6 +11,8 @@ def test_fixture_http_works_when_persistence_drivers_are_unavailable():
     environment = {key: value for key, value in os.environ.items() if not key.startswith("TLS_")}
     environment["PYTHONPATH"] = str(root / "backend")
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    environment["TLS_AUTH_ORIGINS"] = "http://127.0.0.1"
+    environment["TLS_AUTH_LOCAL_HTTP"] = "true"
     # A fresh interpreter prevents installed/cached drivers from masking a leak.
     script = """
 import builtins
@@ -20,7 +22,7 @@ def fixture_import(name, *args, **kwargs):
         raise AssertionError('Fixture imported a persistence driver')
     return original_import(name, *args, **kwargs)
 builtins.__import__ = fixture_import
-from fastapi.testclient import TestClient
+from tests.auth_test_support import TestClient
 from app.main import app
 with TestClient(app) as client:
     assert client.get('/health').json() == {'status': 'ok'}

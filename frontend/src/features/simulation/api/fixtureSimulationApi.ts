@@ -1,3 +1,4 @@
+import { authFetch as fetch } from '../../../shared/auth/client';
 export type FixtureScenario = 'sample' | 'mixed';
 const stages = ['RECEIVED', 'RESOLVING_LAYOUT', 'BINDING_TEMPLATE', 'RASTERIZING', 'CAPTURED', 'FAILED'] as const;
 type Stage = typeof stages[number];

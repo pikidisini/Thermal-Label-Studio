@@ -5,6 +5,7 @@ import logging
 from time import monotonic
 from starlette.concurrency import run_in_threadpool
 from app.observability import current_request_id
+from app.auth.service import actor_id
 from .context import current_activity, stage, ERROR_CODES
 from .store import ActivityUnavailable, configured_activity_store
 
@@ -33,7 +34,7 @@ class ActivityMiddleware:
         if store is None:
             return await self.app(scope, receive, send)
         activity = dict(trace_id=current_request_id(), at=datetime.now(timezone.utc).isoformat(),
-                        origin=route[0], mode=route[1], status='FAILED', events=[], started=monotonic())
+                        actor=actor_id.get(), origin=route[0], mode=route[1], status='FAILED', events=[], started=monotonic())
         token = current_activity.set(activity)
         status, error_body = None, bytearray()
 

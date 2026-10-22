@@ -1,3 +1,4 @@
+import { authFetch as fetch } from '../../../shared/auth/client';
 import { API_BASE } from '../../../shared/api';
 
 const AGENT = 'http://127.0.0.1:18191';

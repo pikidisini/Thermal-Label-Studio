@@ -201,7 +201,7 @@ test('preview client propagates cancellation and reports unsupported canvas', as
   } finally { global.fetch = original; }
 });
 
-test('local application renders Studio without a login or session controls', async () => {
+test('isolated Studio adapter renders inside the production account gate', async () => {
   const html = await render(React.createElement(App));
   assert.match(html, /data-testid="app-root-container"/);
   assert.doesNotMatch(html, /data-testid="(login-page|btn-app-logout|app-auth-loading)"/);

@@ -23,8 +23,9 @@ sendiri dan tidak menjadi prasyarat pengiriman LAN normal di Label Print. Aset
 `engine/` pada root tidak menggantikan implementasi backend aktif di
 `backend/app/engine/`.
 
-Studio belum memiliki sistem login, sesi, atau peran pengguna. Pembatas akses
-lokal dan kredensial intake eksternal memiliki tujuan yang berbeda. Deployment
+Studio memiliki login akun lokal, sesi server, dan peran Admin/Designer/Operator.
+Lihat [kontrak login](AUTH_CONTRACT.md) untuk provisioning, bootstrap, pemulihan
+Admin, dan konfigurasi HTTPS. Login browser dan bearer intake tetap terpisah. Deployment
 bersama, operasional produksi, penegakan batas sumber daya secara menyeluruh,
 integrasi ECC yang aktif, dan penerimaan printer fisik masih memerlukan pekerjaan
 atau bukti tambahan.

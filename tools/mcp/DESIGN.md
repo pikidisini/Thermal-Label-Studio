@@ -2,7 +2,8 @@
 
 This local STDIO server lets an MCP client author SVG using the current Studio
 contract, validate it, inspect a PNG preview and optionally publish a template.
-It delegates operations to an explicitly configured loopback Studio HTTP origin.
+It delegates operations to an explicitly configured Studio origin using an
+expiring Admin/Designer account session. See ../../docs/AUTH_CONTRACT.md.
 It does not import the application, initialize storage or start the application.
 
 ## Setup
@@ -16,10 +17,18 @@ tools/mcp/.venv/Scripts/python.exe tools/mcp/config_example.py --service design 
 ```
 
 Use the actual application port: development commonly uses 8000; packaged
-localhost hosting commonly uses 8002. The server accepts only numeric loopback
-HTTP origins with an explicit port. No redirects, environment proxies, arbitrary
-URLs or caller-selected API paths are allowed. No credentials are needed for the
-current local Studio API; this does not establish remote authentication support.
+localhost hosting commonly uses 8002. The server accepts HTTPS origins or explicit numeric-loopback HTTP origins.
+No redirects, environment proxies or caller-selected API paths are allowed.
+First change any temporary password in the browser, then run:
+
+```powershell
+tools/mcp/.venv/Scripts/python.exe tools/mcp/design_auth.py --url http://127.0.0.1:8000
+```
+
+This prompts interactively and creates an ignored protected session file; it never
+saves the password. Set TLS_MCP_DESIGN_SESSION_FILE for an alternative file.
+Renew explicitly after expiry/revocation; no automatic re-login or localhost bypass
+exists. See AUTH_CONTRACT.md for DPAPI/POSIX protection and origin configuration.
 
 Register the generated block in the client's existing configuration, preserving
 other integrations. Reload that MCP connection. Read-only template calls require

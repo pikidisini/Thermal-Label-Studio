@@ -24,3 +24,14 @@ def real_renderer_settings(monkeypatch):
         monkeypatch.setattr(raster, "get_settings", lambda: settings)
         return settings
     return raster.get_settings()
+
+
+@pytest.fixture(autouse=True)
+def feature_test_auth_environment(request, monkeypatch):
+    """Feature tests explicitly use synthetic authenticated clients; auth tests set their own policy."""
+    from .auth_test_support import reset_feature_clients
+    reset_feature_clients()
+    if request.module.__name__.endswith('test_auth'):
+        return
+    monkeypatch.setenv('TLS_AUTH_ORIGINS', 'http://localhost,http://127.0.0.1,http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:8002')
+    monkeypatch.setenv('TLS_AUTH_LOCAL_HTTP', 'true')

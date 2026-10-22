@@ -122,7 +122,7 @@ export function CanvasViewport({
             key={i}
             data-testid={`corner-reg-mark-${i}`}
             className={`absolute w-3 h-3 border-outline-variant pointer-events-none ${cls}`}
-            style={{ borderColor: '#9ca3af', borderWidth: 1 }}
+            style={{ borderColor: 'var(--ui-outline)', borderWidth: 1 }}
           />
         ))}
 
@@ -132,7 +132,7 @@ export function CanvasViewport({
           className="absolute pointer-events-none"
           style={{
             inset:  bleedPx,
-            border: '1px dashed rgba(156,163,175,0.40)',
+            border: '1px dashed color-mix(in srgb, var(--ui-outline) 40%, transparent)',
           }}
           title={t("2mm peripheral safe margin")}
         />

@@ -1,3 +1,4 @@
+import { mockAccountSession } from '../helpers/studio.js';
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -82,3 +83,6 @@ for (const lang of ['en', 'id']) test(`server LAN print sends selected preview o
   await expect(page.getByText(new RegExp(jobId))).toBeVisible();
   await expect(print).toBeDisabled(); expect(jobs).toHaveLength(2);
 });
+
+// Browser feature fixtures authenticate independently of their mocked feature APIs.
+test.beforeEach(async ({ page }) => { await mockAccountSession(page); });

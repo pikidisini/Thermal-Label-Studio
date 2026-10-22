@@ -17,17 +17,26 @@ MAX_RESPONSE = 24 * 1024 * 1024
 class DesignClient:
     def __init__(self, url: str, *, allow_save: bool = False, transport=None):
         parsed = urlsplit(url)
-        if (parsed.scheme != 'http' or parsed.hostname not in {'127.0.0.1', '[::1]', '::1'}
+        if (parsed.scheme not in {'http', 'https'} or not parsed.hostname
+                or (parsed.scheme == 'http' and parsed.hostname not in {'127.0.0.1', '::1'})
                 or parsed.username or parsed.password or parsed.path not in {'', '/'}
-                or parsed.query or parsed.fragment or not parsed.port):
+                or parsed.query or parsed.fragment or (parsed.scheme == 'http' and not parsed.port)):
             raise ValueError('Set TLS_MCP_DESIGN_URL to an explicit numeric loopback HTTP origin and port.')
         self.allow_save = allow_save
+        self.origin = url.rstrip('/')
+        self.csrf = None
         self.http = httpx.Client(base_url=url.rstrip('/') + '/api/v1/', timeout=30,
                                  trust_env=False, follow_redirects=False, transport=transport)
 
     def request(self, method: str, path: str, payload=None):
+        if self.csrf and not path.startswith('auth/'):
+            # A deliberate design tool action counts as activity; never reauthenticate/retry.
+            self.request('POST', 'auth/activity')
         try:
-            with self.http.stream(method, path, json=payload) as response:
+            headers = {'Origin': self.origin}
+            if self.csrf:
+                headers['X-CSRF-Token'] = self.csrf
+            with self.http.stream(method, path, json=payload, headers=headers) as response:
                 body = bytearray()
                 for chunk in response.iter_bytes():
                     body.extend(chunk)
@@ -47,6 +56,17 @@ class DesignClient:
             if method == 'POST' and path == 'layouts':
                 raise ValueError('Save outcome uncertain; inspect template versions before any deliberate retry.') from None
             raise ValueError('Design API unavailable or invalid response; check the configured Studio target.') from None
+
+    def login(self, username, password):
+        initial = self.request('GET', 'auth/session')
+        self.csrf = initial['csrf_token']
+        result = self.request('POST', 'auth/login', {'username': username, 'password': password})
+        self.csrf = result['csrf_token']
+        user = result.get('user')
+        if not user or user['role'] not in {'Admin', 'Designer'} or user['must_change_password']:
+            self.http.cookies.clear()
+            self.csrf = None
+            raise ValueError('Use an active Admin/Designer account; change temporary passwords in the browser first.')
 
     @staticmethod
     def code(value):
@@ -129,9 +149,17 @@ def create_server(client):
 
 
 if __name__ == '__main__':
+    from design_auth import read_session, DEFAULT_SESSION
     client = DesignClient(os.environ.get('TLS_MCP_DESIGN_URL', ''),
                           allow_save=os.environ.get('TLS_MCP_DESIGN_ALLOW_SAVE') == 'true')
     try:
+        session = read_session(os.environ.get('TLS_MCP_DESIGN_SESSION_FILE', str(DEFAULT_SESSION)), client.origin)
+        client.http.cookies.set('tls_session', session['cookie'])
+        current = client.request('GET', 'auth/session')
+        user = current.get('user')
+        if not user or user['must_change_password'] or user['role'] not in {'Admin', 'Designer'}:
+            raise ValueError('An active Admin/Designer session is required. Run design_auth.py explicitly.')
+        client.csrf = current['csrf_token']
         create_server(client).run(transport='stdio')
     finally:
         client.http.close()

@@ -2,7 +2,7 @@ from datetime import datetime
 from types import SimpleNamespace
 from uuid import UUID
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
+from .auth_test_support import TestClient
 from app.studio_datasets.http import router as datasets_router
 from app.label_print.http import router as preview_router
 from app.studio_datasets.service import DatasetConflictError

@@ -7,11 +7,11 @@ const submitted = { template_sha256: 'a'.repeat(64), binding_version: 1, request
 // Every API request is mocked. Tests never contact storage or a physical printer.
 test.beforeEach(async ({ page }) => {
   await mockBuiltApplication(page);
-  await page.route('**/api/v1/**', route => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/**', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: [] }));
 });
 test('opening Print inspects target; one explicit action locks duplicate clicks and reports unconfirmed delivery', async ({ page }) => {
   const posts = []; let release;
-  await page.route('**/api/v1/printing/target', route => route.fulfill({ json: target }));
+  await page.route('**/api/v1/printing/target', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: target }));
   await page.route('**/api/v1/printing/editor', async route => {
     posts.push(route.request().postDataJSON());
     await new Promise(resolve => { release = resolve; });
@@ -62,7 +62,7 @@ test('opening Print inspects target; one explicit action locks duplicate clicks 
 });
 
 test('planned protocols remain disabled and copy stepper respects bounds', async ({ page }) => {
-  await page.route('**/api/v1/printing/target', route => route.fulfill({ json: target }));
+  await page.route('**/api/v1/printing/target', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: target }));
   await openStudio(page);
   await page.getByTestId('btn-topbar-print').click();
   const dialog = page.getByTestId('editor-print-dialog');
@@ -104,7 +104,7 @@ test('planned protocols remain disabled and copy stepper respects bounds', async
 
 test('Indonesian industrial print controls fit desktop and 320px viewport', async ({ page }, testInfo) => {
   await page.addInitScript(() => localStorage.setItem('thermal-label-studio.preferences.v1', JSON.stringify({ language: 'id', theme: 'industrial-light' })));
-  await page.route('**/api/v1/printing/target', route => route.fulfill({ json: target }));
+  await page.route('**/api/v1/printing/target', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: target }));
   let submissions = 0;
   await page.route('**/api/v1/printing/editor', route => { submissions++; return route.abort(); });
   await openStudio(page);
@@ -143,7 +143,7 @@ test('Indonesian industrial print controls fit desktop and 320px viewport', asyn
 
 test('dialog configures and remembers a target without a server default or print submission', async ({ page }) => {
   const posts = [];
-  await page.route('**/api/v1/printing/target', route => route.fulfill({ json: { available: false, host: null, port: null, encoder: 'IPL' } }));
+  await page.route('**/api/v1/printing/target', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: { available: false, host: null, port: null, encoder: 'IPL' } }));
   await page.route('**/api/v1/printing/editor', route => { posts.push(route.request().postData()); return route.abort(); });
   await openStudio(page);
   await page.getByTestId('btn-topbar-print').click();
@@ -156,7 +156,7 @@ test('dialog configures and remembers a target without a server default or print
   await expect(dialog.getByTestId('btn-print-one-label')).toBeEnabled();
   expect(posts).toEqual([]);
   // Remembered browser choice takes precedence over a later server default.
-  await page.route('**/api/v1/printing/target', route => route.fulfill({ json: target }));
+  await page.route('**/api/v1/printing/target', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: target }));
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   await page.getByTestId('btn-topbar-print').click();
   await expect(page.getByLabel('Printer IP address')).toHaveValue('192.0.2.77');
@@ -170,7 +170,7 @@ test('dialog configures and remembers a target without a server default or print
 
 test('invalid IP or custom port blocks submission; failed default lookup does not block manual entry', async ({ page }) => {
   let posts = 0;
-  await page.route('**/api/v1/printing/target', route => route.fulfill({ status: 503, json: {} }));
+  await page.route('**/api/v1/printing/target', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ status: 503, json: {} }));
   await page.route('**/api/v1/printing/editor', route => { posts++; return route.abort(); });
   await openStudio(page);
   await page.getByTestId('btn-topbar-print').click();
@@ -209,7 +209,7 @@ test('late server default does not overwrite a target entered while loading', as
 for (const [status, code] of [[502, 'print_submission_uncertain'], [500, 'processing_failed']]) {
   test(`print failure ${status} explains uncertainty and prevents automatic resubmission`, async ({ page }) => {
     let posts = 0;
-    await page.route('**/api/v1/printing/target', route => route.fulfill({ json: target }));
+    await page.route('**/api/v1/printing/target', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: target }));
     await page.route('**/api/v1/printing/editor', route => { posts++; return route.fulfill({ status, json: { detail: { code }, request_id: 'fake-failure' } }); });
     await openStudio(page);
     await page.getByTestId('btn-add-text').click();
@@ -226,7 +226,7 @@ for (const [status, code] of [[502, 'print_submission_uncertain'], [500, 'proces
 
 test('invalid copy counts block submission and known preparation errors allow a deliberate retry', async ({ page }) => {
   let posts = 0;
-  await page.route('**/api/v1/printing/target', route => route.fulfill({ json: target }));
+  await page.route('**/api/v1/printing/target', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: target }));
   await page.route('**/api/v1/printing/editor', route => {
     posts++;
     if (posts === 1) return route.fulfill({ status: 500, json: { detail: { code: 'print_preparation_failed' } } });

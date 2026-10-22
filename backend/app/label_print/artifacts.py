@@ -14,7 +14,7 @@ class PreviewArtifacts:
         self.entries = OrderedDict()
         self.lock = Lock()
 
-    def put(self, output):
+    def put(self, output, owner):
         size = len(output.payload) + len(output.bitmap.bitmap_png)
         if size > self.budget:
             return None
@@ -23,7 +23,7 @@ class PreviewArtifacts:
             while self.entries and (len(self.entries) >= 256 or sum(value[2] for value in self.entries.values()) + size > self.budget):
                 self.entries.popitem(last=False)
             identity = token_urlsafe(32)
-            self.entries[identity] = (monotonic() + self.ttl, output, size)
+            self.entries[identity] = (monotonic() + self.ttl, output, size, owner)
             return identity
 
     def _expire(self):
@@ -31,9 +31,11 @@ class PreviewArtifacts:
             if value[0] <= monotonic():
                 del self.entries[key]
 
-    def get_many(self, identities, copies):
+    def get_many(self, identities, copies, owner):
         with self.lock:
             self._expire()
+            if any(key not in self.entries or self.entries[key][3] != owner for key in identities):
+                raise KeyError('invalid_print_artifact')
             outputs = [self.entries[key][1] for key in identities]
         # Reuse the exact bound bitmap. SAP, layout resolution and raster are absent.
         return [replace(output, copies=1) if copies == 1 else prepare_bitmap(output.bitmap, copies=copies)

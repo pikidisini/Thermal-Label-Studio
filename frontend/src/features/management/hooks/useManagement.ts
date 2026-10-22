@@ -1,3 +1,4 @@
+import { authFetch as fetch } from '../../../shared/auth/client';
 import React from 'react';
 import { API_BASE, HttpError } from '../../../shared/api';
 import type { PersistedLayoutSummary } from '../../templates';
@@ -12,6 +13,7 @@ export function useManagement() {
   const [snapshot, setSnapshot] = React.useState<Snapshot | null>(null);
   const [templates, setTemplates] = React.useState<PersistedLayoutSummary[]>([]);
   const [audit, setAudit] = React.useState<AuditEvent[]>([]);
+  const [auditError, setAuditError] = React.useState(false);
   const [errors, setErrors] = React.useState<string[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
@@ -42,6 +44,7 @@ export function useManagement() {
     setSnapshot(results[0].status === 'fulfilled' ? results[0].value : null);
     setTemplates(results[1].status === 'fulfilled' ? results[1].value : []);
     setAudit(results[2].status === 'fulfilled' ? results[2].value : []);
+    setAuditError(results[2].status === 'rejected');
     setServices({ application: results[3].status === 'fulfilled' && results[3].value, layouts: results[1].status === 'fulfilled' });
     setErrors(results.slice(0, 3).filter(result => result.status === 'rejected').map(result => (result as PromiseRejectedResult).reason instanceof Error ? (result as PromiseRejectedResult).reason.message : 'Unable to load content'));
     setCheckedAt(new Date().toLocaleString()); setLoading(false);
@@ -56,7 +59,7 @@ export function useManagement() {
   }, []);
   const { preview, previewError } = useTemplatePreview(editor);
 
-  function navigate(next: Section) { if (next !== section && !window.dispatchEvent(new Event('management:before-navigate', { cancelable: true }))) return; setSection(next); setEditor(null); setIssuedKey(null); setSearch(''); setMessage(''); window.history.replaceState(null, '', `/management?section=${next}`); }
+  function navigate(next: Section) { if (next !== section && !window.dispatchEvent(new Event('management:before-navigate', { cancelable: true }))) return; setSection(next); setEditor(null); setIssuedKey(null); setSearch(''); setMessage(''); const url = new URL(window.location.href); url.searchParams.set('section',next); window.history.replaceState(null, '', url.pathname + url.search); }
   function open(next: Editor) {
     setEditor(next); setMessage(''); setIssuedKey(null);
   }
@@ -70,6 +73,6 @@ export function useManagement() {
   const matches = (value: string) => value.toLowerCase().includes(search.toLowerCase());
   const date = (value: string) => new Date(value).toLocaleString();
   const actionsDisabled = !writable;
-  return { section, snapshot, templates, audit, errors, loading, saving, needsRefresh, message, editor, search, services, checkedAt, preview, previewError, writable, policy, refresh, navigate, open, mutate, matches, date, actionsDisabled, setEditor, setSearch, setMessage, issuedKey, setIssuedKey };
+  return { section, snapshot, templates, audit, auditError, errors, loading, saving, needsRefresh, message, editor, search, services, checkedAt, preview, previewError, writable, policy, refresh, navigate, open, mutate, matches, date, actionsDisabled, setEditor, setSearch, setMessage, issuedKey, setIssuedKey };
 }
 export type ManagementController = ReturnType<typeof useManagement>;

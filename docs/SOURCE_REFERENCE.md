@@ -5,13 +5,15 @@ Inventaris dibuat dengan pemeriksaan statis Python AST dan nama dalam source,
 tanpa mengimpor atau menjalankan aplikasi. Isinya menjelaskan deklarasi source,
 bukan keterjangkauan route pada deployment atau konfigurasi runtime aktif.
 [Kontrak API](API_CONTRACT.md) menentukan skema, izin, serta efek operasi.
+Pembaruan 21 Oktober 2026 menambahkan login, akun/peran, dan katalog RFC Operator;
+lihat [kontrak akses](AUTH_CONTRACT.md) untuk batas aktivasi.
 
 ## Komposisi dan titik masuk halaman
 
 Komposisi backend: [main.py](../backend/app/main.py), komposisi Management:
 [router.py](../backend/app/management/router.py), halaman frontend:
 [routes.tsx](../frontend/src/app/routes.tsx). Prefix API default adalah `/api/v1`.
-Halaman frontend adalah `/`, `/studio`, `/print`, `/management`, dan
+Halaman frontend adalah `/login`, `/`, `/studio`, `/print`, `/management`, dan
 `/fixture-simulation`. Shell/aset backend diatur tersendiri dalam
 [runtime.py](../backend/app/runtime.py). Route dokumentasi yang dibuat otomatis
 oleh FastAPI berada di luar inventaris deklarasi ini.
@@ -20,12 +22,22 @@ oleh FastAPI berada di luar inventaris deklarasi ini.
 
 Path berikut menggabungkan prefix utama default dan prefix router yang dipasang.
 Setiap tautan menunjuk source handler. Deklarasi belum membuktikan fitur sudah
-aktif; baca pembatas akses lokal, konfigurasi, dan kontraknya sebelum memanggilnya.
+aktif; baca pemeriksaan sesi/peran/origin, konfigurasi, dan kontraknya sebelum memanggilnya.
 `PATCH` dan `DELETE /api/v1/layouts/{label_code}` dipertahankan sebagai handler
 pensiun yang mengembalikan HTTP 410; gunakan perintah template Management yang diaudit.
 
 | Metode | Path | Source handler |
 | --- | --- | --- |
+| GET | `/api/v1/auth/session` | [get_session](../backend/app/auth/http.py) |
+| POST | `/api/v1/auth/login` | [login](../backend/app/auth/http.py) |
+| POST | `/api/v1/auth/logout` | [logout](../backend/app/auth/http.py) |
+| POST | `/api/v1/auth/change-password` | [change_password](../backend/app/auth/http.py) |
+| POST | `/api/v1/auth/activity` | [activity](../backend/app/auth/http.py) |
+| GET | `/api/v1/management/users` | [list_users](../backend/app/auth/http.py) |
+| POST | `/api/v1/management/users` | [create_user](../backend/app/auth/http.py) |
+| PATCH | `/api/v1/management/users/{identity}` | [update_user](../backend/app/auth/http.py) |
+| POST | `/api/v1/management/users/{identity}/reset-password` | [reset_password](../backend/app/auth/http.py) |
+| GET | `/api/v1/label-print/operations` | [operator_operations](../backend/app/label_print/http.py) |
 | POST | `/api/v1/design/validate` | [validate_design](../backend/app/simulation/design_http.py) |
 | GET | `/api/v1/graphics` | [list_graphics](../backend/app/graphics/http.py) |
 | POST | `/api/v1/graphics` | [upload_graphic](../backend/app/graphics/http.py) |

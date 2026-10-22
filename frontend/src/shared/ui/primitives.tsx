@@ -11,9 +11,9 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   /** Planned actions stay native-disabled; hover only explains availability. */
   disabledTreatment?: 'muted' | 'subtle' | 'planned';
 };
-export function Button({ tone = 'neutral', variant = 'default', selected = false, disabledTreatment = 'muted', className, type = 'button', ...props }: ButtonProps) {
-  return <button {...props} type={type} data-ui-control="button" data-variant={variant} data-tone={tone} data-selected={selected} data-disabled-treatment={disabledTreatment} className={cx('ui-control', className)} />;
-}
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button({ tone = 'neutral', variant = 'default', selected = false, disabledTreatment = 'muted', className, type = 'button', ...props }: ButtonProps, ref) {
+  return <button {...props} ref={ref} type={type} data-ui-control="button" data-variant={variant} data-tone={tone} data-selected={selected} data-disabled-treatment={disabledTreatment} className={cx('ui-control', className)} />;
+});
 export type IconButtonProps = ButtonProps & { label: string };
 export function IconButton({ label, children, className, variant = 'icon', ...props }: IconButtonProps) {
   const t = useTranslation();

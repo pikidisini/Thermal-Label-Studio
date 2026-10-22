@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 import pytest
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
+from .auth_test_support import TestClient
 from app.layouts.http import router
 from app.layouts.models import RenameLayoutRequest, SaveLayoutRequest
 from app.layouts.service import LayoutService, LayoutNotFoundError, LayoutConflictError, LayoutPersistenceError

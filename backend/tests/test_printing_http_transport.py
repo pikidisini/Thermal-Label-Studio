@@ -2,7 +2,7 @@
 from io import BytesIO
 import socket
 from PIL import Image
-from fastapi.testclient import TestClient
+from .auth_test_support import TestClient
 import pytest
 from app.config import PrinterTarget, get_settings
 from app.engine.bitmap import RenderedLabel

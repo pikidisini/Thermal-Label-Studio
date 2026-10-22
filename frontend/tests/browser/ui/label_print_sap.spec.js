@@ -1,3 +1,4 @@
+import { mockAccountSession } from '../helpers/studio.js';
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,3 +42,6 @@ for(const lang of ['en','id']) test(`SAP Get Data uses selected RFC and preserve
  runtime=false;await page.locator('button').filter({hasText:/Load configured RFC operations|Muat.*RFC/}).first().click();await page.getByLabel(id?'Operasi RFC':'RFC operation',{exact:true}).selectOption('ROLL');
  await getData.click(); await page.locator('#print-settings-tab-printer').click();expect(requests).toHaveLength(1);await expect(page.locator('.label-print-card')).toHaveCount(0);
 });
+
+// Browser feature fixtures authenticate independently of their mocked feature APIs.
+test.beforeEach(async ({ page }) => { await mockAccountSession(page); });

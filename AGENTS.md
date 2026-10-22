@@ -9,9 +9,11 @@
   sample datasets, canonical data, bounded text/symbol binding, shared
   preparation/raster/IPL output and opt-in intake policy/ledger/replay.
   Studio storage and intake ledger are separate lifecycle boundaries.
-  Actual SAP ECC integration, physical printer acceptance, Studio authentication,
+  Actual SAP ECC integration, physical printer acceptance, HTTPS LAN activation,
   broader job orchestration and production operations remain separate work.
-  Studio has no login/session/role implementation. Retired auth and dependent
+  Local accounts, server sessions and Admin/Designer/Operator permissions are implemented
+  in app/auth; see docs/AUTH_CONTRACT.md. Auth schema/bootstrap need explicit
+  named-target provisioning; no startup DDL or localhost auth bypass. Retired auth and dependent
   prototype flows stay archived. Fixture entry loading is separate from Studio/
   diagnostics; retained graphics clients do not establish integration readiness.
   Phase task inventories/results are historical, dated evidence. `.archive/`

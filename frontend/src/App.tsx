@@ -1,7 +1,7 @@
 import React from 'react';
 import { Studio } from './features/studio';
 
-/** Local Studio entry. Shared-deployment access controls remain future work. */
+/** Studio adapter for isolated rendering. Production main.tsx gates routes with AuthGate. */
 export default function App() {
   return <Studio />;
 }

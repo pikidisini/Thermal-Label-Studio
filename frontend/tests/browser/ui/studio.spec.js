@@ -1,3 +1,4 @@
+import { mockAccountSession } from '../helpers/studio.js';
 import { uploadSampleFixture } from '../helpers/sampleData.js';
 import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
@@ -47,7 +48,7 @@ test('friendly fields compose text and retain bindings through mocked save and r
     }
     return route.fulfill({ json: stored ? [stored] : [] });
   });
-  await page.route('**/api/v1/layouts/friendly_fields', route => route.fulfill({ json: stored }));
+  await page.route('**/api/v1/layouts/friendly_fields', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: stored }));
   await openStudio(page);
   await page.getByTestId('dock-btn-sap').click();
   await uploadSampleFixture(page);
@@ -204,8 +205,8 @@ test.beforeEach(async ({ page }) => {
     if (!file.startsWith(path.join(dist, 'assets') + path.sep)) return route.abort();
     return route.fulfill({ path: file });
   });
-  await page.route('**/api/**', route => route.fulfill({ status: 503, json: { detail: { message: 'Unexpected mocked API request.' } } }));
-  await page.route('**/api/v1/layouts', route => route.fulfill({ json: [] }));
+  await page.route('**/api/**', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ status: 503, json: { detail: { message: 'Unexpected mocked API request.' } } }));
+  await page.route('**/api/v1/layouts', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: [] }));
   await page.route('**/api/v1/studio-sample-datasets', route => route.request().method() === 'POST'
     ? route.fulfill({ status: 201, json: { id: 'sample-mock', name: route.request().postDataJSON().name, original_filename: route.request().postDataJSON().original_filename } })
     : route.fulfill({ json: [] }));
@@ -245,7 +246,7 @@ test('save and open use the current layout API and server-owned version', async 
     }
     return route.fulfill({ json: stored ? [stored] : [] });
   });
-  await page.route('**/api/v1/layouts/ui_layout', route => route.fulfill({ json: stored }));
+  await page.route('**/api/v1/layouts/ui_layout', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: stored }));
   await openStudio(page);
   await page.getByTestId('btn-add-text').click();
   const saved = page.waitForResponse(response => response.url().endsWith('/api/v1/layouts') && response.request().method() === 'POST');
@@ -269,7 +270,7 @@ test('storage failure stays visible instead of claiming save success', async ({ 
 test('simulation displays a mocked bitmap without printer requests', async ({ page }) => {
   const physical = [];
   page.on('request', request => { if (/\/(print|sap)(\/|$)/.test(new URL(request.url()).pathname)) physical.push(request.url()); });
-  await page.route('**/api/v1/simulation/editor-preview', route => route.fulfill({ json: {
+  await page.route('**/api/v1/simulation/editor-preview', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: {
     template_sha256: 'a'.repeat(64), binding_version: 1, request_id: 'ui-preview', width_px: 1, height_px: 1, dpi: 203.2,
     png_base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
   } }));
@@ -420,7 +421,7 @@ test('stored barcode and QR images reopen with a renamed XLink namespace', async
     }
     return route.fulfill({ json: stored ? [stored] : [] });
   });
-  await page.route('**/api/v1/layouts/namespace_layout', route => route.fulfill({ json: stored }));
+  await page.route('**/api/v1/layouts/namespace_layout', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: stored }));
   await openStudio(page);
   await page.getByTestId('btn-add-barcode').click();
   await page.getByTestId('btn-add-qrcode').click();
@@ -465,7 +466,7 @@ test('Template Explorer separates the label from its panel and fits landscape an
     width_mm: width, height_mm: height, dpi: 203.2, created_at: '2026-10-06T00:00:00Z', object_key: `layouts/preview_${index}/v1/layout.svg`, svg_sha256: 'a'.repeat(64),
     svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}"><rect x="5" y="5" width="10" height="10" fill="black"/></svg>`,
   }));
-  await page.route('**/api/v1/layouts', route => route.fulfill({ json: layouts }));
+  await page.route('**/api/v1/layouts', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: layouts }));
   for (const layout of layouts) await page.route(`**/api/v1/layouts/${layout.label_code}`, route => route.fulfill({ json: layout }));
   await openStudio(page);
   await page.getByTestId('topbar-open-template-explorer').click();
@@ -500,7 +501,7 @@ test('Template Explorer renames and deletes only after confirmation and server s
     svg: '<svg xmlns="http://www.w3.org/2000/svg" width="80mm" height="40mm" viewBox="0 0 80 40"/>', status: 'published' };
   let fail = false;
   let deletes = 0;
-  await page.route('**/api/v1/layouts', route => route.fulfill({ json: stored ? [stored] : [] }));
+  await page.route('**/api/v1/layouts', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: stored ? [stored] : [] }));
   await page.route('**/api/v1/layouts/manage_ui', route => {
     if (route.request().method() === 'PATCH') {
       expect(route.request().postDataJSON()).toEqual({ title: 'Renamed template' });
@@ -701,7 +702,7 @@ test('sample upload stores original envelope and reopens all items without savin
     }
     return route.fulfill({ json: stored ? [stored] : [] });
   });
-  await page.route('**/api/v1/studio-sample-datasets/*', route => route.fulfill({ json: stored }));
+  await page.route('**/api/v1/studio-sample-datasets/*', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: stored }));
   await openStudio(page); await page.getByTestId('dock-btn-sap').click();
   await expect(page.getByLabel('Preview value for Roll Number', {exact:true})).toHaveValue('ROLL-TEST-001');
   const payload = { sender: { system: 'EXAMPLE' }, request_id: 'sample', mode: 'simulation', field_descriptions: { ZZWIDTH: 'WIDTH' }, items: [
@@ -866,3 +867,5 @@ test('Design opens template-only fields with authored samples and respects impor
   await page.getByTestId('input-local-sap-json').setInputFiles({name:'actual.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(payload))});
   await expect(page.getByTestId('inspector-input-token-value')).toHaveValue('width_mm — no data');
 });
+
+test.beforeEach(async ({ page }) => { await mockAccountSession(page); });

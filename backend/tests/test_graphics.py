@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from PIL import Image
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
+from .auth_test_support import TestClient
 from app.graphics.http import router
 from app.graphics.service import GraphicsService, GraphicsUnavailable
 from app.graphics.validation import validate_graphic, MAX_BODY_BYTES
@@ -113,7 +113,8 @@ def test_http_upload_list_search_content_and_missing(client, service):
     assert client.get('/graphics/not-a-uuid').status_code == 422
     assert client.get('/graphics?offset=-1').status_code == 422
     assert client.get('/graphics?q=' + 'a' * 161).status_code == 422
-    assert client.post('/graphics/' + identifier + '/versions', json=value).status_code == 404
+    # Unmounted/undeclared interactive operations are denied by central policy.
+    assert client.post('/graphics/' + identifier + '/versions', json=value).status_code == 403
 
 
 def test_bounds_json_duplicates_unconfigured_and_failures(client, service):

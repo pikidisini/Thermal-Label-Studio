@@ -1,3 +1,4 @@
+import { AuthGate } from './shared/auth/AuthGate';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
@@ -15,7 +16,7 @@ if (container) {
     <React.StrictMode>
       <ApplicationStartupBoundary>
       <React.Suspense fallback={<ApplicationStartup />}>
-        <ApplicationRoutes />
+        <AuthGate><ApplicationRoutes /></AuthGate>
       </React.Suspense>
       </ApplicationStartupBoundary>
     </React.StrictMode>

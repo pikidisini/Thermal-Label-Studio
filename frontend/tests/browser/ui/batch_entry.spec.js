@@ -1,3 +1,4 @@
+import { mockAccountSession } from '../helpers/studio.js';
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,9 +13,10 @@ async function paste(locator, text) {
 
 for (const language of ['en', 'id']) test(`batch entry preserves pasted values and isolates local input in ${language}`, async ({ page }) => {
   const api = [];
-  page.on('request', request => { if (request.url().includes('/api/')) api.push(request.url()); });
+  page.on('request', request => { if (request.url().includes('/api/') && !request.url().includes('/api/v1/auth/')) api.push(request.url()); });
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
+    if (url.pathname.startsWith('/api/v1/auth/')) return route.fallback();
     if (url.pathname === '/api/v1/label-print/printers') return route.fulfill({ json: { policy_origin: 'management', printers: [] } });
     if (url.hostname !== '127.0.0.1') return route.abort();
     if (url.pathname === '/print') return route.fulfill({ path: path.join(dist, 'index.html'), contentType: 'text/html' });
@@ -52,3 +54,6 @@ for (const language of ['en', 'id']) test(`batch entry preserves pasted values a
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+
+// Browser feature fixtures authenticate independently of their mocked feature APIs.
+test.beforeEach(async ({ page }) => { await mockAccountSession(page); });

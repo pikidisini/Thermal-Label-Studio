@@ -6,6 +6,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from .auth.middleware import AuthenticationMiddleware
+from .auth.http import router as auth_router
+from .auth.service import AuthError
 from .observability import CorrelationMiddleware, current_request_id
 from .config import get_settings
 from .labels.models import LabelProcessAccepted, LabelProcessRequest
@@ -72,7 +75,14 @@ app.add_middleware(EditorBodyMiddleware)
 app.add_middleware(IntakeBodyMiddleware, path=f"{settings.api_prefix}/label-intake")
 app.add_middleware(ManagementBodyMiddleware, prefix=f"{settings.api_prefix}/management")
 app.add_middleware(ActivityMiddleware, api_prefix=settings.api_prefix)
+app.add_middleware(AuthenticationMiddleware, api_prefix=settings.api_prefix)
 app.add_middleware(CorrelationMiddleware)
+
+@app.exception_handler(AuthError)
+async def auth_exception(_request, exc):
+    return JSONResponse(status_code=exc.status, content={'detail': {'code': exc.code, 'message': 'Authentication or account operation failed.'}}, headers={'Cache-Control': 'no-store'})
+
+app.include_router(auth_router, prefix=settings.api_prefix)
 app.add_exception_handler(IntakeAdmissionError, admission_exception)
 app.add_exception_handler(ManagementError, management_exception)
 app.include_router(management_router, prefix=settings.api_prefix)

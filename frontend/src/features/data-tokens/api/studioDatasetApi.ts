@@ -1,3 +1,4 @@
+import { authFetch as fetch } from '../../../shared/auth/client';
 import { API_BASE } from '../../../shared/api';
 export interface StudioDatasetSummary { id: string; name: string; original_filename: string; created_at: string; updated_at: string }
 export interface StudioDataset extends StudioDatasetSummary { payload: unknown }

@@ -1,3 +1,4 @@
+import { mockAccountSession } from '../helpers/studio.js';
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -5,9 +6,10 @@ const dist = fileURLToPath(new URL('../../../dist/', import.meta.url));
 
 for (const language of ['en', 'id']) test(`print workspace distinguishes demo from operational output in ${language}`, async ({ page }, testInfo) => {
   const api = [];
-  page.on('request', request => { if (request.url().includes('/api/')) api.push(request.url()); });
+  page.on('request', request => { if (request.url().includes('/api/') && !request.url().includes('/api/v1/auth/')) api.push(request.url()); });
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
+    if (url.pathname.startsWith('/api/v1/auth/')) return route.fallback();
     if (url.pathname === '/api/v1/label-print/printers') return route.fulfill({ json: { policy_origin: 'management', printers: [] } });
     if (url.hostname !== '127.0.0.1') return route.abort();
     if (url.pathname === '/print') return route.fulfill({ path: path.join(dist, 'index.html'), contentType: 'text/html' });
@@ -93,3 +95,6 @@ for (const language of ['en', 'id']) test(`print workspace distinguishes demo fr
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(api.every(url => url.endsWith('/label-print/printers'))).toBe(true);
 });
+
+// Browser feature fixtures authenticate independently of their mocked feature APIs.
+test.beforeEach(async ({ page }) => { await mockAccountSession(page); });

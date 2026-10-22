@@ -1,3 +1,4 @@
+import { authFetch as fetch } from '../../../shared/auth/client';
 import { API_BASE } from '../../../shared/api';
 import type { ConfiguredPrinter } from './printersApi';
 export type ServerPrintResult = { job_id: string; status: 'SUBMITTED' | 'STOPPED'; confirmed: false; items: { index: number; status: 'SUBMITTED' | 'UNCERTAIN' | 'FAILED_BEFORE_SEND' | 'NOT_ATTEMPTED' }[] };

@@ -1,3 +1,4 @@
+import { authFetch as fetch } from '../../../shared/auth/client';
 import { API_BASE, responseError } from '../../../shared/api';
 import { validateImageFile, validateImageSignature } from '../../images';
 import type { GraphicAsset, GraphicTemplateImpact } from '../model/graphicTypes';

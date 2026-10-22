@@ -215,11 +215,12 @@ valid colors. Custom settings retain the previous palette when a builtin is sele
 The palette applies before first paint and changes editor chrome and rulers only.
 Authored labels, SVG/PNG exports, JSON/SAP keys and barcode payloads are unchanged.
 
-Open `/studio` to edit the Fabric canvas. There is no login, logout, session or
-role selector. Create a layout, use the current text/line/barcode/QR/image tools,
+Sign in through `/login` before opening `/studio`; Admin and Designer can edit
+the Fabric canvas. Accounts with temporary passwords must change them first. Create a layout, use the current text/line/barcode/QR/image tools,
 import a local SVG or inspect local JSON facts without contacting SAP.
-Local draft recovery preserves its existing browser storage namespace; removing
-login does not clear stored drafts.
+Local draft recovery uses the authenticated account ID. Existing anonymous drafts
+are not imported into an account. Logout clears memory through document reload,
+while print uncertainty locks survive account changes.
 
 Save to Server sends authored SVG/media to the layout API. PostgreSQL records
 server-owned versions and active metadata; MinIO preserves the exact immutable
@@ -438,7 +439,7 @@ Label Print offers Check status for the selected enabled Management printer.
 Only that button calls POST /api/v1/label-print/printer-status with target_id,
 expected_host and expected_port; no caller-controlled destination is accepted.
 The route rechecks saved configuration (409 if changed/disabled), uses the same
-loopback/origin and bounded JSON admission as LAN Print, returns no-store and
+authenticated role/origin and bounded JSON admission as LAN Print, returns no-store and
 serializes with LAN delivery (429 while busy). There is no background polling,
 selection probe, SAP access, print payload, reset or configuration command.
 The server sends one IPL ENQ byte (0x05) to the saved numeric TCP target, with

@@ -107,7 +107,9 @@ Simulasi/replay lokal template tersimpan `sample_roll` tercatat di sana; bukti
 tersebut tidak menutup gerbang yang masih terbuka. Penerimaan fisik T12 berstatus
 `BLOCKED` dan bersifat opsional, bukan gerbang wajib penerimaan perangkat lunak.
 
-Studio belum memiliki kontrol login/sesi/peran. Keamanan produksi, integrasi SAP
+Studio kini memiliki login akun lokal, sesi server, dan peran Admin/Designer/Operator.
+Aktivasi akun/database dan HTTPS LAN mengikuti [kontrak login](docs/AUTH_CONTRACT.md);
+belum ada akun bawaan atau provisioning otomatis. Keamanan produksi, integrasi SAP
 ECC aktual, penerimaan operasional paket, dan pencetakan fisik tetap merupakan
 pekerjaan terpisah. Graphics mendukung pustaka lokal PNG/JPEG/WebP dengan
 penyisipan salinan tertanam setelah provisioning PostgreSQL eksplisit. Graphic
@@ -270,7 +272,7 @@ Label Print menyediakan Check status untuk printer Management terpilih yang
 aktif. Hanya tombol tersebut yang memanggil `POST /api/v1/label-print/printer-status`
 dengan `target_id`, `expected_host`, dan `expected_port`; tujuan yang dikendalikan
 pemanggil tidak diterima. Route memeriksa kembali konfigurasi tersimpan
-(409 jika berubah/nonaktif), memakai pembatas loopback/origin dan JSON terbatas
+(409 jika berubah/nonaktif), memakai pemeriksaan sesi/peran/origin dan JSON terbatas
 yang sama dengan LAN Print, mengembalikan `no-store`, serta berjalan bergantian
 dengan pengiriman LAN (429 saat sibuk). Tidak ada polling latar belakang, probe
 saat pemilihan, akses SAP, payload cetak, reset, atau perintah konfigurasi.

@@ -26,6 +26,10 @@ def configure_fixture_serving(app: FastAPI, settings: Settings) -> None:
         raise ValueError("Fixture runtime dependencies are unavailable.")
     app.mount("/assets", StaticFiles(directory=directory / "assets", follow_symlink=False), name="fixture-assets")
 
+    @app.get("/login", include_in_schema=False)
+    def login_page():
+        return FileResponse(directory / "index.html", media_type="text/html")
+
     @app.get("/", include_in_schema=False)
     def fixture_home():
         return FileResponse(directory / "index.html", media_type="text/html")

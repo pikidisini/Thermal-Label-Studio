@@ -128,7 +128,7 @@ def test_successive_saves_publish_monotonic_versions(writer, draft):
 
 def test_http_failed_commit_returns_error_and_following_save_returns_new_version(writer, draft):
     from fastapi import FastAPI
-    from fastapi.testclient import TestClient
+    from .auth_test_support import TestClient
     from app.layouts.http import router
     application = FastAPI()
     application.include_router(router, prefix="/api/v1")

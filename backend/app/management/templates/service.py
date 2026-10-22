@@ -1,4 +1,5 @@
 """Template review and exact-version print approval decisions."""
+from app.auth.service import actor_id
 from datetime import datetime, timezone
 from uuid import uuid4
 from app.label_intake.policy import ApprovalEvent
@@ -49,7 +50,7 @@ def decide_review(document, review_id, command):
                     e.version == review.version and e.svg_sha256 == review.svg_sha256 and e.sender == command.sender]
         if not matching or matching[-1].action != 'approve' or matching[-1].target_id != command.target_id:
             raise ManagementError('invalid_approval', 422)
-    event = ApprovalEvent(event_id='E_' + uuid4().hex, actor='DEVELOPMENT_UNAUTHENTICATED',
+    event = ApprovalEvent(event_id='E_' + uuid4().hex, actor=actor_id.get() or 'DEVELOPMENT_UNAUTHENTICATED',
         at=datetime.now(timezone.utc), action=command.action, sender=command.sender,
         label_code=review.label_code, version=review.version, svg_sha256=review.svg_sha256,
         target_id=command.target_id, max_copies=command.max_copies)

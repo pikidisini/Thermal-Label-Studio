@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from PIL import Image
 import pytest
-from fastapi.testclient import TestClient
+from .auth_test_support import TestClient
 from app.main import app
 from app.engine import pipeline
 from app.engine.editor_request import EditorOutputRequest

@@ -133,7 +133,7 @@ def test_foundation_imports_only_implemented_in_memory_dependencies() -> None:
                 assert all(alias.name in allowed or (source.name == "config.py" and alias.name == "ipaddress") for alias in node.names), source
             elif isinstance(node, ast.ImportFrom):
                 assert node.module in allowed or (
-                            source.name == "main.py" and node.module in {"simulation.http", "simulation.editor_http", "simulation.design_http", "observability", "runtime", "layouts.http", "layouts.service", "studio_datasets.http", "studio_datasets.service", "printing.http", "label_print.http", "engine.editor_request", "label_intake.http", "label_intake.results", "label_intake.runtime", "management.router", "management.errors", "management.middleware", "activity.middleware", "graphics.http", "graphics.service"}
+                            source.name == "main.py" and node.module in {"simulation.http", "simulation.editor_http", "simulation.design_http", "observability", "runtime", "layouts.http", "layouts.service", "studio_datasets.http", "studio_datasets.service", "printing.http", "label_print.http", "engine.editor_request", "label_intake.http", "label_intake.results", "label_intake.runtime", "management.router", "management.errors", "management.middleware", "activity.middleware", "graphics.http", "graphics.service", "auth.middleware", "auth.http", "auth.service"}
                 ), source
             elif isinstance(node, ast.Call):
                 assert not (

@@ -1,12 +1,14 @@
+import { ApplicationHeader } from '../../../shared/ui/ApplicationHeader';
+import { useAccount } from '../../../shared/auth/client';
+import { authFetch as fetch } from '../../../shared/auth/client';
 import { PrinterStatusPanel } from './PrinterStatusPanel';
 import { SapOperationPicker, type SapSelection } from './SapOperationPicker';
-import { ApplicationPageShell, ApplicationBrand } from '../../../shared/ui';
+import { ApplicationPageShell } from '../../../shared/ui';
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Printer, LoaderCircle, ScanLine } from 'lucide-react';
 import { useTranslation } from '../../../shared/i18n';
 import { Badge, Button, Field, Input, Select } from '../../../shared/ui/primitives';
 import { Icon } from '../../../shared/ui/Icon';
-import { PreferencesButton } from '../../preferences';
 import { demoLabelImage } from '../model/demoLabels';
 import { previewDatasetBatches, BatchPreviewRequestError } from '../api/batchPreviewApi';
 import { LabelInspector } from './LabelInspector';
@@ -22,7 +24,7 @@ import { getConfiguredPrinters, type ConfiguredPrinter } from '../api/printersAp
 
 
 export function LabelPrintPage() {
-  const t = useTranslation();
+  const t = useTranslation(); const account = useAccount();
   const serverPrint = useServerPrint();
   const [demo, setDemo] = useState(false);
   const [sapOperation, setSapOperation] = useState<SapSelection | null>(null);
@@ -104,7 +106,7 @@ export function LabelPrintPage() {
   const activeOutcome = serverPrint.result?.items.find(item => serverPrint.batches[item.index] === activeLabel?.batch)?.status;
   const activeDelivery = activeOutcome === 'SUBMITTED' ? 'Submitted to transport' : activeOutcome === 'UNCERTAIN' ? 'Outcome uncertain' : activeOutcome === 'FAILED_BEFORE_SEND' ? 'Failed before sending' : activeOutcome === 'NOT_ATTEMPTED' ? 'Not attempted' : undefined;
   return <ApplicationPageShell className="label-print-page">
-    <header className="application-header"><ApplicationBrand home testId="label-print-brand-home" /><span>Label Print</span><PreferencesButton /></header>
+    <ApplicationHeader testId="label-print-brand-home"><span>Label Print</span></ApplicationHeader>
     <main className="label-print-content label-print-split">
       <div className="label-print-heading"><a href="/" className="application-back"><Icon component={ArrowLeft} />{t('Main menu')}</a><label className="label-print-check"><input type="checkbox" disabled={operationBusy} checked={demo} onChange={event => { setDemo(event.target.checked); setSapOperation(null); setLanguage('IPL'); invalidate(); }} />{t('Demo mode')}</label></div>
       <div className="label-print-layout">
@@ -153,7 +155,7 @@ export function LabelPrintPage() {
               {demo && <><option value="intermec">{t('Intermec — Example')}</option><option value="zebra">{t('Zebra — Example')}</option></>}
             </Select></Field>
             {!demo && <>
-              <div className="label-print-printer-tools"><Button variant="compact" disabled={operationBusy || printersLoading} onClick={() => { setCatalogRevision(value => value + 1); invalidate(); }}>{t('Refresh printers')}</Button><a href="/management?section=printers">{t('Manage printers')}</a></div>
+              <div className="label-print-printer-tools"><Button variant="compact" disabled={operationBusy || printersLoading} onClick={() => { setCatalogRevision(value => value + 1); invalidate(); }}>{t('Refresh printers')}</Button>{account?.role === 'Admin' && <a href="/management?section=printers">{t('Manage printers')}</a>}</div>
               {printersError && <p role="alert">{t(printersError)}</p>}
               {configuredPrinter && <p className="label-print-printer-address">{configuredPrinter.host.includes(':') ? `[${configuredPrinter.host}]` : configuredPrinter.host}:{configuredPrinter.port} · {configuredPrinter.transport}</p>}
               <p className="label-print-muted">{t('Registered and enabled describes configuration only. Use Check status for a device response.')}</p>
@@ -183,7 +185,7 @@ export function LabelPrintPage() {
             <Field label={t('Data source')}><Select data-variant="compact" aria-label={t('Data source')} value={source} onChange={event => { setSource(event.target.value); setSapOperation(null); setLanguage('IPL'); invalidate(); }}>
               <option value="sap">{t('SAP')}</option><option value="dataset">{t('Test Data')}</option>
             </Select></Field>
-            {source === 'dataset' && <><Field label={t('Dataset')}><Select data-variant="compact" aria-label={t('Dataset')} value={datasetId} onChange={event => { setDatasetId(event.target.value); invalidate(); }}><option value="">{t('Select dataset')}</option>{datasets.map(dataset => <option key={dataset.id} value={dataset.id}>{dataset.name}</option>)}</Select></Field><p>{t('Batch matches item_id. Preview uses the saved layout for each label_code.')}</p><a href="/management?section=datasets">{t('Manage test data')}</a></>}
+            {source === 'dataset' && <><Field label={t('Dataset')}><Select data-variant="compact" aria-label={t('Dataset')} value={datasetId} onChange={event => { setDatasetId(event.target.value); invalidate(); }}><option value="">{t('Select dataset')}</option>{datasets.map(dataset => <option key={dataset.id} value={dataset.id}>{dataset.name}</option>)}</Select></Field><p>{t('Batch matches item_id. Preview uses the saved layout for each label_code.')}</p>{account?.role !== 'Operator' && <a href="/management?section=datasets">{t('Manage test data')}</a>}</>}
           </div>}
           {!demo && source === 'sap' && <SapOperationPicker onChange={selection => { setSapOperation(selection); invalidate(); }} />}
           </div>
