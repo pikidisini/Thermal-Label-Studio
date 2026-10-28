@@ -60,9 +60,11 @@ def render_svg_bitmap(svg: str, width: int, height: int, dpi: float, *, allow_ed
         raise RasterError("renderer_unavailable")
     # Binding measures these same trusted siblings. Loading regular alone
     # silently loses authored bold/italic shapes despite correct text metrics.
-    names = ('arialbd.ttf', 'ariali.ttf', 'arialbi.ttf') if settings.fixture_font_path.name.lower() == 'arial.ttf' else (
-        ('LiberationSans-Bold.ttf', 'LiberationSans-Italic.ttf', 'LiberationSans-BoldItalic.ttf')
-        if settings.fixture_font_path.name == 'LiberationSans-Regular.ttf' else ())
+    names = ()
+    if settings.fixture_font_path.name.lower() == 'arial.ttf':
+        names = ('arialbd.ttf', 'ariali.ttf', 'arialbi.ttf')
+    elif settings.fixture_font_path.name == 'LiberationSans-Regular.ttf':
+        names = ('LiberationSans-Bold.ttf', 'LiberationSans-Italic.ttf', 'LiberationSans-BoldItalic.ttf')
     fonts = [settings.fixture_font_path] + [settings.fixture_font_path.with_name(name) for name in names
                                           if settings.fixture_font_path.with_name(name).is_file()]
     font_arguments = [argument for font in fonts for argument in ('--use-font-file', str(font))]

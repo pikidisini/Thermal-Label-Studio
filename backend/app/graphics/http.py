@@ -1,6 +1,7 @@
 """Loopback-only Graphics API, bounded JSON transport and immutable uploads."""
 from uuid import UUID
 import base64
+from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
@@ -32,8 +33,8 @@ def call(request, method, *args):
 
 
 @router.get('/graphics')
-def list_graphics(request: Request, offset: int = Query(default=0, ge=0, le=1_000_000),
-                  q: str = Query(default='', max_length=160)):
+def list_graphics(request: Request, offset: Annotated[int, Query(ge=0, le=1_000_000)] = 0,
+                  q: Annotated[str, Query(max_length=160)] = ''):
     access(request)
     return call(request, 'list', offset, q)
 
@@ -55,7 +56,7 @@ async def upload_graphic(request: Request):
         body.extend(chunk)
     try:
         value = decode_json(bytes(body), limit=MAX_BODY_BYTES)
-    except (ValueError, TypeError, UnicodeError, RecursionError):
+    except (ValueError, TypeError, RecursionError):
         raise error(422, 'invalid_graphic') from None
     return await run_in_threadpool(call, request, 'create', value)
 

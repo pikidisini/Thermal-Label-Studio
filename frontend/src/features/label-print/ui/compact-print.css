@@ -17,7 +17,7 @@
 .label-print-toolbar > .label-print-settings > [data-ui-field], .label-print-toolbar .label-print-pair { order: 0; }
 .label-print-toolbar > .label-print-settings > .label-print-printer-tools { order: 1; }
 .label-print-toolbar .label-print-printer-address { order: 2; }
-.label-print-toolbar .label-print-printer-status { order: 3; }
+.label-print-toolbar .label-print-printer-status { order: 3; display: flex; align-items: center; gap: var(--ui-space-2); flex-wrap: wrap; }
 .label-print-toolbar > .label-print-settings > p.label-print-muted { order: 4; }
 .label-print-toolbar .label-print-printer-tools a { font-size: var(--ui-font-label); }
 .label-print-toolbar .label-print-settings-title { display: none; }
@@ -27,7 +27,6 @@
 .label-print-toolbar .label-print-pair { display: flex; flex-wrap: wrap; gap: var(--ui-space-2); }
 .label-print-toolbar .label-print-printer-tools { gap: var(--ui-space-2); }
 .label-print-toolbar .label-print-muted, .label-print-toolbar p { color: var(--ui-text-secondary); font-size: var(--ui-font-label); }
-.label-print-toolbar .label-print-printer-status { display: flex; align-items: center; gap: var(--ui-space-2); flex-wrap: wrap; }
 .label-print-toolbar .label-print-printer-status > .label-print-muted { flex-basis: 100%; }
 .label-print-toolbar .label-print-agent { gap: var(--ui-space-2); }
 .label-print-page .label-print-layout { grid-template-columns: 240px minmax(0, 1fr); gap: var(--ui-space-2); margin-block: var(--ui-space-2); }

@@ -10,13 +10,51 @@ import json
 from time import time
 from uuid import uuid4
 import math
-from .results import IntakeAdmissionError, IntakeRequest, IntakeResponse, MESSAGES, TemplateEvidence, IntakeError, error
+from .results import IntakeAdmissionError, IntakeRequest, IntakeResponse, MESSAGES, TemplateEvidence, IntakeError, error, batch_status
 from .ledger_models import PrintOutcome
+
+
+SET_TERMINAL_REQUEST_SQL = "UPDATE label_intake.requests SET state = 'TERMINAL', outcome = %s, metadata = %s::jsonb WHERE ledger_id = %s"
 
 
 class LedgerUnavailable(IntakeAdmissionError):
     def __init__(self):
         super().__init__(503, 'ledger_unavailable')
+
+
+def _recovered_item_state(state, previous):
+    if state in ('SEND_CLAIMED', 'SUBMITTED'):
+        return 'UNCERTAIN'
+    if any(item['status'] in ('SUBMITTED', 'UNCERTAIN') for item in previous):
+        return 'SKIPPED'
+    return 'FAILED'
+
+
+def _terminal_item_error(item, state, recovering):
+    if state == 'SUBMITTED':
+        return None
+    existing = item.get('error')
+    if existing:
+        return existing
+    code = 'processing_failed'
+    if state == 'UNCERTAIN':
+        code = 'previous_uncertain' if recovering else 'submission_uncertain'
+    elif state == 'SKIPPED':
+        code = 'batch_stopped'
+    return {'stage': 'RECOVERY' if recovering else 'TRANSPORT',
+            'code': code, 'message': MESSAGES[code]}
+
+
+def _public_terminal_item(item, state, *, recovering, print_mode):
+    public = {key: item[key] for key in ('item_index', 'item_id', 'label_code', 'copies', 'template')}
+    public['status'] = state
+    public['error'] = _terminal_item_error(item, state, recovering)
+    if state in ('SUBMITTED', 'UNCERTAIN'):
+        public['confirmed'] = False
+        public['target_id'] = item['target_id']
+    elif print_mode and item.get('target_id') is not None:
+        public['target_id'] = item['target_id']
+    return public
 
 
 @dataclass(frozen=True)
@@ -36,6 +74,49 @@ def packed(value, limit=128 * 1024):
 
 def unpacked(value):
     return json.loads(value) if isinstance(value, str) else value
+
+
+def validate_pins(pins, request):
+    # Pins contain bounded PUBLIC item metadata, never authored SVG/data.
+    if len(pins) != len(request.items):
+        raise LedgerUnavailable()
+    for index, (pin, item) in enumerate(zip(pins, request.items)):
+        validate_pin(pin, item, index, request.mode)
+
+
+def _same_request_items(result, request):
+    if len(result['results']) != len(request.items):
+        return False
+    fields = ('item_id', 'label_code', 'copies')
+    return all(all(result['results'][index][field] == getattr(item, field) for field in fields)
+               for index, item in enumerate(request.items))
+
+
+def _validate_result_model(result, simulation):
+    (IntakeResponse if simulation else PrintOutcome).model_validate(result)
+
+
+def validate_pin(pin, item, index, mode):
+    expected = {'item_index': index, 'item_id': item.item_id, 'label_code': item.label_code, 'copies': item.copies}
+    extra = {'target_id','policy_revision'} if mode == 'print' else set()
+    if any(pin.get(k) != v for k, v in expected.items()) or set(pin) != set(expected) | {'template', 'media'} | extra:
+        raise LedgerUnavailable()
+    if mode == 'print':
+        from app.label_data.validation import identity
+        if pin['target_id'] is not None:
+            identity(pin['target_id'])
+        identity(pin['policy_revision'])
+    if pin['template'] is not None:
+        TemplateEvidence.model_validate(pin['template'])
+        media = pin['media']
+        if (type(media) is not dict or set(media) != {'width_mm','height_mm','dpi'}
+                or any(type(v) not in (int,float) or not math.isfinite(v) for v in media.values())
+                or not 10 <= media['width_mm'] <= 500 or not 10 <= media['height_mm'] <= 500
+                or not 72 <= media['dpi'] <= 600):
+            raise LedgerUnavailable()
+    elif pin['media'] is not None:
+        raise LedgerUnavailable()
+    packed(pin, 4096)
 
 
 class PostgresLedger:
@@ -96,10 +177,7 @@ class PostgresLedger:
         return rows[0] if rows else None
 
     def _replay(self, cursor, row, request, trace_id):
-        if row[4] == 'EXPIRED' or self.clock() >= row[5]:
-            raise IntakeAdmissionError(409, 'request_expired')
-        if row[4] != 'TERMINAL':
-            raise IntakeAdmissionError(409, 'request_in_progress')
+        self._ensure_replayable(row)
         if row[3] == 'simulation':
             cursor.execute('SELECT response FROM label_intake.simulation_results WHERE ledger_id = %s', (str(row[0]),))
             protected = cursor.fetchone()
@@ -110,16 +188,21 @@ class PostgresLedger:
             result = unpacked(row[7])
         result = {**result, 'request_id': request.request_id, 'trace_id': trace_id,
                   'original_trace_id': str(row[2]), 'replayed': True}
-        if row[3] == 'simulation':
-            IntakeResponse.model_validate(result)
-        else:
-            PrintOutcome.model_validate(result)
-        if len(result['results']) != len(request.items) or any(
-                any(result['results'][index][key] != getattr(item,key) for key in ('item_id','label_code','copies'))
-                for index,item in enumerate(request.items)):
+        self._validate_replay_result(result, request, row[3] == 'simulation')
+        return result
+
+    def _ensure_replayable(self, row):
+        if row[4] == 'EXPIRED' or self.clock() >= row[5]:
+            raise IntakeAdmissionError(409, 'request_expired')
+        if row[4] != 'TERMINAL':
+            raise IntakeAdmissionError(409, 'request_in_progress')
+
+    @staticmethod
+    def _validate_replay_result(result, request, simulation):
+        _validate_result_model(result, simulation)
+        if not _same_request_items(result, request):
             raise LedgerUnavailable()
         packed(result, 12 * 1024 * 1024)
-        return result
 
     def lookup(self, sender, request, trace_id):
         values = self.keys.values(sender, request)
@@ -128,65 +211,63 @@ class PostgresLedger:
             return self._replay(cursor, row, request, trace_id) if row else None
         return self._transaction(read)
 
-    def admit(self, sender, request, trace_id, pins):
+    def admit(self, sender, request, trace_id, pins, *, on_insert=None, on_existing=None):
         request = IntakeRequest.model_validate(request.model_dump())
         pins = unpacked(packed(pins))
         values = self.keys.values(sender, request)
-        # Pins contain bounded PUBLIC item metadata, never authored SVG/data.
-        if len(pins) != len(request.items):
-            raise LedgerUnavailable()
-        for index, (pin, item) in enumerate(zip(pins, request.items)):
-            expected = {'item_index': index, 'item_id': item.item_id, 'label_code': item.label_code, 'copies': item.copies}
-            extra = {'target_id','policy_revision'} if request.mode == 'print' else set()
-            if any(pin.get(k) != v for k, v in expected.items()) or set(pin) != set(expected) | {'template', 'media'} | extra:
-                raise LedgerUnavailable()
-            if request.mode == 'print':
-                from app.label_data.validation import identity
-                if pin['target_id'] is not None:
-                    identity(pin['target_id'])
-                identity(pin['policy_revision'])
-            if pin['template'] is not None:
-                TemplateEvidence.model_validate(pin['template'])
-                media = pin['media']
-                if (type(media) is not dict or set(media) != {'width_mm','height_mm','dpi'}
-                        or any(type(v) not in (int,float) or not math.isfinite(v) for v in media.values())
-                        or not 10 <= media['width_mm'] <= 500 or not 10 <= media['height_mm'] <= 500
-                        or not 72 <= media['dpi'] <= 600):
-                    raise LedgerUnavailable()
-            elif pin['media'] is not None:
-                raise LedgerUnavailable()
-            packed(pin, 4096)
+        validate_pins(pins, request)
         receipt = Receipt(str(uuid4()), str(uuid4()), trace_id, request.mode)
         created = self.clock()
         retention = 86400 if request.mode == 'simulation' else 90 * 86400
-        def insert(cursor):
-            cursor.execute('SELECT identities FROM label_intake.capacity WHERE singleton = 1 FOR UPDATE')
-            capacity = cursor.fetchone()
-            if capacity is None:
-                raise LedgerUnavailable()
-            existing = self._find(cursor, sender, values)
-            if existing:
-                # Admission callers cannot become owners of an existing request.
-                return self._replay(cursor, existing, request, trace_id)
-            if capacity[0] >= 1_000_000:
-                raise LedgerUnavailable()
-            for version in self.keys.versions():
-                cursor.execute('''INSERT INTO label_intake.key_versions (key_version,key_check)
-                    VALUES (%s,%s) ON CONFLICT (key_version) DO NOTHING''',
-                    (version,self.keys.mac(version,b'intake-keycheck-v1\0',version.encode())))
-            identity, digest = values[self.keys.active]
-            cursor.execute('''INSERT INTO label_intake.requests
-                (ledger_id,sender,key_version,identity_hmac,payload_hmac,owner_token,original_trace_id,
-                 mode,state,created_at,expires_at,metadata)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'RECEIVED',%s,%s,NULL)''',
-                (receipt.ledger_id, sender, self.keys.active, identity, digest, receipt.owner_token,
-                 trace_id, request.mode, created, created + retention))
+        return self._transaction(lambda cursor: self._admit_insert(
+            cursor, sender, values, receipt, request, pins, trace_id, created, retention,
+            on_insert, on_existing))
+
+    def _admit_insert(self, cursor, sender, values, receipt, request, pins, trace_id,
+                      created, retention, on_insert, on_existing):
+        cursor.execute('SELECT identities FROM label_intake.capacity WHERE singleton = 1 FOR UPDATE')
+        capacity = cursor.fetchone()
+        if capacity is None:
+            raise LedgerUnavailable()
+        existing = self._find(cursor, sender, values)
+        if existing:
+            # Admission callers cannot become owners of an existing request.
+            if on_existing is not None:
+                return on_existing(cursor, existing)
+            return self._replay(cursor, existing, request, trace_id)
+        if capacity[0] >= 1_000_000:
+            raise LedgerUnavailable()
+        for version in self.keys.versions():
+            cursor.execute('''INSERT INTO label_intake.key_versions (key_version,key_check)
+                VALUES (%s,%s) ON CONFLICT (key_version) DO NOTHING''',
+                (version,self.keys.mac(version,b'intake-keycheck-v1\0',version.encode())))
+        identity, digest = values[self.keys.active]
+        cursor.execute('''INSERT INTO label_intake.requests
+            (ledger_id,sender,key_version,identity_hmac,payload_hmac,owner_token,original_trace_id,
+             mode,state,created_at,expires_at,metadata)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'RECEIVED',%s,%s,NULL)''',
+            (receipt.ledger_id, sender, self.keys.active, identity, digest, receipt.owner_token,
+             trace_id, request.mode, created, created + retention))
+        for index, pin in enumerate(pins):
+            cursor.execute('''INSERT INTO label_intake.items (ledger_id,item_index,state,metadata)
+                VALUES (%s,%s,'RECEIVED',%s::jsonb)''', (receipt.ledger_id, index, packed(pin, 4096)))
+        cursor.execute('UPDATE label_intake.capacity SET identities = identities + 1 WHERE singleton = 1')
+        if on_insert is not None:
+            return on_insert(cursor, receipt)
+        return receipt
+
+    def pin_received(self, receipt, pins):
+        """Queue owner freezes public evidence before any preparation or send."""
+        def update(cursor):
+            self._owned(cursor, receipt)
             for index, pin in enumerate(pins):
-                cursor.execute('''INSERT INTO label_intake.items (ledger_id,item_index,state,metadata)
-                    VALUES (%s,%s,'RECEIVED',%s::jsonb)''', (receipt.ledger_id, index, packed(pin, 4096)))
-            cursor.execute('UPDATE label_intake.capacity SET identities = identities + 1 WHERE singleton = 1')
-            return receipt
-        return self._transaction(insert)
+                state, old = self._item(cursor, receipt, index)
+                if state != 'RECEIVED' or any(old[k] != pin[k] for k in ('item_index','item_id','label_code','copies')):
+                    raise LedgerUnavailable()
+                if pin.get('template') is not None:
+                    TemplateEvidence.model_validate(pin['template'])
+                self._put_item(cursor, receipt, index, state, pin)
+        self._transaction(update)
 
     def _owned(self, cursor, receipt):
         cursor.execute('''SELECT owner_token, mode, state, original_trace_id FROM label_intake.requests
@@ -265,9 +346,10 @@ class PostgresLedger:
             state, item = self._item(cursor, receipt, index)
             if state not in ('RECEIVED','PREPARED'):
                 raise LedgerUnavailable()
+            error_stage = 'TRANSPORT' if code == 'transport_failed_before_send' else 'PREPARATION'
+            failure = detail if detail else error(error_stage, code)
             self._put_item(cursor, receipt, index, 'SKIPPED' if skipped else 'FAILED',
-                {**item, 'error': detail.model_dump() if detail else error(
-                    'TRANSPORT' if code == 'transport_failed_before_send' else 'PREPARATION', code).model_dump()})
+                {**item, 'error': failure.model_dump()})
         self._transaction(fail)
 
     def settle_not_sent(self, receipt, index):
@@ -295,20 +377,23 @@ class PostgresLedger:
             if [row[0] for row in cursor.fetchall()] != [item['item_index'] for item in result['results']]:
                 raise LedgerUnavailable()
             for item in result['results']:
-                state, pin = self._item(cursor, receipt, item['item_index'])
-                if state not in ('RECEIVED', 'PREPARED') or (item['status'] == 'SIMULATED' and state != 'PREPARED'):
-                    raise LedgerUnavailable()
-                if any(item[k] != pin[k] for k in ('item_id','label_code','copies','template')):
-                    raise LedgerUnavailable()
-                if item['status'] == 'SIMULATED' and any(item['simulation'][k] != pin[k] for k in ('payload_sha256','payload_bytes')):
-                    raise LedgerUnavailable()
-                self._put_item(cursor, receipt, item['item_index'], item['status'],
-                               {**pin, 'error': item['error']})
+                self._complete_simulation_item(cursor, receipt, item)
             cursor.execute('INSERT INTO label_intake.simulation_results (ledger_id,response) VALUES (%s,%s::jsonb)',
                            (receipt.ledger_id, protected))
-            cursor.execute("UPDATE label_intake.requests SET state = 'TERMINAL', outcome = %s, metadata = %s::jsonb WHERE ledger_id = %s",
+            cursor.execute(SET_TERMINAL_REQUEST_SQL,
                            (result['status'], packed(metadata), receipt.ledger_id))
         self._transaction(finish)
+
+    def _complete_simulation_item(self, cursor, receipt, item):
+        state, pin = self._item(cursor, receipt, item['item_index'])
+        if state not in ('RECEIVED', 'PREPARED') or (item['status'] == 'SIMULATED' and state != 'PREPARED'):
+            raise LedgerUnavailable()
+        if any(item[k] != pin[k] for k in ('item_id','label_code','copies','template')):
+            raise LedgerUnavailable()
+        if item['status'] == 'SIMULATED' and any(item['simulation'][k] != pin[k] for k in ('payload_sha256','payload_bytes')):
+            raise LedgerUnavailable()
+        self._put_item(cursor, receipt, item['item_index'], item['status'],
+                       {**pin, 'error': item['error']})
 
     def _terminal_metadata(self, cursor, receipt, *, recovering=False):
         cursor.execute('SELECT item_index,state,metadata FROM label_intake.items WHERE ledger_id = %s ORDER BY item_index',
@@ -317,30 +402,16 @@ class PostgresLedger:
         for index, state, raw in cursor.fetchall():
             item = unpacked(raw)
             if recovering and state in ('RECEIVED','PREPARED','SEND_CLAIMED','SUBMITTED'):
-                state = 'UNCERTAIN' if state in ('SEND_CLAIMED','SUBMITTED') else 'SKIPPED' if any(
-                    r['status'] in ('SUBMITTED','UNCERTAIN') for r in results) else 'FAILED'
+                state = _recovered_item_state(state, results)
                 self._put_item(cursor, receipt, index, state, item)
             if state not in ('SUBMITTED','UNCERTAIN','FAILED','SKIPPED'):
                 raise LedgerUnavailable()
-            public = {k: item[k] for k in ('item_index','item_id','label_code','copies','template')}
-            public['status'] = state
-            uncertain_code = 'previous_uncertain' if recovering else 'submission_uncertain'
-            public['error'] = None if state == 'SUBMITTED' else item.get('error') or {
-                'stage': 'RECOVERY' if recovering else 'TRANSPORT',
-                'code': uncertain_code if state == 'UNCERTAIN' else 'batch_stopped' if state == 'SKIPPED' else 'processing_failed',
-                'message': MESSAGES[uncertain_code if state == 'UNCERTAIN' else 'batch_stopped' if state == 'SKIPPED' else 'processing_failed']}
-            if state in ('SUBMITTED','UNCERTAIN'):
-                public['confirmed'] = False
-                public['target_id'] = item['target_id']
-            elif receipt.mode == 'print' and item.get('target_id') is not None:
-                public['target_id'] = item['target_id']
-            results.append(public)
+            results.append(_public_terminal_item(item, state, recovering=recovering, print_mode=receipt.mode == 'print'))
         counts = {key: sum(item['status'] == status for item in results) for key, status in
                   (('simulated','SIMULATED'),('submitted','SUBMITTED'),('failed','FAILED'),('uncertain','UNCERTAIN'),('skipped','SKIPPED'))}
         counts['total'] = len(results)
-        status = 'UNCERTAIN' if counts['uncertain'] else 'COMPLETED' if counts['submitted'] == len(results) else 'PARTIAL' if counts['submitted'] else 'FAILED'
-        result = dict(trace_id=receipt.original_trace_id, original_trace_id=receipt.original_trace_id,
-                    mode=receipt.mode, replayed=False, status=status, summary=counts, results=results)
+        status = batch_status(counts['submitted'], len(results), uncertain=counts['uncertain'])
+        result = {'trace_id': receipt.original_trace_id, 'original_trace_id': receipt.original_trace_id, 'mode': receipt.mode, 'replayed': False, 'status': status, 'summary': counts, 'results': results}
         if receipt.mode == 'print':
             PrintOutcome.model_validate({**result,'request_id':'VALIDATION'})
         else:
@@ -353,7 +424,7 @@ class PostgresLedger:
         def finish(cursor):
             self._owned(cursor, receipt)
             metadata = self._terminal_metadata(cursor, receipt)
-            cursor.execute("UPDATE label_intake.requests SET state = 'TERMINAL', outcome = %s, metadata = %s::jsonb WHERE ledger_id = %s",
+            cursor.execute(SET_TERMINAL_REQUEST_SQL,
                            (metadata['status'], packed(metadata), receipt.ledger_id))
             return metadata
         return self._transaction(finish)
@@ -371,7 +442,7 @@ class PostgresLedger:
             if receipt.mode == 'simulation':
                 cursor.execute('INSERT INTO label_intake.simulation_results (ledger_id,response) VALUES (%s,%s::jsonb)',
                                (ledger_id, packed(metadata)))
-            cursor.execute("UPDATE label_intake.requests SET state = 'TERMINAL', outcome = %s, metadata = %s::jsonb WHERE ledger_id = %s",
+            cursor.execute(SET_TERMINAL_REQUEST_SQL,
                            (metadata['status'], packed(metadata), ledger_id))
         self._transaction(recover)
 

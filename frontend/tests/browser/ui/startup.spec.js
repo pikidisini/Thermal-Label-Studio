@@ -1,8 +1,12 @@
 import { mockAccountSession } from '../helpers/studio.js';
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/coverage.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
 const dist = fileURLToPath(new URL('../../../dist/', import.meta.url));
+const studioChunks = readdirSync(path.join(dist, 'assets')).filter(name => name.endsWith('.js')
+  && readFileSync(path.join(dist, 'assets', name), 'utf8').includes('container-topbar-brand-row'));
+if (studioChunks.length !== 1) throw new Error('Expected one built Studio module for startup fault injection.');
 
 async function setup(page, appRoute) {
   await page.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
@@ -12,7 +16,7 @@ async function setup(page, appRoute) {
   await page.route('**/assets/**', async route => {
     const file = path.resolve(dist, `.${decodeURIComponent(new URL(route.request().url()).pathname)}`);
     if (!file.startsWith(path.join(dist, 'assets') + path.sep)) return route.abort();
-    if (path.basename(file).startsWith('App-')) return appRoute(route, file);
+    if (path.basename(file) === studioChunks[0]) return appRoute(route, file);
     return route.fulfill({ path: file });
   });
 }

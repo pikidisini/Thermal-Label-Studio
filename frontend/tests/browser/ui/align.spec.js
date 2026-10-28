@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { downloadTemplateSvg } from '../helpers/svgDownload.js';
+import { test, expect } from '../helpers/coverage.js';
 import { openStudio, mockBuiltApplication } from '../helpers/studio.js';
 
 // Disposable browser context; every API request is mocked, including writes.
@@ -6,7 +7,7 @@ test('Align buttons center rotated objects, align edges, and preserve geometry w
   test.setTimeout(60000);
   page.on('pageerror', error => { throw error; });
   await mockBuiltApplication(page);
-  await page.route(url => url.pathname.startsWith('/api/'), route => route.fulfill({ json: [] }));
+  await page.route(url => url.pathname.startsWith('/api/') && !url.pathname.startsWith('/api/v1/auth/'), route => route.fulfill({ json: [] }));
   await openStudio(page);
   await page.getByTestId('inspector-tab-btn-transform').click();
   await expect(page.getByTestId('align-btn-left')).toBeDisabled();
@@ -24,11 +25,7 @@ test('Align buttons center rotated objects, align edges, and preserve geometry w
   await page.getByTestId('inspector-tab-btn-transform').click();
 
   const exportedBounds = async () => {
-    await page.getByTestId('topbar-menu-btn-file').click();
-    const pending = page.waitForEvent('download');
-    await page.getByRole('menuitem', { name: 'Download template SVG', exact: true }).click();
-    const stream = await (await pending).createReadStream();
-    let svg = ''; for await (const chunk of stream) svg += chunk.toString();
+    const svg = await downloadTemplateSvg(page);
     return page.evaluate(content => {
       const root = new DOMParser().parseFromString(content, 'image/svg+xml').documentElement;
       document.body.appendChild(root);

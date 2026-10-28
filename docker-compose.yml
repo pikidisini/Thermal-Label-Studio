@@ -26,6 +26,7 @@ services:
       TLS_DATABASE_URL: postgresql://thermal_label:${TLS_DB_PASSWORD:?Set a local database password}@postgres:5432/thermal_label_studio
       TLS_AUTH_ORIGINS: ${TLS_AUTH_ORIGINS:-}
       TLS_AUTH_LOCAL_HTTP: ${TLS_AUTH_LOCAL_HTTP:-false}
+      TLS_AUTH_TRUSTED_LAN_HTTP: ${TLS_AUTH_TRUSTED_LAN_HTTP:-false}
       TLS_TRUSTED_PROXY_IPS: ${TLS_TRUSTED_PROXY_IPS:-}
       TLS_MANAGEMENT_ENABLED: ${TLS_MANAGEMENT_ENABLED:-false}
       TLS_ACTIVITY_ENABLED: ${TLS_ACTIVITY_ENABLED:-false}

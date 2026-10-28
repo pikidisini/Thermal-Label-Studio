@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/coverage.js';
 import { mockBuiltApplication } from '../helpers/studio.js';
 
 const user = { id: 'alice', username: 'alice', display_name: 'Alice', role: 'Operator', active: true, must_change_password: false };
@@ -41,8 +41,17 @@ test('session expiry preserves print lock and does not retry any write', async (
   await page.route('**/api/v1/auth/session', route => route.fulfill({ json: session(current) }));
   await page.route('**/api/v1/label-print/print', route => { prints++; return route.fulfill({ status: 401, json: {} }); });
   await page.goto('/');
+  await expect(page.getByRole('link', { name: /Label Print/ })).toBeVisible();
+  await page.evaluate(() => {
+    sessionStorage.setItem('thermal-label-studio:studio-print-pending', 'pending');
+    const trigger = document.createElement('button');
+    trigger.id = 'test-session-expiry';
+    trigger.textContent = 'Expire test session';
+    trigger.onclick = () => window.dispatchEvent(new Event('auth:expired'));
+    document.body.appendChild(trigger);
+  });
   current = null;
-  await page.evaluate(() => { sessionStorage.setItem('thermal-label-studio:studio-print-pending', 'pending'); window.dispatchEvent(new Event('auth:expired')); });
+  await page.locator('#test-session-expiry').click();
   await expect(page).toHaveURL(/\/login$/);
   expect(await page.evaluate(() => sessionStorage.getItem('thermal-label-studio:studio-print-pending'))).toBe('pending');
   expect(prints).toBe(0);

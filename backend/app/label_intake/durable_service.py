@@ -9,18 +9,20 @@ class ReplayReady(Exception):
         self.response = response
 
 
-def simulate_durable(request, sender, layouts, ledger, trace_id):
+def simulate_durable(request, sender, layouts, ledger, trace_id, *, receipt=None):
     request = IntakeRequest.model_validate(request.model_dump())
     if ledger is None:
         raise LedgerUnavailable()
-    replay = ledger.lookup(sender, request, trace_id)
+    replay = ledger.lookup(sender, request, trace_id) if receipt is None else None
     if replay is not None:
         return IntakeResponse.model_validate(replay)
     if layouts is None:
         raise IntakeAdmissionError(503, 'intake_unavailable')
-    receipt = None
     def pin(snapshot):
         nonlocal receipt
+        if receipt is not None:
+            ledger.pin_received(receipt, snapshot)
+            return
         owned = ledger.admit(sender, request, trace_id, snapshot)
         if not isinstance(owned, Receipt):
             raise ReplayReady(owned)

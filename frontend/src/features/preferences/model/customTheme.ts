@@ -190,12 +190,18 @@ export function parseCustomTheme(value: unknown): CustomTheme | undefined {
   const has = (key: string) => Object.prototype.hasOwnProperty.call(supplied, key);
   if (!LEGACY_COLOR_KEYS.every(key => has(key)) || !COLOR_KEYS.every(key => !has(key) || isHexColor(supplied[key]))) return undefined;
   const defaults = CUSTOM_PRESETS[candidate.base];
-  const colors = Object.fromEntries(COLOR_KEYS.map(key => [key, (has(key) ? supplied[key] as string : key === 'textSecondary' ? supplied.text as string : key === 'actionHover' || key === 'actionFixed' ? supplied.action as string : defaults[key]).toLowerCase()])) as CustomColors;
+  const inheritedColor = (key: ColorKey): string => {
+    if (has(key)) return supplied[key] as string;
+    if (key === 'textSecondary') return supplied.text as string;
+    if (key === 'actionHover' || key === 'actionFixed') return supplied.action as string;
+    return defaults[key];
+  };
+  const colors = Object.fromEntries(COLOR_KEYS.map(key => [key, inheritedColor(key).toLowerCase()])) as CustomColors;
   return { base: candidate.base, ...(candidate.version === 2 ? { version: 2 as const } : {}), colors };
 }
 export function contrastRatio(foreground: string, background: string): number {
   const luminance = (hex: string) => {
-    const channels = [1, 3, 5].map(offset => parseInt(hex.slice(offset, offset + 2), 16) / 255).map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+    const channels = [1, 3, 5].map(offset => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255).map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
     return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
   };
   const a = luminance(foreground), b = luminance(background);

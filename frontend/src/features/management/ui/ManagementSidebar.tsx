@@ -4,11 +4,11 @@ import { useTranslation } from '../../../shared/i18n';
 import type { ManagementController } from '../hooks/useManagement';
 import { sections } from '../model/navigation';
 
-export function ManagementSidebar({ management, expanded, onToggle }: {
+export function ManagementSidebar({ management, expanded, onToggle }: Readonly<{
   management: ManagementController;
   expanded: boolean;
   onToggle: () => void;
-}) {
+}>) {
   const t = useTranslation();
   const { section, saving, navigate } = management;
   return <nav id="management-navigation" aria-label={t('Management sections')} className="management-sidebar">

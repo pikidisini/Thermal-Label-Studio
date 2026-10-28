@@ -7,6 +7,9 @@ from fastapi.staticfiles import StaticFiles
 from .config import Settings
 
 
+HTML_CONTENT_TYPE = 'text/html'
+
+
 def runtime_ready(settings: Settings) -> bool:
     """Presence only; successful rendering and external services are not implied."""
     if not settings.renderer_path.is_file() or not settings.fixture_font_path.is_file():
@@ -28,27 +31,31 @@ def configure_fixture_serving(app: FastAPI, settings: Settings) -> None:
 
     @app.get("/login", include_in_schema=False)
     def login_page():
-        return FileResponse(directory / "index.html", media_type="text/html")
+        return FileResponse(directory / "index.html", media_type=HTML_CONTENT_TYPE)
 
     @app.get("/", include_in_schema=False)
     def fixture_home():
-        return FileResponse(directory / "index.html", media_type="text/html")
+        return FileResponse(directory / "index.html", media_type=HTML_CONTENT_TYPE)
 
     @app.get("/print", include_in_schema=False)
     def label_print_page():
-        return FileResponse(directory / "index.html", media_type="text/html")
+        return FileResponse(directory / "index.html", media_type=HTML_CONTENT_TYPE)
+
+    @app.get("/sap-requests", include_in_schema=False)
+    def sap_requests_page():
+        return FileResponse(directory / "index.html", media_type=HTML_CONTENT_TYPE)
 
     @app.get("/studio", include_in_schema=False)
     def studio_page():
-        return FileResponse(directory / "index.html", media_type="text/html")
+        return FileResponse(directory / "index.html", media_type=HTML_CONTENT_TYPE)
 
     @app.get("/fixture-simulation", include_in_schema=False)
     def fixture_page():
-        return FileResponse(directory / "index.html", media_type="text/html")
+        return FileResponse(directory / "index.html", media_type=HTML_CONTENT_TYPE)
 
     @app.get("/management", include_in_schema=False)
     def management_page():
-        return FileResponse(directory / "index.html", media_type="text/html")
+        return FileResponse(directory / "index.html", media_type=HTML_CONTENT_TYPE)
 
 
 def readiness_response(settings: Settings) -> JSONResponse:

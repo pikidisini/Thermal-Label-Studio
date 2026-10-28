@@ -38,7 +38,7 @@ import { designPreviewSample, shouldUseDesignPreviewSample } from '../../data-to
 import { compositionFields } from '../../data-tokens/model/composition';
 
 // Feature helpers
-import { resolveSapTokenDisplayValue, readLocalSapJson, readLocalSapJsonSource, parseLocalSapJson, createCanonicalWorkingCopy, importDataset, studioDatasetApi, type StudioDatasetSummary } from '../../data-tokens';
+import { resolveSapTokenDisplayValue, readLocalSapJson, parseLocalSapJson, createCanonicalWorkingCopy, importDataset, studioDatasetApi, type StudioDatasetSummary } from '../../data-tokens';
 import { generatePreviewDataUrl, replaceSymbolImage, resolvePayloadTemplate, validatePreviewPayload } from '../../barcode';
 
 
@@ -65,7 +65,7 @@ export function Studio() {
     setDiagnosticsModalOpen,
   } = useTemplateStore();
 
-  const { sampleContracts, activeContractKey, jsonData, tokenMap, fieldDescriptions, usedTokens, customTokens, switchContract, localImport, setLocalImportedContract, updateTokenValue, markCustomToken, updateUsedTokensFromCanvas } = useContractStore();
+  const { sampleContracts, activeContractKey, tokenMap, fieldDescriptions, usedTokens, customTokens, switchContract, localImport, setLocalImportedContract, updateTokenValue, markCustomToken, updateUsedTokensFromCanvas } = useContractStore();
   const [localImportError, setLocalImportError] = React.useState<string | null>(null);
   const [localImportWarning, setLocalImportWarning] = React.useState<string | null>(null);
   const [editorPrintOpen, setEditorPrintOpen] = React.useState(false);
@@ -88,8 +88,8 @@ export function Studio() {
     const revision = datasetRequest.current; const listOperation = ++datasetListRequest.current;
     try {
       const list = await studioDatasetApi.list();
-      if (revision === datasetRequest.current && listOperation === datasetListRequest.current) setSavedDatasets(list);
-    } catch { if (revision === datasetRequest.current && listOperation === datasetListRequest.current) setDatasetStatus('Sample dataset storage is unavailable. Local exploration is available.'); }
+      if (revision === datasetRequest.current && listOperation === datasetListRequest.current) { setSavedDatasets(list); }
+    } catch { if (revision === datasetRequest.current && listOperation === datasetListRequest.current) { setDatasetStatus('Sample dataset storage is unavailable. Local exploration is available.'); } }
   }, []);
   React.useEffect(() => { void reloadDatasets(); }, [reloadDatasets]);
   const applyDataset = React.useCallback((parsed: Awaited<ReturnType<typeof readLocalSapJson>>, filename: string) => {
@@ -99,7 +99,10 @@ export function Studio() {
     useSimulationStore.getState().setThermalImage(null);
     useContractStore.getState().setOutputBlocked(Boolean(parsed.outputBlocked));
     setHistoricalSource(parsed.outputBlocked ? parsed.canonicalSource ?? null : null);
-    setWorkingCopies(parsed.items.map((item) => String(item.contract.source.copies ?? 1)));
+    setWorkingCopies(parsed.items.map((item) => {
+      const copies = item.contract.source.copies;
+      return typeof copies === 'number' || typeof copies === 'string' ? String(copies) : '1';
+    }));
     const first = parsed.items[0];
     setLocalItems(parsed.items); setLocalFileName(filename); setLocalImportError(null);
     setLocalImportWarning(parsed.warnings.length ? parsed.warnings.join(' ') : null);
@@ -119,27 +122,27 @@ export function Studio() {
         },
       });
     } catch (error) {
-      if (operation !== datasetRequest.current) return;
+      if (operation !== datasetRequest.current) { return; }
       setLocalImportError(error instanceof Error ? error.message : 'JSON could not be used.');
       setLocalImportWarning(null); setDatasetStatus('Import failed. Previously selected data is unchanged.');
     }
   }, [applyDataset]);
   const handleSavedDatasetSelect = React.useCallback(async (id: string) => {
     const operation = ++datasetRequest.current;
-    if (!id) return;
+    if (!id) { return; }
     setDatasetStatus('Opening sample dataset...');
     try {
       const saved = await studioDatasetApi.get(id);
       const parsed = parseLocalSapJson(saved.payload);
-      if (operation !== datasetRequest.current) return;
+      if (operation !== datasetRequest.current) { return; }
       applyDataset(parsed, saved.original_filename); setSelectedDatasetId(id); setDatasetStatus('Saved sample dataset');
-    } catch { if (operation === datasetRequest.current) setDatasetStatus('Sample dataset could not be opened. Refresh the list and try again.'); }
+    } catch { if (operation === datasetRequest.current) { setDatasetStatus('Sample dataset could not be opened. Refresh the list and try again.'); } }
   }, [applyDataset]);
 
   const handleLocalItemSelect = React.useCallback((sequence: number) => {
     permitTokenHydration();
     const item = localItems.find((candidate) => candidate.itemSequence === sequence);
-    if (!item || !localImport) return;
+    if (!item || !localImport) { return; }
     setLocalImportedContract(item.contract, item.tokenMap, { ...localImport, fileName: localFileName, itemSequence: item.itemSequence });
   }, [localImport, localFileName, localItems, setLocalImportedContract]);
   const { dpi } = useSimulationStore();
@@ -161,12 +164,12 @@ export function Studio() {
   const restoredDraftRef = React.useRef(false);
   const canvasReadyRef = React.useRef<fabric.Canvas | null>(null);
   const restoreDraft = React.useCallback((canvas: fabric.Canvas) => {
-    if (restoredDraftRef.current) return;
+    if (restoredDraftRef.current) { return; }
     const recovered = draft.restore(canvas, () => {
       updateUsedTokensFromCanvas(canvas);
       actions.saveCanvasHistory();
     });
-    if (!recovered) return;
+    if (!recovered) { return; }
     restoredDraftRef.current = true;
     useTemplateStore.getState().setDimensions(recovered.widthMm, recovered.heightMm);
     useTemplateStore.getState().setActiveTemplateId(recovered.templateId);
@@ -175,14 +178,14 @@ export function Studio() {
   const handleCanvasReady = React.useCallback((canvas: fabric.Canvas) => {
     canvasReadyRef.current = canvas;
     restoreDraft(canvas);
-    const save = (event?: any) => { if (event?.target?.isLineDrawingPreview || useHistoryStore.getState().isLocked) return; draftScheduleRef.current(); };
+    const save = (event?: any) => { if (event?.target?.isLineDrawingPreview || useHistoryStore.getState().isLocked) { return; } draftScheduleRef.current(); };
     canvas.on('object:added', save);
     canvas.on('object:modified', save);
     canvas.on('object:removed', save);
   }, [restoreDraft, templateMgr]);
 
   React.useEffect(() => {
-    if (canvasReadyRef.current) restoreDraft(canvasReadyRef.current);
+    if (canvasReadyRef.current) { restoreDraft(canvasReadyRef.current); }
   }, [restoreDraft]);
 
   React.useEffect(() => {
@@ -195,7 +198,7 @@ export function Studio() {
       }
       void layoutApi.list()
         .then((layouts) => {
-          if (!current) return;
+          if (!current) { return; }
           const mapped = layouts.map((layout) => ({
             id: layout.label_code,
             name: layout.title,
@@ -207,56 +210,56 @@ export function Studio() {
           const params = new URLSearchParams(window.location.search);
           const requested = params.get('template');
           const versionText = params.get('version');
-          const version = versionText && /^[1-9][0-9]*$/.test(versionText) ? Number(versionText) : undefined;
+          const version = versionText && /^[1-9]\d*$/.test(versionText) ? Number(versionText) : undefined;
           const selected = requested ? mapped.find(layout => layout.id === requested) : mapped.find((layout) => layout.id === useTemplateStore.getState().activeTemplateId) || mapped[0];
-          if (selected) void templateMgr.loadTemplateById(selected.id, version);
+          if (selected) { void templateMgr.loadTemplateById(selected.id, version); }
         })
         .catch((error) => console.error('Failed to load persisted layouts:', error));
     };
     loadPersistedLayouts();
     return () => {
       current = false;
-      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+      if (retryTimer !== undefined) { window.clearTimeout(retryTimer); }
     };
   }, []);
 
   React.useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    if (restoredDraftRef.current) return;
+    if (!canvas) { return; }
+    if (restoredDraftRef.current) { return; }
     let changed = false;
     const objects: any[] = [];
     const visit = (object: any) => { objects.push(object); object.getObjects?.().forEach(visit); };
     canvas.getObjects().forEach(visit);
     objects.forEach((object: any) => {
       if (!object.isBarcode && typeof object.payloadTemplate === 'string') {
-        if (object.previewOverride) return;
+        if (object.previewOverride) { return; }
         object.designPreviewText ??= designPreviewSample(object.text);
         const resolved = shouldUseDesignPreviewSample(activeContractKey, compositionFields(object.payloadTemplate), tokenMap)
           ? { value: object.designPreviewText, error: null }
           : resolvePayloadTemplate(object.payloadTemplate, tokenMap, 'text', fieldDescriptions);
-        if (object.text === (resolved.value ?? 'Text content â€” no data') && object.validationError === (resolved.error || undefined)) return;
+        if (object.text === (resolved.value ?? 'Text content â€” no data') && object.validationError === (resolved.error || undefined)) { return; }
         object.set('text', resolved.value ?? 'Text content â€” no data');
         object.validationError = resolved.error || undefined;
         changed = true; return;
       }
-      if (!object.dataField || object.previewOverride || typeof object.set !== 'function') return;
+      if (!object.dataField || object.previewOverride || typeof object.set !== 'function') { return; }
       object.designPreviewText ??= designPreviewSample(object.text);
       const nextValue = shouldUseDesignPreviewSample(activeContractKey, [object.dataField], tokenMap)
         ? object.designPreviewText
         : resolveSapTokenDisplayValue(tokenMap[object.dataField], object.dataField, fieldDescriptions);
-      if (object.text === nextValue) return;
+      if (object.text === nextValue) { return; }
       object.set('text', nextValue);
       changed = true;
     });
     if (changed) {
-      if (canvas.getActiveObject()) actions.syncSelection(canvas.getActiveObject());
+      if (canvas.getActiveObject()) { actions.syncSelection(canvas.getActiveObject()); }
       canvas.renderAll();
       actions.saveCanvasHistory();
       triggerRenderSimulation();
     }
     objects.forEach((object: any) => {
-      if (!object.isBarcode) return;
+      if (!object.isBarcode) { return; }
       if (typeof object.payloadTemplate === 'string') {
         const request = (boundImageRequests.current.get(object) || 0) + 1;
         boundImageRequests.current.set(object, request);
@@ -270,22 +273,22 @@ export function Studio() {
           triggerRenderSimulation();
           return;
         }
-        if (object.barcodeValue === resolved.value && !object.validationError) return;
-        const apply = (url: string | null) => { if (request !== boundImageRequests.current.get(object) || !object._element) return; if (!url) { object.validationError = 'Symbol preview could not be generated.'; actions.syncSelection(object); canvas.renderAll(); return; } void replaceSymbolImage(object,url, () => request === boundImageRequests.current.get(object) && !!object._element).then((applied) => { if (!applied) return; object.barcodeValue = resolved.value; object.previewOverride = false; object.validationError = undefined; object.set('opacity', 1); actions.syncSelection(object); canvas.renderAll(); triggerRenderSimulation(); }); };
+        if (object.barcodeValue === resolved.value && !object.validationError) { return; }
+        const apply = (url: string | null) => { if (request !== boundImageRequests.current.get(object) || !object._element) { return; } if (!url) { object.validationError = 'Symbol preview could not be generated.'; actions.syncSelection(object); canvas.renderAll(); return; } void replaceSymbolImage(object,url, () => request === boundImageRequests.current.get(object) && !!object._element).then((applied) => { if (!applied) { return; } object.barcodeValue = resolved.value; object.previewOverride = false; object.validationError = undefined; object.set('opacity', 1); actions.syncSelection(object); canvas.renderAll(); triggerRenderSimulation(); }); };
         void generatePreviewDataUrl(type, resolved.value, object.symbolSpec).then(apply);
         return;
       }
-      if (object.previewOverride || (!object.dataBarcode && !object.dataQr)) return;
+      if (object.previewOverride || (!object.dataBarcode && !object.dataQr)) { return; }
       const key = object.dataBarcode || object.dataQr;
       const next = tokenMap[key];
-      if (next == null || String(next).length === 0) return;
+      if (next == null || String(next).length === 0) { return; }
       const value = String(next);
-      if (object.barcodeValue === value) return;
+      if (object.barcodeValue === value) { return; }
       const request = (boundImageRequests.current.get(object) || 0) + 1;
       boundImageRequests.current.set(object, request);
-      const apply = (url: string | null) => { if (request !== boundImageRequests.current.get(object) || !object._element) return; if (!url) { object.validationError = 'Symbol preview could not be generated.'; actions.syncSelection(object); canvas.renderAll(); return; } void replaceSymbolImage(object,url, () => request === boundImageRequests.current.get(object) && !!object._element).then((applied) => { if (!applied) return; object.barcodeValue = value; object.previewOverride = false; actions.syncSelection(object); canvas.renderAll(); triggerRenderSimulation(); }); };
+      const apply = (url: string | null) => { if (request !== boundImageRequests.current.get(object) || !object._element) { return; } if (!url) { object.validationError = 'Symbol preview could not be generated.'; actions.syncSelection(object); canvas.renderAll(); return; } void replaceSymbolImage(object,url, () => request === boundImageRequests.current.get(object) && !!object._element).then((applied) => { if (!applied) { return; } object.barcodeValue = value; object.previewOverride = false; actions.syncSelection(object); canvas.renderAll(); triggerRenderSimulation(); }); };
       const type = object.dataQr ? 'qrcode' : object.barcodeType || 'code128';
-      if (validatePreviewPayload(type, value)) return;
+      if (validatePreviewPayload(type, value)) { return; }
       void generatePreviewDataUrl(type, value, object.symbolSpec).then(apply);
     });
   }, [canvasRef, tokenMap, fieldDescriptions, activeContractKey, actions.saveCanvasHistory, actions.syncSelection, triggerRenderSimulation]);
@@ -308,7 +311,7 @@ export function Studio() {
   }, [viewMode, calculateAutoFitZoom, labelWidthMm, labelHeightMm, setZoom, triggerRenderSimulation]);
 
   const handleUndo = useCallback(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current) { return; }
     const jsonStr = undo();
     if (jsonStr) {
       const canvas = canvasRef.current;
@@ -333,7 +336,7 @@ export function Studio() {
   }, [undo, lockHistory, unlockHistory, triggerRenderSimulation, pxPerMm, actions.syncSelection, draft.schedule]);
 
   const handleRedo = useCallback(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current) { return; }
     const jsonStr = redo();
     if (jsonStr) {
       const canvas = canvasRef.current;
@@ -380,7 +383,7 @@ export function Studio() {
   const openTemplateUpload = React.useCallback(() => templateFileRef.current?.click(), []); const openJsonUpload = React.useCallback(() => jsonFileRef.current?.click(), []);
   const getLatestSvg = React.useCallback(() => canvasRef.current ? exportFabricToSvg(canvasRef.current, labelWidthMm, labelHeightMm) : '', [labelWidthMm, labelHeightMm]);
   const getOutputSnapshot = React.useCallback((copies = 1) => captureEditorOutput(canvasRef.current, copies), [currentSvg, tokenMap, fieldDescriptions, labelWidthMm, labelHeightMm, dpi]);
-  const exportTemplate = React.useCallback(() => { const svg = getLatestSvg(); if (svg) downloadLocalFile(svg, 'thermal-template.svg', 'image/svg+xml'); }, [getLatestSvg, downloadLocalFile]);
+  const exportTemplate = React.useCallback(() => { const svg = getLatestSvg(); if (svg) { downloadLocalFile(svg, 'thermal-template.svg', 'image/svg+xml'); } }, [getLatestSvg, downloadLocalFile]);
 
 
   return (
@@ -412,18 +415,18 @@ export function Studio() {
         onRedo={handleRedo}
         onShowAbout={() => window.alert('Thermal Label Studio v1.1')}
       />
-      <input ref={templateFileRef} type="file" accept=".svg,image/svg+xml" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ''; if (file) void handleTemplateUpload(file); }} />
-      {historicalSource && <div role="region" aria-label={t("Historical dataset working copy")} className="absolute bottom-12 left-3 max-h-64 overflow-y-auto z-[var(--ui-layer-toast)] bg-surface-container border border-outline p-2 text-xs">
+      <input ref={templateFileRef} type="file" accept=".svg,image/svg+xml" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ''; if (file) { void handleTemplateUpload(file); } }} />
+      {historicalSource && <section  aria-label={t("Historical dataset working copy")} className="absolute bottom-12 left-3 max-h-64 overflow-y-auto z-[var(--ui-layer-toast)] bg-surface-container border border-outline p-2 text-xs">
         <span>{t("Create a canonical working copy before editing or output.")}</span>
-        {workingCopies.map((copies, index) => <label key={index} className="block">{t("Copies")} {index + 1}<input type="number" min="1" max="999" aria-label={t("Working copy copies item {item}", { item: index + 1 })} value={copies} onChange={(event) => setWorkingCopies((current) => current.map((entry, i) => i === index ? event.target.value : entry))} /></label>)}
+        {workingCopies.map((copies, index) => <label key={`working-copy-${copies}`} className="block">{t("Copies")} {index + 1}<input type="number" min="1" max="999" aria-label={t("Working copy copies item {item}", { item: index + 1 })} value={copies} onChange={(event) => setWorkingCopies((current) => current.map((entry, i) => i === index ? event.target.value : entry))} /></label>)}
         {(['simulation', 'print'] as const).map((mode) => <button key={mode} data-testid={`canonical-copy-${mode}`} onClick={() => {
           ++datasetRequest.current;
           try { applyDataset(createCanonicalWorkingCopy(historicalSource, mode, workingCopies.map(Number)), `${localFileName} (working copy)`); }
           catch (error) { setLocalImportError(error instanceof Error ? error.message : 'Working copy is invalid.'); return; }
           setSelectedDatasetId(''); setDatasetStatus('Unsaved canonical working copy. Import and mode selection never print.');
         }} data-ui-control="button">{t(mode === 'simulation' ? 'Simulation working copy' : 'Print working copy')}</button>)}
-      </div>}
-      <input ref={jsonFileRef} type="file" accept=".json,application/json" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ''; if (file) void handleLocalJsonImport(file); }} />
+      </section>}
+      <input ref={jsonFileRef} type="file" accept=".json,application/json" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ''; if (file) { void handleLocalJsonImport(file); } }} />
 
       {viewMode === 'design' && (
         <PropertyRibbon

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import argparse
 import hashlib
 import os
 from pathlib import Path
@@ -18,8 +19,13 @@ def source_fingerprint() -> str:
              for path in (ROOT / root).rglob("*") if path.is_file() and "__pycache__" not in path.parts]
     files.extend(ROOT / name for name in ("requirements.txt", "frontend/package.json", "frontend/package-lock.json",
                                          "frontend/tsconfig.json", "frontend/vite.config.js"))
-    manifest = "\n".join(f"{path.relative_to(ROOT).as_posix()} {hashlib.sha256(path.read_bytes()).hexdigest()}"
-                         for path in sorted(files))
+    # Normalize separators explicitly because candidate reports are produced in
+    # Linux while verification may run on Windows.  pathlib.as_posix() does
+    # not rewrite separators on Windows paths, so normalize the relative text
+    # before hashing to keep the candidate fingerprint portable.
+    normalized = [(str(path.relative_to(ROOT)).replace("\\", "/"), path) for path in files]
+    manifest = "\n".join(f"{relative} {hashlib.sha256(path.read_bytes()).hexdigest()}"
+                         for relative, path in sorted(normalized, key=lambda item: item[0]))
     return hashlib.sha256(manifest.encode()).hexdigest()
 
 
@@ -33,9 +39,22 @@ def verify_reports(directory: Path) -> None:
             raise ValueError("Coverage report integrity check failed.")
 
 
+def frontend_preparation(checks):
+    """Resolve prerequisites by identity; source-gate ordering may change."""
+    by_name = {check.name: check for check in checks}
+    return [(by_name[name].name, by_name[name].command, by_name[name].cwd)
+            for name in ('frontend_typecheck', 'frontend_build')]
+
+
 def main() -> int:
-    if len(sys.argv) == 3 and sys.argv[1] == "--verify-inputs":
-        verify_reports(Path(sys.argv[2]))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--verify-inputs', type=Path)
+    parser.add_argument('--timeout', type=int, default=1800, help='Per-check timeout in seconds (1..3600).')
+    args = parser.parse_args()
+    if not 1 <= args.timeout <= 3600:
+        parser.error('Per-check timeout must be from 1 to 3600 seconds.')
+    if args.verify_inputs is not None:
+        verify_reports(args.verify_inputs)
         print("Coverage source and report integrity: PASS")
         return 0
     directory = ROOT / ".tmp" / f"coverage-{uuid4()}"
@@ -43,6 +62,13 @@ def main() -> int:
     frontend = ROOT / "frontend"
     initial_fingerprint = source_fingerprint()
     env = {key: value for key, value in os.environ.items() if not key.startswith("TLS_")}
+    # Coverage runs in the isolated Linux runner and needs its pinned,
+    # non-secret renderer/font fixtures.  Keep credentials and runtime
+    # integration settings filtered while passing only these explicit test
+    # inputs to the child processes.
+    for key in ("TLS_RENDERER_PATH", "TLS_FIXTURE_FONT_PATH", "TLS_FIXTURE_FONT_FAMILY", "TLS_TEST_BASE_URL"):
+        if key in os.environ:
+            env[key] = os.environ[key]
     env.update(PYTHONPATH=str(ROOT / "backend"), PYTHONDONTWRITEBYTECODE="1",
                COVERAGE_FILE=str(directory / "python.coverage"),
                TLS_COVERAGE_BUILD="1", TLS_COVERAGE_DIRECTORY=str(directory / "v8"))
@@ -51,8 +77,7 @@ def main() -> int:
         ("backend_coverage", (sys.executable, "-m", "coverage", "run", "--branch", "--source=backend/app",
                               "-m", "pytest", "-p", "no:cacheprovider", "-p", "no:tmpdir", "backend/tests", "-q"), ROOT),
         ("backend_xml", (sys.executable, "-m", "coverage", "xml", "-o", str(directory / "python.xml")), ROOT),
-        (plan[1].name, plan[1].command, frontend),
-        (plan[2].name, plan[2].command, frontend),
+        *frontend_preparation(plan),
     ]
     tests = json.loads((frontend / "package.json").read_text())["scripts"]["test"].removeprefix("tsx --test ").split()
     c8 = ("node", "node_modules/c8/bin/c8.js")
@@ -66,7 +91,13 @@ def main() -> int:
     checks = []
     for name, command, cwd in commands:
         with (directory / f"{name}.log").open("wb") as log:
-            result = subprocess.run(command, cwd=cwd, env=env, stdout=log, stderr=subprocess.STDOUT, timeout=600)
+            try:
+                result = subprocess.run(command, cwd=cwd, env=env, stdout=log, stderr=subprocess.STDOUT, timeout=args.timeout)
+            except subprocess.TimeoutExpired:
+                checks.append({'check': name, 'status': 'BLOCKED', 'reason': 'timeout'})
+                (directory / 'result.json').write_text(json.dumps({'status':'BLOCKED','checks':checks,'per_check_timeout_seconds':args.timeout},indent=2))
+                print(f'{name}: BLOCKED (timeout); Evidence: {directory}',flush=True)
+                return 1
         checks.append({"check": name, "exit_code": result.returncode})
         print(f"{name}: {'PASS' if result.returncode == 0 else 'FAIL'}", flush=True)
         if result.returncode:

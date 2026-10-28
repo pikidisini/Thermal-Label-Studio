@@ -2,11 +2,12 @@ import React from 'react';
 import { Maximize, Minus, Plus } from 'lucide-react';
 import { Button, Icon, IconButton } from '../../../shared/ui';
 import { useTranslation } from '../../../shared/i18n';
+import { arrowKeyDelta } from '../../../shared/keyboard/keyboardContext';
 
 /** Isolated SVG image viewer; transforms affect the preview, never the artifact. */
-export function TemplatePreview({ src }: { src: string }) {
+export function TemplatePreview({ src }: Readonly<{ src: string }>) {
   const t = useTranslation();
-  const viewport = React.useRef<HTMLDivElement>(null);
+  const viewport = React.useRef<HTMLButtonElement>(null);
   const image = React.useRef<HTMLImageElement>(null);
   const drag = React.useRef<{ id: number; x: number; y: number } | null>(null);
   const [size, setSize] = React.useState({ width: 0, height: 0 });
@@ -52,14 +53,14 @@ export function TemplatePreview({ src }: { src: string }) {
     return () => { observer.disconnect(); area.removeEventListener('wheel', wheel); };
   }, [fit, zoom]);
 
-  function endDrag(event: React.PointerEvent<HTMLDivElement>) {
+  function endDrag(event: React.PointerEvent<HTMLButtonElement>) {
     if (drag.current?.id !== event.pointerId) return;
     drag.current = null;
     setDragging(false);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
 
-  if (failed) return <p role="status">{t('Template preview is unavailable.')}</p>;
+  if (failed) return <output data-ui-status-block  >{t('Template preview is unavailable.')}</output>;
   const ready = size.width > 0;
   return <div className="management-template-preview">
     <div className="management-preview-controls" aria-label={t('Preview controls')}>
@@ -69,17 +70,17 @@ export function TemplatePreview({ src }: { src: string }) {
       <Button variant="compact" disabled={!ready} onClick={fit}><Icon component={Maximize} size="small" /> {t('Fit to view')}</Button>
       <span className="management-muted">{t('Drag to pan · Scroll to zoom')}</span>
     </div>
-    <div ref={viewport} className="management-preview-viewport" data-dragging={dragging} data-testid="template-preview-viewport"
-      role="region" aria-label={t('Template preview viewport')} tabIndex={0}
+    <button type="button" ref={viewport} className="management-preview-viewport" data-dragging={dragging} data-testid="template-preview-viewport"
+      aria-label={t('Template preview viewport')}
       onKeyDown={event => {
         if (event.key === '+' || event.key === '=') { event.preventDefault(); zoom(1.25); }
         else if (event.key === '-') { event.preventDefault(); zoom(0.8); }
         else if (event.key === '0') { event.preventDefault(); fit(); }
         else if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
           event.preventDefault();
+          const delta = arrowKeyDelta(event.key, 20);
           setView(previous => ({ ...previous,
-            x: previous.x + (event.key === 'ArrowLeft' ? -20 : event.key === 'ArrowRight' ? 20 : 0),
-            y: previous.y + (event.key === 'ArrowUp' ? -20 : event.key === 'ArrowDown' ? 20 : 0) }));
+            x: previous.x + delta.x, y: previous.y + delta.y }));
         }
       }}
       onPointerDown={event => {
@@ -101,6 +102,6 @@ export function TemplatePreview({ src }: { src: string }) {
         style={{ width: size.width || undefined, height: size.height || undefined,
           visibility: ready ? 'visible' : 'hidden',
           transform: `translate(-50%, -50%) translate(${view.x}px, ${view.y}px) scale(${view.scale})` }} />
-    </div>
+    </button>
   </div>;
 }

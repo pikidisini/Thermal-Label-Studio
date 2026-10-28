@@ -3,7 +3,7 @@ import { decodeSpec, validateMetadataDocument } from './bindingMetadata';
 import * as fabric from 'fabric';
 
 function restorePayloadTemplate(obj: fabric.FabricObject, payloadSpec: string | null) {
-  if (!payloadSpec) return;
+  if (!payloadSpec) { return; }
   const parsed = decodeSpec(payloadSpec);
   obj.set('payloadTemplate', parsed.template);
 }
@@ -11,8 +11,8 @@ function restorePayloadTemplate(obj: fabric.FabricObject, payloadSpec: string | 
 function restoreTextAlignment(elem: Element, obj: fabric.FabricObject) {
   const anchor = elem.getAttribute('text-anchor') || (elem as HTMLElement).style?.textAnchor;
   const textAlign = elem.getAttribute('text-align') || (elem as HTMLElement).style?.textAlign;
-  if (anchor === 'end' || textAlign === 'end' || textAlign === 'right') obj.set('textAlign', 'right');
-  else if (anchor === 'middle' || textAlign === 'center') obj.set('textAlign', 'center');
+  if (anchor === 'end' || textAlign === 'end' || textAlign === 'right') { obj.set('textAlign', 'right'); }
+  else if (anchor === 'middle' || textAlign === 'center') { obj.set('textAlign', 'center'); }
 }
 
 function sourceViewBox(svgString: string): { x: number; y: number; width: number; height: number } | null {
@@ -25,17 +25,29 @@ function sourceViewBox(svgString: string): { x: number; y: number; width: number
   } catch { return null; }
 }
 
+function nearestAncestorWith(element: Element | null, attribute: string): Element | null {
+  let current: Element | null = element;
+  while (current) {
+    if (current.hasAttribute(attribute)) return current;
+    current = current.parentElement;
+  }
+  return null;
+}
+
 export function importSvgIntoFabricCanvas(
   canvas: fabric.Canvas,
   svgString: string,
   targetWidthPx: number,
   targetHeightPx: number,
   onComplete: () => void,
-  isCurrent: () => boolean = () => true,
-  prepareCanvas: () => void = () => undefined,
-  resolveFieldValue: (field: string) => string | undefined = () => undefined,
-  onError: (message: string) => void = () => undefined
+  ...callbacks: [
+    isCurrent?: () => boolean,
+    prepareCanvas?: () => void,
+    resolveFieldValue?: (field: string) => string | undefined,
+    onError?: (message: string) => void,
+  ]
 ) {
+  const [isCurrent = () => true, prepareCanvas = () => undefined, resolveFieldValue = () => undefined, onError = () => undefined] = callbacks;
   const viewBox = sourceViewBox(svgString);
   const document = new DOMParser().parseFromString(svgString, 'image/svg+xml');
   try { validateMetadataDocument(document); } catch { onError('Template binding metadata is invalid or needs explicit migration.'); return; }
@@ -44,14 +56,14 @@ export function importSvgIntoFabricCanvas(
   // image source as SVG 2 href before parsing, including stored older layouts.
   document.querySelectorAll('image').forEach((image) => {
     const href = image.getAttribute('href') || image.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
-    if (href) image.setAttribute('href', href);
+    if (href) { image.setAttribute('href', href); }
   });
   // Fabric exports the baseline coordinates on tspan but its SVG text parser
   // reads only the parent text. Preserve those offsets before applying the
   // surrounding group transform, instead of treating its center as the baseline.
   document.querySelectorAll('text').forEach((text) => {
     const span = text.querySelector('tspan');
-    if (!span) return;
+    if (!span) { return; }
     for (const coordinate of ['x', 'y']) {
       const value = span.getAttribute(coordinate);
       if (!text.hasAttribute(coordinate) && value !== null && Number.isFinite(Number(value))) {
@@ -79,19 +91,10 @@ export function importSvgIntoFabricCanvas(
     }
     return key;
   };
-  const nearestAncestorWith = (element: Element | null, attribute: string): Element | null => {
-    let current: Element | null = element;
-    while (current) {
-      if (current.hasAttribute(attribute)) return current;
-      current = current.parentElement;
-    }
-    return null;
-  };
-
   void fabric.loadSVGFromString(
     parserSvg,
     (elem: Element, obj: fabric.FabricObject) => {
-      if (!elem || !obj) return;
+      if (!elem || !obj) { return; }
       // Fabric invokes the reviver for the inner <image>/<rect>, while our
       // exporter attaches binding metadata to the surrounding <g>. Read only
       // the allowlisted metadata from the immediate parent as a round-trip
@@ -127,11 +130,11 @@ export function importSvgIntoFabricCanvas(
           const step = metrics.font_size * 1.13 * metrics.line_height;
           const firstY = layout ? -layout.height / 2 + metrics.font_size * 1.13 * (1 - .222) : Number(spans[0].getAttribute('y'));
           const count = layout ? Math.round((layout.height / (metrics.font_size * 1.13) - 1) / metrics.line_height) + 1 : 1;
-          if (!Number.isFinite(count) || count < 1 || count > 100) throw new Error('Unsupported canonical text line count.');
+          if (!Number.isFinite(count) || count < 1 || count > 100) { throw new Error('Unsupported canonical text line count.'); }
           const lines = Array.from({ length: count }, () => '');
           for (const span of spans) {
             const index = Math.round((Number(span.getAttribute('y')) - firstY) / step);
-            if (index < 0 || index > 99) throw new Error('Unsupported canonical text baseline.');
+            if (index < 0 || index > 99) { throw new Error('Unsupported canonical text baseline.'); }
             while (lines.length <= index) lines.push('');
             lines[index] += span.textContent ?? '';
           }
@@ -145,16 +148,16 @@ export function importSvgIntoFabricCanvas(
       const groupPath: { key: string; matrix: fabric.TMat2D }[] = [];
       for (const source of chain) {
         const transform = source.getAttribute('transform');
-        if (transform && document.documentElement.getAttribute('data-editor-coordinate-profile') === 'fabric7') {
+        if (transform && document.documentElement.dataset.editorCoordinateProfile === 'fabric7') {
           const parsed = /^matrix\(([^)]+)\)$/.exec(transform.trim());
-          if (!parsed) throw new Error('Canonical Fabric transform is unsupported.');
+          if (!parsed) { throw new Error('Canonical Fabric transform is unsupported.'); }
           const matrix = parsed[1].trim().split(/[ ,]+/).map(Number);
-          if (matrix.length !== 6 || matrix.some((value) => !Number.isFinite(value))) throw new Error('Invalid canonical transform.');
+          if (matrix.length !== 6 || matrix.some((value) => !Number.isFinite(value))) { throw new Error('Invalid canonical transform.'); }
           world = fabric.util.multiplyTransformMatrices(world, matrix as fabric.TMat2D);
         }
-        if (source.hasAttribute('data-editor-group')) groupPath.push({ key: groupKey(source, 'group'), matrix: world });
+        if (source.attributes.getNamedItem('data-editor-group') !== null) { groupPath.push({ key: groupKey(source, 'group'), matrix: world }); }
       }
-      if (document.documentElement.getAttribute('data-editor-coordinate-profile') === 'fabric7') {
+      if (document.documentElement.dataset.editorCoordinateProfile === 'fabric7') {
         (obj as any).__canonicalWorldMatrix = world;
         (obj as any).__canonicalGroupPath = groupPath;
       }
@@ -167,7 +170,7 @@ export function importSvgIntoFabricCanvas(
       const dynamicField = placeholderAttr || fieldAttr;
       const isDynamicAttr = attr('data-is-dynamic') === 'true' || !!dynamicField;
 
-      if (elemId) (obj as any).set('id', elemId);
+      if (elemId) { (obj as any).set('id', elemId); }
 
       if (barcodeAttr) {
         (obj as any).set('dataBarcode', barcodeAttr);
@@ -187,20 +190,20 @@ export function importSvgIntoFabricCanvas(
         (obj as any).set('isBarcode', true);
         (obj as any).set('barcodeType', 'qrcode');
       }
-      if (previewValue && qrAttr) (obj as any).set('barcodeValue', previewValue);
+      if (previewValue && qrAttr) { (obj as any).set('barcodeValue', previewValue); }
       if (dynamicField) {
         (obj as any).set('dataField', dynamicField);
         (obj as any).set('dataPlaceholder', dynamicField);
         (obj as any).set('isDynamic', true);
       }
-      if (isBarcodeAttr) (obj as any).set('isBarcode', true);
-      if (isDynamicAttr) (obj as any).set('isDynamic', true);
-      if (barcodeType) (obj as any).set('barcodeType', barcodeType);
+      if (isBarcodeAttr) { (obj as any).set('isBarcode', true); }
+      if (isDynamicAttr) { (obj as any).set('isDynamic', true); }
+      if (barcodeType) { (obj as any).set('barcodeType', barcodeType); }
 
       restoreTextAlignment(elem, obj);
     }
   ).then(({ objects, options }) => {
-      if (!isCurrent()) return;
+      if (!isCurrent()) { return; }
       if (objects && objects.length > 0) {
         prepareCanvas();
         const origW = viewBox?.width || options.width || targetWidthPx;
@@ -215,7 +218,7 @@ export function importSvgIntoFabricCanvas(
         const roots: (Entry | fabric.FabricObject)[] = [];
         const entries = new Map<string, Entry>();
         rawItems.forEach((obj: any) => {
-          if (obj.__canonicalWorldMatrix) fabric.util.applyTransformToObject(obj, obj.__canonicalWorldMatrix);
+          if (obj.__canonicalWorldMatrix) { fabric.util.applyTransformToObject(obj, obj.__canonicalWorldMatrix); }
           let target = roots;
           const path = obj.__canonicalGroupPath as { key: string; matrix: fabric.TMat2D }[] | undefined;
           for (const group of path || []) {
@@ -226,7 +229,7 @@ export function importSvgIntoFabricCanvas(
           target.push(obj);
         });
         const build = (entry: Entry | fabric.FabricObject): fabric.FabricObject => {
-          if (!('children' in entry)) return entry;
+          if (!('children' in entry)) { return entry; }
           const children = entry.children.map(build);
           const inverse = fabric.util.invertTransform(entry.matrix);
           children.forEach((child) => fabric.util.applyTransformToObject(child, fabric.util.multiplyTransformMatrices(inverse, child.calcTransformMatrix())));
@@ -246,11 +249,11 @@ export function importSvgIntoFabricCanvas(
             textObj.designPreviewText = designPreviewSample(textObj.text);
             const field = (obj as any).dataPlaceholder || (obj as any).dataField;
             const resolved = field ? resolveFieldValue(field) : undefined;
-            if (field) textObj.set('text', resolved ?? textObj.designPreviewText);
+            if (field) { textObj.set('text', resolved ?? textObj.designPreviewText); }
             if (typeof (obj as any).payloadTemplate === 'string') {
               let missing = false;
               const text = (obj as any).payloadTemplate.replace(/\{\{\s*([A-Za-z0-9_-]+)\s*\}\}/g,
-                (_match: string, key: string) => { const value = resolveFieldValue(key); if (value === undefined) missing = true; return value ?? ''; });
+                (_match: string, key: string) => { const value = resolveFieldValue(key); if (value === undefined) { missing = true; } return value ?? ''; });
               textObj.set('text', missing ? textObj.designPreviewText : text);
             }
             if (textObj.stroke && (!textObj.fill || textObj.fill === 'none' || textObj.fill === 'transparent')) {
@@ -263,7 +266,7 @@ export function importSvgIntoFabricCanvas(
           }
         };
         items.forEach((obj) => {
-          if (!obj) return;
+          if (!obj) { return; }
           refreshText(obj);
           obj.scaleX = (obj.scaleX || 1) * fitScale;
           obj.scaleY = (obj.scaleY || 1) * fitScale;
@@ -280,7 +283,7 @@ export function importSvgIntoFabricCanvas(
         canvas.backgroundColor = '#ffffff';
       }
 
-      if (!isCurrent()) return;
+      if (!isCurrent()) { return; }
       canvas.calcOffset();
       canvas.renderAll();
       onComplete();

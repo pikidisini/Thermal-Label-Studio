@@ -573,3 +573,15 @@ label facts and submitting intake. Both simulation and print explicitly carry
 list per source. Intake validates mode, target registration/enabled state and
 source permission without default fallback. Simulation reports its validated
 target while remaining free of printer transport effects. See API_CONTRACT.md.
+
+## Durable asynchronous intake (2026-10-22)
+
+`intake_queue` owns API v2 admission, AES-GCM queue payloads, PostgreSQL scheduling,
+worker supervision and printer ownership. It extends the existing intake ledger
+identity rather than adding a competing deduplication store. Resolution, binding,
+raster, IPL and actual transport remain owned by their existing modules.
+Two worker containers execute separate bounded child process groups; physical
+printer address/port ownership serializes all application TCP operations.
+Persisted Management policy/audit is required; default configuration remains off.
+See [production queue](PRODUCTION_QUEUE.md). Source/fake success does not establish
+PostgreSQL concurrency, Linux resource, deployment, SAP or physical acceptance.

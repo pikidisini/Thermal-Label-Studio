@@ -1,8 +1,8 @@
+import { downloadTemplateSvg } from '../helpers/svgDownload.js';
 import { mockAccountSession, mockBuiltApplication } from '../helpers/studio.js';
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/coverage.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { readFileSync } from 'node:fs';
 const dist = fileURLToPath(new URL('../../../dist/', import.meta.url));
 test.beforeEach(async ({ page }, testInfo) => {
   // Existing regressions intentionally exercise the original Dark choice.
@@ -54,13 +54,11 @@ test('Signature default and explicit selection use exact builtin palette and pre
   expect(await svg(page, testInfo, 'signature-after.svg')).toBe(before);
 });
 async function svg(page, testInfo, name) {
-  await page.getByTestId('topbar-menu-btn-file').click();
-  const download = page.waitForEvent('download');
-  await page.getByTestId('topbar-menuitem-file-5').click();
-  const output = testInfo.outputPath(name);
-  await (await download).saveAs(output);
-  return readFileSync(output, 'utf8');
+  const content = await downloadTemplateSvg(page);
+  await testInfo.attach(name, { body: content, contentType: 'image/svg+xml' });
+  return content;
 }
+
 test('settings localize chrome without changing selected authored text or exported SVG', async ({ page }, testInfo) => {
   await page.goto('/studio');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');

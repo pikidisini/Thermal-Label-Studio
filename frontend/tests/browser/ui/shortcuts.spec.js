@@ -1,16 +1,9 @@
-import { test, expect } from '@playwright/test';
+import { downloadTemplateSvg as exportedSvg } from '../helpers/svgDownload.js';
+import { test, expect } from '../helpers/coverage.js';
 import { mockBuiltApplication, openStudio } from '../helpers/studio.js';
 
 test.beforeEach(async ({ page }) => { await mockBuiltApplication(page); await openStudio(page); });
 const focusCanvas = page => page.locator('canvas.upper-canvas').focus();
-async function exportedSvg(page) {
-  await page.getByTestId('topbar-menu-btn-file').click();
-  const download = page.waitForEvent('download');
-  await page.getByRole('menuitem', { name: 'Download template SVG', exact: true }).click();
-  const stream = await (await download).createReadStream();
-  let content = ''; for await (const chunk of stream) content += chunk.toString();
-  return content;
-}
 async function fixture(page, count = 1) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="60mm" viewBox="0 0 400 240"><rect x="40" y="40" width="40" height="20" fill="black"/>${count === 2 ? '<rect x="120" y="40" width="40" height="20" fill="black"/>' : ''}</svg>`;
   await page.locator('input[accept=".svg,image/svg+xml"]').setInputFiles({ name: 'shortcuts.svg', mimeType: 'image/svg+xml', buffer: Buffer.from(svg) });

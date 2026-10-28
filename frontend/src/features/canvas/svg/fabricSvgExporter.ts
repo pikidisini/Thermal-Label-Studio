@@ -5,26 +5,39 @@ import { key, encodeSpec, payloadSpec, validateSymbolSpec, validateMetadataDocum
  * with millimeter dimensions and viewBox for 100% fidelity.
  */
 
-export function exportFabricToSvg(canvas, labelWidthMm, labelHeightMm, pxPerMm = 4, options = { serverBinding: false }) {
+const DEFAULT_EXPORT_OPTIONS: Readonly<{ serverBinding: boolean }> = Object.freeze({ serverBinding: false });
+
+function escapeXmlAttribute(value: string | number | boolean): string {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function collectFabricObjects(canvas: any): any[] {
+  const objects: any[] = [];
+  const visit = (object: any) => {
+    if (!object) return;
+    objects.push(object);
+    object.getObjects?.().forEach(visit);
+  };
+  canvas.getObjects().forEach(visit);
+  return objects;
+}
+
+export function exportFabricToSvg(canvas, labelWidthMm, labelHeightMm, pxPerMm = 4, options: Readonly<{ serverBinding: boolean }> = DEFAULT_EXPORT_OPTIONS) {
   if (!canvas) return '';
 
   const wPx = labelWidthMm * pxPerMm;
   const hPx = labelHeightMm * pxPerMm;
 
   try {
-    const escapeXmlAttribute = (value: unknown) => String(value)
-      .replace(/&/g, '&amp;')
-      .replace(/"/g, '&quot;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
     // Fabric 7's reviver receives only the generated markup string, not the
     // source object. Wrap each object's serializer briefly so metadata can be
     // attached to the correct element without changing the live object text.
     const serializers: Array<{ object: any; toSVG: Function }> = [];
-    const allObjects: any[] = [];
-    const visit = (object: any) => { if (object) { allObjects.push(object); object.getObjects?.().forEach(visit); } };
-    canvas.getObjects().forEach(visit);
-    allObjects.forEach((object: any) => {
+    collectFabricObjects(canvas).forEach((object: any) => {
       if (!object || typeof object.toSVG !== 'function') return;
       const original = object.toSVG;
       serializers.push({ object, toSVG: original });
@@ -40,7 +53,7 @@ export function exportFabricToSvg(canvas, labelWidthMm, labelHeightMm, pxPerMm =
         if (this.payloadTemplate !== undefined && typeof this.payloadTemplate !== 'string') throw new Error('Invalid binding composition.');
         if (this.symbolSpec !== undefined && !this.isBarcode) throw new Error('Incomplete symbol metadata.');
         const template = typeof this.payloadTemplate === 'string' ? payloadSpec(this.payloadTemplate) : null;
-        if (field && template && !new RegExp(`^\\{\\{\\s*${field}\\s*\\}\\}(?![\\s\\S])`).test(template.template)) throw new Error('Conflicting payload metadata.');
+        if (field && template && !new RegExp(String.raw`^\{\{\s*${field}\s*\}\}(?![\s\S])`).test(template.template)) throw new Error('Conflicting payload metadata.');
         const dynamic = Boolean(field || template || this.isBarcode || this.isDynamic);
         const attrs: string[] = [];
         if (this.isEditorGroup) markup = markup.replace(/(<g\b[^>]*)(>)/i, '$1 data-editor-group="true"$2');
@@ -62,15 +75,15 @@ export function exportFabricToSvg(canvas, labelWidthMm, labelHeightMm, pxPerMm =
             if (field) attrs.push(`data-field="${escapeXmlAttribute(field)}"`);
             if (typeof this.barcodeValue === 'string') attrs.push(`data-barcode-value="${escapeXmlAttribute(this.barcodeValue)}"`);
             markup = markup.replace(/(<g\b[^>]*)(>)/i, `$1 ${attrs.join(' ')}$2`);
-            markup = markup.replace(/(<image\b[^>]*?)(\s*\/?>)/i, '$1 preserveAspectRatio="none"$2');
+            markup = markup.replace(/(<image\b[^>]*?)(\/?>)/i, '$1 preserveAspectRatio="none"$2');
           } else {
             if (!['text', 'i-text'].includes(this.type)) throw new Error('Unsupported dynamic text object.');
             if (this.styles && Object.keys(this.styles).length) throw new Error('Dynamic rich text requires a proven metric profile.');
             if (this.path || this.backgroundColor || this.textBackgroundColor) throw new Error('Dynamic text background/path requires a proven binding profile.');
             const textSpec = { version: 1, font_size: this.fontSize, line_height: this.lineHeight, text_align: this.textAlign || 'left' };
             if (!Number.isFinite(textSpec.font_size) || textSpec.font_size <= 0 || !Number.isFinite(textSpec.line_height) || textSpec.line_height <= 0 || !['left', 'center', 'right'].includes(textSpec.text_align)) throw new Error('Unsupported text metrics.');
-            attrs.push(`data-text-spec="${encodeSpec(textSpec)}"`, 'data-is-dynamic="true"');
-            attrs.push(`data-text-layout="${encodeSpec(textLayout(this))}"`);
+            attrs.push(`data-text-spec="${encodeSpec(textSpec)}"`, 'data-is-dynamic="true"',
+              `data-text-layout="${encodeSpec(textLayout(this))}"`);
             if (field) attrs.push(`data-field="${escapeXmlAttribute(field)}"`, `data-placeholder="${escapeXmlAttribute(field)}"`);
             markup = markup.replace(/(<text\b[^>]*)(>)/i, `$1 ${attrs.join(' ')}$2`);
           }

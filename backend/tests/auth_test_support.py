@@ -4,6 +4,7 @@ Only persistence is faked. Authentication rejection/role tests use raw TestClien
 """
 from contextlib import contextmanager
 from copy import deepcopy
+import os
 from threading import RLock
 from uuid import uuid4
 from weakref import WeakSet
@@ -69,7 +70,11 @@ class TestClient(RawClient):
     __test__ = False
 
     def __init__(self, app, *args, **kwargs):
-        kwargs.setdefault('base_url', 'http://127.0.0.1')
+        # Keep synthetic clients aligned with the explicitly configured test
+        # origin.  Linux coverage runs the app on port 8000, while local
+        # feature tests historically used the loopback origin without a port.
+        kwargs.setdefault('base_url', os.environ.get('TLS_TEST_BASE_URL', 'http://127.0.0.1'))
+        test_origin = kwargs['base_url'].rstrip('/')
         kwargs.setdefault('client', ('127.0.0.1', 50000))
         with _setup_lock:
             _feature_apps.add(app)
@@ -98,4 +103,4 @@ class TestClient(RawClient):
         super().__init__(application, *args, **kwargs)
         self.app = app  # Preserve feature fixture access; transport retains guarded application.
         self.cookies.set('tls_session', token)
-        self.headers.update({'Origin': 'http://127.0.0.1', 'X-CSRF-Token': csrf})
+        self.headers.update({'Origin': test_origin, 'X-CSRF-Token': csrf})

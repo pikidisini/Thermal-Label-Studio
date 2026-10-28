@@ -16,6 +16,9 @@
 <!-- Jika perubahan ini dibuat atau dibantu oleh AI Agent, sebutkan ringkasan prompt/instruksi yang digunakan -->
 
 ## ✅ Checklist Pengujian & Keamanan
+<!-- Kaitkan laporan dengan commit/image yang diuji. Bedakan mock, storage, runtime, SAP, dan printer. -->
+- [ ] Kriteria penerimaan dan hasil pengujian terkait dicantumkan.
+- [ ] Dampak skema SQL dinyatakan; perubahan skema memerlukan migrasi terpisah dari auto-deploy.
 - [ ] Kode sudah diuji secara lokal dan lolos semua unit test (`pytest`, `node --test`).
 - [ ] Tidak ada berkas sementara, cache (`__pycache__`, `node_modules`, `.env`), atau credential sensitif yang terunggah.
 - [ ] Endpoint API baru telah diverifikasi di Swagger Docs (`/docs`).

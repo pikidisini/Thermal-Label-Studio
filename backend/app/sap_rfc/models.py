@@ -1,10 +1,11 @@
 """Bounded declarative SAP contracts; no executable mappings or network IO."""
 from typing import Literal
+import re
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 NAME = r'^[A-Za-z_][A-Za-z0-9_]{0,29}$'
 IDENTITY = r'^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$'
-PATH = r'^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$'
+PATH = re.compile(r'^[A-Za-z_]\w*(\.[A-Za-z_]\w*)*$', re.ASCII)
 
 class Model(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
@@ -52,7 +53,6 @@ class Operation(Model):
 
     @model_validator(mode='after')
     def unique(self):
-        import re
         if self.result_path and not re.fullmatch(PATH, self.result_path):
             raise ValueError('Result path must contain field names only.')
         if self.response_mode == 'mapping' and not self.mappings:

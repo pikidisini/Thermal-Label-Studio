@@ -21,10 +21,12 @@ def test_default_plan_has_no_process_effects(monkeypatch, capsys):
 
 def test_source_commands_use_local_tools_and_full_typecheck():
     checks = gate.source_checks()
-    assert [item.name for item in checks] == ["backend_regression", "frontend_typecheck", "frontend_build", "frontend_regression"]
+    assert [item.name for item in checks] == ["backend_non_native_regression", "backend_native_parity", "frontend_typecheck", "frontend_build", "frontend_regression"]
     assert "backend/tests" in checks[0].command
-    assert "node_modules/typescript/bin/tsc" in checks[1].command
-    assert "tsconfig.json" in checks[1].command
+    assert all(f"--ignore={path}" in checks[0].command for path in gate.NATIVE_PARITY_TESTS)
+    assert all(path in checks[1].command for path in gate.NATIVE_PARITY_TESTS)
+    assert "node_modules/typescript/bin/tsc" in checks[2].command
+    assert "tsconfig.json" in checks[2].command
     assert not any(token in {"docker", "jenkins", "git", "ci", "install", "npx"} for item in checks for token in item.command)
     assert all(item.cwd in {ROOT, ROOT / "frontend"} for item in checks)
 
@@ -40,7 +42,7 @@ def test_pass_does_not_promote_deployment_and_does_not_log_process_output(monkey
     assert report["source_gate"] == "PASS"
     assert report["deployment_ready"] is False
     assert "private" not in str(report)
-    assert len(calls) == 4
+    assert len(calls) == 5
     for _, kwargs in calls:
         assert kwargs["shell"] is False and kwargs["timeout"] == 600
         assert "TLS_RENDERER_PATH" not in kwargs["env"]
@@ -64,7 +66,7 @@ def test_gate_fails_closed_and_reports_remaining_checks(monkeypatch, failure):
     report = gate.execute_checks(gate.source_checks())
     assert report["source_gate"] == "FAIL"
     assert report["checks"][0]["status"] == ("FAIL" if failure == "exit" else "BLOCKED")
-    assert len(report["checks"]) == 4
+    assert len(report["checks"]) == 5
     assert "private" not in str(report)
     assert report["deployment_ready"] is False
 
@@ -82,7 +84,7 @@ def test_explicit_budget_keeps_all_checks_and_failure_semantics(monkeypatch):
         return subprocess.CompletedProcess(command, 1 if len(calls) == 1 else 0)
     monkeypatch.setattr(subprocess, 'run', run)
     report = gate.execute_checks(gate.source_checks(), timeout_seconds=1200)
-    assert calls == [1200] * 4
+    assert calls == [1200] * 5
     assert report['source_gate'] == 'FAIL'
     assert report['per_check_timeout_seconds'] == 1200
     assert report['checks'][0]['status'] == 'FAIL'

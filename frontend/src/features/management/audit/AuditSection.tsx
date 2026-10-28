@@ -8,7 +8,7 @@ export function auditAction(action: string) {
   return labels[action] ?? action;
 }
 
-export function AuditSection({ management }: { management: ManagementController }) {
+export function AuditSection({ management }: Readonly<{ management: ManagementController }>) {
   const t = useTranslation();
   const { audit, saving, open, loading, editor, checkedAt, auditError } = management;
   const model = useLogFilters('audit'); const {filters, update} = model;
@@ -18,8 +18,8 @@ export function AuditSection({ management }: { management: ManagementController 
     <p className="management-muted">{t('Review configuration changes and compare changed fields.')}</p>
     <LogRange model={model}>
       <label>{t('Search audit')}<Input aria-label={t('Search audit')} placeholder={t('Object, action or actor')} value={filters.q} onChange={e => update('q',e.target.value)} /></label>
-      <label>{t('Object type')}<Select aria-label={t('Object type')} value={filters.object} onChange={e => update('object',e.target.value)}><option value="">{t('All object types')}</option>{Array.from(new Set(audit.map(e => e.action.split('.')[0]))).sort().map(value => <option key={value}>{value}</option>)}</Select></label>
-      <label>{t('Action')}<Select aria-label={t('Audit action')} value={filters.action} onChange={e => update('action',e.target.value)}><option value="">{t('All actions')}</option>{Array.from(new Set(audit.map(e => e.action))).sort().map(value => <option key={value} value={value}>{t(auditAction(value))}</option>)}</Select></label>
+      <label>{t('Object type')}<Select aria-label={t('Object type')} value={filters.object} onChange={e => update('object',e.target.value)}><option value="">{t('All object types')}</option>{Array.from(new Set(audit.map(e => e.action.split('.')[0]))).sort((left, right) => Number(left > right) - Number(left < right)).map(value => <option key={value}>{value}</option>)}</Select></label>
+      <label>{t('Action')}<Select aria-label={t('Audit action')} value={filters.action} onChange={e => update('action',e.target.value)}><option value="">{t('All actions')}</option>{Array.from(new Set(audit.map(e => e.action))).sort((left, right) => Number(left > right) - Number(left < right)).map(value => <option key={value} value={value}>{t(auditAction(value))}</option>)}</Select></label>
     </LogRange>
     <p className="management-muted">{t('The latest 200 changes are shown. Audit records cannot be edited or deleted here.')}</p>
     <small>{t('Last loaded')}: {checkedAt || '—'}</small>

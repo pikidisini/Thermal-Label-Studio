@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/coverage.js';
 import { mockBuiltApplication } from '../helpers/studio.js';
 import { fileURLToPath } from 'node:url';
 

@@ -4,20 +4,20 @@ import React from 'react';
 import { labelTokenKeys, isLabelFieldKey, getLabelField } from '../model/labelFieldCatalog';
 import { compileComposition, parseComposition } from '../model/composition';
 
-export function FieldComposer({ template, fields, onChange }: {
+export function FieldComposer({ template, fields, onChange }: Readonly<{
   template: string; fields: string[]; onChange: (template: string) => void;
-}) {
+}>) {
   useTranslation();
   const fieldLabel = useFieldLabel();
   const [field, setField] = React.useState('');
   const [literal, setLiteral] = React.useState('');
   const parts = parseComposition(template);
   const available = labelTokenKeys({}, new Set([...fields, ...parts.filter((part) => part.kind === 'field').map((part) => part.value)]))
-    .filter((key) => isLabelFieldKey(key) && getLabelField(key)?.bindingSupported !== false).sort();
+    .filter((key) => isLabelFieldKey(key) && getLabelField(key)?.bindingSupported !== false).sort((left, right) => Number(left > right) - Number(left < right));
   return <div className="space-y-2" data-testid="field-composer">
     <p className="text-[10px] text-on-surface-variant">{t("Build the content in order with data fields and fixed text.")}</p>
     <div className="flex flex-wrap gap-1" data-testid="composition-parts">
-      {parts.map((part, index) => <span key={index} className="inline-flex items-center gap-1 border border-outline-variant rounded px-1.5 py-1 text-[10px] max-w-full">
+      {parts.map((part, index) => <span key={`${part.kind}:${part.value}`} className="inline-flex items-center gap-1 border border-outline-variant rounded px-1.5 py-1 text-[10px] max-w-full">
         {part.kind === 'field' ? <span className="text-tertiary">{fieldLabel(part.value)}</span>
           : <input aria-label={t("Fixed text {number}", { number: index + 1 })} className="min-w-0 w-24" value={part.value} onChange={(event) => onChange(compileComposition(parts.map((item, i) => i === index ? { ...item, value: event.target.value } : item)))}  data-ui-control="input" data-variant="default" />}
         <button type="button" aria-label={t("Remove part {number}", { number: index + 1 })} onClick={() => onChange(compileComposition(parts.filter((_, i) => i !== index)))} data-ui-control="button" data-variant="default">×</button>

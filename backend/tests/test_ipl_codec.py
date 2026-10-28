@@ -42,8 +42,10 @@ def test_origin_scale_and_white_background():
     payload = encode_png(source(2, 2, 0), 2, 2, 203.2)
     payload = payload.replace(b"o0,0;f0;c64;h1;w1;", b"o3,4;f0;c64;h2;w3;")
     with Image.open(BytesIO(decode_png(payload, 12, 12, 203.2))) as image:
-        assert image.getpixel((3, 4)) == 0 and image.getpixel((8, 7)) == 0
-        assert image.getpixel((2, 4)) == 255 and image.getpixel((9, 7)) == 255
+        assert image.getpixel((3, 4)) == 0
+        assert image.getpixel((8, 7)) == 0
+        assert image.getpixel((2, 4)) == 255
+        assert image.getpixel((9, 7)) == 255
 
 
 @pytest.mark.parametrize("before,after", [
@@ -60,14 +62,17 @@ def test_origin_scale_and_white_background():
 def test_malformed_or_unsupported_payload_fails_closed(before, after):
     payload = encode_png(source(2, 2, 0), 2, 2, 203.2)
     assert before in payload
+    prepared_replace = payload.replace(before, after)
     with pytest.raises(IplError):
-        decode_png(payload.replace(before, after), 2, 2, 203.2)
+        decode_png(prepared_replace, 2, 2, 203.2)
 
 
 @pytest.mark.parametrize("suffix", [b"junk", b"<STX><ETB><ETX>", b"\x00"])
 def test_trailing_data_or_duplicate_print_rejected(suffix):
+    prepared_source = source(2, 2)
+    prepared_encode_png = encode_png(prepared_source, 2, 2, 203.2)
     with pytest.raises(IplError):
-        decode_png(encode_png(source(2, 2), 2, 2, 203.2) + suffix, 2, 2, 203.2)
+        decode_png(prepared_encode_png + suffix, 2, 2, 203.2)
 
 
 def test_tiling_crosses_both_axes_and_preserves_arbitrary_editor_dpi():
@@ -89,15 +94,19 @@ def test_quantity_is_native_rs_command_without_duplicate_canvas_or_print(copies)
     png = source(3, 7, 0)
     payload = encode_png(png, 3, 7, 203.2, copies=copies)
     assert payload.count(b"<STX><RS>") == payload.count(b"<STX><ETB>") == 1
-    assert f"<RS>{copies}".encode() in payload and b"<US>1" in payload
+    assert f'<RS>{copies}'.encode() in payload
+    assert b'<US>1' in payload
     baseline = encode_png(png, 3, 7, 203.2)
     assert payload.replace(f"<RS>{copies}".encode(), b"<RS>1") == baseline
     with Image.open(BytesIO(decode_png(payload, 3, 7, 203.2))) as decoded:
-        assert decoded.size == (3, 7) and decoded.tobytes() == Image.open(BytesIO(png)).tobytes()
+        assert decoded.size == (3, 7)
+        assert decoded.tobytes() == Image.open(BytesIO(png)).tobytes()
 
 @pytest.mark.parametrize("copies", [0, -1, 1000, True, 1.5, "3", None])
 def test_encoder_rejects_invalid_quantity(copies):
-    with pytest.raises(IplError): encode_png(source(2, 2), 2, 2, 203.2, copies=copies)
+    prepared_source_2 = source(2, 2)
+    with pytest.raises(IplError):
+        encode_png(prepared_source_2, 2, 2, 203.2, copies=copies)
 
 @pytest.mark.parametrize("quantity", [b"0", b"1000", b"-1", b"1.5", b"01", b""])
 def test_decoder_rejects_invalid_quantity(quantity):

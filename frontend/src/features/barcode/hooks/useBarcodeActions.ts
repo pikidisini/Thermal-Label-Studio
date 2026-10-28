@@ -4,6 +4,9 @@ import { useCallback } from 'react';
 import * as fabric from 'fabric';
 import { barcodeGenerators } from '../model/barcodeGenerators';
 
+const INITIAL_BARCODE_VALUES: Readonly<Record<string, string>> = {
+  ean13: '4006381333931', code39: 'CODE39', code128: '12345678',
+};
 export interface UseBarcodeActionsProps {
   canvasRef: React.MutableRefObject<fabric.Canvas | null>;
   pxPerMm: number;
@@ -26,7 +29,7 @@ export function useBarcodeActions({
       if (!canvasRef.current) return;
       const barcodeType = typeof type === 'string' ? type : 'code128';
       if (!['code128','code39','ean13'].includes(barcodeType)) return;
-      const initialValue = typeof customValue === 'string' ? customValue : barcodeType === 'ean13' ? '4006381333931' : barcodeType === 'code39' ? 'CODE39' : '12345678';
+      const initialValue = typeof customValue === 'string' ? customValue : INITIAL_BARCODE_VALUES[barcodeType];
       let dataUrl: string | null = null;
 
       if (barcodeType === 'ean13') {

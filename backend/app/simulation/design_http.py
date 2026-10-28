@@ -7,7 +7,7 @@ from app.template_binding import admit_template, TemplateAdmissionError
 router = APIRouter()
 
 
-@router.post('/design/validate')
+@router.post('/design/validate', responses={422: {'description': 'Unprocessable Content'}})
 def validate_design(draft: EditorDraft) -> dict:
     try:
         manifest = admit_template(draft.svg)

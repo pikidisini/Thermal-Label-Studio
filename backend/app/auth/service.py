@@ -108,39 +108,49 @@ class AuthService:
         if not user or not user['active'] or user['role'] != 'Admin' or user['must_change_password']:
             raise AuthError('forbidden', 403)
 
+    def _login_buckets(self, repo, username, ip, now):
+        for key, bucket in repo.all('limits').items():
+            if bucket['until'] <= now:
+                repo.delete('limits', key)
+        try:
+            name = username_key(username)
+        except AuthError:
+            name = ''
+        keys = ['u:' + digest(name), 'ip:' + digest(ip)]
+        buckets = [repo.get('limits', key) or {'count': 0, 'until': now + 900} for key in keys]
+        return name, keys, buckets
+
+    def _failed_login(self, repo, keys, buckets, now):
+        for index, (key, bucket) in enumerate(zip(keys, buckets)):
+            bucket['count'] += 1
+            if bucket['count'] == (5 if index == 0 else 30):
+                bucket['until'] = now + 900
+            repo.put('limits', key, bucket)
+        self.event(repo, 'login.failed')
+        return AuthError('invalid_credentials', 401)
+
+    @staticmethod
+    def _valid_password(user, password):
+        # Unknown accounts still execute the same password verification algorithm.
+        try:
+            return hasher.verify(user['password_hash'] if user else DUMMY_HASH, password)
+        except (VerificationError, InvalidHashError):
+            return False
+
     def login(self, token, username, password, ip):
-        # A fixed dummy hash keeps unknown-account verification on the same algorithm.
         failure = None
         result = None
         with self.transaction() as repo:
             now = self.clock()
             self.require_session(repo, token)
-            for key, bucket in repo.all('limits').items():
-                if bucket['until'] <= now:
-                    repo.delete('limits', key)
-            try:
-                name = username_key(username)
-            except AuthError:
-                name = ''
-            keys = ['u:' + digest(name), 'ip:' + digest(ip)]
-            buckets = [repo.get('limits', key) or {'count': 0, 'until': now + 900} for key in keys]
+            name, keys, buckets = self._login_buckets(repo, username, ip, now)
             if buckets[0]['count'] >= 5 or buckets[1]['count'] >= 30:
                 failure = AuthError('login_throttled', 429)
             else:
                 user = next((u for u in repo.all('users').values() if u['username_key'] == name), None)
-                valid = False
-                try:
-                    valid = hasher.verify(user['password_hash'] if user else DUMMY_HASH, password)
-                except (VerificationError, InvalidHashError):
-                    pass
+                valid = self._valid_password(user, password)
                 if not valid or not user or not user['active']:
-                    for index, (key, bucket) in enumerate(zip(keys, buckets)):
-                        bucket['count'] += 1
-                        if bucket['count'] == (5 if index == 0 else 30):
-                            bucket['until'] = now + 900
-                        repo.put('limits', key, bucket)
-                    self.event(repo, 'login.failed')
-                    failure = AuthError('invalid_credentials', 401)
+                    failure = self._failed_login(repo, keys, buckets, now)
                 else:
                     repo.delete('limits', keys[0])
                     repo.delete('sessions', digest(token))
@@ -196,8 +206,7 @@ class AuthService:
                 raise AuthError('username_exists', 409)
             if len(users) >= 1000:
                 raise AuthError('account_capacity', 409)
-            user = dict(id=uuid4().hex, username=username, username_key=name, display_name=display_name.strip(),
-                        role=role, active=True, must_change_password=True, password_hash=encoded)
+            user = {'id': uuid4().hex, 'username': username, 'username_key': name, 'display_name': display_name.strip(), 'role': role, 'active': True, 'must_change_password': True, 'password_hash': encoded}
             repo.put('users', user['id'], user)
             self.event(repo, 'account.created', actor, user['id'])
             return public_user(user)

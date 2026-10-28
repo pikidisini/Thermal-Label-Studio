@@ -19,7 +19,7 @@ export function translate(message: string, valuesOrLocale: Values | Language = l
     for (const template of Object.keys(indonesian)) {
       const names = [...template.matchAll(/\{(\w+)\}/g)].map(match => match[1]);
       if (!names.length) continue;
-      const pattern = template.split(/\{\w+\}/g).map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('(.+?)');
+      const pattern = template.split(/\{\w+\}/g).map(part => part.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)).join('(.+?)');
       const match = new RegExp(`^${pattern}$`, 's').exec(message);
       if (match) { key = template; values = Object.fromEntries(names.map((name, index) => [name, match[index + 1]])); break; }
     }

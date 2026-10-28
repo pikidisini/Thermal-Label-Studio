@@ -2,7 +2,7 @@ import { ApplicationHeader } from '../../../shared/ui/ApplicationHeader';
 import { useAccount } from '../../../shared/auth/client';
 import { ApplicationPageShell } from '../../../shared/ui';
 import React from 'react';
-import { PanelsTopLeft, Printer, Settings2 } from 'lucide-react';
+import { PanelsTopLeft, Printer, Settings2, ListOrdered } from 'lucide-react';
 import { useTranslation } from '../../../shared/i18n';
 import { WorkspaceCard } from './WorkspaceCard';
 import './home.css';
@@ -22,6 +22,8 @@ export function HomePage() {
           description="Manage templates, printers, integration sources, and application logs." action="Open Management" />}
         <WorkspaceCard href="/print" title="Label Print" icon={Printer}
           description="Retrieve data, preview labels, and print to a registered printer." action="Open Label Print" />
+        <WorkspaceCard href="/sap-requests" title="SAP Requests" icon={ListOrdered}
+          description="Inspect queued requests, printing results, and held printers." action="Open SAP Requests" />
       </nav>
       <p className="home-hint">{t('Choose a menu to continue.')}</p>
     </main>

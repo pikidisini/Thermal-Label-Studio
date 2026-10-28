@@ -4,7 +4,7 @@ import { API_BASE, responseError } from '../../../shared/api';
 import { layoutApi } from '../../templates';
 
 export interface Printer { target_id: string; host: string; port: number; enabled: boolean }
-export interface Source { identity: string; credential_env?: string | null; key_status?: 'active' | 'revoked' | 'legacy' | 'missing'; access_key?: { key_id: string; state: 'active' | 'revoked'; created_at: string; updated_at: string; reveal_available?: boolean } | null; enabled: boolean; modes: Array<'simulation' | 'print'>; print_target_id?: string | null; allowed_print_target_ids?: string[]; print_max_copies?: number }
+export interface Source { identity: string; async_only?: boolean; credential_env?: string | null; key_status?: 'active' | 'revoked' | 'legacy' | 'missing'; access_key?: { key_id: string; state: 'active' | 'revoked'; created_at: string; updated_at: string; reveal_available?: boolean } | null; enabled: boolean; modes: Array<'simulation' | 'print'>; print_target_id?: string | null; allowed_print_target_ids?: string[]; print_max_copies?: number }
 export type KeyAction = 'create' | 'rotate' | 'revoke' | 'migrate' | 'reveal';
 export interface KeyResult { document: ManagementDocument; source: string; key: string | null }
 export interface Grant { sender: string; label_code: string; version: number; svg_sha256: string; target_id: string; max_copies: number; action: 'approve' | 'revoke'; at: string }
@@ -42,11 +42,11 @@ export const managementApi = {
   activity: (signal?: AbortSignal) => request<ActivitySnapshot>('/activity', signal),
   printer: (revision: string, target: Printer) => request<ManagementDocument>('/printers', undefined, { revision, target }, 'PUT'),
   source: (revision: string, source: Source) => request<ManagementDocument>('/sources', undefined, { revision, source: {
-    identity: source.identity, enabled: source.enabled,
+    identity: source.identity, enabled: source.enabled, async_only: source.async_only ?? false,
     modes: source.modes, print_target_id: null, allowed_print_target_ids: source.allowed_print_target_ids ?? [], print_max_copies: source.print_max_copies ?? 1,
   } }, 'PUT'),
   createSource: (revision: string, source: Source) => request<KeyResult>('/sources', undefined, { revision, create_key: true, source: {
-    identity: source.identity, enabled: source.enabled, modes: source.modes,
+    identity: source.identity, enabled: source.enabled, async_only: source.async_only ?? false, modes: source.modes,
     print_target_id: null, allowed_print_target_ids: source.allowed_print_target_ids ?? [], print_max_copies: source.print_max_copies ?? 1,
   } }, 'PUT'),
   key: (revision: string, identity: string, action: KeyAction, signal?: AbortSignal) => request<KeyResult>(`/sources/${encodeURIComponent(identity)}/key`, signal, { revision, action }, 'POST'),

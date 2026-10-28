@@ -1,0 +1,11 @@
+.sap-request-heading { display: flex; justify-content: space-between; align-items: center; gap: var(--ui-space-4, 1rem); }
+.sap-request-health { display: flex; flex-wrap: wrap; gap: var(--ui-space-3, .75rem); padding-block: 1rem; }
+.sap-request-columns { display: grid; grid-template-columns: minmax(0, 3fr) minmax(18rem, 2fr); gap: 1rem; }
+.sap-request-list { overflow: auto; }
+.sap-requests table { width: 100%; border-collapse: collapse; text-align: left; }
+.sap-requests th, .sap-requests td { padding: .5rem; border-bottom: 1px solid var(--ui-border-default); vertical-align: top; }
+.sap-requests small { display: block; }
+.sap-request-details { padding: 1rem; border: 1px solid var(--ui-border-default); border-radius: var(--ui-radius-control); }
+.sap-request-details > .ui-control { margin-top: .75rem; margin-right: .5rem; }
+.sap-requests li { margin-block: .5rem; overflow-wrap: anywhere; }
+@media (max-width: 900px) { .sap-request-columns { grid-template-columns: minmax(0, 1fr); } }

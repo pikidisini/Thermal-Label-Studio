@@ -1,7 +1,7 @@
 import { RefObject, useEffect, useRef } from 'react';
 
-export function useModalA11y(isOpen: boolean, onClose: () => void): RefObject<HTMLDivElement> {
-  const dialogRef = useRef<HTMLDivElement>(null);
+export function useModalA11y(isOpen: boolean, onClose: () => void): RefObject<HTMLDialogElement> {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;

@@ -50,7 +50,10 @@ async function manageFromStudio(code: string, action: 'update' | 'delete', title
 
 export const layoutApi = {
   list: () => fetch(`${API_BASE}/layouts`).then(checked<PersistedLayoutSummary[]>),
-  get: (labelCode: string, version?: number) => fetch(`${API_BASE}/layouts/${encodeURIComponent(labelCode)}${version === undefined ? '' : `?version=${version}`}`).then(checked<PersistedLayout>),
+  get: (labelCode: string, version?: number) => {
+    const query = version === undefined ? '' : '?version=' + version;
+    return fetch(`${API_BASE}/layouts/${encodeURIComponent(labelCode)}${query}`).then(checked<PersistedLayout>);
+  },
   versions: (labelCode: string) => fetch(`${API_BASE}/layouts/${encodeURIComponent(labelCode)}/versions`).then(checked<PersistedLayoutSummary[]>),
   manage: manageTemplate,
   rename: async (labelCode: string, title: string, expected?: TemplateIdentity) => {

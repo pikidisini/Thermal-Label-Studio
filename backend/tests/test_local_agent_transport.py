@@ -53,4 +53,4 @@ def test_windows_raw_queue_lifecycle_with_fake_winspool(monkeypatch, fail_at):
     else:
         transport.windows_raw({'queue': 'Fake USB queue'}, b'IPL')
     if fail_at == 'OpenPrinterW': assert calls == ['OpenPrinterW']
-    else: assert calls[-1] == 'ClosePrinter' and calls.count('WritePrinter') == 1
+    else: assert calls[-1] == 'ClosePrinter'; assert calls.count('WritePrinter') == 1

@@ -44,7 +44,7 @@ async def create_dataset(request: Request):
         value = decode_json(bytes(body), limit=MAX_BYTES + 4096)
         validate_upload(value)
         payload = validate_payload(value["payload"])
-    except (ValueError, TypeError, UnicodeError, RecursionError):
+    except (ValueError, TypeError, RecursionError):
         raise error(422, "invalid_dataset") from None
     return await run_in_threadpool(call, request, "create", value["name"].strip(), value["original_filename"].strip(), payload)
 
@@ -66,6 +66,6 @@ async def update_dataset(identifier: UUID, request: Request):
         if expected.tzinfo is None: raise ValueError()
         validate_upload(value)
         payload = validate_payload(value['payload'])
-    except (ValueError, TypeError, KeyError, AttributeError, UnicodeError, RecursionError):
+    except (ValueError, TypeError, KeyError, AttributeError, RecursionError):
         raise error(422, 'invalid_dataset') from None
     return await run_in_threadpool(call, request, 'update', identifier, value['name'].strip(), value['original_filename'].strip(), payload, expected)

@@ -27,7 +27,7 @@ export function inLogRange(value: string, from: string, to: string) {
   return (!from || time >= new Date(from).getTime()) && (!to || time <= new Date(to).getTime());
 }
 
-export function LogTime({ value }: { value: string }) {
+export function LogTime({ value }: Readonly<{ value: string }>) {
   const t = useTranslation();
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return <>—</>;
@@ -35,27 +35,30 @@ export function LogTime({ value }: { value: string }) {
   return <time dateTime={value} title={value} className="management-log-time"><span>{date.toLocaleDateString(locale, {day:'2-digit',month:'short',year:'numeric'})}</span><small>{date.toLocaleTimeString(locale, {hour12:false})}</small></time>;
 }
 
-export function LogDuration({ value }: { value: number }) {
+export function LogDuration({ value }: Readonly<{ value: number }>) {
   const t = useTranslation();
   const number = (value >= 1000 ? value / 1000 : value).toLocaleString(t('Time') === 'Waktu' ? 'id-ID' : 'en-GB', {maximumFractionDigits:2});
   return <span className="management-log-duration" title={`${value} ms`}>{number} {value >= 1000 ? 's' : 'ms'}</span>;
 }
 
-export function CopyValue({ value, compact = false }: { value: string; compact?: boolean }) {
+export function CopyValue({ value, compact = false }: Readonly<{ value: string; compact?: boolean }>) {
   const t = useTranslation();
   const [message, setMessage] = useState('');
   useEffect(() => setMessage(''), [value]);
   return <span className="management-log-copy"><code title={value}>{compact && value.length > 18 ? `${value.slice(0,8)}…${value.slice(-6)}` : value}</code><Button variant="compact" aria-label={`${t('Copy')} ${value}`} onClick={async () => {
     try { await navigator.clipboard.writeText(value); setMessage('Copied'); } catch { setMessage('Copy unavailable'); }
-  }}>{t('Copy')}</Button><span role="status">{message && t(message)}</span></span>;
+  }}>{t('Copy')}</Button><output >{message && t(message)}</output></span>;
 }
 
-export function LogStatus({ value }: { value: string }) {
-  const tone: ControlTone = value === 'UNCERTAIN' ? 'warning' : ['FAILED','FAILED_BEFORE_SEND','STOPPED'].includes(value) ? 'danger' : ['PARTIAL','ATTENTION'].includes(value) ? 'warning' : ['COMPLETED','PREVIEWED','SIMULATED'].includes(value) ? 'success' : 'neutral';
+export function LogStatus({ value }: Readonly<{ value: string }>) {
+  const tones: Record<string, ControlTone> = { UNCERTAIN: 'warning', FAILED: 'danger',
+    FAILED_BEFORE_SEND: 'danger', STOPPED: 'danger', PARTIAL: 'warning', ATTENTION: 'warning',
+    COMPLETED: 'success', PREVIEWED: 'success', SIMULATED: 'success' };
+  const tone = tones[value] ?? 'neutral';
   return <Badge tone={tone}>{value}</Badge>;
 }
 
-export function LogRow({ selected, onSelect, children }: { selected: boolean; onSelect: () => void; children: ReactNode }) {
+export function LogRow({ selected, onSelect, children }: Readonly<{ selected: boolean; onSelect: () => void; children: ReactNode }>) {
   return <tr tabIndex={0} aria-selected={selected} data-log-selected={selected} onClick={event => {
     if ((event.target as HTMLElement).closest('button,a,input,select')) return;
     event.currentTarget.focus({preventScroll:true}); onSelect();
@@ -64,7 +67,7 @@ export function LogRow({ selected, onSelect, children }: { selected: boolean; on
   }}>{children}</tr>;
 }
 
-export function LogRange({ model, children }: { model: ReturnType<typeof useLogFilters>; children?: ReactNode }) {
+export function LogRange({ model, children }: Readonly<{ model: ReturnType<typeof useLogFilters>; children?: ReactNode }>) {
   const t = useTranslation();
   const {filters, update} = model;
   return <div className="management-log-filters"><div className="management-log-filter-main">{children}</div><div className="management-log-filter-range">
@@ -82,16 +85,16 @@ export function logPage<T>(entries: T[], model: ReturnType<typeof useLogFilters>
   return { page, pages, rows: entries.slice((page-1)*model.pageSize,page*model.pageSize) };
 }
 
-export function LogPagination({ model, count, loaded }: { model: ReturnType<typeof useLogFilters>; count: number; loaded: number }) {
+export function LogPagination({ model, count, loaded }: Readonly<{ model: ReturnType<typeof useLogFilters>; count: number; loaded: number }>) {
   const t = useTranslation();
-  const {page, pages} = logPage(Array(count),model);
-  return <div className="management-log-pagination"><span role="status">{t('Showing {count} of {loaded} loaded records', {count,loaded})} · {t('Page {page} of {pages}',{page,pages})}</span><label>{t('Rows per page')} <Select aria-label={t('Rows per page')} value={String(model.pageSize)} onChange={e => model.update('size',e.target.value)}><option>25</option><option>50</option></Select></label><Button disabled={page === 1} onClick={() => model.update('page',String(page-1))}>{t('Previous page')}</Button><Button disabled={page === pages} onClick={() => model.update('page',String(page+1))}>{t('Next page')}</Button></div>;
+  const {page, pages} = logPage(new Array(count),model);
+  return <div className="management-log-pagination"><output >{t('Showing {count} of {loaded} loaded records', {count,loaded})} · {t('Page {page} of {pages}',{page,pages})}</output><label>{t('Rows per page')} <Select aria-label={t('Rows per page')} value={String(model.pageSize)} onChange={e => model.update('size',e.target.value)}><option>25</option><option>50</option></Select></label><Button disabled={page === 1} onClick={() => model.update('page',String(page-1))}>{t('Previous page')}</Button><Button disabled={page === pages} onClick={() => model.update('page',String(page+1))}>{t('Next page')}</Button></div>;
 }
 
-export function LogDrawer({ title, identity, onClose, children }: { title: string; identity: string; onClose: () => void; children: ReactNode }) {
+export function LogDrawer({ title, identity, onClose, children }: Readonly<{ title: string; identity: string; onClose: () => void; children: ReactNode }>) {
   const t = useTranslation();
   const closeRef = useRef<HTMLButtonElement>(null);
-  const drawerRef = useRef<HTMLElement>(null);
+  const drawerRef = useRef<HTMLDialogElement>(null);
   const [closing, setClosing] = useState(false);
   const returnFocus = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose); onCloseRef.current = onClose;
@@ -118,8 +121,8 @@ export function LogDrawer({ title, identity, onClose, children }: { title: strin
     window.addEventListener('keydown',escape);
     return () => { window.removeEventListener('keydown',escape); const target = returnFocus.current; if (target?.isConnected) target.focus({preventScroll:true}); };
   }, []);
-  return <aside ref={drawerRef} role="dialog" aria-modal="false" aria-label={t(title)} data-ui-motion data-closing={closing} className="management-log-drawer" style={{zIndex:UI_LAYER.flyout}}>
+  return <dialog open ref={drawerRef} aria-modal="false" aria-label={t(title)} data-ui-motion data-closing={closing} className="management-log-drawer" style={{zIndex:UI_LAYER.flyout}}>
     <div className="management-log-drawer-header"><div><h3>{t(title)}</h3><small className="font-mono">{identity}</small></div><button ref={closeRef} type="button" data-ui-control="button" data-tone="neutral" className="ui-control" disabled={closing} onClick={() => setClosing(true)}>{t('Close')}</button></div>
     <div className="management-log-drawer-body">{children}</div>
-  </aside>;
+  </dialog>;
 }

@@ -27,7 +27,8 @@ class SQL:
         if 'pg_advisory_xact_lock' in sql:
             assert parameters == ('A',)
             return
-        assert 'deleted_at IS NULL' in sql and parameters == ('A',)
+        assert 'deleted_at IS NULL' in sql
+        assert parameters == ('A',)
     def fetchone(self): return self.row
 
 
@@ -51,7 +52,9 @@ def test_exact_artifact_bytes_checksum_and_bounded_read():
     result = service.get_layout('A')
     assert result.svg.encode() == SVG
     assert result.svg_sha256 == hashlib.sha256(result.svg.encode()).hexdigest()
-    assert stream.requested == 512 * 1024 + 1 and stream.closed and stream.released
+    assert stream.requested == 512 * 1024 + 1
+    assert stream.closed
+    assert stream.released
 
 
 def test_historical_reader_selects_requested_version_and_checks_exact_artifact():
@@ -62,20 +65,26 @@ def test_historical_reader_selects_requested_version_and_checks_exact_artifact()
         if 'pg_advisory_xact_lock' in sql:
             assert params == ('A',)
             return
-        assert 'v.version = %s' in sql and 'deleted_at IS NULL' in sql
+        assert 'v.version = %s' in sql
+        assert 'deleted_at IS NULL' in sql
         assert params == (4, 'A')
     service._database.execute = execute
     result = service.get_layout('A', 4)
-    assert result.version == 4 and result.svg.encode() == SVG
-    assert len(calls) == 2 and 'pg_advisory_xact_lock' in calls[0][0] and stream.closed
+    assert result.version == 4
+    assert result.svg.encode() == SVG
+    assert len(calls) == 2
+    assert 'pg_advisory_xact_lock' in calls[0][0]
+    assert stream.closed
 
 
 def test_version_history_returns_original_titles_in_descending_order():
     service, _ = reader()
     database = service._database
     def execute(sql, params):
-        assert 'ORDER BY v.version DESC' in sql and 'deleted_at IS NULL' in sql
-        assert 'title_override' not in sql and params == ('A',)
+        assert 'ORDER BY v.version DESC' in sql
+        assert 'deleted_at IS NULL' in sql
+        assert 'title_override' not in sql
+        assert params == ('A',)
     database.execute = execute
     database.fetchall = lambda: [database.row, (*database.row[:2], 3, *database.row[3:])]
     assert [item.version for item in service.list_versions('A')] == [4, 3]
@@ -86,7 +95,9 @@ def test_version_history_returns_original_titles_in_descending_order():
 def test_corrupt_or_oversized_artifact_is_distinct_and_closed(payload,checksum):
     service, stream = reader(payload,checksum)
     with pytest.raises(LayoutArtifactError): service.get_layout('A')
-    assert stream.closed and stream.released and stream.requested == 512 * 1024 + 1
+    assert stream.closed
+    assert stream.released
+    assert stream.requested == 512 * 1024 + 1
 
 
 def test_missing_or_deleted_distinct_from_unavailable():

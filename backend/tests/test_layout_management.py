@@ -56,8 +56,9 @@ def test_delete_hides_layout_preserves_history_and_rejects_reuse(managed):
     with pytest.raises(LayoutNotFoundError): managed.get_layout("example")
     with pytest.raises(LayoutNotFoundError): managed.rename_layout("example", "Again")
     with pytest.raises(LayoutNotFoundError): managed.delete_layout("example")
+    prepared_SaveLayoutRequest = SaveLayoutRequest(label_code='example', title='Again', svg='<svg xmlns="http://www.w3.org/2000/svg"/>', width_mm=80, height_mm=40, dpi=203.2)
     with pytest.raises(LayoutConflictError):
-        managed.save_layout(SaveLayoutRequest(label_code="example", title="Again", svg='<svg xmlns="http://www.w3.org/2000/svg"/>', width_mm=80, height_mm=40, dpi=203.2))
+        managed.save_layout(prepared_SaveLayoutRequest)
     assert not any("DELETE FROM label_studio.layout_versions" in sql for sql in managed._database.sql)
     assert any("deleted_at IS NULL" in sql for sql in managed._database.sql)
 
@@ -78,7 +79,8 @@ def test_direct_metadata_endpoints_cannot_bypass_management_audit(managed):
     with TestClient(application) as client:
         assert client.patch('/layouts/example', json={'title': 'New name'}).status_code == 410
         assert client.delete('/layouts/example').status_code == 410
-    assert not managed._database.sql and not managed._database.deleted
+    assert not managed._database.sql
+    assert not managed._database.deleted
 
 
 def test_direct_endpoints_never_mutate_without_persistence():

@@ -7,7 +7,7 @@ import { layoutApi, type PersistedLayoutSummary } from '../../templates';
 import type { ManagementController } from '../hooks/useManagement';
 import { managementApi } from '../api/managementApi';
 
-export function TemplateDetailsDialog({ management }: { management: ManagementController }) {
+export function TemplateDetailsDialog({ management }: Readonly<{ management: ManagementController }>) {
   const t = useTranslation();
   const { editor, policy, mutate, writable, saving, preview, previewError, templates, setEditor } = management;
   const selected = editor?.kind === 'template' ? editor.value : null;
@@ -47,7 +47,7 @@ export function TemplateDetailsDialog({ management }: { management: ManagementCo
     <p className="management-muted">{selected.width_mm} × {selected.height_mm} mm · {selected.dpi} DPI</p>
     {preview && <TemplatePreview key={preview} src={preview} />}
     {previewError && <p role="alert">{t(previewError)}</p>}
-    {!preview && !previewError && <p role="status">{t('Loading template preview…')}</p>}
+    {!preview && !previewError && <output data-ui-status-block  >{t('Loading template preview…')}</output>}
     <div className="management-template-artifact-line management-muted"><span>{new Date(selected.created_at).toLocaleString()}</span><span>v{selected.version}</span></div>
     </section>
     <form className="management-template-form" onSubmit={event => { event.preventDefault(); if (writable && changed && validCode && title.trim()) update(); }}>
@@ -59,13 +59,13 @@ export function TemplateDetailsDialog({ management }: { management: ManagementCo
       <p className="management-muted management-printer-note"><Icon component={Info} /><span>{t('Identity changes apply to the stored template. Label content is edited in Studio.')}</span></p>
       {labelCode !== active.label_code && <p className="management-notice">{t('Configured source references will use the new code. Update external senders too. The previous code becomes available for another template.')}</p>}
       <details className="management-template-artifact-details"><summary>{t('Artifact details')}</summary><div className="management-template-artifact-grid"><span>{t('Selected version')}</span><span>v{selected.version}</span><span>{t('Stored versions')}</span><span>{versions.length || '—'}</span><span>{t('SVG checksum')}</span><code className="management-checksum">{selected.svg_sha256}</code></div></details>
-    {confirmDelete && <div className="management-notice" role="group" aria-label={t('Delete template confirmation')}>
+    {confirmDelete && <fieldset className="min-w-0 management-notice"  aria-label={t('Delete template confirmation')}>
       <p>{t('Delete this template and all its versions from the application?')} <strong>{active.title}</strong> · <code>{active.label_code}</code> · {versions.length || '—'} {t('versions')}</p>
       <p>{t('Stored version files and audit history are retained. The label code cannot be reused.')}</p>
       <Field label={t('Type the label code to confirm')}><Input aria-label={t('Type the label code to confirm')} disabled={saving} value={confirmation} onChange={event => setConfirmation(event.target.value)} /></Field>
       <div className="management-tools"><Button tone="danger" disabled={!writable || confirmation !== active.label_code} onClick={remove}>{t('Confirm delete')}</Button><Button disabled={saving} onClick={() => { setConfirmDelete(false); setConfirmation(''); }}>{t('Cancel')}</Button></div>
-    </div>}
-    <div className="management-source-footer"><IconButton label="Delete template" tone="danger" disabled={!writable} onClick={() => setConfirmDelete(true)}><Icon component={Trash2} /></IconButton><span className="management-draft-status" role="status" data-dirty={changed}>{t(changed ? 'Unsaved changes' : 'No unsaved changes')}</span><Button disabled={saving} onClick={() => setEditor(null)}>{t('Cancel')}</Button><Button tone="primary" type="submit" disabled={!writable || !changed || !validCode || !title.trim()}><Icon component={Save} />{t('Save changes')}</Button></div>
+    </fieldset>}
+    <div className="management-source-footer"><IconButton label="Delete template" tone="danger" disabled={!writable} onClick={() => setConfirmDelete(true)}><Icon component={Trash2} /></IconButton><output className="management-draft-status"  data-dirty={changed}>{t(changed ? 'Unsaved changes' : 'No unsaved changes')}</output><Button disabled={saving} onClick={() => setEditor(null)}>{t('Cancel')}</Button><Button tone="primary" type="submit" disabled={!writable || !changed || !validCode || !title.trim()}><Icon component={Save} />{t('Save changes')}</Button></div>
     </form>
   </>;
 }

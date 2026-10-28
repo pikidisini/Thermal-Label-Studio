@@ -45,8 +45,9 @@ def test_dataset_preview_uses_saved_layout_and_one_pinned_version(monkeypatch):
     client = TestClient(app, client=('127.0.0.1', 1234))
     result = client.post('/label-print/preview', json=dict(source='dataset', dataset_id='00000000-0000-0000-0000-000000000001', encoder='IPL', batches=['0010245801', '0010245801', 'UNKNOWN', '0010245802']))
     assert result.status_code == 200, result.text
-    data = result.json(); assert data['source'] == 'dataset' and data['dataset_updated_at']
+    data = result.json(); assert data['source'] == 'dataset'; assert data['dataset_updated_at']
     assert [item['status'] for item in data['items']] == ['PREVIEWED', 'PREVIEWED', 'FAILED', 'FAILED']
-    assert data['items'][0]['label_code'] == 'SAVED_ROLL' and data['items'][0]['template_version'] == '7'
+    assert data['items'][0]['label_code'] == 'SAVED_ROLL'
+    assert data['items'][0]['template_version'] == '7'
     assert data['items'][3]['error_code'] == 'layout_not_found'
     assert calls == ['SAVED_ROLL', 'MISSING']

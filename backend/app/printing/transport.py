@@ -12,6 +12,11 @@ class TcpRawTransport:
         self.target = target
 
     def submit(self, payload: bytes) -> None:
+        from app.intake_queue.printers import printer_operation
+        with printer_operation(self.target):
+            self._submit(payload)
+
+    def _submit(self, payload: bytes) -> None:
         address = ipaddress.ip_address(self.target.host)
         family = socket.AF_INET6 if address.version == 6 else socket.AF_INET
         # Numeric host and explicit family avoid DNS resolution. No connection

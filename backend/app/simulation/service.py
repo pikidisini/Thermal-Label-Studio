@@ -1,7 +1,7 @@
 """Capture one existing renderer result per ordered item, without output IO."""
 
 from dataclasses import dataclass, replace
-from typing import Literal
+from typing import Literal, cast
 
 from pydantic import ValidationError
 
@@ -62,7 +62,7 @@ def simulate_prepared_output(output: PreparedOutput) -> RenderedLabel:
     """Decode the exact prepared payload without rendering, encoding or IO."""
     _, decoder = codec_for(output.language)
     bitmap = output.bitmap
-    return replace(bitmap, bitmap_png=decoder(output.payload, bitmap.width_px, bitmap.height_px, bitmap.dpi))
+    return cast(RenderedLabel, replace(bitmap, bitmap_png=decoder(output.payload, bitmap.width_px, bitmap.height_px, bitmap.dpi)))
 
 
 def _simulate_label_request(

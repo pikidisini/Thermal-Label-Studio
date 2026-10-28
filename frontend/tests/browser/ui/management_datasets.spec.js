@@ -1,5 +1,5 @@
 import { mockAccountSession } from '../helpers/studio.js';
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/coverage.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 const dist = fileURLToPath(new URL('../../../dist/', import.meta.url));

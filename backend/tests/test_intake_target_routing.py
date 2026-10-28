@@ -34,7 +34,9 @@ def request(target='TARGET_A'):
 
 @pytest.mark.parametrize('mode', ['print','simulation'])
 def test_target_is_required_and_identity_includes_explicit_target(mode):
-    with pytest.raises(ValueError): IntakeRequest.model_validate({**request(None),'mode':mode})
+    prepared_request = request(None)
+    with pytest.raises(ValueError):
+        IntakeRequest.model_validate({**prepared_request, 'mode': mode})
     raw={**request('TARGET_A'),'mode':mode};model=IntakeRequest.model_validate(raw)
     expected={**raw,'field_descriptions':{}}
     assert model.model_dump()==expected
@@ -47,19 +49,29 @@ def test_target_is_required_and_identity_includes_explicit_target(mode):
 
 @pytest.mark.parametrize('value', [None, '', ' target', 'http://127.0.0.1:19100', {'host':'127.0.0.1'}])
 def test_invalid_target_shapes_rejected(value):
+    prepared_request_2 = request()
+    prepared_dumps = json.dumps({**prepared_request_2, 'target_id': value})
+    prepared_encode = prepared_dumps.encode()
     with pytest.raises((LabelDataError, ValueError)):
-        admit_json(json.dumps({**request(), 'target_id':value}).encode())
+        admit_json(prepared_encode)
 
 
 def test_simulation_validates_the_same_explicit_target():
     p=configured()
     model=IntakeRequest.model_validate({**request('TARGET_B'),'mode':'simulation'})
     authorize(auth(p),model)
+    prepared_auth = auth(p)
+    prepared_request_3 = request('TARGET_C')
+    prepared_model_validate = IntakeRequest.model_validate({**prepared_request_3, 'mode': 'simulation'})
     with pytest.raises(IntakeAdmissionError):
-        authorize(auth(p),IntakeRequest.model_validate({**request('TARGET_C'),'mode':'simulation'}))
-    with pytest.raises(PolicyDenied):preflight_print(auth(p),'A',EVIDENCE,1)
+        authorize(prepared_auth, prepared_model_validate)
+    prepared_auth_2 = auth(p)
+    with pytest.raises(PolicyDenied):
+        preflight_print(prepared_auth_2, 'A', EVIDENCE, 1)
     legacy=p.model_copy(update={'sources':(source(print_target_id='TARGET_A',allowed_print_target_ids=()),)})
-    with pytest.raises(PolicyDenied):preflight_print(auth(legacy),'A',EVIDENCE,1,'TARGET_A')
+    prepared_auth_3 = auth(legacy)
+    with pytest.raises(PolicyDenied):
+        preflight_print(prepared_auth_3, 'A', EVIDENCE, 1, 'TARGET_A')
 
 
 def test_default_additional_and_permission_revocation():
@@ -72,8 +84,13 @@ def test_default_additional_and_permission_revocation():
     revoked = p.model_copy(update={'sources':(p.sources[0].model_copy(update={'allowed_print_target_ids':()}),)})
     with pytest.raises(PolicyDenied): revalidate_claim(explicit, admission, revoked, {ENV:TOKEN})
     disabled = p.model_copy(update={'targets':tuple(t.model_copy(update={'enabled':False}) if t.target_id=='TARGET_B' else t for t in p.targets)})
-    with pytest.raises(PolicyDenied): preflight_print(auth(disabled), 'A', EVIDENCE, 1, 'TARGET_B')
-    with pytest.raises(IntakeAdmissionError) as raised: authorize(admission, IntakeRequest.model_validate(request('TARGET_C')))
+    prepared_auth_4 = auth(disabled)
+    with pytest.raises(PolicyDenied):
+        preflight_print(prepared_auth_4, 'A', EVIDENCE, 1, 'TARGET_B')
+    prepared_request_4 = request('TARGET_C')
+    prepared_model_validate_2 = IntakeRequest.model_validate(prepared_request_4)
+    with pytest.raises(IntakeAdmissionError) as raised:
+        authorize(admission, prepared_model_validate_2)
     assert (raised.value.status,raised.value.code) == (403,'target_not_allowed')
 
 
@@ -114,7 +131,8 @@ def test_http_target_choice_replay_and_conflict(monkeypatch):
         assert replay.json()['replayed'] is True
         assert len(recorder.calls)==1
         conflict=client.post('/api/v1/label-intake',json={**body,'target_id':'TARGET_A'},headers=headers)
-        assert conflict.status_code==409 and conflict.json()['detail']['code']=='request_conflict'
+        assert conflict.status_code == 409
+        assert conflict.json()['detail']['code'] == 'request_conflict'
         denied=client.post('/api/v1/label-intake',json={**body,'request_id':'DENIED','target_id':'TARGET_C'},headers=headers)
         assert denied.status_code==403
         assert len(recorder.calls)==1
@@ -135,7 +153,9 @@ def test_management_references_and_duplicate_grants(monkeypatch):
     assert document.policy.sources[0].allowed_print_target_ids==('EXTRA',)
     with pytest.raises(ManagementError) as blocked: delete_target(document,'EXTRA')
     assert blocked.value.code=='printer_in_use'
-    with pytest.raises(ManagementError): upsert_source(document,original.model_copy(update={'allowed_print_target_ids':('UNKNOWN',)}))
+    prepared_model_copy = original.model_copy(update={'allowed_print_target_ids': ('UNKNOWN',)})
+    with pytest.raises(ManagementError):
+        upsert_source(document, prepared_model_copy)
     with pytest.raises(ValidationError): source(allowed_print_target_ids=('A','A'))
 
 
@@ -182,5 +202,6 @@ def test_simulation_reports_validated_target_and_never_constructs_printer_transp
             assert response.status_code==200,response.text
             assert response.json()['target_id']=='TARGET_'+letter
             replay=client.post('/api/v1/label-intake',json=body,headers={'Authorization':'Bearer '+TOKEN})
-            assert replay.json()['target_id']=='TARGET_'+letter and replay.json()['replayed']
+            assert replay.json()['target_id'] == 'TARGET_' + letter
+            assert replay.json()['replayed']
     finally:app.dependency_overrides.clear()

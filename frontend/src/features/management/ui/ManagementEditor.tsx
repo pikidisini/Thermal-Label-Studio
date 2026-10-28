@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { Button, Icon, IconButton } from '../../../shared/ui';
+import { Icon, IconButton } from '../../../shared/ui';
 import { useTranslation } from '../../../shared/i18n';
 import type { ManagementController } from '../hooks/useManagement';
 import { PrinterDialog } from '../printers/PrinterDialog';
@@ -8,7 +8,7 @@ import { TemplateDetailsDialog } from '../templates/TemplateDetailsDialog';
 import { AuditDetails } from '../audit/AuditDetails';
 import { LogDrawer } from './LogTools';
 
-export function ManagementEditor({ management }: { management: ManagementController }) {
+export function ManagementEditor({ management }: Readonly<{ management: ManagementController }>) {
   const t = useTranslation(); const { editor, saving, setEditor, setIssuedKey } = management;
   if (!editor) return null;
   if (editor.kind === 'template') return <section className="management-editor management-template-editor" aria-label={t('Selected item details')}><TemplateDetailsDialog management={management} /></section>;

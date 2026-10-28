@@ -1,4 +1,5 @@
 """Shared editor draft admission. Route chooses the sink, never the input."""
+from app.http_body import BodyLimitExceeded, read_bounded_body, replay_body
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.label_data.validation import fields
@@ -10,8 +11,16 @@ from app.observability import current_request_id
 
 class EditorBodyMiddleware:
     """Count streamed bytes before JSON parsing; reject ambiguous duplicate data."""
+
     def __init__(self, app):
         self.app = app
+
+    @staticmethod
+    def rejection(code, status):
+        return JSONResponse(status_code=status, content={
+            'detail': {'code': code, 'message': 'Editor request admission failed.'},
+            'request_id': current_request_id(),
+        })
 
     async def __call__(self, scope, receive, send):
         if scope['type'] != 'http' or scope.get('method') != 'POST' or scope.get('path') not in {
@@ -20,40 +29,20 @@ class EditorBodyMiddleware:
             return await self.app(scope, receive, send)
         headers = dict(scope.get('headers', []))
         media = headers.get(b'content-type', b'').decode('latin1').split(';')[0].strip().lower()
-        code, status = None, 400
-        body = bytearray()
         if media != 'application/json':
-            code, status = 'unsupported_media_type', 415
-        else:
-            while True:
-                message = await receive()
-                if message['type'] == 'http.disconnect':
-                    return
-                chunk = message.get('body', b'')
-                if len(body) + len(chunk) > MAX_BYTES:
-                    code, status = 'request_too_large', 413
-                    break
-                body.extend(chunk)
-                if not message.get('more_body', False):
-                    break
-            if code is None:
-                try:
-                    decode_json(bytes(body))
-                except LabelDataError as exc:
-                    code = exc.code
-        if code:
-            return await JSONResponse(status_code=status, content={
-                'detail': {'code': code, 'message': 'Editor request admission failed.'},
-                'request_id': current_request_id(),
-            })(scope, receive, send)
-        delivered = False
-        async def replay():
-            nonlocal delivered
-            if delivered:
-                return await receive()
-            delivered = True
-            return {'type': 'http.request', 'body': bytes(body), 'more_body': False}
-        return await self.app(scope, replay, send)
+            return await self.rejection('unsupported_media_type', 415)(scope, receive, send)
+        try:
+            body = await read_bounded_body(receive, MAX_BYTES)
+        except BodyLimitExceeded:
+            return await self.rejection('request_too_large', 413)(scope, receive, send)
+        if body is None:
+            return
+        try:
+            decode_json(body)
+        except LabelDataError as exc:
+            return await self.rejection(exc.code, 400)(scope, receive, send)
+        return await self.app(scope, replay_body(body, receive), send)
+
 
 
 class EditorDraft(BaseModel):

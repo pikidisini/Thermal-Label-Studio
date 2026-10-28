@@ -1,5 +1,5 @@
 import { mockAccountSession } from '../helpers/studio.js';
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/coverage.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const dist = fileURLToPath(new URL('../../../dist/', import.meta.url));
@@ -12,6 +12,7 @@ for (const lang of ['en', 'id']) test(`server LAN print sends selected preview o
   const packages = [], jobs = [], previews = [];
   await page.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url());
+    if (url.pathname.startsWith('/api/v1/auth/')) return route.fallback();
     if (url.port === '18191') throw new Error('LAN printing must not contact a local agent');
     if (url.pathname === '/api/v1/label-print/printers') return route.fulfill({ json: { policy_origin: 'management', printers: [{ target_id: 'PLANT', host: '192.0.2.44', port: 9100, enabled: true, language: 'IPL', connection: 'Ethernet', transport: 'TCP/RAW' }] } });
     if (url.pathname.endsWith('/studio-sample-datasets')) return route.fulfill({ json: [{ id: '00000000-0000-0000-0000-000000000001', name: 'Saved rolls' }] });

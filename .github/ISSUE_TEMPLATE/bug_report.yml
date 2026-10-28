@@ -3,6 +3,13 @@ description: Laporkan bug, error, atau anomali render label
 title: "[BUG]: "
 labels: ["bug", "triage"]
 body:
+  - type: input
+    id: application-version
+    attributes:
+      label: Versi aplikasi / commit rilis
+      description: Cantumkan versi yang mengalami masalah, bukan password atau token.
+    validations:
+      required: true
   - type: markdown
     attributes:
       value: Terima kasih telah melaporkan bug. Mohon berikan informasi selengkap mungkin agar AI agent atau kontributor dapat mereproduksinya secara cepat.
@@ -11,7 +18,7 @@ body:
     attributes:
       label: Deskripsi Bug
       description: Apa yang terjadi secara detail?
-      placeholder: Contoh: Hasil render ZPL menghasilkan karakter rusak saat mencetak QR code...
+      placeholder: Contoh: Preview IPL gagal ketika memilih dataset tertentu.
     validations:
       required: true
   - type: textarea
@@ -23,11 +30,18 @@ body:
         1. Buka halaman Studio
         2. Pilih template 'label_roll_80x200'
         3. Masukkan payload JSON berikut...
-        4. Klik 'Render ZPL'
+        4. Jalankan Preview
     validations:
       required: true
   - type: textarea
     id: logs
     attributes:
       label: Log / Traceback Error (Jika Ada)
+      description: Gunakan trace ID atau log yang disanitasi. Jangan kirim token, credential, atau payload SAP mentah.
       render: shell
+  - type: textarea
+    id: expected-result
+    attributes:
+      label: Hasil yang diharapkan
+    validations:
+      required: true

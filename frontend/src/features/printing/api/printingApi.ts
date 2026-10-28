@@ -10,6 +10,20 @@ export type PrintFailureKind = 'unavailable' | 'target' | 'copies' | 'invalid' |
 export class PrintFailure extends Error {
   constructor(public readonly kind: PrintFailureKind) { super(kind); }
 }
+
+function printFailureKind(status: number, code: unknown): PrintFailureKind {
+  if (status === 503 && code === 'printer_unavailable') return 'unavailable';
+  if (status === 422) {
+    if (code === 'invalid_print_copies') return 'copies';
+    if (code === 'invalid_printer_target') return 'target';
+    const invalidCodes = ['invalid_print_layout', 'invalid_request', 'missing_binding',
+      'null_binding', 'empty_binding', 'invalid_binding', 'invalid_symbol',
+      'symbol_capacity', 'unsupported_feature', 'invalid_media', 'resource_limit'];
+    if (typeof code === 'string' && invalidCodes.includes(code)) return 'invalid';
+  }
+  if (status === 500 && code === 'print_preparation_failed') return 'preparation';
+  return 'uncertain';
+}
 export async function getPrintTarget(signal?: AbortSignal): Promise<PrintTarget> {
   const response = await fetch(`${API_BASE}/printing/target`, { signal });
   if (!response.ok) throw new Error('target_unavailable');
@@ -33,12 +47,7 @@ export async function printEditorLabel(request: EditorPrintRequest): Promise<Edi
   if (!response.ok) {
     let code: unknown;
     try { code = (await response.json()).detail?.code; } catch { throw new PrintFailure('uncertain'); }
-    const kind: PrintFailureKind = response.status === 503 && code === 'printer_unavailable' ? 'unavailable'
-      : response.status === 422 && code === 'invalid_print_copies' ? 'copies'
-      : response.status === 422 && code === 'invalid_printer_target' ? 'target'
-      : response.status === 422 && (code === 'invalid_print_layout' || code === 'invalid_request' || ['missing_binding', 'null_binding', 'empty_binding', 'invalid_binding', 'invalid_symbol', 'symbol_capacity', 'unsupported_feature', 'invalid_media', 'resource_limit'].includes(String(code))) ? 'invalid'
-      : response.status === 500 && code === 'print_preparation_failed' ? 'preparation' : 'uncertain';
-    throw new PrintFailure(kind);
+    throw new PrintFailure(printFailureKind(response.status, code));
   }
   try {
     const result = await response.json() as { request_id: string; status: string; confirmed: boolean; width_px: number; height_px: number; dpi: number; payload_bytes: number; target: PrinterTarget; copies: number; template_sha256: string; binding_version: number };

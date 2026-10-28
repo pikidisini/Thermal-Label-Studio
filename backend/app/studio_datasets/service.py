@@ -43,7 +43,7 @@ class StudioDatasetService:
 
     @staticmethod
     def _summary(row):
-        return dict(id=str(row[0]), name=row[1], original_filename=row[2], created_at=row[3], updated_at=row[4])
+        return {'id': str(row[0]), 'name': row[1], 'original_filename': row[2], 'created_at': row[3], 'updated_at': row[4]}
 
     def create(self, name, original_filename, payload):
         from app.label_data import validate_payload

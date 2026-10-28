@@ -20,7 +20,7 @@ const failureMessages = {
   uncertain: 'Delivery is uncertain. Check the printer before sending again to avoid duplicate labels.',
 };
 
-export function EditorPrintModal({ isOpen, onClose, getSnapshot, widthMm, heightMm, dpi }: EditorPrintModalProps) {
+export function EditorPrintModal({ isOpen, onClose, getSnapshot, widthMm, heightMm, dpi }: Readonly<EditorPrintModalProps>) {
   useTranslation();
   const [host, setHost] = React.useState('');
   const [port, setPort] = React.useState('9100');
@@ -56,14 +56,16 @@ export function EditorPrintModal({ isOpen, onClose, getSnapshot, widthMm, height
   }, [isOpen]);
   const target = targetFromFields(host, port);
   const hostInvalid = !!host && !isNumericPrinterHost(host.trim());
-  const portInvalid = !/^[0-9]{1,5}$/.test(port) || Number(port) < 1 || Number(port) > 65535;
-  const copiesInvalid = !/^[0-9]{1,3}$/.test(copies) || Number(copies) < 1 || Number(copies) > 999;
+  const portInvalid = !/^\d{1,5}$/.test(port) || Number(port) < 1 || Number(port) > 65535;
+  const copiesInvalid = !/^\d{1,3}$/.test(copies) || Number(copies) < 1 || Number(copies) > 999;
   const controlsLocked = busy || attempted;
   const changeCopies = (delta: number) => {
     if (controlsLocked || copiesInvalid) return;
     setCopies(String(Math.min(999, Math.max(1, Number(copies) + delta))));
   };
-  const printAction = copiesInvalid ? t('Print label') : t(Number(copies) === 1 ? 'Print {count} label' : 'Print {count} labels', { count: Number(copies) });
+  const actionWithQuantity = t(Number(copies) === 1 ? 'Print {count} label' : 'Print {count} labels', { count: Number(copies) });
+  const printAction = copiesInvalid ? t('Print label') : actionWithQuantity;
+  const copyQuantityLabel = t(Number(copies) === 1 ? '{count} label' : '{count} labels', { count: Number(copies) });
   const remember = () => { if (target) rememberPrinterTarget(target); };
   const close = () => { if (!sending.current) onClose(); };
   const print = async () => {
@@ -110,7 +112,7 @@ export function EditorPrintModal({ isOpen, onClose, getSnapshot, widthMm, height
           <h3 id="print-target-title" className="font-medium">{t('Printer target')}</h3>
           <div className="grid grid-cols-[minmax(0,1fr)_5rem] min-[440px]:grid-cols-[minmax(0,1fr)_7rem] gap-3">
             <Field label={t('Printer IP address')} className="min-w-0">
-              <Input className="w-full min-w-0 font-mono" aria-label={t('Printer IP address')} aria-invalid={hostInvalid} aria-describedby={hostInvalid ? 'print-host-error' : undefined} placeholder="192.168.88.84" value={host} disabled={controlsLocked} onChange={event => { edited.current = true; setHost(event.target.value); }} onBlur={remember} autoComplete="off" spellCheck={false} />
+              <Input className="w-full min-w-0 font-mono" aria-label={t('Printer IP address')} aria-invalid={hostInvalid} aria-describedby={hostInvalid ? 'print-host-error' : undefined} placeholder={t('Printer IP address')} value={host} disabled={controlsLocked} onChange={event => { edited.current = true; setHost(event.target.value); }} onBlur={remember} autoComplete="off" spellCheck={false} />
             </Field>
             <Field label={t('TCP port')} className="min-w-0">
               <Input className="w-full min-w-0 font-mono" aria-label={t('TCP port')} aria-invalid={portInvalid} aria-describedby={portInvalid ? 'print-port-error' : undefined} value={port} disabled={controlsLocked} onChange={event => { edited.current = true; setPort(event.target.value); }} onBlur={remember} inputMode="numeric" autoComplete="off" />
@@ -132,19 +134,19 @@ export function EditorPrintModal({ isOpen, onClose, getSnapshot, widthMm, height
         {targetLoading && <p className="text-xs text-on-surface-variant">{t('Loading optional server default… You can enter a target now.')}</p>}
         {targetError && !target && <p className="text-xs text-on-surface-variant">{t('The server default could not be loaded. Enter a printer IP address and port to continue.')}</p>}
         <div className="flex items-start gap-2 text-on-surface-variant"><Icon component={Info} className="mt-0.5 shrink-0" aria-hidden="true"  size="control" /><p>{t('Submission sends bytes to the selected printer. It does not confirm that a label was printed.')}</p></div>
-        {busy && <p role="status">{t('Sending labels… Keep this dialog open until the request finishes.')}</p>}
+        {busy && <output data-ui-status-block  >{t('Sending labels… Keep this dialog open until the request finishes.')}</output>}
         {error && <ErrorState title={error} />}
-        {result && <div role="status" data-testid="print-submitted" className="text-sm space-y-2">
+        {result && <output data-ui-status-block  data-testid="print-submitted" className="text-sm space-y-2">
           <p>{t('Sent to printer; physical delivery is unconfirmed.')}</p>
           <p data-testid="print-submitted-copies">{t('Copies')}: {result.copies}</p>
           <p className="font-mono">{result.widthPx} × {result.heightPx} px · {result.dpi} DPI · {result.payloadBytes} bytes</p>
           <p data-testid="print-effective-target">{t('Printer target:')} {result.target.host.includes(':') ? `[${result.target.host}]` : result.target.host}:{result.target.port}</p>
           <p>{t('Request ID:')} <code>{result.requestId}</code></p>
-        </div>}
+        </output>}
         {attempted && !busy && <p className="text-xs text-on-surface-variant">{t('To send another label, close and reopen this dialog after checking the printer.')}</p>}
       </DialogBody>
       <DialogFooter className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-on-surface-variant">{copiesInvalid ? t('Check the copy count') : t(Number(copies) === 1 ? '{count} label' : '{count} labels', { count: Number(copies) })}</span>
+        <span className="text-on-surface-variant">{copiesInvalid ? t('Check the copy count') : copyQuantityLabel}</span>
         <div className="ml-auto flex gap-2">
         <Button onClick={close} disabled={busy}>{t('Cancel')}</Button>
         <Button tone="primary" className="inline-flex items-center gap-2" onClick={() => void print()} disabled={!target || copiesInvalid || busy || attempted} data-testid="btn-print-one-label"><Icon component={Printer} aria-hidden="true"  size="control" />{printAction}</Button>

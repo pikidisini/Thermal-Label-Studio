@@ -51,6 +51,8 @@ frontend/playwright-report/
 frontend/test-results/
 frontend/.auth/
 /.auth/
+/deploy/private/
+*.tlsbackup
 **/.last-run.json
 
 # Disposable pytest directories left by interrupted local runs.

@@ -592,3 +592,14 @@ label facts and submitting intake. Both simulation and print explicitly carry
 list per source. Intake validates mode, target registration/enabled state and
 source permission without default fallback. Simulation reports its validated
 target while remaining free of printer transport effects. See API_CONTRACT.md.
+
+## SAP queued requests (2026-10-22)
+
+SAP submits canonical data to API v2 and receives an acceptance ID after durable
+storage; it polls the returned status URL every five seconds. Two workers prepare
+labels with the existing stored-template engine and serve different printers
+concurrently. Each physical printer is served in admission order. Uncertain sends
+are held for inspection, never retried automatically. The SAP Requests activity
+shows recent results and allows an operator to record a physical check; only an
+Admin can release a hold with an audited note. Neither action sends a label.
+See [queue contract and production gates](PRODUCTION_QUEUE.md).

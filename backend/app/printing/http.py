@@ -63,7 +63,7 @@ def get_print_target(target: PrinterTarget | None = Depends(configured_target)):
     return PrintTargetResponse(available=target is not None, host=target.host if target else None,
                                port=target.port if target else None)
 
-@router.post("/printing/editor", response_model=EditorPrintResponse)
+@router.post('/printing/editor', response_model=EditorPrintResponse, responses={422: {'description': 'Unprocessable Content'}, 500: {'description': 'Internal Server Error'}, 502: {'description': 'Bad Gateway'}, 503: {'description': 'Service Unavailable'}})
 def print_editor(
     request: EditorPrintRequest,
     factory: Callable[[PrinterTarget], BitmapTransport] = Depends(print_transport_factory),

@@ -1,0 +1,9 @@
+ARG CONTROLLER_IMAGE=thermal-label-jenkins:local
+FROM ${CONTROLLER_IMAGE}
+USER root
+RUN mkdir /opt/tls-agent && cd /opt/tls-agent \
+    && entry="$(jar tf /usr/share/jenkins/jenkins.war | grep '^WEB-INF/lib/remoting-.*\.jar$')" \
+    && test -n "$entry" && jar xf /usr/share/jenkins/jenkins.war "$entry" \
+    && cp "$entry" /opt/tls-agent/agent.jar && rm -rf WEB-INF
+USER jenkins
+ENTRYPOINT ["java", "-jar", "/opt/tls-agent/agent.jar"]

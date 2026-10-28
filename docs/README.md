@@ -72,3 +72,13 @@ Ketika perilaku berubah, perbarui kontrak terkait dan bagian panduan utama yang
 relevan. Perbarui referensi source ketika route, modul, atau nama environment
 berubah. Pertahankan bukti bertanggal dan buat tinjauan baru. Jangan memasukkan
 rahasia, data operasional mentah, atau bukti runtime yang dihasilkan ke Git.
+
+## Antrean SAP dan persiapan production
+
+[Production queue](PRODUCTION_QUEUE.md) menjelaskan kontrak API asinkron, dua
+worker, penguncian printer, payload terenkripsi, deployment Ubuntu/HTTPS, serta
+prosedur backup dan restore terisolasi. Bukti source dan bukti operasional tetap
+merupakan gerbang penerimaan yang berbeda.
+
+Local Docker Linux acceptance: [runtime result](implementation/universal-label-pipeline/results/LOCAL_QUEUE_LINUX_2026-10-22.md)
+and [isolated test instructions](../deploy/queue-local-test/README.md).

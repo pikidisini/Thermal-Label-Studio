@@ -1,5 +1,5 @@
 import { mockAccountSession } from '../helpers/studio.js';
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/coverage.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const dist = fileURLToPath(new URL('../../../dist/', import.meta.url));
@@ -9,6 +9,7 @@ for (const lang of ['en', 'id']) test(`registered printer selection is configura
   const printer = (target_id, host, enabled) => ({ target_id, host, port: 9100, enabled, language: 'IPL', connection: 'Ethernet', transport: 'TCP/RAW' });
   await page.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url());
+    if (url.pathname.startsWith('/api/v1/auth/')) return route.fallback();
     if (url.pathname.startsWith('/api/')) requests.push({ path: url.pathname, method: request.method() });
     if (url.pathname === '/api/v1/label-print/printers') {
       if (mode === 'fail') return route.fulfill({ status: 503, json: {} });

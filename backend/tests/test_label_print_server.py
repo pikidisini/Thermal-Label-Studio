@@ -24,7 +24,7 @@ def setup(client, monkeypatch):
     ids = [cache.put(output, 'synthetic-admin') for _ in range(3)]
     calls = []
     class Transport:
-        def __init__(self, target): assert target.host == '192.0.2.44' and target.port == 9100
+        def __init__(self, target): assert target.host == '192.0.2.44'; assert target.port == 9100
         def submit(self, payload): calls.append(payload)
     client.app.dependency_overrides[print_transport_factory] = lambda: Transport
     body = {'job_id': str(uuid4()), 'artifacts': ids, 'copies': 1, 'target_id': 'LAN', 'expected_host': '192.0.2.44', 'expected_port': 9100}

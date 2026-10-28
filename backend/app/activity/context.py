@@ -32,8 +32,7 @@ def stage(name, *, item_index=None, error_code=None):
     if len(activity['events']) >= 1024:
         activity['events_truncated'] = True
         return
-    event = dict(event=name, at=datetime.now(timezone.utc).isoformat(),
-                 elapsed_ms=round((monotonic() - activity['started']) * 1000, 2))
+    event = {'event': name, 'at': datetime.now(timezone.utc).isoformat(), 'elapsed_ms': round((monotonic() - activity['started']) * 1000, 2)}
     item_index = item_index if item_index is not None else activity.get('item_index')
     if type(item_index) is int and 0 <= item_index < 100:
         event['item_index'] = item_index
@@ -54,7 +53,7 @@ def studio_identity(request):
         activity['operation'] = getattr(request, 'purpose', 'print')
         activity['copies'] = request.copies
         if getattr(request, 'target', None) is not None:
-            activity['target'] = dict(host=request.target.host, port=request.target.port)
+            activity['target'] = {'host': request.target.host, 'port': request.target.port}
 
 
 def intake_identity(request, admission):
@@ -79,7 +78,7 @@ def intake_outcome(result):
         value = {key: getattr(item, key) for key in ('item_index', 'label_code', 'copies', 'status')}
         value['template'] = item.template.model_dump() if item.template else None
         if item.error:
-            value['error'] = dict(code=item.error.code, stage=item.error.stage)
+            value['error'] = {'code': item.error.code, 'stage': item.error.stage}
         if result.mode == 'print':
             value.update(target_id=item.target_id, confirmed=item.confirmed)
         elif item.simulation:
@@ -102,7 +101,7 @@ def studio_outcome(result):
                     width_px=result.width_px, height_px=result.height_px, dpi=result.dpi)
     if activity['mode'] == 'print':
         activity.update(copies=result.copies, payload_bytes=result.payload_bytes,
-                        confirmed=False, target=dict(host=result.target.host, port=result.target.port))
+                        confirmed=False, target={'host': result.target.host, 'port': result.target.port})
 
 
 def label_print_identity(*, operation, count=None, source=None, target_id=None, copies=None):
@@ -123,14 +122,18 @@ def label_preview_outcome(items):
         return
     safe = []
     for item in items:
-        value = dict(item_index=item.index, status='NOT_ATTEMPTED' if item.not_attempted else item.status)
+        value = {'item_index': item.index, 'status': 'NOT_ATTEMPTED' if item.not_attempted else item.status}
         if item.error_code in ERROR_CODES: value['error_code'] = item.error_code
         if item.failed_stage: value['failed_stage'] = item.failed_stage
         safe.append(value)
     ready = sum(item['status'] == 'PREVIEWED' for item in safe)
-    activity.update(status='PREVIEWED' if ready == len(safe) else 'PARTIAL' if ready else 'FAILED',
-                    summary=dict(total=len(safe), ready=ready, failed=sum(item['status'] == 'FAILED' for item in safe),
-                                 not_attempted=sum(item['status'] == 'NOT_ATTEMPTED' for item in safe)), items=safe)
+    status = 'FAILED'
+    if ready == len(safe):
+        status = 'PREVIEWED'
+    elif ready:
+        status = 'PARTIAL'
+    activity.update(status=status,
+                    summary={'total': len(safe), 'ready': ready, 'failed': sum((item['status'] == 'FAILED' for item in safe)), 'not_attempted': sum((item['status'] == 'NOT_ATTEMPTED' for item in safe))}, items=safe)
     for item in safe:
         stage(item['status'], item_index=item['item_index'], error_code=item.get('error_code'))
 
@@ -139,9 +142,13 @@ def label_delivery_outcome(items):
     activity = current_activity.get()
     if activity is None:
         return
-    safe = [dict(item_index=item['index'], status=item['status']) for item in items]
-    activity.update(status='SUBMITTED' if all(item['status'] == 'SUBMITTED' for item in safe) else
-                    'UNCERTAIN' if any(item['status'] == 'UNCERTAIN' for item in safe) else 'STOPPED',
+    safe = [{'item_index': item['index'], 'status': item['status']} for item in items]
+    status = 'STOPPED'
+    if all(item['status'] == 'SUBMITTED' for item in safe):
+        status = 'SUBMITTED'
+    elif any(item['status'] == 'UNCERTAIN' for item in safe):
+        status = 'UNCERTAIN'
+    activity.update(status=status,
                     confirmed=False, items=safe)
     for item in safe: stage(item['status'], item_index=item['item_index'])
 

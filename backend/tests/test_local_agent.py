@@ -45,10 +45,13 @@ def test_wire_conversion_and_hash_rejection():
 def test_catalog_and_duplicate_jobs_never_probe_or_resend(database):
     calls = []
     agent = Agent(CONFIG, database, transport=lambda *args: calls.append(args))
-    assert agent.catalog()['status'] == 'READY' and not calls
+    assert agent.catalog()['status'] == 'READY'
+    assert not calls
     request = job(2)
     result = agent.job(request)
-    assert result['status'] == 'SUBMITTED' and not result['confirmed'] and len(calls) == 2
+    assert result['status'] == 'SUBMITTED'
+    assert not result['confirmed']
+    assert len(calls) == 2
     assert calls[0][1].startswith(b'\x02\x1bC')
     restarted = Agent(CONFIG, database, transport=lambda *args: pytest.fail('Duplicate submission'))
     with pytest.raises(AgentError) as exc: restarted.job(request)
@@ -66,16 +69,20 @@ def test_partial_failure_stops_remaining_labels(database, before):
             raise OSError('PRIVATE DEVICE DETAIL')
     agent = Agent(CONFIG, database, transport=transport)
     result = agent.job(job(3, 'USB'))
-    assert len(calls) == 2 and calls[0][0]['queue'] == 'Synthetic RAW queue'
+    assert len(calls) == 2
+    assert calls[0][0]['queue'] == 'Synthetic RAW queue'
     assert [i['status'] for i in result['items']] == ['SUBMITTED', 'FAILED_BEFORE_SEND' if before else 'UNCERTAIN', 'NOT_ATTEMPTED']
-    assert result['status'] == 'STOPPED' and 'PRIVATE' not in json.dumps(result)
+    assert result['status'] == 'STOPPED'
+    assert 'PRIVATE' not in json.dumps(result)
 
 
 def test_all_payloads_validated_before_any_send_and_unknown_target_rejected(database):
     agent = Agent(CONFIG, database, transport=lambda *args: pytest.fail('Rejected job printed'))
     request = job(2); request['items'][1]['sha256'] = 'a' * 64
     with pytest.raises(AgentError): agent.job(request)
-    with pytest.raises(AgentError): agent.job(job(target='UNREGISTERED'))
+    prepared_job = job(target='UNREGISTERED')
+    with pytest.raises(AgentError):
+        agent.job(prepared_job)
 
 
 def test_running_job_is_uncertain_after_restart(database):
@@ -102,10 +109,13 @@ def test_http_auth_origin_preflight_and_delivery(database):
         assert request('OPTIONS', '/v1/jobs')[0] == 204
         assert request('GET', '/v1/status', token='WRONG')[0] == 403
         assert request('GET', '/v1/status', origin='http://untrusted.invalid')[0] == 403
-        assert request('GET', '/v1/status')[0] == 200 and not calls
+        assert request('GET', '/v1/status')[0] == 200
+        assert not calls
         value = job()
-        assert request('POST', '/v1/jobs', value)[0] == 200 and len(calls) == 1
-        assert request('POST', '/v1/jobs', value)[0] == 409 and len(calls) == 1
+        assert request('POST', '/v1/jobs', value)[0] == 200
+        assert len(calls) == 1
+        assert request('POST', '/v1/jobs', value)[0] == 409
+        assert len(calls) == 1
         assert request('GET', '/v1/jobs/' + value['job_id'])[0] == 200
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=3)

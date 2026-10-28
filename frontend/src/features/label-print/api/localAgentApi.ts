@@ -34,7 +34,7 @@ export async function printPackage(artifacts: string[], copies: number, printer:
   if (body?.language !== 'IPL' || body.copies !== copies || !Array.isArray(body.items) || body.items.length !== artifacts.length) throw new Error('Invalid print package.');
   for (const item of body.items) {
     if (typeof item.payload_base64 !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(item.payload_base64) || !/^[a-f0-9]{64}$/.test(item.sha256)) throw new Error('Invalid print package.');
-    const data = Uint8Array.from(atob(item.payload_base64), char => char.charCodeAt(0));
+    const data = Uint8Array.from(atob(item.payload_base64), char => char.codePointAt(0)!);
     const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', data)), byte => byte.toString(16).padStart(2, '0')).join('');
     if (hash !== item.sha256) throw new Error('Invalid print package.');
   }

@@ -1,6 +1,8 @@
 import { useTranslation } from '../../../shared/i18n';
 import type { PreviewStage, PreviewStep } from '../api/batchPreviewApi';
 
+const stepStatuses: Record<string, string> = { PASSED: 'Succeeded', FAILED: 'Failed' };
+
 const names: Record<PreviewStage, string> = {
   FETCH_DATA: 'Retrieve data', VALIDATE_DATA: 'Validate label data', RESOLVE_LAYOUT: 'Find saved layout',
   BIND_TEMPLATE: 'Bind data to template', RASTERIZE: 'Render bitmap', ENCODE_IPL: 'Encode IPL',
@@ -22,11 +24,14 @@ const reasons: Record<string, [string, string]> = {
   management_conflict: ['Configuration changed during this request. These results cannot be used.', 'Reload the configured RFC operations before making another request.'],
 };
 
-export function PreviewFailure({ batch, code, error, failedStage, notAttempted }: { batch: string; code?: string; error: string; failedStage?: PreviewStage | null; notAttempted?: boolean }) {
+export function PreviewFailure({ batch, code, error, failedStage, notAttempted }: Readonly<{ batch: string; code?: string; error: string; failedStage?: PreviewStage | null; notAttempted?: boolean }>) {
   const t = useTranslation();
   const [reason, action] = reasons[error] ?? ['Label preparation failed at the stage shown below.', 'Check the error code and the configuration for this stage.'];
+  let heading = 'Failed';
+  if (failedStage) heading = 'Failed at: {stage}';
+  if (notAttempted) heading = 'Not attempted';
   return <div className="label-print-failure" role="alert">
-    <strong>{t('Batch {batch}', { batch })} — {t(notAttempted ? 'Not attempted' : failedStage ? 'Failed at: {stage}' : 'Failed', { stage: failedStage ? t(names[failedStage]) : '' })}</strong>
+    <strong>{t('Batch {batch}', { batch })} — {t(heading, { stage: failedStage ? t(names[failedStage]) : '' })}</strong>
     <p>{t(reason, { code: code ?? '?' })}</p>
     <details className="label-print-failure-detail"><summary>{t('Details')}</summary>
       {notAttempted && <p>{t('This batch was not processed because an earlier batch stopped further requests.')}</p>}
@@ -35,12 +40,12 @@ export function PreviewFailure({ batch, code, error, failedStage, notAttempted }
   </div>;
 }
 
-export function PreviewSteps({ steps, initiallyOpen = false }: { steps?: PreviewStep[]; failed: boolean; initiallyOpen?: boolean }) {
+export function PreviewSteps({ steps, initiallyOpen = false }: Readonly<{ steps?: PreviewStep[]; initiallyOpen?: boolean }>) {
   const t = useTranslation();
   return <details className="label-print-progress" open={initiallyOpen}>
     <summary>{t('Processing steps')}</summary>
     {!steps?.length ? <p>{t('Stage information is unavailable for this response.')}</p> : <ol>{steps.map(step => <li key={step.stage} data-stage={step.stage} data-status={step.status}>
-      <span>{t(names[step.stage])}</span><strong>{t(step.status === 'PASSED' ? 'Succeeded' : step.status === 'FAILED' ? 'Failed' : 'Not run')}</strong>
+      <span>{t(names[step.stage])}</span><strong>{t(stepStatuses[step.status] ?? 'Not run')}</strong>
     </li>)}</ol>}
   </details>;
 }

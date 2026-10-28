@@ -30,6 +30,35 @@ def _pairs(pairs):
             raise LabelDataError()
         result[key] = value
     return result
+def _reject_constant(_value):
+    raise LabelDataError("malformed_json")
+
+
+def _quoted_state(char, escaped):
+    if escaped:
+        return False, True
+    if char == "\\":
+        return True, True
+    return False, char != '"'
+
+
+def _json_depth(raw):
+    depth = 0
+    quoted = escaped = False
+    for char in raw:
+        if quoted:
+            escaped, quoted = _quoted_state(char, escaped)
+            continue
+        if char == '"':
+            quoted = True
+        elif char in "[{":
+            depth += 1
+            if depth > 32:
+                raise LabelDataError("malformed_json")
+        elif char in "]}":
+            depth -= 1
+
+
 def decode_json(body: bytes, *, limit=MAX_BYTES):
     if len(body) > limit:
         raise LabelDataError("request_too_large")
@@ -37,28 +66,11 @@ def decode_json(body: bytes, *, limit=MAX_BYTES):
         raw = body.decode("utf-8", errors="strict")
         if raw.startswith("\ufeff"):
             raise LabelDataError("malformed_json")
-        depth=0
-        quoted=False
-        escaped=False
-        for char in raw:
-            if quoted:
-                if escaped:
-                    escaped=False
-                elif char == "\\":
-                    escaped=True
-                elif char == '"':
-                    quoted=False
-            elif char == '"':
-                quoted=True
-            elif char in "[{":
-                depth += 1
-                if depth > 32:
-                    raise LabelDataError("malformed_json")
-            elif char in "]}":
-                depth -= 1
-        return json.loads(raw, object_pairs_hook=_pairs, parse_constant=lambda _: (_ for _ in ()).throw(LabelDataError("malformed_json")))
+        _json_depth(raw)
+        return json.loads(raw, object_pairs_hook=_pairs, parse_constant=_reject_constant)
     except (UnicodeError, json.JSONDecodeError, RecursionError):
         raise LabelDataError("malformed_json") from None
+
 def shape(value, required, optional=()):
     if type(value) is not dict or not required <= set(value) or set(value) - required - set(optional):
         raise LabelDataError()
@@ -66,25 +78,34 @@ def identity(value, pattern=IDENTITY):
     text(value,128,128)
     if not pattern.fullmatch(value):
         raise LabelDataError()
+def _number(entry):
+    try:
+        number = float(entry)
+    except (OverflowError, ValueError):
+        raise LabelDataError() from None
+    if not math.isfinite(number) or number.is_integer() and abs(number) > MAX_SAFE_INTEGER:
+        raise LabelDataError()
+
+
+def _field_value(entry, descriptions):
+    if descriptions:
+        text(entry, 256, 1024)
+    elif type(entry) is str:
+        text(entry)
+    elif type(entry) in (int, float):
+        _number(entry)
+    elif entry is not None and type(entry) is not bool:
+        raise LabelDataError()
+
+
 def fields(value, descriptions=False):
-    if type(value) is not dict or len(value)>200:
+    if type(value) is not dict or len(value) > 200:
         raise LabelDataError()
     for key, entry in value.items():
         if type(key) is not str or not KEY.fullmatch(key) or key in FORBIDDEN:
             raise LabelDataError()
-        if descriptions:
-            text(entry,256,1024)
-        elif type(entry) is str:
-            text(entry)
-        elif type(entry) in (int,float):
-            try:
-                number=float(entry)
-            except (OverflowError,ValueError):
-                raise LabelDataError() from None
-            if not math.isfinite(number) or number.is_integer() and abs(number)>MAX_SAFE_INTEGER:
-                raise LabelDataError()
-        elif entry is not None and type(entry) is not bool:
-            raise LabelDataError()
+        _field_value(entry, descriptions)
+
 def validate_payload(payload):
     shape(payload,{"sender","request_id","mode","items"},{"field_descriptions","target_id"})
     shape(payload["sender"],{"system"})

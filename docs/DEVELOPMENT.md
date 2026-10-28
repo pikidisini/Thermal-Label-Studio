@@ -232,10 +232,19 @@ For measured quality evidence, install the pinned requirements and frontend
 lockfile dependencies, then run `python -B scripts/check_coverage.py`. It adds
 backend branch coverage and combines unit/browser frontend coverage using a
 fresh sourcemapped build. Its unique `.tmp/coverage-*` directory contains the
-logs, portable XML/LCOV and passing source/report fingerprint. Feed that
+per-stage logs. `--timeout <seconds>` sets a 1..3600-second per-stage limit
+(default 1800); a timed-out stage is recorded as BLOCKED, never PASS.
+The same directory contains portable XML/LCOV and a passing source/report fingerprint. Feed that
 directory to `scripts/sonar_scan.ps1 -CoverageDirectory <absolute-directory>`.
 The scanner rejects stale or modified reports. Regular production builds do
 not emit sourcemaps. This local scan is separate from a Jenkins execution.
+
+`sonar_scan.ps1 -TokenFile tools/sonarqube/.env.scan -CoverageDirectory
+<absolute-directory>` reads one private `SONAR_TOKEN=...` entry if the process
+environment has no analysis token. Token contents are never command arguments
+or report fields; the previous process environment is restored after scanning.
+Do not use the read-only MCP credential as a scanner token or rerun account
+bootstrap to recover a missing analysis credential.
 
 Real raster regressions need an installed native renderer and matching font;
 these platform binaries are not part of the source export. Windows source
@@ -588,3 +597,15 @@ Activity Log lists Label Print as source and offers preview/status mode filters.
 Recording remains completion-time and best-effort: a running/hung request is
 not yet a persisted row; this is not a live job monitor or durable request queue.
 Past unrecorded requests cannot be reconstructed from these new records.
+
+## Queue source checks (2026-10-22)
+
+Run `backend/tests/test_intake_queue.py` and `backend/tests/test_queue_operations.py`
+with the normal source-test environment and project-local disposable output. Their
+SQLite adapter exercises transaction/fault behavior and is not PostgreSQL evidence.
+Run the full source gate and `frontend/tests/browser/ui/sap_requests.spec.js` using
+the existing UI project/installed browser; all API calls are mocked in that spec.
+No script here starts a server or operational container. Windows cannot satisfy
+the worker Linux/cgroup acceptance gate. Production startup uses
+`TLS_STORAGE_INITIALIZE=false`; exercise migrations/provisioning only on approved
+named targets. [Operations and rollout](PRODUCTION_QUEUE.md).

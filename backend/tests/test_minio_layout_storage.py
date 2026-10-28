@@ -309,7 +309,7 @@ def test_simulation_uses_stored_layout_shared_renderer_with_fake_process(objects
 
     def fake_raster(command, **kwargs):
         calls.append(command)
-        assert Path(command[0]).name == "resvg.exe"
+        assert Path(command[0]).name in {"resvg", "resvg.exe"}
         assert b"BATCH1" in kwargs["input"] and b"MATERIAL1" in kwargs["input"]
         assert b"data-fact" not in kwargs["input"]
         return subprocess.CompletedProcess(command, 0, image_bytes.getvalue(), b"")

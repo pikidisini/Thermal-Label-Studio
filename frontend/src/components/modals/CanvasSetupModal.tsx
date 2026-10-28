@@ -6,7 +6,7 @@ import { CustomDimensionForm } from './canvas-setup/CustomDimensionForm';
 import { MatrixGeometryHud } from './canvas-setup/MatrixGeometryHud';
 import { useTemplateStore } from '../../store/useTemplateStore';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { Icon, Badge, Button, Dialog, DialogBody, DialogFooter, DialogHeader, Field, IconButton } from '../../shared/ui';
+import { Icon, Badge, Button, Dialog, DialogFooter, DialogHeader, Field, IconButton } from '../../shared/ui';
 
 interface CanvasSetupModalProps {
   isOpen: boolean;

@@ -10,6 +10,7 @@ const StudioPage = lazy(async () => {
   return { default: studio.Studio };
 });
 const HomePage = lazy(() => import('../features/home').then(module => ({ default: module.HomePage })));
+const SapRequestsPage = lazy(() => import('../features/sap-requests/SapRequestsPage'));
 const LabelPrintPage = lazy(() => import('../features/label-print').then(module => ({ default: module.LabelPrintPage })));
 const DesignerManagementPage = lazy(() => import('../features/management/ui/DesignerManagementPage').then(module => ({ default: module.DesignerManagementPage })));
 const ManagementPage = lazy(() => import('../features/management').then(module => ({ default: module.ManagementPage })));
@@ -25,6 +26,7 @@ export function ApplicationRoutes() {
     case '/': return <HomePage />;
     case '/studio': return <StudioPage />;
     case '/print': return <LabelPrintPage />;
+    case '/sap-requests': return <SapRequestsPage />;
     case '/management': return currentAccount()?.role === 'Designer' ? <DesignerManagementPage /> : <ManagementPage />;
     case '/fixture-simulation': return <FixtureSimulationPage />;
     default: return <NotFoundPage />;

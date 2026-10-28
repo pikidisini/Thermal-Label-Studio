@@ -1,5 +1,5 @@
 import { mockAccountSession } from '../helpers/studio.js';
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/coverage.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { mockBuiltApplication, openStudio } from '../helpers/studio.js';
@@ -28,10 +28,11 @@ for (const language of ['en', 'id']) test(`authenticated home navigation and pri
   });
   await page.goto('/');
   await expect(page.getByRole('heading', { name: language === 'id' ? 'Pilih aktivitas Anda' : 'Choose your activity' })).toBeVisible();
-  await expect(page.locator('.home-card')).toHaveCount(3);
+  await expect(page.locator('.home-card')).toHaveCount(4);
+  await expect(page.locator('a[href="/sap-requests"]')).toBeVisible();
   await expect(page.locator('a[href="/management"]')).toBeVisible();
   await expect(page.locator('a[href="/print"] [data-ui-badge]')).toHaveCount(0);
-  await expect(page.locator('.home-card-icon svg')).toHaveCount(3);
+  await expect(page.locator('.home-card-icon svg')).toHaveCount(4);
   await expect(page.locator('.home-card-icon svg').first()).toHaveAttribute('data-ui-glyph', 'true');
   await page.getByTestId('topbar-menu-btn-view').click();
   await page.getByTestId('preferences-button').click();
@@ -50,7 +51,7 @@ for (const language of ['en', 'id']) test(`authenticated home navigation and pri
   expect(apiRequests.every(url => url.endsWith('/label-print/printers'))).toBe(true);
   expect(modules.some(url => /\/App\.(tsx|jsx)|\/App-[^/]+\.js|vendor-fabric/.test(url))).toBe(false);
   await page.locator('a[href="/"]').click();
-  await expect(page.locator('.home-card')).toHaveCount(3);
+  await expect(page.locator('.home-card')).toHaveCount(4);
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

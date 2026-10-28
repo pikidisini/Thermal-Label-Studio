@@ -1,3 +1,4 @@
+import { sourceKeyLabel } from './StoredKey';
 import { useEffect, useState } from 'react';
 import { KeyRound, Plus } from 'lucide-react';
 import { Badge, Button, Field, Icon, Input, Select } from '../../../shared/ui';
@@ -6,12 +7,12 @@ import type { ManagementController } from '../hooks/useManagement';
 import { ManagementEditor } from '../ui/ManagementEditor';
 import { IssuedKey } from './IssuedKey';
 
-export function AddSourceButton({ management }: { management: ManagementController }) {
+export function AddSourceButton({ management }: Readonly<{ management: ManagementController }>) {
   const t = useTranslation();
   return <Button tone="primary" disabled={!management.writable} onClick={() => management.open({ kind: 'source', existing: false, value: { identity: '', key_status: 'missing', enabled: false, modes: ['simulation'], print_target_id: null, print_max_copies: 1 } })}><Icon component={Plus} /> {t('Add source')}</Button>;
 }
 
-export function IntegrationsSection({ management }: { management: ManagementController }) {
+export function IntegrationsSection({ management }: Readonly<{ management: ManagementController }>) {
   const t = useTranslation();
   const { policy, matches, saving, open, editor, setEditor, setIssuedKey } = management;
   const [configuration, setConfiguration] = useState('all');
@@ -39,7 +40,7 @@ export function IntegrationsSection({ management }: { management: ManagementCont
           {sources.map(source => <Button key={source.identity} className="management-source-row" data-testid={`integration-source-${source.identity}`} data-source-selected={selected === source.identity} aria-pressed={selected === source.identity} aria-label={`${t('Details')} · ${source.identity}`} disabled={saving} onClick={() => open({ kind: 'source', existing: true, value: { ...source, modes: [...source.modes] } })}>
             <span className="management-source-line"><strong>{source.identity}</strong><Badge>{t(source.enabled ? 'Enabled' : 'Disabled')}</Badge></span>
             <span className="management-source-line"><span className="management-source-modes">{source.modes.map(value => <Badge key={value}>{t(value === 'print' ? 'Print' : 'Simulation')}</Badge>)}{!source.modes.length && <Badge>{t('No modes')}</Badge>}</span>
-            <span className="management-source-status"><Icon component={KeyRound} /><span>{t(source.key_status === 'active' ? 'Active key' : source.key_status === 'revoked' ? 'Key revoked' : source.key_status === 'legacy' ? 'Previous server key' : 'No access key')}</span></span></span>
+            <span className="management-source-status"><Icon component={KeyRound} /><span>{t(sourceKeyLabel(source.key_status))}</span></span></span>
           </Button>)}
           {!sources.length && <p className="management-muted">{t('No sources match these filters.')}</p>}
         </div>

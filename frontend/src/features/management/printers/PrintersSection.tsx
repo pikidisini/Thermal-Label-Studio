@@ -5,12 +5,12 @@ import { useTranslation } from '../../../shared/i18n';
 import type { ManagementController } from '../hooks/useManagement';
 import { ManagementEditor } from '../ui/ManagementEditor';
 
-export function AddPrinterButton({ management }: { management: ManagementController }) {
+export function AddPrinterButton({ management }: Readonly<{ management: ManagementController }>) {
   const t = useTranslation();
   return <Button tone="primary" disabled={!management.writable} onClick={() => management.open({ kind: 'printer', existing: false, value: { target_id: '', host: '', port: 9100, enabled: false } })}><Icon component={Plus} /> {t('Add printer')}</Button>;
 }
 
-export function PrintersSection({ management }: { management: ManagementController }) {
+export function PrintersSection({ management }: Readonly<{ management: ManagementController }>) {
   const t = useTranslation();
   const [configuration, setConfiguration] = useState('all');
   const { policy, matches, saving, editor, setEditor, open } = management;

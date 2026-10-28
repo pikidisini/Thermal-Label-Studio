@@ -13,8 +13,15 @@ def test_shared_cases(case):
         model=LabelDataRequest.model_validate(payload)
         assert type(model.items[0].copies) is int
         validate_payload(model.model_dump())
+    elif any(0xd800 <= ord(character) <= 0xdfff for character in case['raw']):
+        # Exercise admission of the parsed scalar rather than failing in UTF-8 encoding.
+        payload = json.loads(case['raw'])
+        with pytest.raises(ValueError):
+            validate_payload(payload)
     else:
-        with pytest.raises(ValueError): admit_json(case['raw'].encode())
+        prepared_encode = case['raw'].encode()
+        with pytest.raises(ValueError):
+            admit_json(prepared_encode)
 
 @pytest.mark.parametrize('body',[b'\xff',b'\xef\xbb\xbf{}',b'x'*(2*1024*1024+1)],ids=['invalid_utf8','bom','oversize'])
 def test_raw_bounds(body):

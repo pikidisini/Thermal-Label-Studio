@@ -27,7 +27,7 @@ def decode_spec(value):
         if type(spec) is not dict or type(spec.get('version')) not in (int, float) or spec['version'] != 1:
             reject()
         return spec
-    except (ValueError, UnicodeError):
+    except ValueError:
         reject()
 
 def composition(value):
@@ -90,6 +90,34 @@ def layout_spec(value):
         reject()
     return TextLayout(width, height, *vectors, *origins, spacing)
 
+def _qr_options(options):
+    if set(options) != {'ecc', 'margin', 'size', 'encoding', 'segmentation', 'qr_version', 'mask'}:
+        reject()
+    if options['ecc'] not in ('L', 'M', 'Q', 'H') or options['encoding'] != 'utf8' or options['segmentation'] not in ('auto', 'byte'):
+        reject('unsupported_feature')
+    for name, maximum in (('qr_version', 40), ('mask', 7)):
+        v = options[name]
+        if v != 'auto' and (type(v) not in (int, float) or not float(v).is_integer() or (not (1 if name == 'qr_version' else 0) <= v <= maximum)):
+            reject()
+    if options['margin'] != 1 or type(options['margin']) not in (int, float):
+        reject('unsupported_feature')
+    if type(options['size']) not in (int, float) or not 0 < options['size'] <= 4096:
+        reject()
+
+
+def _barcode_options(kind, options):
+    if set(options) != {'module_width', 'bar_height', 'margin', 'display_value', 'font_size', 'checksum'}:
+        reject()
+    for name in ('module_width', 'bar_height', 'font_size'):
+        if type(options[name]) not in (int, float) or not 0 < options[name] <= 4096:
+            reject()
+    if options['margin'] != 2 or type(options['margin']) not in (int, float) or options['display_value'] is not False or (options['font_size'] != 12):
+        reject('unsupported_feature')
+    expected = {'ean13': 'verified', 'code39': False}.get(kind, 'native')
+    if options['checksum'] != expected or (kind == 'code39' and type(options['checksum']) is not bool):
+        reject()
+
+
 def symbol_spec(value):
     spec = decode_spec(value)
     if set(spec) != {'version', 'type', 'options'} or type(spec['options']) is not dict:
@@ -97,29 +125,9 @@ def symbol_spec(value):
     kind = spec['type']
     options = spec['options']
     if kind == 'qrcode':
-        if set(options) != {'ecc', 'margin', 'size', 'encoding', 'segmentation', 'qr_version', 'mask'}:
-            reject()
-        if options['ecc'] not in ('L', 'M', 'Q', 'H') or options['encoding'] != 'utf8' or options['segmentation'] not in ('auto', 'byte'):
-            reject('unsupported_feature')
-        for name, maximum in (('qr_version', 40), ('mask', 7)):
-            v = options[name]
-            if v != 'auto' and (type(v) not in (int, float) or not float(v).is_integer() or not (1 if name == 'qr_version' else 0) <= v <= maximum):
-                reject()
-        if options['margin'] != 1 or type(options['margin']) not in (int, float):
-            reject('unsupported_feature')
-        if type(options['size']) not in (int, float) or not 0 < options['size'] <= 4096:
-            reject()
+        _qr_options(options)
     elif kind in ('code128', 'code39', 'ean13'):
-        if set(options) != {'module_width', 'bar_height', 'margin', 'display_value', 'font_size', 'checksum'}:
-            reject()
-        for name in ('module_width', 'bar_height', 'font_size'):
-            if type(options[name]) not in (int, float) or not 0 < options[name] <= 4096:
-                reject()
-        if options['margin'] != 2 or type(options['margin']) not in (int, float) or options['display_value'] is not False or options['font_size'] != 12:
-            reject('unsupported_feature')
-        expected = 'verified' if kind == 'ean13' else False if kind == 'code39' else 'native'
-        if options['checksum'] != expected or kind == 'code39' and type(options['checksum']) is not bool:
-            reject()
+        _barcode_options(kind, options)
     else:
         reject('unsupported_feature')
-    return kind, tuple(options.items())
+    return (kind, tuple(options.items()))

@@ -40,13 +40,7 @@ def ensure_unique(document, identity, digest):
             raise ManagementError('access_key_duplicate', 422)
 
 
-def change_key(document, identity, action, raw_key=None):
-    sources = list(document.policy.sources)
-    position = next((i for i, item in enumerate(sources) if item.identity == identity), None)
-    if position is None or sources[position].deleted:
-        raise ManagementError('source_not_found', 404)
-    source = sources[position]
-    current = credential_digest(source)
+def validate_key_action(source, current, action):
     if action == 'create' and current is not None:
         raise ManagementError('access_key_exists', 422)
     if action == 'rotate' and current is None:
@@ -55,11 +49,9 @@ def change_key(document, identity, action, raw_key=None):
         raise ManagementError('access_key_required', 422)
     if action == 'migrate' and (source.access_key is not None or current is None):
         raise ManagementError('legacy_key_unavailable', 422)
-    now = datetime.now(timezone.utc)
-    digest = (current if action == 'migrate' else
-              hashlib.sha256(raw_key.encode('ascii')).digest() if action != 'revoke' else None)
-    if digest is not None:
-        ensure_unique(document, identity, digest)
+
+
+def replacement_key(source, identity, action, raw_key, current, digest, now):
     previous = source.access_key
     key_id = previous.key_id if action == 'revoke' and previous else 'K_' + uuid4().hex
     if action == 'migrate':
@@ -73,6 +65,26 @@ def change_key(document, identity, action, raw_key=None):
                     ciphertext=encrypted,
                     created_at=previous.created_at if action == 'revoke' and previous else now,
                     updated_at=now)
+    return key
+
+
+def change_key(document, identity, action, raw_key=None):
+    sources = list(document.policy.sources)
+    position = next((i for i, item in enumerate(sources) if item.identity == identity), None)
+    if position is None or sources[position].deleted:
+        raise ManagementError('source_not_found', 404)
+    source = sources[position]
+    current = credential_digest(source)
+    validate_key_action(source, current, action)
+    now = datetime.now(timezone.utc)
+    digest = None
+    if action == 'migrate':
+        digest = current
+    elif action != 'revoke':
+        digest = hashlib.sha256(raw_key.encode('ascii')).digest()
+    if digest is not None:
+        ensure_unique(document, identity, digest)
+    key = replacement_key(source, identity, action, raw_key, current, digest, now)
     sources[position] = source.model_copy(update={'access_key': key, 'credential_env': None})
     document.policy = document.policy.model_copy(update={'sources': tuple(sources)})
 

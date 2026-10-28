@@ -54,7 +54,9 @@ def test_safety_and_semantics_are_separate_and_references_are_bounded():
     validate_safe_svg(safe_but_unsupported)
     with pytest.raises(TemplateAdmissionError): admit_template(safe_but_unsupported)
     for definitions in ['<clipPath id="A"><rect clip-path="url(#A)" width="1" height="1"/></clipPath>', '<linearGradient id="A" fill="url(#B)"/><linearGradient id="B" fill="url(#A)"/>']:
-        with pytest.raises(TemplateAdmissionError): admit_template(STATIC.replace('<rect','<defs>'+definitions+'</defs><rect',1))
+        prepared_replace = STATIC.replace('<rect', '<defs>' + definitions + '</defs><rect', 1)
+        with pytest.raises(TemplateAdmissionError):
+            admit_template(prepared_replace)
     valid = STATIC.replace('<rect','<defs><linearGradient id="A"><stop offset="0%" stop-color="black"/></linearGradient></defs><rect',1).replace('fill="black"','fill="url(#A)"')
     assert admit_template(valid).required_keys == ()
 
@@ -77,7 +79,9 @@ def test_all_symbol_kinds_options_and_text_metric_conflicts():
         spec['options']['checksum']='invalid'
         bad=re.sub(r'data-symbol-spec="[^"]+"',f'data-symbol-spec="{encoded(spec)}"',svg)
         with pytest.raises(TemplateAdmissionError): admit_template(bad)
-    with pytest.raises(TemplateAdmissionError): admit_template(FIXTURE.replace('font-size="12"','font-size="20"'))
+    prepared_replace_2 = FIXTURE.replace('font-size="12"', 'font-size="20"')
+    with pytest.raises(TemplateAdmissionError):
+        admit_template(prepared_replace_2)
 
 def test_symbol_owner_is_exactly_one_image():
     bad=FIXTURE.replace('<image style=', '<rect width="2" height="2"/><image style=',1)

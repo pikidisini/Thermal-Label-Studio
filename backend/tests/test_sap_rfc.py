@@ -37,7 +37,9 @@ def test_connection_password_encryption_redaction_retention_and_audit(runtime, m
     assert save(client, store, 'sap-connections', {'connection': {**CONNECTION, 'name': 'Renamed'}}).status_code == 200
     assert store.read().sap_rfc.connections[0].password_ciphertext == encrypted
     public = client.get('/api/v1/management/snapshot').text + client.get('/api/v1/management/audit').text
-    assert secret not in public and encrypted not in public and 'password_ciphertext' not in public
+    assert secret not in public
+    assert encrypted not in public
+    assert 'password_ciphertext' not in public
     assert secret not in json.dumps(database.document) + json.dumps(database.events)
     forged = save(client, store, 'sap-connections', {'connection': {**CONNECTION, 'password_ciphertext': encrypted}})
     assert forged.status_code == 422
@@ -51,9 +53,11 @@ def test_configuration_crud_references_revision_sample_and_closed_execution(runt
     assert result.status_code == 200
     assert result.json()['rows'] == [{'Roll Number': '001', 'zero': 0}]
     assert result.json()['parameters'] == {'IV_ROLL': '001'}
-    assert result.json()['evidence'] == 'synthetic' and result.json()['sap_contacted'] is False
+    assert result.json()['evidence'] == 'synthetic'
+    assert result.json()['sap_contacted'] is False
     assert result.headers['cache-control'] == 'no-store'
-    assert len(database.events) == 2 and store.read().policy.revision == revision
+    assert len(database.events) == 2
+    assert store.read().policy.revision == revision
     assert client.get('/api/v1/management/sap-operations').json()['runtime_available'] is False
     assert client.post('/api/v1/management/sap-operations/ROLL/execute', json={'revision': revision}).status_code == 503
     assert client.request('DELETE', '/api/v1/management/sap-connections/DEV', json={'revision': revision}).status_code == 422
@@ -61,7 +65,8 @@ def test_configuration_crud_references_revision_sample_and_closed_execution(runt
     assert client.post('/api/v1/management/sap-operations/ROLL/sample', json={'revision': 'P1', 'values': {}, 'response': {}}).status_code == 409
     assert client.request('DELETE', '/api/v1/management/sap-operations/ROLL', json={'revision': revision}).status_code == 200
     assert client.request('DELETE', '/api/v1/management/sap-connections/DEV', json={'revision': store.read().policy.revision}).status_code == 200
-    assert store.read().sap_rfc.connections == [] and store.read().sap_rfc.operations == []
+    assert store.read().sap_rfc.connections == []
+    assert store.read().sap_rfc.operations == []
 
 
 @pytest.mark.parametrize('failure', ['audit', 'commit'])
@@ -70,7 +75,9 @@ def test_configuration_save_rollback(runtime, failure):
     before = json.dumps(database.document)
     database.fail = failure
     response = client.put('/api/v1/management/sap-connections', json={'revision': 'P1', 'connection': CONNECTION})
-    assert response.status_code == 503 and json.dumps(database.document) == before and database.events == []
+    assert response.status_code == 503
+    assert json.dumps(database.document) == before
+    assert database.events == []
 
 
 @pytest.mark.parametrize('kind,value,expected', [('integer', '0', 0), ('decimal', '0.10', '0.10'), ('boolean', False, ''), ('date', '2024-02-29', '20240229'), ('string_list', '001\n002', ['001', '002'])])
@@ -87,7 +94,9 @@ def test_invalid_input_types_fail_closed(kind, value):
 
 @pytest.mark.parametrize('response', [{}, {'ET_DATA': []}, {'ET_DATA': [{'ROLL': None}]}, {'ET_DATA': [{'ROLL': ''}]}, {'ET_DATA': [{'ROLL': {}}]}, {'ET_DATA': [{'ROLL': float('nan')}]}])
 def test_missing_null_empty_and_invalid_responses_fail_closed(response):
-    with pytest.raises(ContractError): map_response(Operation(**OPERATION), response)
+    prepared_Operation = Operation(**OPERATION)
+    with pytest.raises(ContractError):
+        map_response(prepared_Operation, response)
 
 
 def test_duplicate_fields_unknown_inputs_and_non_executable_paths():
@@ -131,7 +140,9 @@ def test_verified_rfc_shape_uses_label_code_and_all_data_without_mapping():
 ])
 def test_label_json_failures_never_become_successful_label_data(response):
     from app.sap_rfc.contract import process_response
-    with pytest.raises(ContractError): process_response(label_json_operation(), response)
+    prepared_label_json_operation = label_json_operation()
+    with pytest.raises(ContractError):
+        process_response(prepared_label_json_operation, response)
 
 
 def test_response_parameters_are_configurable_and_direct_mode_preserves_fields():
@@ -156,8 +167,10 @@ def test_label_json_sample_endpoint_returns_routing_code_and_never_audits_sample
         'response': {'EV_STATUS': 'S', 'EV_MESSAGE': 'data_read', 'EV_JSON': '{"label_code":"DEMO_LABEL","data":{"ZZNOMORROLL":"DEMO-001"}}'}})
     assert response.status_code == 200
     assert response.json()['items'] == [{'label_code': 'DEMO_LABEL', 'data': {'ZZNOMORROLL': 'DEMO-001'}}]
-    assert response.json()['sap_contacted'] is False and response.json()['evidence'] == 'synthetic'
-    assert len(database.events) == events and store.read().policy.revision == revision
+    assert response.json()['sap_contacted'] is False
+    assert response.json()['evidence'] == 'synthetic'
+    assert len(database.events) == events
+    assert store.read().policy.revision == revision
     assert 'DEMO-001' not in json.dumps(database.document) + json.dumps(database.events)
 
 
@@ -174,5 +187,6 @@ def test_sample_errors_distinguish_missing_input_types_status_and_response(runti
     assert save(client, store, 'sap-operations', {'operation': label_json_operation().model_dump(mode='json')}).status_code == 200
     events = len(database.events)
     result = client.post('/api/v1/management/sap-operations/ROLL/sample', json={'revision': store.read().policy.revision, 'values': values, 'response': response})
-    assert result.status_code == 422 and result.json()['detail']['code'] == code
+    assert result.status_code == 422
+    assert result.json()['detail']['code'] == code
     assert len(database.events) == events

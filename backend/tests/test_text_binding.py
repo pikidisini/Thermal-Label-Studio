@@ -14,7 +14,11 @@ from app.svg_safety import SVG_NS
 
 ROOT = Path(__file__).resolve().parents[2]
 CAPTURE = json.loads((ROOT/'tests/contracts/templates/text_binding_fabric.json').read_text(encoding='utf-8'))
-FONT = Path('C:/Windows/Fonts/arial.ttf')
+try:
+    from .conftest import test_font_path
+    FONT = test_font_path()
+except ImportError:
+    FONT = Path('C:/Windows/Fonts/arial.ttf')
 PROFILE = FontProfile(FONT, 'Arial')
 font_matches = FONT.is_file() and hashlib.sha256(FONT.read_bytes()).hexdigest() == CAPTURE['font']['sha256']
 font_matches = font_matches and all(FONT.with_name(name).is_file() and hashlib.sha256(FONT.with_name(name).read_bytes()).hexdigest() == digest for name,digest in CAPTURE['font']['variants'].items())
@@ -85,8 +89,9 @@ def test_required_failures_before_font_renderer_or_transport(data, code, monkeyp
     monkeypatch.setattr(raster, 'render_svg_bitmap', forbidden)
     import socket
     monkeypatch.setattr(socket, 'create_connection', forbidden)
+    prepared_ordinary = ordinary()
     with pytest.raises(BindingError) as failure:
-        bind_text_template(ordinary(), data)
+        bind_text_template(prepared_ordinary, data)
     assert failure.value.code == code
     assert failure.value.stage == 'BINDING'
     assert str(failure.value) == 'Template binding failed.'
@@ -100,7 +105,8 @@ def test_unavailable_text_uses_display_fallback_without_mutating_facts(data, exp
     result = bind_text_template(ordinary(), data, font_profile=PROFILE)
     node = ET.fromstring(result.svg).find(f'{{{SVG_NS}}}text')
     assert ''.join(node.itertext()) == expected
-    assert data == snapshot and not admit_template(result.svg).objects
+    assert data == snapshot
+    assert not admit_template(result.svg).objects
 
 
 def test_composition_fallbacks_are_per_exact_token_and_preserve_spaces():
@@ -133,8 +139,9 @@ def test_numeric_golden_matches_actual_javascript(case):
 @pytest.mark.skipif(not font_matches, reason='Fixed font unavailable')
 @pytest.mark.parametrize('value', ['ไทย', '😀', 'a\u0338', 'one\rtwo'])
 def test_unproven_shaping_and_line_profiles_reject(value):
+    prepared_ordinary_2 = ordinary()
     with pytest.raises(BindingError) as failure:
-        bind_text_template(ordinary(), {'KEY':value}, font_profile=PROFILE)
+        bind_text_template(prepared_ordinary_2, {'KEY': value}, font_profile=PROFILE)
     assert failure.value.code == 'unsupported_feature'
 
 
@@ -164,8 +171,9 @@ def test_generated_output_limit_before_safety_renderer(monkeypatch):
     def oversized(node, *args, **kwargs):
         node.text = 'x' * (512*1024)
     monkeypatch.setattr(service, 'bind_text', oversized)
+    prepared_ordinary_3 = ordinary()
     with pytest.raises(BindingError) as failure:
-        bind_text_template(ordinary(), {'KEY':'fresh data'}, font_profile=PROFILE)
+        bind_text_template(prepared_ordinary_3, {'KEY': 'fresh data'}, font_profile=PROFILE)
     assert failure.value.code == 'resource_limit'
 
 

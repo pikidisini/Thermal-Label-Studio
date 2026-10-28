@@ -4,8 +4,22 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.label_data.models import LabelDataItem, LabelDataRequest
 
 
+INTAKE_IDENTITY_PATTERN = '^[A-Za-z0-9][A-Za-z0-9_.:-]*$'
+
+
+def batch_status(completed: int, total: int, *, uncertain: int = 0) -> Literal['COMPLETED', 'PARTIAL', 'FAILED', 'UNCERTAIN']:
+    """Shared terminal status calculation for outcomes and their validators."""
+    if uncertain:
+        return 'UNCERTAIN'
+    if completed == total:
+        return 'COMPLETED'
+    if completed:
+        return 'PARTIAL'
+    return 'FAILED'
+
+
 class IntakeItem(LabelDataItem):
-    item_id: str = Field(min_length=1, max_length=128, pattern=r'^[A-Za-z0-9][A-Za-z0-9_.:-]*$')
+    item_id: str = Field(min_length=1, max_length=128, pattern=INTAKE_IDENTITY_PATTERN)
     label_code: str = Field(min_length=1, max_length=128, pattern=r'^[A-Za-z0-9][A-Za-z0-9_-]*$')
     copies: int = Field(ge=1, le=999)
     data: dict[str, str | int | float | bool | None] = Field(json_schema_extra={'maxProperties': 200})
@@ -15,11 +29,11 @@ class IntakeRequest(LabelDataRequest):
     """Canonical external envelope; sender.system is an assertion, not a credential."""
     sender: dict[str, str] = Field(json_schema_extra={
         'properties': {'system': {'type': 'string', 'minLength': 1, 'maxLength': 128,
-            'pattern': r'^[A-Za-z0-9][A-Za-z0-9_.:-]*$'}},
+            'pattern': INTAKE_IDENTITY_PATTERN}},
         'required': ['system'], 'additionalProperties': False})
-    request_id: str = Field(min_length=1, max_length=128, pattern=r'^[A-Za-z0-9][A-Za-z0-9_.:-]*$')
+    request_id: str = Field(min_length=1, max_length=128, pattern=INTAKE_IDENTITY_PATTERN)
     items: list[IntakeItem] = Field(min_length=1, max_length=100)
-    target_id: str = Field(min_length=1, max_length=128, pattern=r'^[A-Za-z0-9][A-Za-z0-9_.:-]*$')
+    target_id: str = Field(min_length=1, max_length=128, pattern=INTAKE_IDENTITY_PATTERN)
 
 
 MESSAGES = {
@@ -157,7 +171,7 @@ class IntakeResponse(PublicModel):
             if (item.status == 'SIMULATED') != (item.error is None):
                 raise ValueError('Invalid result error.')
         counts = {state: sum(item.status == state for item in self.results) for state in ('SIMULATED','FAILED','SKIPPED')}
-        expected = 'COMPLETED' if counts['SIMULATED'] == len(self.results) else 'PARTIAL' if counts['SIMULATED'] else 'FAILED'
+        expected = batch_status(counts['SIMULATED'], len(self.results))
         if (self.status != expected or self.summary.total != len(self.results)
                 or (self.summary.simulated,self.summary.failed,self.summary.skipped) !=
                 (counts['SIMULATED'],counts['FAILED'],counts['SKIPPED'])):

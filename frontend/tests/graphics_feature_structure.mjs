@@ -209,11 +209,11 @@ test('F3.53 right inspector panels use shared UI without changing object control
 test('F3.54 Template Explorer uses a document-body modal portal above chrome', () => {
   const selector = read('features', 'templates', 'ui', 'TemplateSelector.tsx');
   assert.match(selector, /import \{ createPortal \} from 'react-dom'/);
-  assert.match(selector, /createPortal\(<div role="dialog"/);
+  assert.match(selector, /createPortal\(<dialog open aria-modal="true"/);
   assert.match(selector, /document\.body/);
   assert.match(selector, /data-testid="template-explorer-modal-overlay"/);
   assert.match(selector, /z-\[var\(--ui-layer-modal\)\]/);
-  assert.match(selector, /if \(!busy && e\.target === e\.currentTarget\) setOpen\(false\)/);
+  assert.match(selector, /if \(!busy && e\.target === e\.currentTarget\) \{ setOpen\(false\); \}/);
   assert.match(selector, /e\.key === 'Escape'/);
   assert.match(selector, /onSelectTemplate\(selected\.id\)/);
 });

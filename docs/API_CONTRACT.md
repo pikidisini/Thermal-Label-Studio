@@ -852,3 +852,25 @@ request ID silently, mutate ledger entries, or resend an uncertain transaction.
 A new target-bearing transaction is distinct from historical targetless requests.
 The generic Studio dataset format still accepts targetless data; this mandatory
 field belongs to the external intake contract, not editor preview or RFC data.
+
+## Asynchronous intake API v2 (2026-10-22)
+
+POST `/api/v2/label-intake` accepts the existing canonical `IntakeRequest`, including
+mandatory logical `target_id` in both modes. Bearer/source/policy admission remains
+separate from browser sessions. After atomic shared-ledger/encrypted-queue commit,
+HTTP 202 returns `{request_id, trace_id, status: "QUEUED", status_url}` with Location,
+Retry-After: 5 and no-store. Duplicate active requests return the same identity and
+QUEUED/PROCESSING; terminal replay returns HTTP 200 with the existing typed outcome.
+Same identity/different body conflicts; v1/v2 share one identity namespace.
+
+GET `/api/v2/label-intake/{request_id}` requires an active source bearer and exposes
+only that source's jobs. It returns QUEUED/PROCESSING or a retained terminal result,
+404 for another source/unknown request and 410 for expired queued/results. No printer
+transport is constructed by status reads. Queue-full 429, paused/unavailable 503,
+authentication 401 and permission 403 never acknowledge a newly accepted job.
+
+Source `async_only=true` denies synchronous v1 admission and is managed/audited
+through existing source changes. See [queue operations](PRODUCTION_QUEUE.md) for
+encrypted temporary business-data retention, two-worker ownership, resource limits,
+operator APIs `/api/v1/sap-requests`, physical-check/release-hold actions, operational
+checks and the mandatory deployment/SAP/device acceptance gates.

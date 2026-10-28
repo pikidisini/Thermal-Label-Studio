@@ -11,7 +11,8 @@ export function initializePreferences(): () => void {
     const customTheme = parseCustomTheme(preferences.customTheme);
     const theme = resolveTheme(preferences.theme, media?.matches ?? false, customTheme);
     const style = document.documentElement.style;
-    const palette = preferences.theme === 'label-studio-signature' ? SIGNATURE_THEME : preferences.theme === 'custom' ? customTheme : undefined;
+    const customPalette = preferences.theme === 'custom' ? customTheme : undefined;
+    const palette = preferences.theme === 'label-studio-signature' ? SIGNATURE_THEME : customPalette;
     for (const key of COLOR_KEYS) for (const token of COLOR_TOKENS[key]) {
       style.removeProperty(token);
       if (palette) style.setProperty(token, palette.colors[key]);

@@ -24,7 +24,8 @@ def test_package_reuses_preview_bitmap_without_sap_layout_or_raster(client, monk
     client.app.state.studio_dataset_service = Datasets()
     client.app.state.layout_service = SimpleNamespace(get_layout=lambda code: SimpleNamespace(svg=TEMPLATE, width_mm=80, height_mm=60, dpi=203.2, version=1))
     item = client.post('/api/v1/label-print/preview', json={'source': 'dataset', 'dataset_id': '00000000-0000-0000-0000-000000000001', 'encoder': 'IPL', 'batches': ['0010245801']}).json()['items'][0]
-    assert item['print_artifact'] and item['status'] == 'PREVIEWED'
+    assert item['print_artifact']
+    assert item['status'] == 'PREVIEWED'
     def forbidden(*args, **kwargs): raise AssertionError('Package re-fetched/rasterized data')
     monkeypatch.setattr(http, 'execute_operation', forbidden)
     monkeypatch.setattr(pipeline, 'render_svg_bitmap', forbidden)

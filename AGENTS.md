@@ -17,8 +17,14 @@
   prototype flows stay archived. Fixture entry loading is separate from Studio/
   diagnostics; retained graphics clients do not establish integration readiness.
   Phase task inventories/results are historical, dated evidence. `.archive/`
-  is reference only. The local Jenkins/SonarQube quality gate is installed for
-  curated source validation only; no deployment pipeline is claimed.
+  is reference only. Server CI/CD is defined in tools/jenkins/server and Jenkinsfile;
+  migrate preserved Jenkins/SonarQube state before cutover. The release marker
+  stays absent until exact-commit source, quality and real isolated-storage gates
+  pass. The legacy local source-quality job remains historical, not a deploy job.
+  Controller has no build executor/socket; only trusted reviewed revisions may
+  use the Docker-capable agent. Monitoring must not create auth sessions or write
+  application data. SQL changes block automatic deployment; never restore data
+  or resend printer work as an automatic image rollback.
 - The checkpoint includes local SVG import/export and JSON exploration, editing,
   versioned layouts, Preview, PNG Label Simulation and fixture simulation.
   Graphics supports immutable PNG/JPEG/WebP assets and embedded-copy insertion.
@@ -148,3 +154,11 @@ Label Print status is an explicit /label-print/printer-status IPL ENQ query to
 a revalidated registered target, serialized with LAN Print. Never query on
 selection/startup/Demo, send reset/configuration commands, infer physical print
 completion from status, or replace ambiguous IPL states with a READY claim.
+
+Asynchronous intake v2 is implemented under backend/app/intake_queue with two
+Linux/cgroup-fenced worker containers and encrypted transient queue payloads.
+Read docs/PRODUCTION_QUEUE.md before queue, cutover, recovery or deployment work.
+API v1/v2 must share permanent identity; never reclaim ownership from a heartbeat
+timeout, resend an uncertain item, or bypass physical-address printer ownership.
+Production uses TLS_STORAGE_INITIALIZE=false and additive explicit provisioning.
+All storage/SAP/container/printer gates still require their named-target scope.

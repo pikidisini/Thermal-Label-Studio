@@ -20,7 +20,7 @@ export async function mockBuiltApplication(page) {
   await page.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
   await page.route('https://fonts.gstatic.com/**', route => route.abort());
   await page.route('**/studio', route => route.fulfill({ path: path.join(dist, 'index.html') }));
-  await page.route(/^http:\/\/127\.0\.0\.1:\d+\/(?:login|print|management|fixture-simulation)?(?:\?.*)?$/, route => route.fulfill({ path: path.join(dist, 'index.html') }));
+  await page.route(/^http:\/\/127\.0\.0\.1:\d+\/(?:login|print|management|sap-requests|fixture-simulation)?(?:\?.*)?$/, route => route.fulfill({ path: path.join(dist, 'index.html') }));
   await page.route('**/assets/**', route => {
     const asset = path.resolve(dist, `.${decodeURIComponent(new URL(route.request().url()).pathname)}`);
     if (!asset.startsWith(path.join(dist, 'assets') + path.sep)) return route.abort();

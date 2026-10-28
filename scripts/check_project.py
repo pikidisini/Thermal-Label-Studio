@@ -20,6 +20,12 @@ PENDING_RUNTIME = (
     "resource_shutdown_and_rollback_rehearsal",
 )
 MAX_FAILURE_OUTPUT_CHARS = 12_000
+NATIVE_PARITY_TESTS = (
+    "backend/tests/test_editor_shared_binding.py",
+    "backend/tests/test_intake_print.py",
+    "backend/tests/test_label_intake.py",
+    "backend/tests/test_pipeline_acceptance.py",
+)
 
 
 @dataclass(frozen=True)
@@ -55,8 +61,11 @@ def source_checks(root: Path = ROOT) -> tuple[Check, ...]:
     npm = shutil.which("npm") or "npm"
     node = shutil.which("node") or "node"
     frontend = root / "frontend"
+    pytest = (sys.executable, "-B", "-m", "pytest", "-p", "no:cacheprovider", "-p", "no:tmpdir")
+    non_native_ignores = tuple(f"--ignore={path}" for path in NATIVE_PARITY_TESTS)
     return (
-        Check("backend_regression", (sys.executable, "-B", "-m", "pytest", "-p", "no:cacheprovider", "-p", "no:tmpdir", "backend/tests", "-q"), root),
+        Check("backend_non_native_regression", (*pytest, "backend/tests", *non_native_ignores, "-q"), root),
+        Check("backend_native_parity", (*pytest, *NATIVE_PARITY_TESTS, "-q"), root),
         Check("frontend_typecheck", (node, "node_modules/typescript/bin/tsc", "--noEmit", "-p", "tsconfig.json"), frontend),
         Check("frontend_build", (npm, "run", "build"), frontend),
         # The regression suite intentionally verifies the generated dist

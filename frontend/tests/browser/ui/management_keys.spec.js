@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/coverage.js';
 import { fileURLToPath } from 'node:url';
 import { mockBuiltApplication } from '../helpers/studio.js';
 
@@ -34,7 +34,7 @@ test('integration source filters clear key display and details stack without ove
   await expect(page.getByLabel('Access key value', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Source details', exact: true })).toBeVisible();
   await page.getByTestId('integration-source-PRINT_ONLY').click();
-  await expect(page.getByRole('heading', { name: 'Print permissions', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Permitted printers', exact: true })).toBeVisible();
   await expect(page.getByLabel('Maximum copies', { exact: true })).toHaveValue('3');
   await page.getByLabel('Configuration filter').selectOption('enabled');
   await expect(page.getByText('No sources match these filters.', { exact: true })).toBeVisible();
@@ -65,8 +65,8 @@ async function fixture(page, status = 'legacy') {
   await page.route(/^http:\/\/127\.0\.0\.1:\d+\/management(?:\?.*)?$/, route => route.fulfill({ path: fileURLToPath(new URL('../../../dist/index.html', import.meta.url)) }));
   await page.route('**/health', route => route.fulfill({ json: { status: 'ok' } }));
   await page.route('**/api/v1/layouts', route => route.fulfill({ json: [] }));
-  const source = { identity: 'SAP_DEMO', enabled: true, modes: ['simulation'], key_status: status, access_key: null };
-  const document = { policy: { revision: 'P1', sources: [source], targets: [], audit: [] }, reviews: [] };
+  const source = { identity: 'SAP_DEMO', enabled: true, modes: ['simulation'], allowed_print_target_ids: ['P1'], key_status: status, access_key: null };
+  const document = { policy: { revision: 'P1', sources: [source], targets: [{ target_id: 'P1', enabled: true, host: '192.0.2.1', port: 9100 }], audit: [] }, reviews: [] };
   const requests = [];
   await page.route('**/api/v1/management/**', route => {
     const path = new URL(route.request().url()).pathname;
@@ -144,11 +144,12 @@ test('add source creates its key in one request while Enabled', async ({ page })
   await page.getByRole('button', { name: 'Add source', exact: true }).click();
   await page.getByLabel('Source identity', { exact: true }).fill('NEW_SENDER');
   await page.getByRole('combobox', { name: 'Configuration', exact: true }).selectOption('true');
+  await page.getByRole('checkbox', { name: 'Permit printer P1', exact: true }).check();
   await page.getByRole('button', { name: 'Create source & key', exact: true }).click();
   await expect(page.getByLabel('New access key value', { exact: true })).toHaveValue(key);
   await expect(page.getByTestId('integration-source-NEW_SENDER')).toContainText('Enabled');
   expect(requests).toEqual([{ revision: 'P1', create_key: true, source: {
-    identity: 'NEW_SENDER', enabled: true, modes: ['simulation'], print_target_id: null, print_max_copies: 1,
+    identity: 'NEW_SENDER', enabled: true, async_only: false, modes: ['simulation'], print_target_id: null, allowed_print_target_ids: ['P1'], print_max_copies: 1,
   } }]);
 });
 
@@ -171,8 +172,18 @@ test('revealed key is cleared on pagehide and details close', async ({ page }) =
   await expect(page.getByLabel('Access key value', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Show key', exact: true }).click();
   await expect(page.getByLabel('Access key value', { exact: true })).toHaveValue(key);
-  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+  await page.evaluate(() => {
+    const trigger = document.createElement('button');
+    trigger.id = 'test-restored-page';
+    trigger.textContent = 'Restore test page';
+    trigger.onclick = () => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+    document.body.appendChild(trigger);
+  });
+  await page.locator('#test-restored-page').click();
+  await expect(page.getByRole('heading', { name: 'Application Management', exact: true })).toBeVisible();
   await expect(page.getByLabel('Access key value', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: /^Details(?: \u00b7 .+)?$/ }).click();
+  await page.getByRole('button', { name: 'Access key', exact: true }).click();
   await page.getByRole('button', { name: 'Show key', exact: true }).click();
   await expect(page.getByLabel('Access key value', { exact: true })).toHaveValue(key);
   await page.getByRole('button', { name: 'Close', exact: true }).click();
@@ -204,7 +215,7 @@ test('missing keys permit disabling and creation; source saves never send key me
   await page.getByRole('combobox', { name: 'Configuration', exact: true }).selectOption('false');
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();
   await expect(page.locator('.management-source-row').getByText('Disabled', { exact: true })).toBeVisible();
-  expect(requests[0].source).toEqual({ identity: 'SAP_DEMO', enabled: false, modes: ['simulation'], print_target_id: null, print_max_copies: 1 });
+  expect(requests[0].source).toEqual({ identity: 'SAP_DEMO', enabled: false, async_only: false, modes: ['simulation'], print_target_id: null, allowed_print_target_ids: ['P1'], print_max_copies: 1 });
   await page.getByRole('button', { name: /^Details(?: \u00b7 .+)?$/ }).click();
   await page.getByRole('button', { name: 'Access key', exact: true }).click();
   await page.getByRole('button', { name: 'Create key', exact: true }).click();

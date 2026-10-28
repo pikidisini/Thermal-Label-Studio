@@ -4,13 +4,16 @@ export type Theme = 'dark' | 'light' | 'industrial-dark' | 'industrial-light' | 
 export interface Preferences { language: Language; theme: Theme; customTheme?: CustomTheme }
 export const PREFERENCES_KEY = 'thermal-label-studio.preferences.v1';
 export const DEFAULT_PREFERENCES: Preferences = { language: 'en', theme: 'label-studio-signature' };
+const BUILTIN_THEMES = new Set(['dark', 'light', 'industrial-dark', 'industrial-light', 'system', 'label-studio-signature']);
 export function parsePreferences(raw: string | null): Preferences {
   try {
     const value: unknown = raw ? JSON.parse(raw) : null;
     if (!value || typeof value !== 'object' || Array.isArray(value)) return { ...DEFAULT_PREFERENCES };
     const candidate = value as Record<string, unknown>;
     const customTheme = parseCustomTheme(candidate.customTheme);
-    const theme = candidate.theme === 'custom' && customTheme ? 'custom' : candidate.theme === 'dark' || candidate.theme === 'light' || candidate.theme === 'industrial-dark' || candidate.theme === 'industrial-light' || candidate.theme === 'system' || candidate.theme === 'label-studio-signature' ? candidate.theme : DEFAULT_PREFERENCES.theme;
+    let theme = DEFAULT_PREFERENCES.theme;
+    if (candidate.theme === 'custom' && customTheme) theme = 'custom';
+    else if (typeof candidate.theme === 'string' && BUILTIN_THEMES.has(candidate.theme)) theme = candidate.theme as Theme;
     return { language: candidate.language === 'id' ? 'id' : 'en', theme, ...(customTheme ? { customTheme } : {}) };
   } catch { return { ...DEFAULT_PREFERENCES }; }
 }
@@ -23,7 +26,9 @@ export function savePreferences(value: Preferences): void {
   catch { /* Preferences remain usable in memory when storage is unavailable. */ }
 }
 export function resolveTheme(theme: Theme, systemDark: boolean, customTheme?: CustomTheme): Exclude<Theme, 'system' | 'custom'> {
-  return theme === 'custom' ? (customTheme?.base ?? 'industrial-light') : theme === 'system' ? (systemDark ? 'dark' : 'light') : theme;
+  if (theme === 'custom') return customTheme?.base ?? 'industrial-light';
+  if (theme === 'system') return systemDark ? 'dark' : 'light';
+  return theme;
 }
 
 export function themeColorScheme(theme: Exclude<Theme, "system">): "dark" | "light" {

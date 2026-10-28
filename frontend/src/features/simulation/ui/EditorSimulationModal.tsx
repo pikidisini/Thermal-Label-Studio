@@ -14,7 +14,7 @@ export interface EditorSimulationModalProps {
 
 }
 
-export function EditorSimulationModal({ isOpen, onClose, getSnapshot, widthMm, heightMm, dpi }: EditorSimulationModalProps) {
+export function EditorSimulationModal({ isOpen, onClose, getSnapshot, widthMm, heightMm, dpi }: Readonly<EditorSimulationModalProps>) {
   useTranslation();
   const [encoder, setEncoder] = React.useState<"IPL">("IPL");
   const [loading, setLoading] = React.useState(false);
@@ -55,8 +55,11 @@ export function EditorSimulationModal({ isOpen, onClose, getSnapshot, widthMm, h
   };
 
   if (!isOpen) return null;
+  let actionLabel = 'Run simulation';
+  if (result) actionLabel = 'Render again';
+  if (loading) actionLabel = 'Rendering…';
   return (
-    <div className="fixed inset-0 z-[var(--ui-layer-modal)] flex items-center justify-center p-4" role="presentation" data-ui-backdrop="true">
+    <div className="fixed inset-0 z-[var(--ui-layer-modal)] flex items-center justify-center p-4" data-ui-backdrop="true">
       <Dialog className="w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader className="flex items-center justify-between">
           <div><h2 className="text-base font-semibold">{t("Label Simulation")}</h2><p className="mt-1 text-xs text-on-surface-variant">{t("Render the current Studio canvas through the server renderer.")}</p></div>
@@ -73,7 +76,7 @@ export function EditorSimulationModal({ isOpen, onClose, getSnapshot, widthMm, h
           {error && <ErrorState title={error} />}
           {result && <section className="space-y-3 border border-outline-variant p-4"><p className="text-xs text-on-surface-variant">{t("Request ID:")} <code>{result.requestId}</code> · {result.widthPx} × {result.heightPx} {t("px ·")} {result.dpi} {t("DPI")}</p><img src={editorPreviewUrl(result)} alt={t("Backend bitmap preview of the current Studio canvas")} className="max-h-[55vh] max-w-full bg-white object-contain" /></section>}
         </div>
-        <DialogFooter className="flex items-center justify-end gap-3"><Button onClick={onClose} variant="default">{t("Close")}</Button><Button tone="primary" onClick={() => void preview()} disabled={loading} variant="default">{loading ? t("Rendering…") : result ? t("Render again") : t("Run simulation")}</Button></DialogFooter>
+        <DialogFooter className="flex items-center justify-end gap-3"><Button onClick={onClose} variant="default">{t("Close")}</Button><Button tone="primary" onClick={() => void preview()} disabled={loading} variant="default">{t(actionLabel)}</Button></DialogFooter>
       </Dialog>
     </div>
   );

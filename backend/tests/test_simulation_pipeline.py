@@ -107,8 +107,10 @@ def test_ordered_items_keep_independent_trace_and_failure_context(monkeypatch, f
         "RECEIVED", "RESOLVING_LAYOUT", "BINDING_TEMPLATE", "FAILED"
     ]
     assert [entry.status for entry in results[2].trace] == SUCCESS_STAGES
-    assert results[0].payload and results[2].payload
-    assert results[0].bitmap is not rendered[0] and results[2].bitmap is not rendered[1]
+    assert results[0].payload
+    assert results[2].payload
+    assert results[0].bitmap is not rendered[0]
+    assert results[2].bitmap is not rendered[1]
     assert results[1].bitmap is None
     assert results[1].error.code == "invalid_template_or_facts"
     assert "private" not in repr(results[1])
@@ -202,6 +204,7 @@ def test_simulation_imports_no_transport_or_external_adapter():
 def test_unsupported_action_encoder_cannot_enter_renderer(monkeypatch, fixture_input):
     layout, request = fixture_input
     monkeypatch.setattr(pipeline, "render_label_item", lambda *a, **k: pytest.fail("Unsupported encoder reached raster"))
+    prepared_LayoutRegistry = LayoutRegistry({layout.label_code: layout})
     with pytest.raises(SimulationRequestError) as raised:
-        simulate_label_request(request, LayoutRegistry({layout.label_code: layout}), encoder="ZPL")
+        simulate_label_request(request, prepared_LayoutRegistry, encoder='ZPL')
     assert raised.value.code == "invalid_simulation_request"

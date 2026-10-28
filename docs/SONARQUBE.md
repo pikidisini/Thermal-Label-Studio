@@ -1,5 +1,10 @@
 # Local SonarQube
 
+For server Jenkins/SonarQube migration and automated release, use the current
+[CI server runbook](../tools/jenkins/server/README.md). The root Jenkinsfile now
+defines trusted-Git release CI; the local-snapshot instructions below describe
+the retained local quality setup and its historical evidence.
+
 This repository keeps the local SonarQube configuration in `tools/sonarqube`.
 It is separate from the application Compose stack: it creates a dedicated
 PostgreSQL database and five named volumes for SonarQube. It does not create,
@@ -24,7 +29,7 @@ not an application dependency and not a production deployment.
 
 3. Copy `tools/sonarqube/.env.example` to `tools/sonarqube/.env` and replace
    both placeholders with unique secrets. Keep this file out of source control.
-4. From `web_app`, start only after the preflight passes:
+4. From the application root, start only after the preflight passes:
 
    ```powershell
    docker compose --env-file tools/sonarqube/.env -f tools/sonarqube/compose.yml up -d

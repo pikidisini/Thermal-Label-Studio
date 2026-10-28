@@ -33,10 +33,12 @@ def assert_private(client, store, database, *secrets):
     public = client.get('/api/v1/management/snapshot').text + client.get('/api/v1/management/audit').text
     stored = json.dumps(database.document) + json.dumps(database.events)
     for secret in secrets:
-        assert secret not in public and secret not in stored
+        assert secret not in public
+        assert secret not in stored
         assert hashlib.sha256(secret.encode('ascii')).hexdigest() not in public
     assert 'sha256' not in json.dumps(database.events)
-    assert 'ciphertext' not in public and 'ciphertext' not in json.dumps(database.events)
+    assert 'ciphertext' not in public
+    assert 'ciphertext' not in json.dumps(database.events)
     key = store.read().policy.sources[0].access_key
     if key and key.sha256:
         assert key.sha256 not in repr(store.read())
@@ -53,14 +55,17 @@ def test_create_rotate_reveal_and_revoke(runtime, monkeypatch):
     assert created.headers['cache-control'] == 'no-store'
     source = store.read().policy.sources[0]
     assert source.access_key.sha256 == hashlib.sha256(first.encode('ascii')).hexdigest()
-    assert source.access_key.state == 'active' and source.credential_env is None
+    assert source.access_key.state == 'active'
+    assert source.credential_env is None
     assert authenticate(store.read().policy, 'Bearer ' + first, {}).source.identity == 'SAP_DEMO'
     assert 'sha256' not in created.text
     revision = store.read().policy.revision
     revealed = key_command(client, store, 'reveal')
-    assert revealed.status_code == 200 and revealed.json()['key'] == first
+    assert revealed.status_code == 200
+    assert revealed.json()['key'] == first
     assert revealed.headers['cache-control'] == 'no-store'
-    assert store.read().policy.revision == revision and len(database.events) == 1
+    assert store.read().policy.revision == revision
+    assert len(database.events) == 1
     assert source.access_key.ciphertext not in repr(store.read())
     assert key_command(client, store, 'create').status_code == 422
     assert key_command(client, store, 'rotate', revision='P1').status_code == 409
@@ -71,13 +76,15 @@ def test_create_rotate_reveal_and_revoke(runtime, monkeypatch):
     admission = authenticate(store.read().policy, 'Bearer ' + second, {})
     pin = preflight_print(admission, 'ANY_TEMPLATE', TemplateEvidence(version=1, svg_sha256='a' * 64), 1, 'P_DEMO')
     revoked = key_command(client, store, 'revoke')
-    assert revoked.status_code == 200 and revoked.json()['key'] is None
+    assert revoked.status_code == 200
+    assert revoked.json()['key'] is None
     assert store.read().policy.sources[0].access_key.sha256 is None
     assert store.read().policy.sources[0].access_key.ciphertext is None
     assert key_command(client, store, 'reveal').status_code == 422
     denied(store.read().policy, second, {'TLS_INTAKE_TOKEN_DEMO': second})
+    prepared_read = store.read()
     with pytest.raises(PolicyDenied):
-        revalidate_claim(pin, admission, store.read().policy, {'TLS_INTAKE_TOKEN_DEMO': second})
+        revalidate_claim(pin, admission, prepared_read.policy, {'TLS_INTAKE_TOKEN_DEMO': second})
     assert [item['action'] for item in database.events] == ['source.key.create', 'source.key.rotate', 'source.key.revoke']
     assert_private(client, store, database, first, second)
     third = key_command(client, store, 'create').json()['key']
@@ -92,13 +99,16 @@ def test_migration_preserves_sender_key_and_cannot_restore_revoked_env(runtime, 
     original = authenticate(store.read().policy, 'Bearer ' + TOKEN)
     pin = preflight_print(original, 'A', TemplateEvidence(version=1, svg_sha256='a' * 64), 1, 'P_DEMO')
     migrated = key_command(client, store, 'migrate')
-    assert migrated.status_code == 200 and migrated.json()['key'] is None
+    assert migrated.status_code == 200
+    assert migrated.json()['key'] is None
     assert key_command(client, store, 'reveal').json()['key'] == TOKEN
     assert key_command(client, store, 'migrate').status_code == 422
     monkeypatch.delenv('TLS_INTAKE_TOKEN_DEMO')
     assert authenticate(store.read().policy, 'Bearer ' + TOKEN).source.identity == 'SAP_DEMO'
     # Migration changes revision; an already-prepared send cannot silently continue.
-    with pytest.raises(PolicyDenied): revalidate_claim(pin, original, store.read().policy)
+    prepared_read_2 = store.read()
+    with pytest.raises(PolicyDenied):
+        revalidate_claim(pin, original, prepared_read_2.policy)
     assert_private(client, store, database, TOKEN)
     assert key_command(client, store, 'revoke').status_code == 200
     denied(store.read().policy, TOKEN, {'TLS_INTAKE_TOKEN_DEMO': TOKEN})
@@ -119,7 +129,8 @@ def test_disable_unconfigured_source_and_create_draft_without_environment(runtim
     assert created.status_code == 200
     source['enabled'] = True
     saved = client.put('/api/v1/management/sources', json={'revision': store.read().policy.revision, 'source': source})
-    assert saved.status_code == 200 and 'sha256' not in saved.text
+    assert saved.status_code == 200
+    assert 'sha256' not in saved.text
     # The missing legacy credential on disabled SAP_DEMO does not break NEW_SENDER.
     assert authenticate(store.read().policy, 'Bearer ' + created.json()['key'], {}).source.identity == 'NEW_SENDER'
 
@@ -131,13 +142,15 @@ def test_key_commit_failure_never_discloses_secret_or_retries(runtime, monkeypat
     monkeypatch.setattr('app.management.integrations.http.secrets.token_urlsafe', lambda _: synthetic)
     database.fail = failure
     response = key_command(client, store, 'rotate', revision='P1')
-    assert response.status_code == 503 and synthetic not in response.text
+    assert response.status_code == 503
+    assert synthetic not in response.text
     database.fail = None
     if failure == 'committed_ack_lost':
         assert len(database.events) == 1
         assert authenticate(store.read().policy, 'Bearer ' + synthetic).source.identity == 'SAP_DEMO'
     else:
-        assert database.events == [] and store.read().policy.revision == 'P1'
+        assert database.events == []
+        assert store.read().policy.revision == 'P1'
         denied(store.read().policy, synthetic)
     assert_private(client, store, database, synthetic)
 
@@ -153,7 +166,8 @@ def test_key_endpoint_guard_and_no_client_digest_injection(runtime):
     source = store.read().policy.sources[0].model_dump(mode='json')
     source['access_key'] = {'sha256': 'a' * 64}
     response = client.put('/api/v1/management/sources', json={'revision': 'P1', 'source': source})
-    assert response.status_code == 422 and database.events == []
+    assert response.status_code == 422
+    assert database.events == []
 
 
 def test_all_document_mutations_redact_installed_hash(runtime):
@@ -162,10 +176,12 @@ def test_all_document_mutations_redact_installed_hash(runtime):
     secret = response.json()['key']
     target = store.read().policy.targets[0].model_dump(mode='json')
     response = client.put('/api/v1/management/printers', json={'revision': store.read().policy.revision, 'target': target})
-    assert response.status_code == 200 and 'sha256' not in response.text
+    assert response.status_code == 200
+    assert 'sha256' not in response.text
     source = {'identity': 'SAP_DEMO', 'enabled': True, 'modes': ['simulation']}
     response = client.put('/api/v1/management/sources', json={'revision': store.read().policy.revision, 'source': source})
-    assert response.status_code == 200 and 'sha256' not in response.text
+    assert response.status_code == 200
+    assert 'sha256' not in response.text
     assert authenticate(store.read().policy, 'Bearer ' + secret).source.identity == 'SAP_DEMO'
     assert_private(client, store, database, secret)
 
@@ -182,14 +198,17 @@ def test_managed_key_http_admission_replay_rotation_and_revocation(runtime, prep
     try:
         headers = {'Authorization': 'Bearer ' + first}
         response = client.post('/api/v1/label-intake', json=body, headers=headers)
-        assert response.status_code == 200 and response.json()['results'][0]['status'] == 'SIMULATED'
+        assert response.status_code == 200
+        assert response.json()['results'][0]['status'] == 'SIMULATED'
         repeated = client.post('/api/v1/label-intake', json=body, headers=headers)
-        assert repeated.status_code == 200 and repeated.json()['replayed'] is True
+        assert repeated.status_code == 200
+        assert repeated.json()['replayed'] is True
         second = key_command(client, store, 'rotate').json()['key']
         assert client.post('/api/v1/label-intake', json=body, headers=headers).status_code == 401
         headers = {'Authorization': 'Bearer ' + second}
         repeated = client.post('/api/v1/label-intake', json=body, headers=headers)
-        assert repeated.status_code == 200 and repeated.json()['replayed'] is True
+        assert repeated.status_code == 200
+        assert repeated.json()['replayed'] is True
         assert len(prepared) == 1  # Rotation preserves durable identity; no rerender.
         assert key_command(client, store, 'revoke').status_code == 200
         app.dependency_overrides[http.stored_layouts] = lambda: pytest.fail('Unauthorized layout access')
@@ -210,13 +229,18 @@ def test_delete_source_removes_keys_and_blocks_identity_reuse(runtime):
     stale = client.request('DELETE', '/api/v1/management/sources/SAP_DEMO', json={'revision': 'P1'})
     assert stale.status_code == 409
     removed = client.request('DELETE', '/api/v1/management/sources/SAP_DEMO', json={'revision': policy.revision})
-    assert removed.status_code == 200 and removed.json()['policy']['sources'] == []
+    assert removed.status_code == 200
+    assert removed.json()['policy']['sources'] == []
     source = store.read().policy.sources[0]
-    assert source.deleted and not source.enabled
-    assert source.access_key is None and source.credential_env is None
+    assert source.deleted
+    assert not source.enabled
+    assert source.access_key is None
+    assert source.credential_env is None
     denied(store.read().policy, secret, {'TLS_INTAKE_TOKEN_DEMO': secret})
+    prepared_authenticate = authenticate(policy, 'Bearer ' + secret)
+    prepared_read_3 = store.read()
     with pytest.raises(PolicyDenied):
-        revalidate_claim(pin, authenticate(policy, 'Bearer ' + secret), store.read().policy)
+        revalidate_claim(pin, prepared_authenticate, prepared_read_3.policy)
     assert key_command(client, store, 'create').status_code == 404
     assert key_command(client, store, 'reveal').status_code == 404
     response = client.put('/api/v1/management/sources', json={'revision': store.read().policy.revision, 'source': {
@@ -233,8 +257,10 @@ def test_source_deletion_rolls_back_and_unknown_source_does_not_audit(runtime, f
     client, database, store = runtime
     before = json.dumps(database.document)
     missing = client.request('DELETE', '/api/v1/management/sources/UNKNOWN', json={'revision': 'P1'})
-    assert missing.status_code == 404 and database.events == []
+    assert missing.status_code == 404
+    assert database.events == []
     database.fail = failure
     response = client.request('DELETE', '/api/v1/management/sources/SAP_DEMO', json={'revision': 'P1'})
     assert response.status_code == 503
-    assert json.dumps(database.document) == before and database.events == []
+    assert json.dumps(database.document) == before
+    assert database.events == []

@@ -27,7 +27,7 @@ export function TemplateSelector({ templates, activeTemplateId, onSelectTemplate
   const [needsRefresh, setNeedsRefresh] = React.useState(false);
 
   React.useEffect(() => {
-    if (!open) return;
+    if (!open) { return; }
     setError(null); setNeedsRefresh(false); setSelected(null); setDetail(null); setAction(null); setLoading(true);
     setLibrary(templates);
     setLoading(false);
@@ -35,19 +35,19 @@ export function TemplateSelector({ templates, activeTemplateId, onSelectTemplate
   React.useEffect(() => { setLibrary(templates); }, [templates]);
 
   React.useEffect(() => {
-    if (!selected) return;
+    if (!selected) { return; }
     let current = true;
     setLoading(true); setDetail(null); setError(null); setAction(null);
     const request = layoutApi.get(selected.id);
-    request.then((value) => { if (current) setDetail(value); }).catch((e) => { if (current) setError(e.message); }).finally(() => { if (current) setLoading(false); });
+    request.then((value) => { if (current) { setDetail(value); } }).catch((e) => { if (current) { setError(e.message); } }).finally(() => { if (current) { setLoading(false); } });
     return () => { current = false; };
   }, [selected]);
-  React.useEffect(() => { if (!open) return; const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) setOpen(false); }; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey); }, [open, busy]);
+  React.useEffect(() => { if (!open) { return; } const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) { setOpen(false); } }; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey); }, [open, busy]);
 
   const shown = library.filter((t) => !query || t.name.toLowerCase().includes(query.toLowerCase()) || t.id.toLowerCase().includes(query.toLowerCase()));
 
   const manageTemplate = async () => {
-    if (!selected || !action || busy || needsRefresh || !detail?.version || !detail.svg_sha256) return;
+    if (!selected || !action || busy || needsRefresh || !detail?.version || !detail.svg_sha256) { return; }
     const expected = { label_code: selected.id, title: detail.title ?? selected.name, version: detail.version, svg_sha256: detail.svg_sha256 };
     setBusy(true); setError(null);
     try {
@@ -60,7 +60,7 @@ export function TemplateSelector({ templates, activeTemplateId, onSelectTemplate
         await layoutApi.delete(selected.id, expected);
         const state = useTemplateStore.getState();
         state.setTemplates(state.templates.filter(t => t.id !== selected.id));
-        if (state.activeTemplateId === selected.id) state.setActiveTemplateId('');
+        if (state.activeTemplateId === selected.id) { state.setActiveTemplateId(''); }
         setSelected(null); setDetail(null);
       }
       setAction(null);
@@ -70,30 +70,33 @@ export function TemplateSelector({ templates, activeTemplateId, onSelectTemplate
     } finally { setBusy(false); }
   };
 
+  const confirmedActionLabel = action === 'rename' ? t('Save name') : t('Confirm delete');
+  const saveActionLabel = busy ? t('Saving...') : confirmedActionLabel;
   return <>
     <div data-testid="container-template-selector" className="flex items-center gap-2">
       <Button data-testid="topbar-open-template-explorer" onClick={() => setOpen(true)} className="flex items-center gap-1.5" variant="default"><Icon  size={14} glyph="folder_open" />{templates.find((t) => t.id === activeTemplateId)?.name || t("Templates")}</Button>
       <Badge data-ui-numeric="true">{labelWidthMm} × {labelHeightMm} {t("mm")}</Badge>
     </div>
-    {open && typeof document !== 'undefined' && createPortal(<div role="dialog" aria-modal="true" aria-label={t("Template explorer")} data-testid="template-explorer-modal-overlay" className="fixed inset-0 z-[var(--ui-layer-modal)] flex items-center justify-center p-6" onMouseDown={(e) => { if (!busy && e.target === e.currentTarget) setOpen(false); }} data-ui-backdrop="true">
-      <Dialog className="w-full max-w-5xl h-[min(680px,88vh)] flex flex-col">
+    {open && typeof document !== 'undefined' && createPortal(<dialog open aria-modal="true" aria-label={t("Template explorer")} data-testid="template-explorer-modal-overlay" className="fixed inset-0 h-full w-full z-[var(--ui-layer-modal)] flex items-center justify-center p-6" data-ui-backdrop="true" onCancel={(e) => { e.preventDefault(); if (!busy) { setOpen(false); } }}>
+      <button type="button" aria-label={t("Close backdrop")} disabled={busy} className="absolute inset-0 cursor-default" tabIndex={-1} onClick={(e) => { if (!busy && e.target === e.currentTarget) { setOpen(false); } }} />
+      <Dialog className="relative z-10 w-full max-w-5xl h-[min(680px,88vh)] flex flex-col">
         <DialogHeader className="flex items-center gap-3"><h2 className="text-sm font-semibold flex-1">{t("Template Explorer")}</h2><Input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("Search templates")} className="w-64" /><IconButton disabled={busy} onClick={() => setOpen(false)} label={t("Close")}>×</IconButton></DialogHeader>
         <div className="flex flex-1 min-h-0">
           <aside className="w-2/5 border-r border-outline-variant overflow-auto p-3"><div className="mt-3 border-t border-outline-variant">{shown.map((template) => <button key={template.id} disabled={busy} onClick={() => setSelected(template)} className={`block w-full text-left`} data-ui-control="button" data-variant="default" data-selected={selected?.id === template.id} data-tone="neutral">{template.name}<span data-ui-caption="true" className="block">{template.is_builtin ? t("Built-in") : t("Custom")}</span></button>)}{!shown.length && <div className="p-3 text-xs text-on-surface-variant">{t("No templates found.")}</div>}</div></aside>
           <section className="flex-1 p-5 flex flex-col min-w-0">{error && <ErrorState title={error} />}{loading && <div className="m-auto text-xs">{t("Loading preview…")}</div>}{selected && detail && !loading && <><div className="flex-1 min-h-0 flex items-center justify-center bg-surface-container border border-outline-variant p-4"><div className="w-full h-full flex items-center justify-center" style={{ containerType: 'size' }}><SafePreview svg={detail.raw_svg || detail.svg_content || detail.svg || ''} widthMm={detail.width_mm} heightMm={detail.height_mm} /></div></div><TemplateDetails key={selected.id} template={selected} detail={detail} />{action && <div className="mt-3 border border-outline-variant p-3 text-xs">
               {action === 'rename' ? <><label data-ui-label="true" htmlFor="template-rename-title">{t("Template name")}</label><Input id="template-rename-title" autoFocus value={title} maxLength={160} disabled={busy} onChange={e => setTitle(e.target.value)} className="mt-2 w-full" /></> : <p>{t('Delete "{name}" from the template library? Version history is retained. The current canvas will remain available.', { name: selected.name })}</p>}
-              <div className="mt-3 flex justify-end gap-2"><Button disabled={busy} onClick={() => setAction(null)} variant="default">{t("Cancel")}</Button><Button disabled={busy || needsRefresh || (action === 'rename' && !title.trim())} onClick={manageTemplate} variant="default">{busy ? t("Saving...") : action === 'rename' ? t("Save name") : t("Confirm delete")}</Button></div>
+              <div className="mt-3 flex justify-end gap-2"><Button disabled={busy} onClick={() => setAction(null)} variant="default">{t("Cancel")}</Button><Button disabled={busy || needsRefresh || (action === 'rename' && !title.trim())} onClick={manageTemplate} variant="default">{saveActionLabel}</Button></div>
             </div>}
             <div className="mt-3 flex items-center gap-2">{!selected.is_builtin && <><Button disabled={busy || needsRefresh || loading} onClick={() => { setTitle(selected.name); setAction('rename'); setError(null); }} variant="default">{t("Rename")}</Button><Button disabled={busy || needsRefresh || loading} onClick={() => { setAction('delete'); setError(null); }} variant="default">{t("Delete")}</Button></>}<Button disabled={busy || needsRefresh || !!action} tone="primary" onClick={() => { onSelectTemplate(selected.id); setOpen(false); }} className="ml-auto" variant="default">{t("Open template")}</Button></div></>}{!selected && !loading && <div className="m-auto text-sm text-on-surface-variant">{t("Select a template to preview it.")}</div>}</section>
         </div>
       </Dialog>
-    </div>, document.body)}
+    </dialog>, document.body)}
   </>;
 }
-function SafePreview({ svg, widthMm, heightMm }: { svg: string; widthMm?: number; heightMm?: number }) {
+function SafePreview({ svg, widthMm, heightMm }: Readonly<{ svg: string; widthMm?: number; heightMm?: number }>) {
   useTranslation();
   const result = validateLocalSvg(svg, widthMm, heightMm);
-  if ('error' in result) return <ErrorState title={t("Preview unavailable")} detail={result.error} />;
+  if ('error' in result) { return <ErrorState title={t("Preview unavailable")} detail={result.error} />; }
   const ratio = result.widthMm / result.heightMm;
   return <img
     src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(result.svg)}`}
@@ -103,7 +106,7 @@ function SafePreview({ svg, widthMm, heightMm }: { svg: string; widthMm?: number
   />;
 }
 
-function TemplateDetails({ template, detail }: { template: TemplateMetadata; detail: Detail }) {
+function TemplateDetails({ template, detail }: Readonly<{ template: TemplateMetadata; detail: Detail }>) {
   useTranslation();
   const created = detail.created_at ? new Date(detail.created_at) : null;
   const createdLabel = created && Number.isFinite(created.getTime())

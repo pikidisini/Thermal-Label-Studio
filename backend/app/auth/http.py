@@ -12,6 +12,12 @@ from .store import AuthStore
 
 router = APIRouter()
 COOKIE = 'tls_session'
+TRUSTED_LAN_NETWORKS = (
+    ipaddress.ip_network('10.0.0.0/8'),
+    ipaddress.ip_network('172.16.0.0/12'),
+    ipaddress.ip_network('192.168.0.0/16'),
+    ipaddress.ip_network('fc00::/7'),
+)
 
 
 def service(request):
@@ -24,23 +30,32 @@ def service(request):
     return AuthService(AuthStore(dsn))
 
 
+def validate_origin(value):
+    parsed = urlsplit(value)
+    if (parsed.scheme not in {'http', 'https'} or not parsed.hostname or parsed.username or parsed.password
+            or parsed.path or parsed.query or parsed.fragment):
+        raise AuthError()
+    if parsed.scheme == 'http':
+        try:
+            address = ipaddress.ip_address(parsed.hostname)
+            local = address.is_loopback
+            trusted_lan = not local and any(address in network for network in TRUSTED_LAN_NETWORKS)
+        except ValueError:
+            local = parsed.hostname == 'localhost'
+            trusted_lan = False
+        local_enabled = os.environ.get('TLS_AUTH_LOCAL_HTTP') == 'true'
+        lan_enabled = os.environ.get('TLS_AUTH_TRUSTED_LAN_HTTP') == 'true'
+        if not ((local and local_enabled) or (trusted_lan and lan_enabled)):
+            raise AuthError()
+
+
 def allowed_origins():
     values = os.environ.get('TLS_AUTH_ORIGINS', '').split(',')
     origins = set()
     for value in values:
         if not value:
             continue
-        parsed = urlsplit(value)
-        if (parsed.scheme not in {'http', 'https'} or not parsed.hostname or parsed.username or parsed.password
-                or parsed.path or parsed.query or parsed.fragment):
-            raise AuthError()
-        if parsed.scheme == 'http':
-            try:
-                local = parsed.hostname == 'localhost' or ipaddress.ip_address(parsed.hostname).is_loopback
-            except ValueError:
-                local = False
-            if not local or os.environ.get('TLS_AUTH_LOCAL_HTTP') != 'true':
-                raise AuthError()
+        validate_origin(value)
         origins.add(value)
     if not origins:
         raise AuthError()
@@ -52,12 +67,13 @@ def transport_access(request):
     if str(request.base_url).rstrip('/') not in origins:
         raise AuthError('host_rejected', 403)
     local_http = os.environ.get('TLS_AUTH_LOCAL_HTTP') == 'true'
+    lan_http = os.environ.get('TLS_AUTH_TRUSTED_LAN_HTTP') == 'true'
     if request.url.scheme != 'https':
         try:
             peer_local = request.client and ipaddress.ip_address(request.client.host).is_loopback
         except ValueError:
             peer_local = False
-        if not local_http or not peer_local:
+        if not (lan_http or (local_http and peer_local)):
             raise AuthError('https_required', 403)
     origin = request.headers.get('origin')
     if origin is not None and origin not in origins:

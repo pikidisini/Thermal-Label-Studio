@@ -58,6 +58,6 @@ MESSAGES = {
 }
 
 
-def management_exception(request, exc):
+def management_exception(_request, exc):
     return JSONResponse(status_code=exc.status, content={'detail': {'code': exc.code,
         'message': MESSAGES.get(exc.code, MESSAGES['management_unavailable'])}, 'request_id': current_request_id()})

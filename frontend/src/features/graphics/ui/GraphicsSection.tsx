@@ -5,7 +5,7 @@ import { API_BASE } from '../../../shared/api';
 import { Button } from '../../../shared/ui';
 import { useTranslation } from '../../../shared/i18n';
 
-export function GraphicsSection({ onAdd }: { onAdd?: (asset: GraphicAsset) => Promise<void> }) {
+export function GraphicsSection({ onAdd }: Readonly<{ onAdd?: (asset: GraphicAsset) => Promise<void> }>) {
   const t = useTranslation();
   const [items, setItems] = React.useState<GraphicAsset[]>([]);
   const [query, setQuery] = React.useState('');
@@ -24,13 +24,7 @@ export function GraphicsSection({ onAdd }: { onAdd?: (asset: GraphicAsset) => Pr
     const controller = new AbortController();
     setLoading(true); setError(''); setMore(false);
     if (offset === 0) setItems([]);
-    graphicsApi.list(query, offset, controller.signal).then(result => {
-      if (controller.signal.aborted) return;
-      setItems(current => offset === 0 ? result : [...current, ...result.filter(item => !current.some(old => old.id === item.id))]);
-      setMore(result.length === 100);
-    }).catch(reason => {
-      if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Graphics request failed.');
-    }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    void loadGraphics(query, offset, controller.signal, setItems, setMore, setError, setLoading);
     return () => controller.abort();
   }, [query, offset, revision]);
 
@@ -62,16 +56,10 @@ export function GraphicsSection({ onAdd }: { onAdd?: (asset: GraphicAsset) => Pr
       <input ref={input} data-testid="graphics-upload-file" type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={upload} className="hidden" />
     </div>
     {error && <p role="alert" className="text-on-surface">{t(error)}</p>}
-    {message && <p role="status">{t(message)}</p>}
-    {loading && <p role="status">{t('Loading graphics...')}</p>}
+    {message && <output data-ui-status-block  >{t(message)}</output>}
+    {loading && <output data-ui-status-block  >{t('Loading graphics...')}</output>}
     <div className="graphics-library-content"><div className="graphics-library-grid grid grid-cols-2 gap-2">
-      {items.map(item => <Button key={item.id} disabled={busy || loading} data-testid={`graphics-asset-${item.id}`}
-        aria-pressed={onAdd ? undefined : selected?.id === item.id}
-        onClick={() => { if (onAdd) void run(async () => { await onAdd(item); setMessage('Graphic added to the label.'); }); else setSelected(item); }}
-        title={t(onAdd ? 'Add graphic to label' : 'View graphic details')} className="rounded border border-outline-variant p-1 text-left">
-        <div className="grid h-14 place-items-center overflow-hidden bg-white"><img alt="" loading="lazy" src={`${API_BASE}/graphics/${encodeURIComponent(item.id)}/content`} className="max-h-full max-w-full" /></div>
-        <span className="block truncate">{item.name}</span>
-      </Button>)}
+      {items.map(item => <GraphicCard key={item.id} item={item} busy={busy} loading={loading} selected={selected} onAdd={onAdd} run={run} setSelected={setSelected} setMessage={setMessage} t={t} />)}
     </div>
     {!onAdd && selected && <section className="graphics-library-detail" aria-label={t('Graphic details')}>
       <h3>{selected.name}</h3>
@@ -86,4 +74,41 @@ export function GraphicsSection({ onAdd }: { onAdd?: (asset: GraphicAsset) => Pr
     {!items.length && !loading && !error && <p>{t('No graphics found. Upload a PNG, JPEG or WebP image.')}</p>}
     {more && <Button variant="compact" disabled={busy || loading} onClick={() => setOffset(value => value + 100)}>{t('Load more')}</Button>}
   </div>;
+}
+
+async function loadGraphics(query: string, offset: number, signal: AbortSignal, setItems: React.Dispatch<React.SetStateAction<GraphicAsset[]>>, setMore: React.Dispatch<React.SetStateAction<boolean>>, setError: React.Dispatch<React.SetStateAction<string>>, setLoading: React.Dispatch<React.SetStateAction<boolean>>): Promise<void> {
+  try {
+    const result = await graphicsApi.list(query, offset, signal);
+    if (signal.aborted) return;
+    setItems(current => offset === 0 ? result : [...current, ...result.filter(item => !current.some(old => old.id === item.id))]);
+    setMore(result.length === 100);
+  } catch (reason) {
+    if (!signal.aborted) setError(reason instanceof Error ? reason.message : 'Graphics request failed.');
+  } finally {
+    if (!signal.aborted) setLoading(false);
+  }
+}
+
+function GraphicCard({ item, busy, loading, selected, onAdd, run, setSelected, setMessage, t }: Readonly<{
+  item: GraphicAsset;
+  busy: boolean;
+  loading: boolean;
+  selected: GraphicAsset | null;
+  onAdd?: (asset: GraphicAsset) => Promise<void>;
+  run: (action: () => Promise<void>) => Promise<void>;
+  setSelected: (asset: GraphicAsset) => void;
+  setMessage: (message: string) => void;
+  t: (value: string) => string;
+}>) {
+  const choose = () => {
+    if (onAdd) {
+      void run(async () => { await onAdd(item); setMessage('Graphic added to the label.'); });
+      return;
+    }
+    setSelected(item);
+  };
+  return <Button disabled={busy || loading} data-testid={`graphics-asset-${item.id}`} aria-pressed={onAdd ? undefined : selected?.id === item.id} onClick={choose} title={t(onAdd ? 'Add graphic to label' : 'View graphic details')} className="rounded border border-outline-variant p-1 text-left">
+    <div className="grid h-14 place-items-center overflow-hidden bg-white"><img alt="" loading="lazy" src={`${API_BASE}/graphics/${encodeURIComponent(item.id)}/content`} className="max-h-full max-w-full" /></div>
+    <span className="block truncate">{item.name}</span>
+  </Button>;
 }

@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from '../helpers/coverage.js';
 import {fileURLToPath} from 'node:url';
 import {mockBuiltApplication} from '../helpers/studio.js';
 
@@ -50,6 +50,7 @@ test('Audit details open immediately, compare changed fields and restore focus a
   await expect(rows.first()).toHaveAttribute('aria-selected','false');
   await expect(page.getByRole('button',{name:'Details',exact:true})).toHaveCount(0);
   await page.keyboard.press('Escape');
+  await expect(drawer).toHaveCount(0);
   await expect(rows.nth(1)).toBeFocused();
   await first.press('Space');
   await expect(drawer).toBeVisible();

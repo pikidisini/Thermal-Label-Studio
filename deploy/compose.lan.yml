@@ -1,0 +1,12 @@
+# Self-hosted LAN override for the standard Compose stack.
+# Run with: docker compose -f docker-compose.yml -f deploy/compose.lan.yml up --build -d
+# The application is published only at the explicit private server IP. HTTPS/cloud
+# deployments use deploy/compose.production.yml instead.
+services:
+  app:
+    ports: !override
+      - "${TLS_LAN_BIND_IP:?Set the private server LAN address}:${TLS_LAN_PORT:-18082}:8000"
+    environment:
+      TLS_AUTH_ORIGINS: "http://${TLS_LAN_BIND_IP:?Set the private server LAN address}:${TLS_LAN_PORT:-18082}"
+      TLS_AUTH_LOCAL_HTTP: "false"
+      TLS_AUTH_TRUSTED_LAN_HTTP: "true"

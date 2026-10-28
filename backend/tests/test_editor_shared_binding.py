@@ -7,6 +7,7 @@ from pathlib import Path
 from PIL import Image
 import pytest
 from .auth_test_support import TestClient
+from .conftest import test_font_path
 from app.main import app
 from app.engine import pipeline
 from app.engine.editor_request import EditorOutputRequest
@@ -22,6 +23,15 @@ TEXT = json.loads((ROOT/'tests/contracts/templates/text_binding_fabric.json').re
 SYMBOLS = json.loads((ROOT/'tests/contracts/templates/symbol_binding_fabric.json').read_text(encoding='utf-8'))['cases']
 STATIC = '<svg xmlns="http://www.w3.org/2000/svg" width="40mm" height="30mm" viewBox="0 0 160 120"><g transform="rotate(37 40 40)"><rect width="30" height="60" fill="#123456"/><circle cx="60" cy="20" r="12"/></g></svg>'
 
+
+def test_native_renderer_fixture_path_is_absolute_without_runtime_override(monkeypatch):
+    """The sanitized source gate must not feed a relative path into Settings."""
+    from .conftest import test_renderer_path
+
+    monkeypatch.delenv('TLS_RENDERER_PATH', raising=False)
+    monkeypatch.delenv('CI_RENDERER_PATH', raising=False)
+    assert test_renderer_path().is_absolute()
+
 def request(svg=STATIC, data=None, copies=1, width=40, height=30):
     return dict(draft=dict(svg=svg,width_mm=width,height_mm=height,dpi=203,binding_version=1),
                 data={} if data is None else data,encoder='IPL',copies=copies)
@@ -32,10 +42,13 @@ def pixels(png):
 
 @pytest.fixture
 def native_renderer(monkeypatch):
-    renderer = ROOT/'engine/bin/resvg.exe'
-    if not renderer.is_file() or not Path('C:/Windows/Fonts/arial.ttf').is_file():
-        pytest.skip('Installed resvg/Arial unavailable; native raster parity NOT RUN.')
+    from .conftest import test_renderer_path
+    renderer = test_renderer_path()
+    font = test_font_path()
+    if not renderer.is_file() or not font.is_file():
+        pytest.skip('Installed renderer/test font unavailable; native raster parity NOT RUN.')
     monkeypatch.setenv('TLS_RENDERER_PATH', str(renderer))
+    monkeypatch.setenv('TLS_FIXTURE_FONT_PATH', str(font))
 
 @pytest.fixture(autouse=True)
 def fake_transport(monkeypatch):
@@ -59,7 +72,8 @@ def test_real_shared_raster_payload_and_sinks(case,copies,native_renderer,fake_t
     # A future stored consumer uses precisely the same pure binder and engine.
     stored=bind_template(body['draft']['svg'],body['data'],dpi=203)
     stored_output=pipeline.prepare_editor_output(stored.svg,stored.media.width_mm,stored.media.height_mm,203,copies=copies)
-    assert bound.svg==stored.svg and pixels(prepared.bitmap.bitmap_png)==pixels(stored_output.bitmap.bitmap_png)
+    assert bound.svg == stored.svg
+    assert pixels(prepared.bitmap.bitmap_png) == pixels(stored_output.bitmap.bitmap_png)
     assert prepared.payload==stored_output.payload
     assert pixels(prepared.bitmap.bitmap_png)==pixels(simulate_prepared_output(prepared).bitmap_png)
     client=TestClient(app)
@@ -79,8 +93,10 @@ def test_required_data_rejects_before_raster_or_transport(route,data,code,monkey
     monkeypatch.setattr(pipeline,'render_svg_bitmap',lambda *a,**k:pytest.fail('Invalid data rendered'))
     body=request(TEXT[0]['before'],{**data,'ZERO':0,'FLAG':False},width=80,height=60)
     response=TestClient(app).post('/api/v1/'+route,json=body)
-    assert response.status_code==422 and response.json()['detail']['code']==code
-    assert fake_transport==[] and 'SAMPLE OLD' not in response.text
+    assert response.status_code == 422
+    assert response.json()['detail']['code'] == code
+    assert fake_transport == []
+    assert 'SAMPLE OLD' not in response.text
 
 
 @pytest.mark.parametrize('kind', ['text', 'code128', 'qrcode'])
@@ -109,7 +125,8 @@ def test_media_version_no_bypass(route,change,monkeypatch,fake_transport):
 @pytest.mark.parametrize('body,status,code',[(b'{"data":{},"data":{}}',400,'duplicate_member'),(b'{',400,'malformed_json'),(b' '*2097153,413,'request_too_large')],ids=['duplicate','malformed','overflow'])
 def test_raw_body_admission(route,body,status,code,fake_transport):
     response=TestClient(app).post('/api/v1/'+route,content=body,headers={'content-type':'application/json'})
-    assert response.status_code==status and response.json()['detail']['code']==code
+    assert response.status_code == status
+    assert response.json()['detail']['code'] == code
     assert fake_transport==[]
 
 def test_old_composed_request_and_simulation_target_rejected(fake_transport):

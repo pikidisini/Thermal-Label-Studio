@@ -1,4 +1,5 @@
 """Default-deny API policy. Authentication precedes body parsing and effects."""
+from app.http_body import BodyLimitExceeded, read_bounded_body, replay_body
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
@@ -13,6 +14,11 @@ import re
 DESIGN = {'Admin', 'Designer'}
 ALL = DESIGN | {'Operator'}
 POLICY = [
+    (r'/sap-requests(?:/operations|/holds|/[^/]+/history)?', {'GET'}, ALL),
+    (r'/sap-requests/[^/]+/physical-check', {'POST'}, ALL),
+    (r'/sap-requests/[^/]+/release-hold', {'POST'}, {'Admin'}),
+    (r'/sap-requests/printer-holds/[^/]+/physical-check', {'POST'}, ALL),
+    (r'/sap-requests/printer-holds/[^/]+/release-hold', {'POST'}, {'Admin'}),
     (r'/auth/session', {'GET'}, ALL),
     (r'/auth/(login|logout|change-password|activity)', {'POST'}, ALL),
     (r'/management/users', {'GET', 'POST'}, {'Admin'}),
@@ -51,58 +57,42 @@ class AuthenticationMiddleware:
     def __init__(self, app, api_prefix='/api/v1'):
         self.app, self.prefix = app, api_prefix
 
-    async def __call__(self, scope, receive, send):
+    def handles(self, scope):
         if scope['type'] != 'http':
-            return await self.app(scope, receive, send)
+            return False
         path = scope['path']
-        # Intake alone authenticates machine identities using its existing bearer policy.
-        if path == self.prefix + '/label-intake' or not path.startswith(self.prefix + '/'):
-            return await self.app(scope, receive, send)
-        request = Request(scope)
-        user = None
-        try:
-            transport_access(request)
-            relative = path[len(self.prefix):]
-            if relative != '/auth/session' or request.method != 'GET':
-                auth = service(request)
-                session, user = await run_in_threadpool(auth.session, request.cookies.get(COOKIE, ''), touch=False)
-                if request.method not in {'GET', 'HEAD'}:
-                    auth.csrf(session, request.headers.get('x-csrf-token', ''))
-                if relative != '/auth/login' and not user:
-                    raise AuthError('unauthenticated', 401)
-                if user and user['must_change_password'] and relative not in {'/auth/change-password', '/auth/logout', '/auth/activity'}:
-                    raise AuthError('password_change_required', 403)
-                if not permitted(relative, request.method, user['role'] if user else ''):
-                    raise AuthError('forbidden', 403)
-                scope.setdefault('state', {})['auth_user'] = public_user(user) if user else None
-        except AuthError as exc:
-            return await JSONResponse({'detail': {'code': exc.code, 'message': 'Authentication or access check failed.'}},
-                                      status_code=exc.status, headers={'Cache-Control': 'no-store'})(scope, receive, send)
-        token = actor_id.set(user['id'] if user else None)
-        if request.method not in {'GET', 'HEAD'} and (relative.startswith('/auth/') or relative.startswith('/management/users')):
-            body = bytearray()
-            while True:
-                message = await receive()
-                if message['type'] == 'http.disconnect':
-                    actor_id.reset(token)
-                    return
-                body.extend(message.get('body', b''))
-                if len(body) > 16384:
-                    actor_id.reset(token)
-                    return await JSONResponse({'detail': {'code': 'request_too_large'}}, status_code=413,
-                                              headers={'Cache-Control': 'no-store'})(scope, receive, send)
-                if not message.get('more_body', False):
-                    break
-            original_receive = receive
-            delivered = False
+        return (path != self.prefix + '/label-intake'
+                and path != '/api/v2/label-intake'
+                and not path.startswith('/api/v2/label-intake/')
+                and path.startswith(self.prefix + '/'))
 
-            async def bounded_receive():
-                nonlocal delivered
-                if not delivered:
-                    delivered = True
-                    return {'type': 'http.request', 'body': bytes(body), 'more_body': False}
-                return await original_receive()
-            receive = bounded_receive
+    async def authorize(self, request, relative):
+        transport_access(request)
+        if relative == '/auth/session' and request.method == 'GET':
+            return None
+        auth = service(request)
+        session, user = await run_in_threadpool(auth.session, request.cookies.get(COOKIE, ''), touch=False)
+        if request.method not in {'GET', 'HEAD'}:
+            auth.csrf(session, request.headers.get('x-csrf-token', ''))
+        if relative != '/auth/login' and not user:
+            raise AuthError('unauthenticated', 401)
+        if user and user['must_change_password'] and relative not in {'/auth/change-password', '/auth/logout', '/auth/activity'}:
+            raise AuthError('password_change_required', 403)
+        if not permitted(relative, request.method, user['role'] if user else ''):
+            raise AuthError('forbidden', 403)
+        request.scope.setdefault('state', {})['auth_user'] = public_user(user) if user else None
+        return user
+
+    async def dispatch(self, request, relative, receive, send):
+        if request.method not in {'GET', 'HEAD'} and relative.startswith(('/auth/', '/management/users')):
+            try:
+                body = await read_bounded_body(receive, 16384)
+            except BodyLimitExceeded:
+                return await JSONResponse({'detail': {'code': 'request_too_large'}}, status_code=413,
+                                          headers={'Cache-Control': 'no-store'})(request.scope, receive, send)
+            if body is None:
+                return
+            receive = replay_body(body, receive)
 
         async def no_store(message):
             if message['type'] == 'http.response.start':
@@ -110,7 +100,20 @@ class AuthenticationMiddleware:
                 message['headers'] = headers + [(b'cache-control', b'no-store')]
             await send(message)
 
+        await self.app(request.scope, receive, no_store)
+
+    async def __call__(self, scope, receive, send):
+        if not self.handles(scope):
+            return await self.app(scope, receive, send)
+        request = Request(scope)
+        relative = scope['path'][len(self.prefix):]
         try:
-            await self.app(scope, receive, no_store)
+            user = await self.authorize(request, relative)
+        except AuthError as exc:
+            return await JSONResponse({'detail': {'code': exc.code, 'message': 'Authentication or access check failed.'}},
+                                      status_code=exc.status, headers={'Cache-Control': 'no-store'})(scope, receive, send)
+        token = actor_id.set(user['id'] if user else None)
+        try:
+            await self.dispatch(request, relative, receive, send)
         finally:
             actor_id.reset(token)

@@ -9,7 +9,7 @@ import { RfcOperationForm } from './RfcOperationForm';
 import './sap-rfc.css';
 
 type Tab = 'API Sources' | 'SAP Connections' | 'RFC Operations';
-export function IntegrationWorkspace({ management }: { management: ManagementController }) {
+export function IntegrationWorkspace({ management }: Readonly<{ management: ManagementController }>) {
   const t = useTranslation();
   const [tab, setTab] = useState<Tab>('API Sources');
   const [connection, setConnection] = useState<SapConnection | null>(null);

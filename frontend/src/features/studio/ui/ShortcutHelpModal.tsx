@@ -12,7 +12,7 @@ const GESTURES = [
   { keys: ['Space+Drag / Middle mouse+Drag'], desc: 'Pan canvas freely' },
 ];
 
-export default function ShortcutHelpModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+export default function ShortcutHelpModal({ isOpen, onClose }: Readonly<{ isOpen: boolean; onClose: () => void }>) {
   useTranslation();
   const dialogRef = useModalA11y(isOpen, onClose);
   const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
@@ -53,19 +53,19 @@ export default function ShortcutHelpModal({ isOpen, onClose }: { isOpen: boolean
 
         {/* Content */}
         <div className="p-5 space-y-5 overflow-y-auto">
-          {SHORTCUT_GROUPS.map((grp, idx) => (
-            <div key={idx} className="space-y-2">
+          {SHORTCUT_GROUPS.map((grp) => (
+            <div key={grp.category} className="space-y-2">
               <h3 className="text-xs font-semibold text-secondary uppercase tracking-wider font-mono">
                 {t(grp.category)}
               </h3>
               <div className="bg-surface-container border border-outline-variant divide-y divide-outline-variant/60">
-                {grp.items.map((item, i) => (
-                  <div key={i} className="px-3.5 py-2 flex items-center justify-between text-xs">
+                {grp.items.map((item) => (
+                  <div key={item.desc} className="px-3.5 py-2 flex items-center justify-between text-xs">
                     <span className="text-on-surface">{t(item.desc)}</span>
                     <div className="flex flex-wrap justify-end gap-1 ml-3 max-w-[55%]">
                       {item.keys.map((k, ki) => (
                         <span
-                          key={ki}
+                          key={k}
                           className={`${
                             k === '+' || k === '/'
                               ? 'text-outline text-[10px]'

@@ -46,7 +46,7 @@ const labels: Record<ColorKey, string> = {
   "danger": "Error / destructive"
 };
 
-export function CustomThemeEditor({ draft, onChange }: { draft: CustomTheme; onChange: (value: CustomTheme) => void }) {
+export function CustomThemeEditor({ draft, onChange }: Readonly<{ draft: CustomTheme; onChange: (value: CustomTheme) => void }>) {
   const t = useTranslation();
   const [tab, setTab] = React.useState(0);
   const color = (key: ColorKey) => isHexColor(draft.colors[key]) ? draft.colors[key] : CUSTOM_PRESETS[draft.base][key];
@@ -61,7 +61,7 @@ export function CustomThemeEditor({ draft, onChange }: { draft: CustomTheme; onC
         <h3 className="mb-2 font-medium">{t('Colors by area')}</h3>
         <div role="tablist" aria-label={t('Color groups')} className="grid grid-cols-2 min-[640px]:grid-cols-3 gap-1 mb-3" data-testid="custom-color-tabs">
           {groups.map((group, index) => <Button key={group.id} role="tab" selected={tab === index} aria-selected={tab === index} aria-controls={`custom-colors-${group.id}`} id={`custom-tab-${group.id}`} tabIndex={tab === index ? 0 : -1} className="min-w-0 px-1 whitespace-normal text-center leading-tight" onClick={() => setTab(index)} onKeyDown={event => {
-            let next = index;
+            let next: number;
             if (event.key === 'ArrowRight') next = (index + 1) % groups.length;
             else if (event.key === 'ArrowLeft') next = (index + groups.length - 1) % groups.length;
             else if (event.key === 'Home') next = 0;
@@ -77,7 +77,7 @@ export function CustomThemeEditor({ draft, onChange }: { draft: CustomTheme; onC
             <Input data-testid={`custom-hex-${key}`} aria-label={t('{area} HEX', { area: t(labels[key]) })} aria-invalid={!isHexColor(draft.colors[key])} aria-describedby={!isHexColor(draft.colors[key]) ? 'custom-color-error' : undefined} className="w-full min-w-0 font-mono" maxLength={7} value={draft.colors[key]} spellCheck={false} autoComplete="off" onChange={event => change(key, event.target.value)} />
           </div>)}
         </div>)}
-        <p role="status" className="mt-3 text-on-surface-variant" data-testid="custom-contrast">{t('Lowest text contrast: {ratio}:1', { ratio: score.toFixed(1) })} · {t(score >= 4.5 ? 'Readable' : 'Low contrast')}</p>
+        <output data-ui-status-block  className="mt-3 text-on-surface-variant" data-testid="custom-contrast">{t('Lowest text contrast: {ratio}:1', { ratio: score.toFixed(1) })} · {t(score >= 4.5 ? 'Readable' : 'Low contrast')}</output>
         {!COLOR_KEYS.every(key => isHexColor(draft.colors[key])) && <p id="custom-color-error" role="alert" style={{ color: color('danger') }}>{t('Use a six-digit HEX color, for example #8496A4.')}</p>}
       </section>
       <section className="min-w-0" aria-label={t('Theme preview')}><h3 className="mb-2 font-medium">{t('Live preview')}</h3>

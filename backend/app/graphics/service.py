@@ -27,8 +27,7 @@ class GraphicsService:
 
     @staticmethod
     def _summary(row):
-        return dict(id=str(row[0]), name=row[1], content_type=row[2], byte_length=row[3],
-                    width=row[4], height=row[5], updated_at=row[6], version=1)
+        return {'id': str(row[0]), 'name': row[1], 'content_type': row[2], 'byte_length': row[3], 'width': row[4], 'height': row[5], 'updated_at': row[6], 'version': 1}
 
     def create(self, value):
         name, mime, data, width, height = validate_graphic(value)

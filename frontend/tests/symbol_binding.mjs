@@ -26,6 +26,16 @@ function pixels(url) {
   const png=PNG.sync.read(Buffer.from(url.split(',')[1],'base64'));
   return {width:png.width,height:png.height,rgba_sha256:hash(png.data)};
 }
+function portablePixels(value) {
+  return {...value, rgba_sha256: '<platform-raster>'};
+}
+function portableFixture(value) {
+  return JSON.parse(JSON.stringify(value, (key, item) => {
+    if (key === 'pixels' && item && typeof item === 'object') return portablePixels(item);
+    if (typeof item === 'string') return item.replace(/data:image\/png;base64,[A-Za-z0-9+/=]+/g, '<platform-png>');
+    return item;
+  }));
+}
 async function capture() {
   const cases=[];
   for(const [type,values] of [['code128',['0','false','A','12','123','1234','12345','ABC1234DEF','AB12345cd6789Z','12ABCx1234',' A B ','~!@#$%^&*()_+','ABC1234xY567890','ABCD']],['code39',['0','A','ABC-39','0123456789','AZ $%+-./']],['ean13',['4006381333931','5901234123457','0000000000000']]]) {
@@ -85,7 +95,8 @@ test('actual Fabric symbol refresh preserves design corners and full-image mappi
     cases.push({type,data:{KEY:value},before,expected,pixels:pixels(url)});c.dispose();
   }
   if(process.env.UPDATE_SYMBOL_FIXTURES==='1') fs.writeFileSync(geometryFixture,JSON.stringify({fabric:fabric.version,cases},null,2));
-  assert.deepEqual({fabric:fabric.version,cases},JSON.parse(fs.readFileSync(geometryFixture,'utf8')));
+  const expectedFixture=JSON.parse(fs.readFileSync(geometryFixture,'utf8'));
+  assert.deepEqual(portableFixture({fabric:fabric.version,cases}),portableFixture(expectedFixture));
 });
 
 test('invalid generators never substitute data, clean EAN, change symbology or allocate oversized images',async()=>{

@@ -4,7 +4,14 @@ import { Field, Icon, IconButton, Input } from '../../../shared/ui';
 import { useTranslation } from '../../../shared/i18n';
 import { managementApi } from '../api/managementApi';
 
-export function StoredKey({ identity, revision, disabled, children }: { identity: string; revision: string; disabled: boolean; children?: ReactNode }) {
+export function sourceKeyLabel(status?: string): string {
+  if (status === 'active') return 'Active key';
+  if (status === 'revoked') return 'Key revoked';
+  if (status === 'legacy') return 'Previous server key';
+  return 'No access key';
+}
+
+export function StoredKey({ identity, revision, disabled, children }: Readonly<{ identity: string; revision: string; disabled: boolean; children?: ReactNode }>) {
   const t = useTranslation();
   const [secret, setSecret] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -45,6 +52,6 @@ export function StoredKey({ identity, revision, disabled, children }: { identity
       {children}
     </div>
     {secret && <Field label={t('Access key value')}><Input readOnly autoComplete="off" spellCheck={false} aria-label={t('Access key value')} value={secret} onFocus={event => event.target.select()} /></Field>}
-    {message && <p role="status">{t(message)}</p>}
+    {message && <output data-ui-status-block  >{t(message)}</output>}
   </div>;
 }

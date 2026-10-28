@@ -113,14 +113,16 @@ def test_fixture_serving_has_only_explicit_page_and_static_asset_routes(monkeypa
     for path in ("/", "/login", "/print", "/management"):
         response = routes[path].endpoint()
         assert response.path == settings.frontend_dist / "index.html"
-        assert response.media_type == "text/html" and response.status_code == 200
+        assert response.media_type == 'text/html'
+        assert response.status_code == 200
     studio = routes["/studio"].endpoint()
     assert studio.path == settings.frontend_dist / "index.html"
     page = routes["/fixture-simulation"].endpoint()
     assert page.path == settings.frontend_dist / "index.html"
     assert calls == [{"directory": settings.frontend_dist / "assets", "follow_symlink": False}]
     assert not any("path:" in path for path in routes)
-    assert "/api" not in routes and "/login" in routes
+    assert '/api' not in routes
+    assert '/login' in routes
 
 
 def test_configured_frontend_missing_dependencies_rejects_startup(monkeypatch):

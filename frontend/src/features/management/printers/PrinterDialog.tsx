@@ -5,12 +5,12 @@ import { useTranslation } from '../../../shared/i18n';
 import type { ManagementController } from '../hooks/useManagement';
 import { managementApi, type Printer } from '../api/managementApi';
 
-export function PrinterDialog({ management }: { management: ManagementController }) {
+export function PrinterDialog({ management }: Readonly<{ management: ManagementController }>) {
   const t = useTranslation();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmation, setConfirmation] = useState('');
   const { editor, setEditor, policy, mutate, writable, actionsDisabled, saving } = management;
-  if (!editor || editor.kind !== 'printer') return null;
+  if (editor?.kind !== 'printer') return null;
   const printer = editor.value;
   const saved = policy?.targets.find(target => target.target_id === printer.target_id);
   const dirty = !editor.existing || !saved || printer.host !== saved.host || printer.port !== saved.port || printer.enabled !== saved.enabled;
@@ -44,12 +44,12 @@ export function PrinterDialog({ management }: { management: ManagementController
     {editor.existing && <>
       {assigned.length > 0 && <p className="management-notice">{t('Change or remove the assigned integration print destinations before deleting this printer.')}</p>}
     </>}
-    {confirmDelete && <div className="management-notice" role="group" aria-label={t('Delete printer confirmation')}>
+    {confirmDelete && <fieldset className="min-w-0 management-notice"  aria-label={t('Delete printer confirmation')}>
       <p>{t('Delete this printer?')} <strong>{printer.target_id}</strong></p>
       <p>{t('Audit history is retained. Deleting this configuration does not connect to the printer.')}</p>
       <Field label={t('Type the printer ID to confirm')}><Input aria-label={t('Type the printer ID to confirm')} disabled={saving} value={confirmation} onChange={event => setConfirmation(event.target.value)} /></Field>
       <div className="management-tools"><Button tone="danger" disabled={actionsDisabled || assigned.length > 0 || confirmation !== printer.target_id} onClick={() => policy && void mutate(() => managementApi.deletePrinter(policy.revision, printer.target_id))}>{t('Confirm delete')}</Button><Button disabled={saving} onClick={() => { setConfirmDelete(false); setConfirmation(''); }}>{t('Cancel deletion')}</Button></div>
-    </div>}
-    <div className="management-source-footer">{editor.existing && <IconButton label="Delete printer" tone="danger" disabled={actionsDisabled || assigned.length > 0} onClick={() => setConfirmDelete(true)}><Icon component={Trash2} /></IconButton>}<span className="management-draft-status" role="status" data-dirty={dirty}>{t(dirty ? 'Unsaved changes' : 'No unsaved changes')}</span><Button disabled={saving} onClick={() => setEditor(null)}>{t('Cancel')}</Button><Button tone="primary" type="submit" disabled={actionsDisabled || !dirty}><Icon component={Save} />{t('Save changes')}</Button></div>
+    </fieldset>}
+    <div className="management-source-footer">{editor.existing && <IconButton label="Delete printer" tone="danger" disabled={actionsDisabled || assigned.length > 0} onClick={() => setConfirmDelete(true)}><Icon component={Trash2} /></IconButton>}<output className="management-draft-status"  data-dirty={dirty}>{t(dirty ? 'Unsaved changes' : 'No unsaved changes')}</output><Button disabled={saving} onClick={() => setEditor(null)}>{t('Cancel')}</Button><Button tone="primary" type="submit" disabled={actionsDisabled || !dirty}><Icon component={Save} />{t('Save changes')}</Button></div>
   </form>;
 }

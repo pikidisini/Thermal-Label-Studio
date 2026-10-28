@@ -11,7 +11,7 @@ import { useStudioStore } from '../../store/useStudioStore';
 
 function renewSelectionIds(object: fabric.FabricObject) {
   object.id = crypto.randomUUID();
-  if (object instanceof fabric.Group) object.getObjects().forEach(renewSelectionIds);
+  if (object instanceof fabric.Group) { object.getObjects().forEach(renewSelectionIds); }
 }
 
 interface UseObjectOrderingActionsProps {
@@ -58,7 +58,7 @@ export function useObjectOrderingActions({
 
   const handleCopy = useCallback(() => {
     const active = canvasRef.current?.getActiveObject() as fabric.FabricObject & { isEditing?: boolean };
-    if (!active || active.isEditing || useStudioStore.getState().viewMode !== 'design' || useHistoryStore.getState().isLocked) return;
+    if (!active || active.isEditing || useStudioStore.getState().viewMode !== 'design' || useHistoryStore.getState().isLocked) { return; }
     // A serialized snapshot survives deletion/edits of its source without sharing references.
     try {
       const json = JSON.stringify(active.toObject([...CANVAS_SERIALIZE_PROPS]));
@@ -71,9 +71,9 @@ export function useObjectOrderingActions({
   const handlePaste = useCallback(() => {
     const canvas = canvasRef.current;
     const snapshot = clipboard.current;
-    if (!canvas || !snapshot || pasteAbort.current || useHistoryStore.getState().isLocked || useStudioStore.getState().viewMode !== 'design') return;
+    if (!canvas || !snapshot || pasteAbort.current || useHistoryStore.getState().isLocked || useStudioStore.getState().viewMode !== 'design') { return; }
     const active = canvas.getActiveObject() as fabric.FabricObject & { isEditing?: boolean };
-    if (active?.isEditing) return;
+    if (active?.isEditing) { return; }
     const controller = new AbortController();
     pasteAbort.current = controller;
     const objectsBefore = canvas.getObjects();
@@ -86,14 +86,14 @@ export function useObjectOrderingActions({
       }
       insertSelectionCopy(canvas, cloned, (snapshot.pasteCount + 1) * 10 * pxPerMm);
       snapshot.pasteCount++;
-    }).catch(() => { if (!controller.signal.aborted) console.warn('Selection paste failed.'); })
-      .finally(() => { if (pasteAbort.current === controller) pasteAbort.current = null; });
+    }).catch(() => { if (!controller.signal.aborted) { console.warn('Selection paste failed.'); } })
+      .finally(() => { if (pasteAbort.current === controller) { pasteAbort.current = null; } });
   }, [canvasRef, pxPerMm, insertSelectionCopy]);
   const handleUpdateProperty = useCallback(
     (property: string, value: any) => {
-      if (!canvasRef.current) return;
+      if (!canvasRef.current) { return; }
       const active = canvasRef.current.getActiveObject() as any;
-      if (!active) return;
+      if (!active) { return; }
 
       const binding = property === 'dataField' || property === 'dataBarcode' || property === 'dataQr';
       const bindingKey = binding ? String(value).trim() : '';
@@ -119,12 +119,12 @@ export function useObjectOrderingActions({
         const composite = typeof active.payloadTemplate === 'string' ? resolvePayloadTemplate(active.payloadTemplate, useContractStore.getState().tokenMap, active.barcodeType || 'code128', useContractStore.getState().fieldDescriptions) : null;
         if (composite?.error) { active.validationError = composite.error; syncSelection(active); return; }
         const restored = composite?.value ?? resolveSapTokenDisplayValue(useContractStore.getState().tokenMap[key], key, useContractStore.getState().fieldDescriptions);
-        if (active.dataField) active.set('text', restored);
-        else { const type = active.barcodeType || 'code128'; const error = validatePreviewPayload(type, restored); if (error) { active.validationError = error; syncSelection(active); return; } const id = ++requestId.current; void generatePreviewDataUrl(type, restored, active.symbolSpec).then((u) => { if (id !== requestId.current || !u || !active._element) return; void replaceSymbolImage(active,u, () => id === requestId.current && !!active._element).then((applied) => { if (!applied) return; active.barcodeValue = restored; active.previewOverride = false; active.validationError = undefined; active.setCoords(); syncSelection(active); saveCanvasHistory(); canvasRef.current?.renderAll(); triggerRenderSimulation?.(); }); }); }
+        if (active.dataField) { active.set('text', restored); }
+        else { const type = active.barcodeType || 'code128'; const error = validatePreviewPayload(type, restored); if (error) { active.validationError = error; syncSelection(active); return; } const id = ++requestId.current; void generatePreviewDataUrl(type, restored, active.symbolSpec).then((u) => { if (id !== requestId.current || !u || !active._element) { return; } void replaceSymbolImage(active,u, () => id === requestId.current && !!active._element).then((applied) => { if (!applied) { return; } active.barcodeValue = restored; active.previewOverride = false; active.validationError = undefined; active.setCoords(); syncSelection(active); saveCanvasHistory(); canvasRef.current?.renderAll(); triggerRenderSimulation?.(); }); }); }
         if (active.dataField) { active.previewOverride = false; active.validationError = undefined; active.setCoords(); syncSelection(active); saveCanvasHistory(); canvasRef.current.renderAll(); triggerRenderSimulation?.(); } return;
       }
       if (property === 'dataBarcode' || property === 'dataQr') {
-        if (!/^[A-Za-z0-9_-]+$/.test(bindingKey)) return;
+        if (!/^[A-Za-z0-9_-]+$/.test(bindingKey)) { return; }
         // A template binding exists independently of its current sample value.
         // Invalidate pending refreshes before replacing the binding, even if
         // this sample cannot generate a symbol yet.
@@ -142,7 +142,7 @@ export function useObjectOrderingActions({
         active.set('opacity', resolved.error ? 0.45 : 1);
         active.setCoords(); syncSelection(active); saveCanvasHistory();
         canvasRef.current.renderAll(); triggerRenderSimulation?.();
-        if (resolved.error) return;
+        if (resolved.error) { return; }
       }
       const templateValue = property === 'payloadTemplate' ? String(value ?? '') : '';
       if (property === 'payloadTemplate') {
@@ -154,22 +154,58 @@ export function useObjectOrderingActions({
         saveCanvasHistory();
         canvasRef.current.renderAll();
       }
-      const candidate = binding ? resolveSapTokenDisplayValue(useContractStore.getState().tokenMap[bindingKey], bindingKey, useContractStore.getState().fieldDescriptions) : (property === 'payloadTemplate' ? (resolvePayloadTemplate(templateValue, useContractStore.getState().tokenMap, active.barcodeType || 'code128', useContractStore.getState().fieldDescriptions).value || '') : String(value ?? ''));
+      let candidate = String(value ?? '');
+      if (binding) {
+        candidate = resolveSapTokenDisplayValue(useContractStore.getState().tokenMap[bindingKey], bindingKey, useContractStore.getState().fieldDescriptions);
+      } else if (property === 'payloadTemplate') {
+        candidate = resolvePayloadTemplate(templateValue, useContractStore.getState().tokenMap, active.barcodeType || 'code128', useContractStore.getState().fieldDescriptions).value || '';
+      }
       if (binding && property === 'dataField') { delete active.payloadTemplate; active.set('dataField', bindingKey); active.set('dataPlaceholder', bindingKey); active.set('text', candidate); active.previewOverride = false; active.setCoords(); syncSelection(active); saveCanvasHistory(); canvasRef.current.renderAll(); triggerRenderSimulation?.(); return; }
-      if (binding) active.set('payloadTemplate', `{{${bindingKey}}}`);
-      if (binding) property = 'barcodeValue';
+      if (binding) { active.set('payloadTemplate', `{{${bindingKey}}}`); }
+      if (binding) { property = 'barcodeValue'; }
       if (property === 'barcodeValue' || property === 'barcodeType' || property === 'payloadTemplate') {
         const type = property === 'barcodeType' ? String(value) : (active.barcodeType || 'code128');
         const templateText = property === 'payloadTemplate' ? templateValue : (active.payloadTemplate || '');
         const templateResolution = (property === 'payloadTemplate' || (property === 'barcodeType' && templateText)) ? resolvePayloadTemplate(templateText, useContractStore.getState().tokenMap, type, useContractStore.getState().fieldDescriptions) : null;
-        const val = binding ? candidate : (property === 'payloadTemplate' ? (templateResolution?.value || '') : (property === 'barcodeValue' ? String(value ?? '') : String(active.barcodeValue || '')));
+        let val = String(active.barcodeValue || '');
+        if (binding) { val = candidate; }
+        else if (property === 'payloadTemplate') { val = templateResolution?.value || ''; }
+        else if (property === 'barcodeValue') { val = String(value ?? ''); }
         const resolvedVal = property === 'barcodeType' && templateResolution ? (templateResolution.value || '') : val;
         if (templateResolution && templateResolution.error) { active.validationError = templateResolution.error; active.set('opacity', 0.45); syncSelection(active); canvasRef.current.renderAll(); return; }
         const existingBindingKey = active.dataQr || active.dataBarcode;
         const validationError = validatePreviewPayload(type, resolvedVal);
         if (validationError) { active.validationError = validationError; active.set('opacity', 0.45); syncSelection(active); canvasRef.current.renderAll(); return; }
         const id = ++requestId.current;
-        const commit = (url: string | null) => { if (id !== requestId.current || !url || !active._element) { if (!url) { active.validationError = `Payload ${type} gagal dibuat`; syncSelection(active); } return; } active.set('barcodeType', type); active.symbolSpec = candidateSpec; active.set('barcodeValue', resolvedVal); active.set('opacity', 1); if (property === 'payloadTemplate') active.set('payloadTemplate', templateValue); const tokenKey = binding ? bindingKey : existingBindingKey; if (type === 'qrcode') { if (tokenKey) active.dataQr = tokenKey; delete active.dataBarcode; } else { if (tokenKey) active.dataBarcode = tokenKey; delete active.dataQr; } if (!binding && property === 'barcodeType') active.previewOverride = !!active.previewOverride; else active.previewOverride = !binding; active.validationError = undefined; void replaceSymbolImage(active,url, () => id === requestId.current && !!active._element).then((applied) => { if (!applied) return; active.setCoords(); syncSelection(active); saveCanvasHistory(); canvasRef.current?.renderAll(); triggerRenderSimulation?.(); }); };
+        const commit = (url: string | null) => {
+          if (id !== requestId.current || !url || !active._element) {
+            if (!url) { active.validationError = `Payload ${type} gagal dibuat`; syncSelection(active); }
+            return;
+          }
+          active.set('barcodeType', type);
+          active.symbolSpec = candidateSpec;
+          active.set('barcodeValue', resolvedVal);
+          active.set('opacity', 1);
+          if (property === 'payloadTemplate') { active.set('payloadTemplate', templateValue); }
+          const tokenKey = binding ? bindingKey : existingBindingKey;
+          if (type === 'qrcode') {
+            if (tokenKey) { active.dataQr = tokenKey; }
+            delete active.dataBarcode;
+          } else {
+            if (tokenKey) { active.dataBarcode = tokenKey; }
+            delete active.dataQr;
+          }
+          active.previewOverride = !binding || (property === 'barcodeType' && !!active.previewOverride);
+          active.validationError = undefined;
+          void replaceSymbolImage(active, url, () => id === requestId.current && !!active._element).then((applied) => {
+            if (!applied) { return; }
+            active.setCoords();
+            syncSelection(active);
+            saveCanvasHistory();
+            canvasRef.current?.renderAll();
+            triggerRenderSimulation?.();
+          });
+        };
         const candidateSpec = property === 'barcodeType' ? creationSymbolSpec(type) : active.symbolSpec;
         void generatePreviewDataUrl(type, resolvedVal, candidateSpec).then((url) => commit(url));
         return;
@@ -190,7 +226,7 @@ export function useObjectOrderingActions({
         active.set('strokeWidth', clampLineWidthMm(Number(value)) * pxPerMm);
       } else {
         active.set(property, value);
-        if (property === 'text' || property === 'barcodeValue') active.previewOverride = true;
+        if (property === 'text' || property === 'barcodeValue') { active.previewOverride = true; }
       }
 
       active.setCoords();
@@ -203,7 +239,7 @@ export function useObjectOrderingActions({
   );
 
   const handleBringForward = useCallback(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current) { return; }
     const active = canvasRef.current.getActiveObject();
     if (active) {
       canvasRef.current.bringObjectForward(active);
@@ -213,7 +249,7 @@ export function useObjectOrderingActions({
   }, [canvasRef, saveCanvasHistory]);
 
   const handleSendBackward = useCallback(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current) { return; }
     const active = canvasRef.current.getActiveObject();
     if (active) {
       canvasRef.current.sendObjectBackwards(active);
@@ -225,9 +261,9 @@ export function useObjectOrderingActions({
   const handleNudge = useCallback((dxMm: number, dyMm: number) => {
     const canvas = canvasRef.current;
     const active = canvas?.getActiveObject();
-    if (!canvas || !active || useHistoryStore.getState().isLocked) return false;
+    if (!canvas || !active || useHistoryStore.getState().isLocked) { return false; }
     const members = active instanceof fabric.ActiveSelection ? active.getObjects() : [active];
-    if (members.some(object => (dxMm && object.lockMovementX) || (dyMm && object.lockMovementY))) return false;
+    if (members.some(object => (dxMm && object.lockMovementX) || (dyMm && object.lockMovementY))) { return false; }
     active.set({ left: active.left + dxMm * pxPerMm, top: active.top + dyMm * pxPerMm });
     active.setCoords();
     syncSelection(active);
@@ -238,29 +274,29 @@ export function useObjectOrderingActions({
   const handleNudgeEnd = useCallback(() => {
     const canvas = canvasRef.current;
     const target = canvas?.getActiveObject();
-    if (canvas && target) canvas.fire('object:modified', { target });
+    if (canvas && target) { canvas.fire('object:modified', { target }); }
   }, [canvasRef]);
 
   const duplicating = useRef(false);
   const handleDuplicate = useCallback(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current) { return; }
     const active = canvasRef.current.getActiveObject();
-    if (!active || duplicating.current || useHistoryStore.getState().isLocked) return;
+    if (!active || duplicating.current || useHistoryStore.getState().isLocked) { return; }
     const canvas = canvasRef.current;
     duplicating.current = true;
 
     void active.clone().then((cloned: fabric.FabricObject) => {
       const originals = active instanceof fabric.ActiveSelection ? active.getObjects() : [active];
-      if (canvasRef.current !== canvas || originals.some(object => !canvas.getObjects().includes(object)) || useHistoryStore.getState().isLocked) return;
+      if (canvasRef.current !== canvas || originals.some(object => !canvas.getObjects().includes(object)) || useHistoryStore.getState().isLocked) { return; }
       insertSelectionCopy(canvas, cloned, 10 * pxPerMm);
     }).catch(() => { console.warn('Selection duplication failed.'); }).finally(() => { duplicating.current = false; });
   }, [canvasRef, pxPerMm, insertSelectionCopy]);
 
   const handleDelete = useCallback(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current) { return; }
     const active = canvasRef.current.getActiveObject();
     if (active) {
-      if ((active as any).isEditing) (active as any).exitEditing();
+      if ((active as any).isEditing) { (active as any).exitEditing(); }
       const objectsToRemove = active.type === 'activeselection'
         ? (active as fabric.ActiveSelection).getObjects()
         : [active];
@@ -275,11 +311,11 @@ export function useObjectOrderingActions({
 
   const handleGroup = useCallback(() => {
     const canvas = canvasRef.current; const active = canvas?.getActiveObject() as any;
-    if (!canvas || active?.type !== 'activeselection') return;
+    if (!canvas || active?.type !== 'activeselection') { return; }
     const members = active.getObjects() as any[];
-    if (members.length < 2 || members.length > 50) return;
+    if (members.length < 2 || members.length > 50) { return; }
     const history = useHistoryStore.getState();
-    if (history.isLocked) return;
+    if (history.isLocked) { return; }
     history.lockHistory();
     try {
       canvas.discardActiveObject(); canvas.remove(...members);
@@ -292,9 +328,9 @@ export function useObjectOrderingActions({
 
   const handleUngroup = useCallback(() => {
     const canvas = canvasRef.current; const active = canvas?.getActiveObject() as any;
-    if (!canvas || active?.type !== 'group') return;
+    if (!canvas || active?.type !== 'group') { return; }
     const history = useHistoryStore.getState();
-    if (history.isLocked) return;
+    if (history.isLocked) { return; }
     history.lockHistory();
     try {
       const members = active.removeAll(); canvas.remove(active); canvas.add(...members);

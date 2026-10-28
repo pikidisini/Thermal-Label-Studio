@@ -16,9 +16,10 @@ export function bindingErrors(objects: any[], data: Record<string, unknown>, des
       });
     } else {
       const field = object.dataField || object.dataBarcode || object.dataQr;
-      if (field && !hasFieldValue(data[field])) errors.add(`${getFieldLabel(field, descriptions)} has no data.`);
-      else if (field && object.isBarcode) {
-        const error = validatePreviewPayload(object.barcodeType || 'code128', String(data[field]));
+      const fieldValue = data[field];
+      if (field && !hasFieldValue(fieldValue)) errors.add(`${getFieldLabel(field, descriptions)} has no data.`);
+      else if (field && object.isBarcode && hasFieldValue(fieldValue)) {
+        const error = validatePreviewPayload(object.barcodeType || 'code128', String(fieldValue));
         if (error) errors.add(error);
       }
     }

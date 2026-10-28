@@ -5,7 +5,7 @@ import { useTranslation } from '../../../shared/i18n';
 import type { ManagementController } from '../hooks/useManagement';
 import { sapRfcApi, type SapConnection } from '../api/sapRfcApi';
 
-export function SapConnectionForm({ initial, existing, management, close }: { initial: SapConnection; existing: boolean; management: ManagementController; close: () => void }) {
+export function SapConnectionForm({ initial, existing, management, close }: Readonly<{ initial: SapConnection; existing: boolean; management: ManagementController; close: () => void }>) {
   const t = useTranslation();
   const [value, setValue] = useState(initial);
   const [password, setPassword] = useState('');

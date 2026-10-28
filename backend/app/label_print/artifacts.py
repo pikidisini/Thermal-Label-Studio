@@ -27,7 +27,9 @@ class PreviewArtifacts:
             return identity
 
     def _expire(self):
-        for key, value in list(self.entries.items()):
+        # Expiry deletes entries, so iterate an immutable snapshot.
+        entries = tuple(self.entries.items())
+        for key, value in entries:
             if value[0] <= monotonic():
                 del self.entries[key]
 

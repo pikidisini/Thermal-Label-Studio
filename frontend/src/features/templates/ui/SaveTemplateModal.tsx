@@ -2,7 +2,7 @@ import { translate as t, useTranslation } from "../../../shared/i18n";
 import { useTemplateStore } from '../../../store/useTemplateStore';
 import React, { useState, useEffect } from 'react';
 import { Save, X, Layers, HardDrive, CheckCircle2, AlertCircle, FileCode } from 'lucide-react';
-import { Icon, Badge, Button, Dialog, DialogBody, DialogFooter, DialogHeader, ErrorState, Field, IconButton, Input, Status } from '../../../shared/ui';
+import { Icon, Badge, Button, Dialog, DialogFooter, DialogHeader, ErrorState, Field, IconButton, Input, Status } from '../../../shared/ui';
 
 export default function SaveTemplateModal({
   isOpen,

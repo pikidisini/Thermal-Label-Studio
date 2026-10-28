@@ -48,7 +48,12 @@ test('browser reports and artifacts use a unique project .tmp child', async () =
   const first = await loadConfig(undefined, 'outputs-one');
   const second = await loadConfig(undefined, 'outputs-two');
   assert.notEqual(first.outputDir, second.outputDir);
-  const reportDir = first.reporter.find(([kind]) => kind === 'html')[1].outputFolder;
-  assert.equal(path.dirname(reportDir), path.dirname(first.outputDir));
+  const htmlReporter = first.reporter.find(([kind]) => kind === 'html');
+  if (process.env.TLS_COVERAGE_BUILD) {
+    assert.equal(htmlReporter, undefined);
+  } else {
+    const reportDir = htmlReporter[1].outputFolder;
+    assert.equal(path.dirname(reportDir), path.dirname(first.outputDir));
+  }
   assert.equal(path.basename(path.dirname(path.dirname(first.outputDir))), '.tmp');
 });

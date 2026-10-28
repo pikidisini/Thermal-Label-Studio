@@ -18,7 +18,11 @@ from app.svg_safety import SVG_NS
 ROOT=Path(__file__).resolve().parents[2]
 VECTORS=json.loads((ROOT/'tests/contracts/symbol_vectors.json').read_text(encoding='utf-8'))['cases']
 GEOMETRY=json.loads((ROOT/'tests/contracts/templates/symbol_binding_fabric.json').read_text(encoding='utf-8'))['cases']
-PROFILE=FontProfile(Path('C:/Windows/Fonts/arial.ttf'),'Arial')
+try:
+    from .conftest import test_font_path
+    PROFILE=FontProfile(test_font_path(),'Arial')
+except ImportError:
+    PROFILE=FontProfile(Path('C:/Windows/Fonts/arial.ttf'),'Arial')
 
 
 def spec(case):
@@ -33,8 +37,15 @@ def test_actual_studio_modules_decisions_and_rgba_pixels(case):
         assert (result.evidence.qr_version,result.evidence.mask)==(case['version'],case['mask'])
     else:assert result.rows==(case['bits'],)
     image=symbols.image(result)
-    assert {'width':image.width,'height':image.height,'rgba_sha256':hashlib.sha256(image.tobytes()).hexdigest()}==case['pixels']
-    assert symbols.data_url(result)==symbols.data_url(result)
+    actual_pixels = {'width': image.width, 'height': image.height,
+                     'rgba_sha256': hashlib.sha256(image.tobytes()).hexdigest()}
+    assert actual_pixels == case['pixels']
+    uri = symbols.data_url(result)
+    prefix, encoded = uri.split(',', 1)
+    assert prefix == 'data:image/png;base64'
+    with Image.open(io.BytesIO(base64.b64decode(encoded, validate=True))) as embedded:
+        assert embedded.size == image.size
+        assert embedded.convert('RGBA').tobytes() == image.tobytes()
 
 
 def images(svg):
@@ -100,7 +111,9 @@ def test_invalid_required_data_precedes_symbol_generation_render_or_transport(ki
     monkeypatch.setattr(service,'symbol_plan',forbidden)
     monkeypatch.setattr(raster,'render_svg_bitmap',forbidden)
     monkeypatch.setattr(socket,'create_connection',forbidden)
-    with pytest.raises(BindingError) as failure:bind_template(simple(kind),data)
+    prepared_simple = simple(kind)
+    with pytest.raises(BindingError) as failure:
+        bind_template(prepared_simple, data)
     assert failure.value.code==code
 
 
@@ -121,9 +134,12 @@ def test_unavailable_symbols_are_plain_centered_boxes_without_generator(kind, da
     assert text.text == ' N/A '
     assert float(text.get('x')) == pytest.approx(x+w/2, abs=.0001)
     assert float(text.get('y')) == pytest.approx(y+h/2, abs=.0001)
-    assert 'text-anchor:middle' in text.get('style') and 'dominant-baseline:central' in text.get('style')
-    assert float(rect.get('width')) < w and float(rect.get('height')) < h
-    assert bound.symbols == () and not admit_template(bound.svg).objects
+    assert 'text-anchor:middle' in text.get('style')
+    assert 'dominant-baseline:central' in text.get('style')
+    assert float(rect.get('width')) < w
+    assert float(rect.get('height')) < h
+    assert bound.symbols == ()
+    assert not admit_template(bound.svg).objects
     assert data == snapshot
     # Owner transforms and source order remain intact.
     assert root[0].get('transform') == ET.fromstring(source)[0].get('transform')
@@ -143,7 +159,9 @@ def test_valid_zero_false_and_compositions_use_fresh_payload(kind,value):
 def test_capacity_options_geometry_and_aggregate_reservation_fail_closed(monkeypatch):
     options=dict(next(c['options'] for c in VECTORS if c['type']=='qrcode'))
     options.update(qr_version=1,ecc='H',segmentation='byte')
-    with pytest.raises(BindingError) as failure:bind_template(simple('qrcode',options=options),{'KEY':'x'*100})
+    prepared_simple_2 = simple('qrcode', options=options)
+    with pytest.raises(BindingError) as failure:
+        bind_template(prepared_simple_2, {'KEY': 'x' * 100})
     assert failure.value.code=='symbol_capacity'
     options.update(qr_version='auto',size=2000)
     one=ET.fromstring(simple('qrcode',options=options));owner=one.find(f'{{{SVG_NS}}}g')
@@ -151,9 +169,14 @@ def test_capacity_options_geometry_and_aggregate_reservation_fail_closed(monkeyp
     one.append(copy.deepcopy(owner))
     import app.template_binding.service as service
     monkeypatch.setattr(service,'data_url',lambda *args:pytest.fail('Budget overflow reached PNG allocation'))
-    with pytest.raises(BindingError) as failure:bind_template(ET.tostring(one,encoding='unicode'),{'KEY':'valid'})
+    prepared_tostring = ET.tostring(one, encoding='unicode')
+    with pytest.raises(BindingError) as failure:
+        bind_template(prepared_tostring, {'KEY': 'valid'})
     assert failure.value.code=='resource_limit'
-    with pytest.raises(BindingError) as failure:bind_template(simple().replace('preserveAspectRatio="none"',''),{'KEY':'NEW'})
+    prepared_simple_3 = simple()
+    prepared_replace = prepared_simple_3.replace('preserveAspectRatio="none"', '')
+    with pytest.raises(BindingError) as failure:
+        bind_template(prepared_replace, {'KEY': 'NEW'})
     assert failure.value.code=='unsupported_feature'
 
 
@@ -180,7 +203,9 @@ def test_static_images_and_mixed_text_symbols_are_atomic_and_sink_independent(mo
     text.set('data-field','ABSENT')
     import app.template_binding.service as service
     monkeypatch.setattr(service,'symbol_plan',forbidden)
-    with pytest.raises(BindingError) as failure:bind_template(ET.tostring(source,encoding='unicode'),{'KEY':'fresh','ABSENT':[]})
+    prepared_tostring_2 = ET.tostring(source, encoding='unicode')
+    with pytest.raises(BindingError) as failure:
+        bind_template(prepared_tostring_2, {'KEY': 'fresh', 'ABSENT': []})
     assert failure.value.code=='invalid_binding'
 
 
@@ -190,13 +215,17 @@ def test_unknown_or_unsupported_symbol_settings_reject_before_generation(change,
     options.update(change)
     import app.template_binding.service as service
     monkeypatch.setattr(service,'symbol_plan',lambda *a:pytest.fail('Invalid metadata reached generator'))
-    with pytest.raises(TemplateAdmissionError):bind_template(simple(options=options),{'KEY':'valid'})
+    prepared_simple_4 = simple(options=options)
+    with pytest.raises(TemplateAdmissionError):
+        bind_template(prepared_simple_4, {'KEY': 'valid'})
 
 
 def test_fractional_linear_metrics_reject_without_substitution():
     options=dict(next(c['options'] for c in VECTORS if c['type']=='code128'))
     options['module_width']=1.5
-    with pytest.raises(BindingError) as failure:bind_template(simple(options=options),{'KEY':'valid'})
+    prepared_simple_5 = simple(options=options)
+    with pytest.raises(BindingError) as failure:
+        bind_template(prepared_simple_5, {'KEY': 'valid'})
     assert failure.value.code=='unsupported_feature'
 
 

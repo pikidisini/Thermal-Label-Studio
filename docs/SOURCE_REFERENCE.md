@@ -187,3 +187,18 @@ nama tersebut. Nilai rahasia tidak boleh disalin ke dokumentasi, laporan, atau G
 | `TLS_SAP_RFC_FUNCTIONS` | [backend/app/sap_rfc/runtime.py](../backend/app/sap_rfc/runtime.py), [scripts/dev.py](../scripts/dev.py) |
 | `TLS_SAP_RFC_PYTHON` | [backend/app/sap_rfc/runtime.py](../backend/app/sap_rfc/runtime.py), [scripts/dev.py](../scripts/dev.py) |
 | `TLS_SAP_RFC_TARGETS` | [backend/app/sap_rfc/runtime.py](../backend/app/sap_rfc/runtime.py), [scripts/dev.py](../scripts/dev.py) |
+
+## Antrean SAP asinkron
+
+| Batas | Source aktif |
+| --- | --- |
+| POST/GET `/api/v2/label-intake` dan API operator `/api/v1/sap-requests` | `backend/app/intake_queue/http.py` |
+| Transaksi antrean, ledger bersama, retensi, dan kepemilikan printer | `backend/app/intake_queue/store.py`, `printers.py` |
+| Enkripsi payload dan supervisor dua worker Linux | `backend/app/intake_queue/crypto.py`, `runtime.py`, `worker.py` |
+| Lightweight committed-heartbeat health probe | `backend/app/intake_queue/health.py` |
+| Isolated local Linux acceptance harness | `deploy/queue-local-test/` |
+| Migrasi eksplisit | `backend/schema/009_intake_queue.sql` |
+| Layar operator | `frontend/src/features/sap-requests/` |
+| Deployment dan pemulihan | `deploy/`, `scripts/queue_operations.py`, `scripts/production_backup.py`, `scripts/production_restore.py` |
+
+Kontrak dan gerbang penerimaan: [Production queue](PRODUCTION_QUEUE.md).

@@ -5,7 +5,7 @@ import { useTranslation } from '../../../shared/i18n';
 import type { ManagementController } from '../hooks/useManagement';
 import { sapRfcApi, type RfcOperation, type RfcParameter, type LiveResult } from '../api/sapRfcApi';
 
-export function RfcOperationForm({ initial, existing, management, close }: { initial: RfcOperation; existing: boolean; management: ManagementController; close: () => void }) {
+export function RfcOperationForm({ initial, existing, management, close }: Readonly<{ initial: RfcOperation; existing: boolean; management: ManagementController; close: () => void }>) {
   const t = useTranslation();
   const examples: Record<RfcParameter['kind'], string> = { string: 'DEMO-001', integer: '10', decimal: '0.50', date: '2026-01-31', boolean: 'true', string_list: 'DEMO-001\nDEMO-002' };
   const [value, setValue] = useState(initial);
@@ -26,7 +26,7 @@ export function RfcOperationForm({ initial, existing, management, close }: { ini
     if (missing) { setLive(null); setError(t('Enter a value for {parameter}. Placeholder examples are not submitted.', { parameter: missing.name })); return; }
     setFetching(true); setLive(null); setError('');
     try { setLive(await sapRfcApi.execute(management.policy.revision, initial.operation_id, values)); }
-    catch (failure) { setError(failure instanceof Error ? failure.message : 'SAP request failed. No automatic retry was made.'); }
+    catch (error_) { setError(error_ instanceof Error ? error_.message : 'SAP request failed. No automatic retry was made.'); }
     finally { setFetching(false); }
   }
   return <form className="management-source-form" onSubmit={event => { event.preventDefault(); if (management.policy) void management.mutate(() => sapRfcApi.operation(management.policy!.revision, value), close); }}>
@@ -41,7 +41,7 @@ export function RfcOperationForm({ initial, existing, management, close }: { ini
       <SapField label={t('Configuration')} help={t("Disabled keeps the operation as a draft. Enabled makes it selectable when its SAP connection is also enabled. Both states remain unverified until a real SAP runtime is available.")}><Select disabled={disabled} value={String(value.enabled)} onChange={e => update({ enabled: e.target.value === 'true' })}><option value="false">{t('Disabled')}</option><option value="true">{t('Enabled')}</option></Select></SapField>
     </div>
     <section className="management-source-group"><h3>{t('RFC input parameters')}</h3>
-      {value.parameters.map((p, index) => <fieldset key={index} className="management-rfc-fields"><legend>{t('Parameter')} {index + 1}</legend>
+      {value.parameters.map((p, index) => <fieldset key={`${p.name}:${p.kind}:${p.source}:${p.label}`} className="management-rfc-fields"><legend>{t('Parameter')} {index + 1}</legend>
         <SapField label={t('SAP parameter name')} help={t("Required. Exact input parameter name expected by the RFC, for example IV_ROLL_NUMBER. Add only parameters in the agreed SAP contract; names must be unique.")}><Input required pattern="[A-Za-z_][A-Za-z0-9_]{0,29}" disabled={disabled} placeholder={t('Example: {value}', { value: 'IV_CHARG' })} value={p.name} onChange={e => parameter(index, { name: e.target.value })} /></SapField>
         <SapField label={t('Display name')} help={t("Required. User-facing name for this input, for example Roll number. Changing it does not change the technical SAP parameter name.")}><Input required maxLength={80} disabled={disabled} placeholder={t('Example: {value}', { value: t('Roll number') })} value={p.label} onChange={e => parameter(index, { label: e.target.value })} /></SapField>
         <SapField label={t('Data type')} help={t("Choose the expected value type: string for text or identifiers with leading zeros; integer for whole numbers; decimal for fractions; date for YYYY-MM-DD; boolean for true/false; string_list for one text value per line.")}><Select disabled={disabled} value={p.kind} onChange={e => parameter(index, { kind: e.target.value as RfcParameter['kind'] })}>{(['string', 'integer', 'decimal', 'date', 'boolean', 'string_list'] as const).map(kind => <option key={kind}>{kind}</option>)}</Select></SapField>
@@ -68,7 +68,7 @@ export function RfcOperationForm({ initial, existing, management, close }: { ini
       <div className="management-fields"><SapField label={t('Result path')} help={t("Optional. Location of the result inside the RFC response, for example ET_LABEL_DATA or ES_RESULT.LABELS. Leave blank to use the response root. Use field names separated by dots, without array indexes.")}><Input maxLength={256} disabled={disabled} placeholder="ET_LABEL_DATA" value={value.result_path} onChange={e => update({ result_path: e.target.value })} /></SapField><SapField label={t('Result shape')} help={t("Table means a list of rows, such as ET_LABEL_DATA. Structure means one object, such as ES_LABEL_DATA. Choose the shape that matches the configured result path.")}><Select disabled={disabled} value={value.result_kind} onChange={e => update({ result_kind: e.target.value as RfcOperation['result_kind'] })}><option value="table">{t('Table')}</option><option value="structure">{t('Structure')}</option></Select></SapField></div>
       <p className="management-muted">{t('Use dot-separated field names. Leave the result path empty to map the response root.')}</p>
       </>}
-      {responseMode === 'mapping' && <>{value.mappings.map((mapping, index) => <fieldset key={index} className="management-rfc-fields"><legend>{t('Mapping')} {index + 1}</legend>
+      {responseMode === 'mapping' && <>{value.mappings.map((mapping, index) => <fieldset key={`${mapping.source}:${mapping.target}`} className="management-rfc-fields"><legend>{t('Mapping')} {index + 1}</legend>
         <SapField label={t('SAP response field')} help={t("Required. Field within each result row or structure, for example ZZNOMORROLL or MATERIAL.CODE. This path starts inside the selected result, so do not repeat ET_LABEL_DATA here.")}><Input required maxLength={256} disabled={disabled} placeholder={t('Example: {value}', { value: 'ZZNOMORROLL' })} value={mapping.source} onChange={e => update({ mappings: value.mappings.map((m, i) => i === index ? { ...m, source: e.target.value } : m) })} /></SapField>
         <SapField label={t('Label data field')} help={t("Required. Exact destination key used by the label data or template, for example Roll Number. Preserve spelling, spaces and letter case. Each destination key must be unique.")}><Input required maxLength={128} disabled={disabled} placeholder={t('Example: {value}', { value: 'Roll Number' })} value={mapping.target} onChange={e => update({ mappings: value.mappings.map((m, i) => i === index ? { ...m, target: e.target.value } : m) })} /></SapField>
         <SapField label={t('Required')} help={t("Checked means this value must be provided. For response mappings, a required field must exist and cannot be null or empty; 0 and false are valid values.")}><Input type="checkbox" disabled={disabled} checked={mapping.required} onChange={e => update({ mappings: value.mappings.map((m, i) => i === index ? { ...m, required: e.target.checked } : m) })} /></SapField>
@@ -85,7 +85,7 @@ export function RfcOperationForm({ initial, existing, management, close }: { ini
       {(!initial.enabled || !management.snapshot?.document.sap_rfc?.connections.find(c => c.connection_id === initial.connection_id)?.enabled) && <p>{t('Enable the SAP connection and RFC operation before fetching data.')}</p>}
       {dirty && <p>{t('Save changes before calling SAP.')}</p>}
       {error && <p role="alert">{t(error)}</p>}
-      {live && <div className="management-source-group"><p role="status">{t('Actual SAP response received. No label was printed.')} · {live.target.system_id} / {live.target.client}</p><pre className="management-rfc-result">{JSON.stringify(live.items ?? live.rows, null, 2)}</pre><details><summary>{t('Raw RFC response')}</summary><pre className="management-rfc-result">{JSON.stringify(live.response, null, 2)}</pre></details></div>}
+      {live && <div className="management-source-group"><output data-ui-status-block  >{t('Actual SAP response received. No label was printed.')} · {live.target.system_id} / {live.target.client}</output><pre className="management-rfc-result">{JSON.stringify(live.items ?? live.rows, null, 2)}</pre><details><summary>{t('Raw RFC response')}</summary><pre className="management-rfc-result">{JSON.stringify(live.response, null, 2)}</pre></details></div>}
 
     </section>}
   </form>;

@@ -29,7 +29,9 @@ export function useLocalPrint() {
       } else setMessage('Printing stopped. Check the per-label results before another print.');
     } catch (error) {
       const safe = ['Preview expired. Get Data again before printing.', 'Printer configuration changed. Refresh printers and reconnect the agent.', 'Print package is too large. Select fewer labels.', 'Print package could not be prepared. Nothing was sent to the local agent.', 'Invalid print package.'];
-      setMessage(sent ? 'Print outcome is uncertain. Check the printer and agent ledger before another print.' : error instanceof Error && safe.includes(error.message) ? error.message : 'Print preparation failed. Nothing was sent to the local agent.');
+      if (sent) setMessage('Print outcome is uncertain. Check the printer and agent ledger before another print.');
+      else if (error instanceof Error && safe.includes(error.message)) setMessage(error.message);
+      else setMessage('Print preparation failed. Nothing was sent to the local agent.');
     } finally { inFlight.current = false; setPrinting(false); }
   }
   function unlock() {

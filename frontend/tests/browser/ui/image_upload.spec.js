@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/coverage.js';
 import { mockBuiltApplication, openStudio, saveLayout, reopenLayout } from '../helpers/studio.js';
 
 test.beforeEach(async ({page}) => { await mockBuiltApplication(page); await openStudio(page); });

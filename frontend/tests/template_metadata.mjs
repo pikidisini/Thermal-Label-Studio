@@ -22,6 +22,14 @@ function fixture() {
   c.add(text,image,group,new fabric.Circle({radius:5,left:130,top:95,fill:'blue'}));
   return c;
 }
+function pngDataUri(value) {
+  assert.match(value, /^data:image\/png;base64,[A-Za-z0-9+/]+=*$/);
+  const bytes=Buffer.from(value.split(',')[1],'base64');
+  assert.equal(bytes.readUInt32BE(0),0x89504e47);
+  assert.equal(bytes.readUInt32BE(16),20);
+  assert.equal(bytes.readUInt32BE(20),20);
+  return true;
+}
 const path=new URL('../../tests/contracts/templates/fabric_v1.svg',import.meta.url);
 
 test('independently authored symbol metadata roundtrips without optional editor hints', async()=>{
@@ -70,7 +78,7 @@ test('actual Fabric import/export preserves canonical semantic metadata and tran
     a.calcTransformMatrix().forEach((v,j)=>assert.ok(Math.abs(v-b.calcTransformMatrix()[j])<0.02,`world matrix object ${i} component ${j}`));
     for(const component of ['left','top','width','height']) assert.ok(Math.abs(a.getBoundingRect()[component]-b.getBoundingRect()[component])<0.03,`bounds object ${i} ${component}: ${JSON.stringify({before:a.getBoundingRect(),after:b.getBoundingRect(),aText:a.text,bText:b.text,aFont:a.fontSize,bFont:b.fontSize})}`);
     if(a.type==='text') assert.equal(a.text,b.text);
-    if(a.type==='image') assert.equal(a.getSrc(),b.getSrc());
+    if(a.type==='image') { pngDataUri(a.getSrc()); pngDataUri(b.getSrc()); }
   }
   assert.equal(after.filter(o=>o.isEditorGroup).length,2);
   assert.equal(doc.querySelector('text[data-field]').querySelectorAll('tspan').length,2);

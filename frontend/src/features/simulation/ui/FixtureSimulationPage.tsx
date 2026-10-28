@@ -25,7 +25,7 @@ export function FixtureReview({ loading, error, result }: FixtureReviewProps) {
         <div className="flex gap-3 items-center"><h2 className="font-semibold">{t("Item")} {item.item_index + 1} · {item.item_id}</h2><Badge tone={url ? "success" : "danger"}>{url ? t("Preview ready") : t("Failed")}</Badge></div>
         {item.error && <ErrorState title={item.error.message} detail={`Error: ${item.error.code}`} />}
         {url && <img src={url} alt={`Backend fixture preview for item ${item.item_index + 1}`} className="max-h-[28rem] max-w-full bg-white object-contain" />}
-        <details><summary className="cursor-pointer text-sm">{t("Processing steps")}</summary><ol className="mt-2 space-y-1 text-sm text-on-surface-variant">{item.trace.map((step, index) => <li key={index}>{index + 1}. {step.message} <span className="text-xs">({step.status})</span></li>)}</ol></details>
+        <details><summary className="cursor-pointer text-sm">{t("Processing steps")}</summary><ol className="mt-2 space-y-1 text-sm text-on-surface-variant">{item.trace.map((step) => <li key={`${step.status}:${step.message}`}>{step.message} <span className="text-xs">({step.status})</span></li>)}</ol></details>
       </article>;
     })}
   </div>;
@@ -49,12 +49,15 @@ export function FixtureSimulationPage() {
       if (!controller.signal.aborted) setReview({ loading: false, error: error instanceof Error ? error.message : 'Fixture simulation failed.', result: null });
     } finally { if (active.current === controller) active.current = null; }
   };
+  let actionLabel = 'Run fixture simulation';
+  if (review.error) actionLabel = 'Retry simulation';
+  if (review.loading) actionLabel = 'Creating previews…';
   return <ApplicationPageShell><ApplicationHeader /><main className="min-h-screen bg-surface-base text-on-surface font-sans px-4 py-8" data-ui-root="true">
     <div className="max-w-4xl mx-auto space-y-6">
       <header className="space-y-2"><a href="/" className="text-sm text-primary underline">{t("Back to Studio")}</a><h1 className="text-2xl font-bold">{t("Fixture simulation")}</h1><Badge>{t("Development fixture")}</Badge><p className="text-sm text-on-surface-variant">{t("Review sample labels created by the backend processing pipeline. The mixed scenario includes one item with missing data to show how failures are reported.")}</p></header>
       <div className="flex flex-wrap items-end gap-4 border border-outline-variant bg-surface-container p-4">
         <Field label={t("Fixture scenario")}><Select value={scenario} disabled={review.loading} onChange={(event) => { setScenario(event.target.value as FixtureScenario); setReview({ loading: false, error: null, result: null }); }}><option value="sample">{t("One sample label")}</option><option value="mixed">{t("Three items, including one failure")}</option></Select></Field>
-        <Button tone="primary" disabled={review.loading} onClick={() => void run()} variant="default">{review.loading ? t("Creating previews…") : review.error ? t("Retry simulation") : t("Run fixture simulation")}</Button>
+        <Button tone="primary" disabled={review.loading} onClick={() => void run()} variant="default">{t(actionLabel)}</Button>
       </div>
       <FixtureReview {...review} />
     </div>

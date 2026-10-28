@@ -25,6 +25,27 @@ def unique_members(pairs):
     return result
 
 
+def resolve_keys(config, values):
+    keys = {}
+    refs = set()
+    for version, reference in config.keys.items():
+        if (not reference.startswith('TLS_INTAKE_HMAC_') or len(reference) <= len('TLS_INTAKE_HMAC_')
+                or len(reference) > 128 or reference in refs
+                or not all(char in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_' for char in reference)):
+            raise ValueError()
+        refs.add(reference)
+        encoded = values.get(reference, '')
+        if (not isinstance(encoded, str) or not 43 <= len(encoded) <= 86
+                or not all(char in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_' for char in encoded)):
+            raise ValueError()
+        secret = base64.urlsafe_b64decode(encoded + '=' * (-len(encoded) % 4))
+        if (not 32 <= len(secret) <= 64
+                or base64.urlsafe_b64encode(secret).decode('ascii').rstrip('=') != encoded):
+            raise ValueError()
+        keys[version] = secret
+    return LedgerKeys(config.active_key, keys)
+
+
 def create_runtime_ledger(environment=None):
     """Opt-in keyring and dedicated DSN. Missing/invalid config never enables fallback.
 
@@ -47,24 +68,7 @@ def create_runtime_ledger(environment=None):
             raise ValueError()
         # Force parsing of an invalid port before the connection factory exists.
         parsed.port
-        keys = {}
-        refs = set()
-        for version, reference in config.keys.items():
-            if (not reference.startswith('TLS_INTAKE_HMAC_') or len(reference) <= len('TLS_INTAKE_HMAC_')
-                    or len(reference) > 128 or reference in refs
-                    or not all(char in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_' for char in reference)):
-                raise ValueError()
-            refs.add(reference)
-            encoded = values.get(reference, '')
-            if (not isinstance(encoded, str) or not 43 <= len(encoded) <= 86
-                    or not all(char in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_' for char in encoded)):
-                raise ValueError()
-            secret = base64.urlsafe_b64decode(encoded + '=' * (-len(encoded) % 4))
-            if (not 32 <= len(secret) <= 64
-                    or base64.urlsafe_b64encode(secret).decode('ascii').rstrip('=') != encoded):
-                raise ValueError()
-            keys[version] = secret
-        keyring = LedgerKeys(config.active_key, keys)
+        keyring = resolve_keys(config, values)
     except Exception:
         # Never expose validation input, DSN, credential material or private paths.
         raise ValueError('Invalid intake ledger configuration.') from None

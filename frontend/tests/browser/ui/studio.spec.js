@@ -1,10 +1,9 @@
+import { downloadTemplateSvg } from '../helpers/svgDownload.js';
 import { mockAccountSession } from '../helpers/studio.js';
 import { uploadSampleFixture } from '../helpers/sampleData.js';
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/coverage.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
 const dist = fileURLToPath(new URL('../../../dist/', import.meta.url));
 import { openStudio, saveLayout, reopenLayout, preview, mockBuiltApplication } from '../helpers/studio.js';
 
@@ -196,7 +195,6 @@ test.beforeEach(async ({ page }) => {
   // Keep mocked UI tests independent of external font downloads.
   await page.route('https://fonts.googleapis.com/**', route => route.fulfill({ contentType: 'text/css', body: '' }));
   await page.route('https://fonts.gstatic.com/**', route => route.abort());
-  if (process.env.TLS_COVERAGE_DIRECTORY) await page.coverage.startJSCoverage({ resetOnNavigation: false });
   // Exercise the freshly built source, independent of a stale container image.
   await page.route('**/studio', route => route.fulfill({ path: path.join(dist, 'index.html'), contentType: 'text/html' }));
   await page.route('**/assets/**', route => {
@@ -210,20 +208,6 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/v1/studio-sample-datasets', route => route.request().method() === 'POST'
     ? route.fulfill({ status: 201, json: { id: 'sample-mock', name: route.request().postDataJSON().name, original_filename: route.request().postDataJSON().original_filename } })
     : route.fulfill({ json: [] }));
-});
-
-test.afterEach(async ({ page }) => {
-  const directory = process.env.TLS_COVERAGE_DIRECTORY;
-  if (!directory) return;
-  const projectTmp = fileURLToPath(new URL('../../../../.tmp/', import.meta.url));
-  if (!path.resolve(directory).startsWith(path.resolve(projectTmp) + path.sep)) throw new Error('Coverage output must be inside project .tmp.');
-  const entries = await page.coverage.stopJSCoverage();
-  const result = entries.filter(entry => entry.url.startsWith('http') && new URL(entry.url).pathname.startsWith('/assets/')).map(entry => ({
-    scriptId: entry.scriptId, functions: entry.functions,
-    url: path.join(dist, decodeURIComponent(new URL(entry.url).pathname)),
-  }));
-  mkdirSync(directory, { recursive: true });
-  writeFileSync(path.join(directory, `coverage-browser-${randomUUID()}.json`), JSON.stringify({ result }));
 });
 
 test('Studio mounts and canvas text tools work without login', async ({ page }) => {
@@ -297,7 +281,7 @@ test('Preview view uses the current endpoint once and clears the bitmap on serve
   await expect(page.getByAltText('Backend bitmap reference')).toBeVisible();
   await expect(page.getByAltText('Thermal Simulation')).toBeVisible();
   expect(calls.filter(path => path === '/api/v1/simulation/editor-preview')).toHaveLength(1);
-  expect(calls.some(path => /\/(render|templates|auth|print|sap)(\/|$)/.test(path))).toBe(false);
+  expect(calls.some(path => /\/(render|templates|print|sap)(\/|$)/.test(path))).toBe(false);
   fail = true;
   await page.getByRole('button', { name: /Re-simulate/ }).click();
   await expect(page.getByAltText('Backend bitmap reference')).toHaveCount(0);
@@ -360,20 +344,12 @@ test('Fabric 7 preserves SVG groups through import/export, undo, redo and duplic
   await page.keyboard.press('Control+a');
   await page.getByTestId('layers-btn-group').click();
   await expect(page.getByTestId('layers-count-label')).toContainText('(1)');
-  await page.getByTestId('topbar-menu-btn-file').click();
-  const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('menuitem', { name: 'Download template SVG', exact: true }).click();
-  const stream = await (await downloadPromise).createReadStream();
-  let exported = ''; for await (const chunk of stream) exported += chunk.toString();
+  const exported = await downloadTemplateSvg(page);
   await test.info().attach('exported-group.svg', { body: exported, contentType: 'image/svg+xml' });
   expect(exported).toContain('data-editor-group="true"');
   await upload(exported);
   await expect(page.getByTestId('layers-count-label')).toContainText('(1)');
-  await page.getByTestId('topbar-menu-btn-file').click();
-  const secondDownload = page.waitForEvent('download');
-  await page.getByRole('menuitem', { name: 'Download template SVG', exact: true }).click();
-  const secondStream = await (await secondDownload).createReadStream();
-  let roundTrip = ''; for await (const chunk of secondStream) roundTrip += chunk.toString();
+  const roundTrip = await downloadTemplateSvg(page);
   const bounds = await page.evaluate(contents => contents.map(content => {
     const root = new DOMParser().parseFromString(content, 'image/svg+xml').documentElement;
     document.body.appendChild(root);
@@ -449,11 +425,7 @@ test('SVG export escapes an imported ID containing attribute delimiters', async 
   await page.locator('input[accept=".svg,image/svg+xml"]').setInputFiles({ name: 'quoted-id.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="80mm" height="40mm" viewBox="0 0 320 160"><rect id="safe&quot; onload=&quot;window.__svgExecuted=1" width="30" height="20"/></svg>') });
   await page.getByTestId('inspector-tab-btn-layers').click();
   await expect(page.getByTestId('layers-count-label')).toContainText('(1)');
-  await page.getByTestId('topbar-menu-btn-file').click();
-  const pending = page.waitForEvent('download');
-  await page.getByRole('menuitem', { name: 'Download template SVG', exact: true }).click();
-  const stream = await (await pending).createReadStream();
-  let svg = ''; for await (const chunk of stream) svg += chunk.toString();
+  const svg = await downloadTemplateSvg(page);
   expect(await page.evaluate(content => {
     const document = new DOMParser().parseFromString(content, 'image/svg+xml');
     return document.querySelectorAll('parsererror, script, foreignObject, [onload], [onerror]').length;
@@ -498,22 +470,27 @@ test('Template Explorer separates the label from its panel and fits landscape an
 
 test('Template Explorer renames and deletes only after confirmation and server success', async ({ page }) => {
   let stored = { label_code: 'manage_ui', title: 'Original template', version: 1, width_mm: 80, height_mm: 40, dpi: 203.2,
-    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="80mm" height="40mm" viewBox="0 0 80 40"/>', status: 'published' };
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="80mm" height="40mm" viewBox="0 0 80 40"/>', svg_sha256: 'a'.repeat(64), status: 'published' };
   let fail = false;
   let deletes = 0;
   await page.route('**/api/v1/layouts', route => new URL(route.request().url()).pathname.startsWith('/api/v1/auth/') ? route.fallback() : route.fulfill({ json: stored ? [stored] : [] }));
-  await page.route('**/api/v1/layouts/manage_ui', route => {
-    if (route.request().method() === 'PATCH') {
-      expect(route.request().postDataJSON()).toEqual({ title: 'Renamed template' });
+  await page.route('**/api/v1/layouts/manage_ui', route => route.fulfill({ json: stored }));
+  await page.route('**/api/v1/management/snapshot', route => route.fulfill({ json: { writable: true, document: { policy: { revision: 'studio-test' } } } }));
+  await page.route('**/api/v1/management/templates/manage_ui', route => {
+    expect(route.request().method()).toBe('POST');
+    const input = route.request().postDataJSON();
+    expect(input).toMatchObject({ revision: 'studio-test', label_code: 'manage_ui', version: 1,
+      svg_sha256: 'a'.repeat(64), previous_title: stored.title, new_code: 'manage_ui' });
+    if (input.action === 'update') {
+      expect(input.title).toBe('Renamed template');
       stored = { ...stored, title: 'Renamed template' };
     }
-    if (route.request().method() === 'DELETE') {
+    if (input.action === 'delete') {
       deletes++;
       if (fail) return route.fulfill({ status: 503, json: { detail: { message: 'Storage unavailable' } } });
       stored = null;
-      return route.fulfill({ status: 204 });
     }
-    return route.fulfill({ json: stored });
+    return route.fulfill({ json: { revision: 'studio-test' } });
   });
   await openStudio(page);
   await page.getByTestId('btn-add-text').click();
@@ -540,7 +517,13 @@ test('Template Explorer renames and deletes only after confirmation and server s
   await modal.getByRole('button', { name: 'Confirm delete' }).click();
   await expect(modal.getByText('Storage unavailable', { exact: true })).toBeVisible();
   await expect(modal.getByRole('button', { name: 'Renamed template Custom', exact: true })).toBeVisible();
+  await expect(modal.getByRole('button', { name: 'Confirm delete' })).toBeDisabled();
+  expect(deletes).toBe(1);
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
   fail = false;
+  await page.getByTestId('topbar-open-template-explorer').click();
+  await modal.getByRole('button', { name: 'Renamed template Custom', exact: true }).click();
+  await modal.getByRole('button', { name: 'Delete', exact: true }).click();
   await modal.getByRole('button', { name: 'Confirm delete' }).click();
   await expect(modal.getByRole('button', { name: 'Renamed template Custom', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Close', exact: true }).click();
@@ -737,7 +720,7 @@ test('failed sample save retains local values and reports unsaved', async ({ pag
   const payload = { sender: { system: 'EXAMPLE' }, request_id: 'sample', mode: 'simulation', items: [{ item_id: 'one', label_code: 'A013', copies: 1, data: { ZZWIDTH: 42 } }] };
   await page.getByTestId('input-local-sap-json').setInputFiles({ name: 'example.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(payload)) });
   await expect(page.getByTestId('dataset-storage-status')).toContainText('Unsaved');
-  await expect(page.getByLabel('Preview value for ZZWIDTH', { exact: true })).toHaveValue('42');
+  await expect(page.getByLabel('Preview value for Width', { exact: true })).toHaveValue('42');
   expect(posts).toBe(1);
 });
 

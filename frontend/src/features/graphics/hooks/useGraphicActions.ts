@@ -11,7 +11,7 @@ export function useGraphicActions({ addImageFile }: { addImageFile: (file: File)
     const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(uri);
     if (!match) throw new Error('Invalid graphic response.');
     const binary = atob(match[2]);
-    const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+    const bytes = Uint8Array.from(binary, char => char.codePointAt(0)!);
     await addImageFile(new File([bytes], full.name, { type: match[1] }));
   }, [addImageFile]);
   return { handleAddGraphic };

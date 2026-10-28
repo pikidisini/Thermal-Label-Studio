@@ -1,7 +1,7 @@
 """Validate retained print outcomes without enabling an HTTP print sink."""
 from typing import Literal
 from pydantic import Field, model_validator
-from .results import PublicModel, IntakeError, TemplateEvidence
+from .results import PublicModel, IntakeError, TemplateEvidence, batch_status
 
 
 class PrintItem(PublicModel):
@@ -61,7 +61,7 @@ class PrintOutcome(PublicModel):
             ('submitted','SUBMITTED'),('failed','FAILED'),('uncertain','UNCERTAIN'),('skipped','SKIPPED'))}
         if self.summary.total!=len(self.results) or any(getattr(self.summary,key)!=value for key,value in counts.items()):
             raise ValueError('Invalid summary.')
-        expected='UNCERTAIN' if counts['uncertain'] else 'COMPLETED' if counts['submitted']==len(self.results) else 'PARTIAL' if counts['submitted'] else 'FAILED'
+        expected = batch_status(counts['submitted'], len(self.results), uncertain=counts['uncertain'])
         if self.status!=expected:
             raise ValueError('Invalid batch outcome.')
         return self

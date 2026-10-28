@@ -5,7 +5,9 @@ import { useTemplateStore } from '../../../store/useTemplateStore';
 import { useHistoryStore } from '../../../store/useHistoryStore';
 import type { ActiveTool } from '../../../types/label';
 import { matchStudioShortcut } from '../model/studioShortcuts';
-import { isEditorKeyboardBlocked } from '../../../shared/keyboard/keyboardContext';
+import { arrowKeyDelta, isEditorKeyboardBlocked } from '../../../shared/keyboard/keyboardContext';
+
+const NUDGE_STEPS = { nudge: 1, nudgeFast: 5, nudgeFine: 0.2 } as const;
 
 interface KeyboardShortcutProps {
   canvasRef: React.MutableRefObject<fabric.Canvas | null>;
@@ -43,44 +45,7 @@ export function useKeyboardShortcuts(props: KeyboardShortcutProps) {
       if (event.repeat && !shortcut.repeat) return;
       if (!shortcut.id.startsWith('nudge')) finishNudge();
       if (shortcut.designOnly && useHistoryStore.getState().isLocked) return;
-      const actions = latest.current;
-      switch (shortcut.id) {
-        case 'undo': actions.onUndo(); break;
-        case 'redo': actions.onRedo(); break;
-        case 'delete': if (active) actions.onDelete(); break;
-        case 'duplicate': if (active) actions.onDuplicate(); break;
-        case 'copy': if (active) actions.onCopy(); break;
-        case 'paste': actions.onPaste(); break;
-        case 'save': actions.onSave(); break;
-        case 'selectAll': {
-          if (!canvas) break;
-          canvas.discardActiveObject();
-          const objects = canvas.getObjects().filter(object => object.selectable !== false);
-          if (objects.length) canvas.setActiveObject(new fabric.ActiveSelection(objects, { canvas }));
-          else studio.setSelectedObject(null);
-          canvas.requestRenderAll();
-          break;
-        }
-        case 'escape':
-          // Line's document listener owns cancellation of its current segment.
-          if (studio.activeTool !== 'select') studio.setActiveTool('select');
-          canvas?.discardActiveObject(); canvas?.requestRenderAll();
-          studio.setSelectedObject(null);
-          break;
-        case 'fit': studio.triggerFit(); break;
-        case 'actualSize': studio.triggerReset100(); break;
-        case 'zoomIn': studio.setZoom(z => Math.min(3, Math.round((z + 0.1) * 10) / 10)); break;
-        case 'zoomOut': studio.setZoom(z => Math.max(0.2, Math.round((z - 0.1) * 10) / 10)); break;
-        case 'help': useTemplateStore.getState().setShortcutModalOpen(true); break;
-        case 'nudge': case 'nudgeFast': case 'nudgeFine': {
-          const step = shortcut.id === 'nudgeFast' ? 5 : shortcut.id === 'nudgeFine' ? 0.2 : 1;
-          const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
-          const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
-          nudging = actions.onNudge(dx, dy) || nudging;
-          break;
-        }
-        default: studio.setActiveTool(shortcut.id as ActiveTool);
-      }
+      nudging = dispatchShortcut(shortcut.id, latest.current, canvas, active, event, studio) || nudging;
     };
     const handleKeyUp = (event: KeyboardEvent) => { if (event.key.startsWith('Arrow')) finishNudge(); };
     window.addEventListener('keydown', handleKeyDown);
@@ -95,4 +60,50 @@ export function useKeyboardShortcuts(props: KeyboardShortcutProps) {
       document.removeEventListener('pointerdown', finishNudge, true);
     };
   }, []);
+}
+
+
+function dispatchShortcut(
+  id: NonNullable<ReturnType<typeof matchStudioShortcut>>['id'],
+  actions: KeyboardShortcutProps,
+  canvas: fabric.Canvas | null,
+  active: fabric.FabricObject | undefined,
+  event: KeyboardEvent,
+  studio: ReturnType<typeof useStudioStore.getState>,
+): boolean {
+  switch (id) {
+    case 'undo': actions.onUndo(); break;
+    case 'redo': actions.onRedo(); break;
+    case 'delete': if (active) actions.onDelete(); break;
+    case 'duplicate': if (active) actions.onDuplicate(); break;
+    case 'copy': if (active) actions.onCopy(); break;
+    case 'paste': actions.onPaste(); break;
+    case 'save': actions.onSave(); break;
+    case 'selectAll': {
+      if (!canvas) break;
+      canvas.discardActiveObject();
+      const objects = canvas.getObjects().filter(object => object.selectable !== false);
+      if (objects.length) canvas.setActiveObject(new fabric.ActiveSelection(objects, { canvas }));
+      else studio.setSelectedObject(null);
+      canvas.requestRenderAll();
+      break;
+    }
+    case 'escape':
+      // Line's document listener owns cancellation of its current segment.
+      if (studio.activeTool !== 'select') studio.setActiveTool('select');
+      canvas?.discardActiveObject(); canvas?.requestRenderAll();
+      studio.setSelectedObject(null);
+      break;
+    case 'fit': studio.triggerFit(); break;
+    case 'actualSize': studio.triggerReset100(); break;
+    case 'zoomIn': studio.setZoom(z => Math.min(3, Math.round((z + 0.1) * 10) / 10)); break;
+    case 'zoomOut': studio.setZoom(z => Math.max(0.2, Math.round((z - 0.1) * 10) / 10)); break;
+    case 'help': useTemplateStore.getState().setShortcutModalOpen(true); break;
+    case 'nudge': case 'nudgeFast': case 'nudgeFine': {
+      const delta = arrowKeyDelta(event.key, NUDGE_STEPS[id]);
+      return actions.onNudge(delta.x, delta.y);
+    }
+    default: studio.setActiveTool(id as ActiveTool);
+  }
+  return false;
 }

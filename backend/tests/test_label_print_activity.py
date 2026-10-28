@@ -31,9 +31,11 @@ def test_busy_preview_is_logged_with_http_code_trace_and_no_business_data(logged
     finally: http._preview_lock.release()
     assert response.status_code == 429
     event = store.events[-1]
-    assert event['error_code'] == 'preview_busy' and event['status_code'] == 429
+    assert event['error_code'] == 'preview_busy'
+    assert event['status_code'] == 429
     assert event['trace_id'] == response.headers['x-request-id']
-    assert event['origin'] == 'label_print' and event['mode'] == 'preview'
+    assert event['origin'] == 'label_print'
+    assert event['mode'] == 'preview'
     assert event['duration_ms'] >= 0
     assert 'PRIVATE' not in json.dumps(event)
     assert current_activity.get() is None
@@ -66,11 +68,14 @@ def test_delivery_outcomes_preserve_uncertainty_and_never_log_payloads(logged, m
         if failure: raise OSError('PRIVATE-NETWORK-DETAIL')
     monkeypatch.setitem(app.dependency_overrides,http.print_transport_factory,lambda: lambda target: SimpleNamespace(submit=submit))
     response = client.post('/api/v1/label-print/print',json={'job_id':str(uuid4()),'target_id':'LAN','expected_host':'192.0.2.44','expected_port':9100,'copies':1,'artifacts':[artifact]})
-    assert response.status_code == 200 and len(sends)==1
+    assert response.status_code == 200
+    assert len(sends) == 1
     event = store.events[-1]
-    assert event['status']==expected and event['confirmed'] is False
+    assert event['status'] == expected
+    assert event['confirmed'] is False
     assert event['items'][0]['status']==expected
-    assert artifact not in json.dumps(event) and 'PRIVATE' not in json.dumps(event)
+    assert artifact not in json.dumps(event)
+    assert 'PRIVATE' not in json.dumps(event)
 
 
 def test_status_outcome_records_only_fixed_state_not_device_text(logged,monkeypatch):
@@ -79,7 +84,8 @@ def test_status_outcome_records_only_fixed_state_not_device_text(logged,monkeypa
     response=client.post('/api/v1/label-print/printer-status',json={'target_id':'LAN','expected_host':'192.0.2.44','expected_port':9100})
     assert response.status_code==200
     event=store.events[-1]
-    assert event['status']=='CHECKED' and event['printer_state']=='ATTENTION'
+    assert event['status'] == 'CHECKED'
+    assert event['printer_state'] == 'ATTENTION'
     assert event['printer_reason']=='media_out'
     assert [step['event'] for step in event['events']]==['REQUEST_RECEIVED','CHECKING_STATUS','STATUS_CHECKED','REQUEST_COMPLETED']
     assert 'PRIVATE' not in json.dumps(event)

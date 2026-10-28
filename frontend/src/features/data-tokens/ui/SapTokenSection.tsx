@@ -42,7 +42,6 @@ interface TokenCardProps {
   onAddSapToken: (token: string, asType: 'text' | 'barcode' | 'qr') => void;
 }
 
-type TokenProfile = string;
 
 function TokenCard({ fieldKey, value, isUsed, onAddSapToken, onUpdateToken, status, readOnly }: TokenCardProps & { onUpdateToken?: (token: string, value: string) => void; readOnly?: boolean }) {
   useTranslation();
@@ -156,7 +155,7 @@ export function SapTokenSection({
   const [customName, setCustomName] = React.useState('');
   const [customValue, setCustomValue] = React.useState('');
   const [search, setSearch] = React.useState('');
-  const [profile, setProfile] = React.useState<TokenProfile>('standard');
+  const [profile, setProfile] = React.useState<string>('standard');
   const addCustom = () => {
     const name = customName;
     if (!canAddLabelField(name, schemaKeys) || readOnly) return;
@@ -165,7 +164,7 @@ export function SapTokenSection({
     setCustomName(''); setCustomValue('');
   };
 
-  const categoryByKey = new Map<string, TokenProfile>();
+  const categoryByKey = new Map<string, string>();
   tokenKeys.forEach((key) => {
     if (customTokens.has(`${activeContractKey}:${key}`)) { categoryByKey.set(key, 'custom'); return; }
     const definition = getLabelField(key);
@@ -208,8 +207,8 @@ export function SapTokenSection({
           </select>
         </label>
         <button type="button" data-testid="btn-upload-dataset" onClick={() => datasetFileInput.current?.click()} className="cursor-pointer" data-ui-control="button" data-variant="default">{t("Upload dataset")}</button>
-        {activeContractKey === 'demo-defaults' && <p role="status" data-testid="default-token-data-notice" className="text-[10px]">{t("Default demo values - edit or load a dataset for actual data.")}</p>}
-        {datasetStatus && <p role="status" data-testid="dataset-storage-status" className="text-[10px]">{t(datasetStatus)}</p>}
+        {activeContractKey === 'demo-defaults' && <output data-ui-status-block  data-testid="default-token-data-notice" className="text-[10px]">{t("Default demo values - edit or load a dataset for actual data.")}</output>}
+        {datasetStatus && <output data-ui-status-block  data-testid="dataset-storage-status" className="text-[10px]">{t(datasetStatus)}</output>}
         {localImport && (
           <div className="rounded border border-tertiary/50 bg-tertiary/10 p-2 text-[10px] text-tertiary" data-testid="local-sap-import-banner">
             <div className="font-semibold">{t("Imported data - local preview")}</div>
@@ -243,7 +242,7 @@ export function SapTokenSection({
         <label data-ui-label="true" className="sr-only" htmlFor="input-sap-token-search">{t("Search fields")}</label>
         <input id="input-sap-token-search" data-testid="input-sap-token-search" aria-label={t("Search fields")} value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Search fields or values")} className="w-full"  data-ui-control="input" data-variant="default" />
         <label data-ui-label="true" className="sr-only" htmlFor="select-sap-token-profile">{t("Field group")}</label>
-        <select id="select-sap-token-profile" data-testid="select-sap-token-profile" aria-label={t("Field group")} value={profile} onChange={(e) => setProfile(e.target.value as TokenProfile)} className="w-full cursor-pointer" data-ui-control="select" data-variant="default">
+        <select id="select-sap-token-profile" data-testid="select-sap-token-profile" aria-label={t("Field group")} value={profile} onChange={(e) => setProfile(e.target.value as string)} className="w-full cursor-pointer" data-ui-control="select" data-variant="default">
           <option value="standard">{t("All fields")}</option>
           {LABEL_FIELD_GROUPS.map(group => <option key={group.id} value={group.id}>{t(group.label)}</option>)}
           <option value="customer">{t("Customer")}</option>

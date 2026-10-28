@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/coverage.js';
 import { openStudio, mockBuiltApplication } from '../helpers/studio.js';
 
 const target = { available: true, host: '192.0.2.44', port: 9100, encoder: 'IPL' };

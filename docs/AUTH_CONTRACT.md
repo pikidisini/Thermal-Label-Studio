@@ -115,7 +115,12 @@ python -B scripts/provision_auth.py --action recover --username <existing-admin>
 ```
 
 Set `TLS_AUTH_ORIGINS` to exact comma-separated browser/backend origins without
-trailing slash. LAN origins require HTTPS. The reverse proxy must preserve the
+trailing slash. HTTPS is the default and required for cloud/production deployment.
+The optional self-hosted LAN profile may set `TLS_AUTH_TRUSTED_LAN_HTTP=true` only
+when every HTTP origin is an exact private numeric IP origin in
+`TLS_AUTH_ORIGINS`; public addresses, DNS names, wildcards and unlisted hosts are
+rejected. This mode preserves account, role, CSRF and session controls, but its
+browser-to-server transport is not encrypted. The reverse proxy must preserve the
 public Host, terminate TLS, and replace forwarded protocol/address headers.
 `TLS_TRUSTED_PROXY_IPS` admits only explicit numeric peer addresses; empty means
 forwarded headers are ignored. No wildcard trust exists. Keep the backend/Compose

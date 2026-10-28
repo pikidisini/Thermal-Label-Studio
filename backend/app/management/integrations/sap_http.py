@@ -162,7 +162,7 @@ def execute_operation(identity: str, revision: str, values: dict, request: Reque
     try:
         response = rfc_runtime.call(connection, operation, parameters, password)
     except rfc_runtime.RfcError as exc:
-        status = 403 if exc.code == 'sap_execution_not_allowed' else 422 if exc.code == 'sap_logon_failed' else 503
+        status = {'sap_execution_not_allowed': 403, 'sap_logon_failed': 422}.get(exc.code, 503)
         raise ManagementError(exc.code, status) from None
     finally:
         password = None

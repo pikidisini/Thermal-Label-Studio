@@ -7,7 +7,7 @@ export function useTemplatePreview(editor: Editor | null) {
   const [previewError, setPreviewError] = React.useState('');
   React.useEffect(() => {
     setPreview(null); setPreviewError('');
-    if (!editor || editor.kind !== 'template') return;
+    if (editor?.kind !== 'template') return;
     let cancelled = false, url: string | null = null;
     layoutApi.get(editor.value.label_code, editor.value.version).then(layout => {
       if (cancelled) return;

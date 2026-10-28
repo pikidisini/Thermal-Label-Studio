@@ -3,17 +3,18 @@ import { Download, X, Plus, LoaderCircle } from 'lucide-react';
 import { useTranslation } from '../../../shared/i18n';
 import { Button, Input } from '../../../shared/ui/primitives';
 import './batch-entry.css';
+import { previewStatus } from '../model/labelPreview';
 
 type BatchRow = { id: number; value: string };
 
 /** Local input only. No SAP retrieval or printer submission is implied. */
-export function BatchEntry({ onBatchesChange, onRetrieve, busy = false, retrieving = false, results = [] }: {
+export function BatchEntry({ onBatchesChange, onRetrieve, busy = false, retrieving = false, results = [] }: Readonly<{
   onBatchesChange?: () => void;
   onRetrieve?: (batches: string[]) => void;
   busy?: boolean;
   retrieving?: boolean;
   results?: Array<{ batch: string; error?: string; notAttempted?: boolean }>;
-}) {
+}>) {
   const t = useTranslation();
   const nextId = useRef(1);
   const [rows, setRows] = useState<BatchRow[]>([{ id: 0, value: '' }]);
@@ -22,7 +23,7 @@ export function BatchEntry({ onBatchesChange, onRetrieve, busy = false, retrievi
   const newRow = (value = '') => ({ id: nextId.current++, value });
   const updateRows = (updated: BatchRow[]) => { setRows(updated); onBatchesChange?.(); };
   const complete = (values: BatchRow[]) => {
-    if (!values.length || values[values.length - 1].value.trim()) values.push(newRow());
+    if (!values.length || values[values.length - 1].value.trim()) { values.push(newRow()); }
     return values;
   };
   const focus = (id: number) => requestAnimationFrame(() => inputs.current.get(id)?.focus());
@@ -31,17 +32,25 @@ export function BatchEntry({ onBatchesChange, onRetrieve, busy = false, retrievi
   const seen = new Map<string, number>();
   const duplicateRows = rows.map((row, index) => {
     const value = row.value.trim();
-    if (!value) return undefined;
+    if (!value) { return undefined; }
     const first = seen.get(value);
-    if (first !== undefined) return first + 1;
+    if (first !== undefined) { return first + 1; }
     seen.set(value, index);
     return undefined;
   });
 
+  function rowStatus(value: string): string {
+    const batch = value.trim();
+    if (!batch) return 'Empty';
+    if (retrieving) return 'Waiting for response';
+    const result = results.find(item => item.batch === batch);
+    return result ? previewStatus(result) : 'Not retrieved';
+  }
+
   function paste(event: React.ClipboardEvent<HTMLInputElement>, index: number) {
-    if (busy) return;
+    if (busy) { return; }
     const text = event.clipboardData.getData('text/plain');
-    if (!/[\r\n\t]/.test(text)) return;
+    if (!/[\r\n\t]/.test(text)) { return; }
     event.preventDefault();
     const lines = text.replace(/\r\n?/g, '\n').split('\n').filter(line => line.trim());
     if (lines.some(line => line.split('\t').filter(cell => cell.trim()).length > 1)) {
@@ -49,7 +58,7 @@ export function BatchEntry({ onBatchesChange, onRetrieve, busy = false, retrievi
       return;
     }
     const batches = lines.map(line => line.trim()).filter(Boolean);
-    if (!batches.length) return;
+    if (!batches.length) { return; }
     if (count - (rows[index].value.trim() ? 1 : 0) + batches.length > 100) { setMessage('Batch limit is 100 per request.'); return; }
     const updated = [...rows];
     updated.splice(index, 1, ...batches.map(value => newRow(value)));
@@ -68,28 +77,28 @@ export function BatchEntry({ onBatchesChange, onRetrieve, busy = false, retrievi
         {rows.map((row, index) => <tr key={row.id}>
           <td className="batch-entry-number">{index + 1}</td>
           <td className="batch-entry-cell"><Input data-variant="compact" disabled={busy}
-            ref={element => { if (element) inputs.current.set(row.id, element); else inputs.current.delete(row.id); }}
+            ref={element => { if (element) { inputs.current.set(row.id, element); } else inputs.current.delete(row.id); }}
             aria-label={t('Batch row {row}', { row: index + 1 })} value={row.value}
             aria-describedby={duplicateRows[index] ? `batch-duplicate-${row.id}` : undefined}
             placeholder={t('Enter or paste batches…')} spellCheck={false} autoComplete="off"
             onChange={event => {
-              if (busy) return;
+              if (busy) { return; }
               updateRows(complete(rows.map(item => item.id === row.id ? { ...item, value: event.target.value } : item)));
               setMessage('');
             }}
             onBlur={() => setRows(rows.map(item => item.id === row.id ? { ...item, value: item.value.trim() } : item))}
             onPaste={event => paste(event, index)}
             onKeyDown={event => {
-              if (busy) return;
-              if (event.key !== 'Enter') return;
+              if (busy) { return; }
+              if (event.key !== 'Enter') { return; }
               event.preventDefault();
               const updated = [...rows];
-              if (index === updated.length - 1) { if (count >= 100) return; updated.push(newRow()); }
+              if (index === updated.length - 1) { if (count >= 100) { return; } updated.push(newRow()); }
               setRows(updated); focus(updated[index + 1].id);
             }} />
             {duplicateRows[index] && <div className="batch-entry-duplicate" id={`batch-duplicate-${row.id}`}>{t('Duplicate of row {row}', { row: duplicateRows[index] })}</div>}
           </td>
-          <td className="batch-entry-result">{t(!row.value.trim() ? 'Empty' : retrieving ? 'Waiting for response' : results.find(item => item.batch === row.value.trim())?.notAttempted ? 'Not attempted' : results.find(item => item.batch === row.value.trim())?.error ? 'Failed' : results.some(item => item.batch === row.value.trim()) ? 'Preview ready' : 'Not retrieved')}</td>
+          <td className="batch-entry-result">{t(rowStatus(row.value))}</td>
           <td className="batch-entry-delete">{!(index === rows.length - 1 && !row.value) && <Button disabled={busy} variant="compact" data-ui-icon="true" aria-label={t('Delete row {row}', { row: index + 1 })}
             onClick={() => { const updated = complete(rows.filter(item => item.id !== row.id)); updateRows(updated); setMessage(''); focus(updated[Math.min(index, updated.length - 1)].id); }}><X size={16} aria-hidden="true" /></Button>}
           </td></tr>)}

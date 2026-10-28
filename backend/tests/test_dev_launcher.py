@@ -77,8 +77,9 @@ def test_unrelated_owner_never_prompts_or_stops():
 
 def test_revalidation_failure_does_not_report_success():
     with patch.object(dev, 'powershell_json', side_effect=ValueError('identity changed')):
+        prepared_server_owner = server_owner()
         with pytest.raises(ValueError, match='identity changed'):
-            dev.stop_verified_owner(server_owner())
+            dev.stop_verified_owner(prepared_server_owner)
 
 
 def test_restart_waits_for_companion_frontend_shutdown():
@@ -169,17 +170,20 @@ def test_compose_storage_requires_running_storage_services():
 
 def test_normal_startup_uses_compose_storage():
     args = dev.parse_arguments([])
-    assert args.compose_storage and not args.no_storage
+    assert args.compose_storage
+    assert not args.no_storage
 
 
 def test_storage_can_only_be_disabled_explicitly():
     args = dev.parse_arguments(['--no-storage'])
-    assert args.no_storage and not args.compose_storage
+    assert args.no_storage
+    assert not args.compose_storage
 
 
 def test_explicit_environment_storage_does_not_read_compose():
     args = dev.parse_arguments(['--persistence'])
-    assert args.persistence and not args.compose_storage
+    assert args.persistence
+    assert not args.compose_storage
 
 
 def test_dev_carries_server_owned_printer_settings_without_connecting():
@@ -189,4 +193,5 @@ def test_dev_carries_server_owned_printer_settings_without_connecting():
     assert translated["TLS_PRINTER_HOST"] == "192.0.2.44"
     with patch.dict(dev.os.environ, {}, clear=True):
         child = dev.prepare_environment(True, translated)
-    assert child["TLS_PRINTER_HOST"] == "192.0.2.44" and child["TLS_PRINTER_PORT"] == "9100"
+    assert child['TLS_PRINTER_HOST'] == '192.0.2.44'
+    assert child['TLS_PRINTER_PORT'] == '9100'

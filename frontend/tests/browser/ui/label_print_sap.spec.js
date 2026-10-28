@@ -1,5 +1,5 @@
 import { mockAccountSession } from '../helpers/studio.js';
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/coverage.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const dist=fileURLToPath(new URL('../../../dist/',import.meta.url));
@@ -8,8 +8,9 @@ for(const lang of ['en','id']) test(`SAP Get Data uses selected RFC and preserve
  const id=lang==='id';const requests=[];let png;let runtime=true;
  await page.route('**/*',async route=>{
   const url=new URL(route.request().url());
+  if(url.pathname.startsWith('/api/v1/auth/'))return route.fallback();
   if(url.pathname==='/api/v1/label-print/printers')return route.fulfill({json:{policy_origin:'management',printers:[]}});
-  if(url.pathname==='/api/v1/management/sap-operations')return route.fulfill({json:{revision:'RFC-R1',runtime_available:runtime,operations:[{operation_id:'ROLL',name:'Roll RFC',enabled:true,response_mode:'label_json',parameters:[{name:'IV_CHARG',label:'Batch',kind:'string',source:'operator',required:true}]}]}});
+  if(url.pathname==='/api/v1/label-print/operations')return route.fulfill({json:{revision:'RFC-R1',runtime_available:runtime,operations:[{operation_id:'ROLL',name:'Roll RFC',enabled:true,response_mode:'label_json',parameters:[{name:'IV_CHARG',label:'Batch',kind:'string',source:'operator',required:true}]}]}});
   if(url.pathname==='/api/v1/label-print/preview'){
    const body=route.request().postDataJSON();requests.push(body);
    return route.fulfill({json:{source:'sap',encoder:'IPL',operation_id:'ROLL',operation_revision:'RFC-R1',items:body.batches.map((batch,index)=>({index,batch,status:batch==='UNKNOWN'?'FAILED':'PREVIEWED',label_code:'SAP_LABEL',template_version:'4',template_sha256:'a'.repeat(64),payload_sha256:'b'.repeat(64),width_px:640,height_px:480,dpi:203.2,png_base64:batch==='UNKNOWN'?null:png,error_code:batch==='UNKNOWN'?'sap_status_failed':null}))}});

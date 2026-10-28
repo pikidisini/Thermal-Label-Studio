@@ -9,8 +9,7 @@
 .management-page h3 { font-size:var(--ui-font-body); font-weight:500; }
 .management-page p { margin-block:var(--ui-space-3); }
 .management-layout { display:grid; grid-template-columns:210px minmax(0,1fr); flex:1; min-height:0; transition:grid-template-columns calc(var(--ui-transition-duration) * 2) var(--ui-transition-easing); }
-.management-sidebar { padding:var(--ui-space-3) var(--ui-space-2); border-right:1px solid var(--ui-border-default); background:var(--ui-surface-low); display:flex; flex-direction:column; gap:var(--ui-space-1); }
-.management-sidebar { min-width:0; overflow:hidden; }
+.management-sidebar { padding:var(--ui-space-3) var(--ui-space-2); border-right:1px solid var(--ui-border-default); background:var(--ui-surface-low); display:flex; flex-direction:column; gap:var(--ui-space-1); min-width:0; overflow:hidden; }
 .management-sidebar-toggle { display:flex; padding-left:calc(var(--ui-space-3) + var(--ui-border-width) + var(--ui-icon-control) * var(--ui-icon-scale) / 2 - var(--ui-height-compact) / 2); margin-bottom:var(--ui-space-2); }
 .management-sidebar-items { display:flex; flex-direction:column; gap:var(--ui-space-1); }
 .management-sidebar-items button { display:flex; align-items:center; text-align:left; overflow:hidden; }
@@ -59,9 +58,9 @@
 .management-log-target { display:block; min-width:100px; max-width:180px; overflow-wrap:anywhere; }
 .management-log-copy { display:inline-flex; gap:var(--ui-space-1); align-items:center; flex-wrap:wrap; }
 .management-log-copy code { overflow-wrap:anywhere; }
-.management-log-copy [role="status"]:empty { display:none; }
+.management-log-copy [role="status"]:empty,.management-log-copy output:empty { display:none; }
 .management-log-pagination,.management-log-summary { display:flex; align-items:center; flex-wrap:wrap; gap:var(--ui-space-3); margin-block:var(--ui-space-3); }
-.management-log-pagination>span { margin-right:auto; }
+.management-log-pagination>span,.management-log-pagination>output { margin-right:auto; }
 .management-log-loaded { display:flex; align-items:center; gap:var(--ui-space-2); }
 .management-log-loaded time { flex-direction:row; gap:var(--ui-space-2); }
 .management-log-result { display:block; min-width:180px; margin-top:var(--ui-space-1); color:var(--ui-text-secondary); font-size:var(--ui-font-label); }
@@ -83,7 +82,7 @@
 .management-log-drawer summary { cursor:pointer; font-weight:var(--ui-weight-control); }
 .management-audit-diff td { vertical-align:top; min-width:100px; }
 @media(max-width:1100px) { .management-log-filter-main { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-@media(max-width:700px) { .management-log-drawer { width:100%; } .management-log-filter-main { grid-template-columns:minmax(0,1fr); } .management-log-filter-range label { flex:1 1 200px; } .management-log-pagination>span { width:100%; } }
+@media(max-width:700px) { .management-log-drawer { width:100%; } .management-log-filter-main { grid-template-columns:minmax(0,1fr); } .management-log-filter-range label { flex:1 1 200px; } .management-log-pagination>span,.management-log-pagination>output { width:100%; } }
 .management-table td,.management-table th { padding:var(--ui-space-2); border-bottom:1px solid var(--ui-border-default); vertical-align:middle; }
 .management-table th { background:var(--ui-surface-low); font-weight:500; color:var(--ui-text-secondary); }
 .management-subheading { margin-top:var(--ui-space-4); }
@@ -143,7 +142,7 @@
 .management-preview-controls output { min-width:42px; text-align:center; font-size:var(--ui-font-control); font-variant-numeric:tabular-nums; }
 .management-preview-controls button { display:inline-flex; align-items:center; justify-content:center; gap:var(--ui-space-1); }
 .management-preview-controls .management-muted { margin-left:auto; font-size:var(--ui-font-control); }
-.management-preview-viewport { position:relative; height:280px; overflow:hidden; background:var(--ui-surface-canvas); touch-action:none; user-select:none; cursor:grab; }
+.management-preview-viewport { position:relative; display:block; width:100%; min-width:0; height:280px; padding:0; border:0; overflow:hidden; background:var(--ui-surface-canvas); touch-action:none; user-select:none; cursor:grab; }
 .management-preview-viewport[data-dragging="true"] { cursor:grabbing; }
 .management-preview-viewport img { position:absolute; top:50%; left:50%; max-width:none; max-height:none; transform-origin:center; background:white; pointer-events:none; }
 .management-stored-templates { margin-top:var(--ui-space-4); border:1px solid var(--ui-border-default); background:var(--ui-surface-raised); }

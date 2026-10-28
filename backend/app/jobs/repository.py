@@ -24,6 +24,8 @@ ERROR_MESSAGES = MappingProxyType({
     "raster_failed": "The bitmap could not be created.",
     "processing_failed": "Label processing failed.",
 })
+_INVALID_STORED_JOB = "Stored job is invalid."
+_INVALID_STORED_HISTORY = "Stored job history is invalid."
 
 
 class JobError(ValueError):
@@ -100,7 +102,7 @@ FROM label_backend.job_events WHERE job_id = %s ORDER BY revision LIMIT 4"""
 
 def _map_job(row):
     if not isinstance(row, (tuple, list)) or len(row) != 10:
-        raise JobError("Stored job is invalid.")
+        raise JobError(_INVALID_STORED_JOB)
     values = dict(zip(_COLUMNS.split(", "), row))
     if isinstance(values["job_id"], str):
         values["job_id"] = UUID(values["job_id"])
@@ -162,7 +164,7 @@ class JobRepository:
                 raise JobConflict("Job identity already exists.")
             stored = _map_job(row)
             if stored != job:
-                raise JobError("Stored job is invalid.")
+                raise JobError(_INVALID_STORED_JOB)
             self._event(cursor, stored)
             return stored
         return self._transaction(insert)
@@ -178,7 +180,7 @@ class JobRepository:
                 raise JobConflict("Job does not exist.")
             job = _map_job(row)
             if job.job_id != job_id:
-                raise JobError("Stored job is invalid.")
+                raise JobError(_INVALID_STORED_JOB)
             return job
         return self._transaction(read)
 
@@ -207,7 +209,7 @@ class JobRepository:
                 raise JobConflict("Job transition conflicted with stored state.")
             stored = _map_job(row)
             if stored != updated:
-                raise JobError("Stored job is invalid.")
+                raise JobError(_INVALID_STORED_JOB)
             self._event(cursor, stored)
             return stored
         return self._transaction(update)
@@ -220,29 +222,29 @@ class JobRepository:
             cursor.execute(SELECT_EVENTS, (job_id,))
             rows = cursor.fetchall()
             if not 1 <= len(rows) <= 3:
-                raise JobError("Stored job history is invalid.")
+                raise JobError(_INVALID_STORED_HISTORY)
             events = []
             previous = None
             for index, row in enumerate(rows):
                 if not isinstance(row, (tuple, list)) or len(row) != 6:
-                    raise JobError("Stored job history is invalid.")
+                    raise JobError(_INVALID_STORED_HISTORY)
                 identity = UUID(row[0]) if isinstance(row[0], str) else row[0]
                 event = JobEvent(job_id=identity, revision=row[1], state=row[2],
                     occurred_at=row[3], error_code=row[4], error_message=row[5])
                 if identity != job_id or event.revision != index or event.occurred_at.tzinfo is None:
-                    raise JobError("Stored job history is invalid.")
+                    raise JobError(_INVALID_STORED_HISTORY)
                 if index == 0 and event.state != "RECEIVED" or previous and (
                     previous.state not in ("RECEIVED", "PROCESSING")
                     or event.state not in ({"PROCESSING", "FAILED"} if previous.state == "RECEIVED"
                                            else {"SIMULATED", "SUBMITTED", "FAILED"})
                     or event.occurred_at < previous.occurred_at
                 ):
-                    raise JobError("Stored job history is invalid.")
+                    raise JobError(_INVALID_STORED_HISTORY)
                 if event.state == "FAILED":
                     if event.error_code is None or event.error_message != ERROR_MESSAGES[event.error_code]:
-                        raise JobError("Stored job history is invalid.")
+                        raise JobError(_INVALID_STORED_HISTORY)
                 elif event.error_code is not None or event.error_message is not None:
-                    raise JobError("Stored job history is invalid.")
+                    raise JobError(_INVALID_STORED_HISTORY)
                 events.append(event)
                 previous = event
             return tuple(events)

@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
 from app.auth.service import AuthService, AuthError, digest
-from app.auth.http import router, COOKIE
+from app.auth.http import router, COOKIE, allowed_origins
 from app.auth.middleware import AuthenticationMiddleware, permitted
 
 PASSWORD = 'synthetic password for tests'
@@ -187,6 +187,43 @@ def test_http_csrf_cookie_and_no_effects_before_admission(web, auth):
     assert client.post('/api/v1/printing/editor', json={}).status_code == 200
 
 
+def test_trusted_lan_http_is_explicit_and_keeps_authenticated_session(auth, monkeypatch):
+    monkeypatch.setenv('TLS_AUTH_ORIGINS', 'http://192.168.254.58:18082')
+    monkeypatch.setenv('TLS_AUTH_TRUSTED_LAN_HTTP', 'true')
+    monkeypatch.delenv('TLS_AUTH_LOCAL_HTTP', raising=False)
+    app = FastAPI()
+    app.state.auth_service = auth
+    app.add_middleware(AuthenticationMiddleware)
+    app.include_router(router, prefix='/api/v1')
+    with TestClient(app, base_url='http://192.168.254.58:18082') as client:
+        client.headers['Origin'] = 'http://192.168.254.58:18082'
+        initial = client.get('/api/v1/auth/session')
+        assert initial.status_code == 200
+        assert 'Secure' not in initial.headers['set-cookie']
+        user = auth.create_user('lan-admin', 'LAN Admin', 'Admin', PASSWORD)
+        client.headers['X-CSRF-Token'] = initial.json()['csrf_token']
+        login = client.post('/api/v1/auth/login', json={'username': user['username'], 'password': PASSWORD})
+        assert login.status_code == 200
+        assert login.json()['user']['role'] == 'Admin'
+
+
+@pytest.mark.parametrize('origin', ['http://192.168.254.58:18082', 'http://10.1.2.3'])
+def test_trusted_lan_http_requires_explicit_opt_in(monkeypatch, origin):
+    monkeypatch.setenv('TLS_AUTH_ORIGINS', origin)
+    monkeypatch.delenv('TLS_AUTH_LOCAL_HTTP', raising=False)
+    monkeypatch.delenv('TLS_AUTH_TRUSTED_LAN_HTTP', raising=False)
+    with pytest.raises(AuthError):
+        allowed_origins()
+
+
+@pytest.mark.parametrize('origin', ['http://example.test', 'http://203.0.113.1'])
+def test_trusted_lan_http_rejects_non_private_origins(monkeypatch, origin):
+    monkeypatch.setenv('TLS_AUTH_ORIGINS', origin)
+    monkeypatch.setenv('TLS_AUTH_TRUSTED_LAN_HTTP', 'true')
+    with pytest.raises(AuthError):
+        allowed_origins()
+
+
 @pytest.mark.parametrize('role', ['Admin', 'Designer', 'Operator'])
 def test_http_role_matrix_and_sender_separation(web, auth, role):
     client, app = web
@@ -204,7 +241,8 @@ def test_password_change_gate_and_session_replacement(web, auth):
     sign_in(client, auth, temporary=True)
     assert client.get('/api/v1/management/users').status_code == 403
     reused = client.post('/api/v1/auth/change-password', json={'current_password': PASSWORD, 'password': PASSWORD})
-    assert reused.status_code == 422 and reused.json()['detail']['code'] == 'password_reuse'
+    assert reused.status_code == 422
+    assert reused.json()['detail']['code'] == 'password_reuse'
     assert client.get('/api/v1/auth/session').json()['user']['must_change_password'] is True
     old_cookie = client.cookies.get(COOKIE)
     changed = client.post('/api/v1/auth/change-password', json={'current_password': PASSWORD, 'password': PASSWORD + ' new'})
@@ -276,5 +314,6 @@ def test_body_limit_and_admin_reset_never_echo_credentials(web, auth):
         'username': 'new-operator', 'display_name': 'New', 'role': 'Operator', 'password': PASSWORD,
     })
     assert response.status_code == 201
-    assert 'password_hash' not in response.text and PASSWORD not in response.text
+    assert 'password_hash' not in response.text
+    assert PASSWORD not in response.text
     assert PASSWORD not in str(auth.store.repo.events)

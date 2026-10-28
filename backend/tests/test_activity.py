@@ -58,10 +58,12 @@ def test_studio_success_stage_timing_and_sensitive_values_are_excluded():
                            headers={'Authorization': 'Bearer private-token', 'X-Request-ID': 'spoofed'})
     event = store.events[0]
     assert event['trace_id'] == response.headers['x-request-id']
-    assert event['status'] == 'SIMULATED' and event['operation'] == 'preview'
+    assert event['status'] == 'SIMULATED'
+    assert event['operation'] == 'preview'
     assert [e['event'] for e in event['events']] == ['REQUEST_RECEIVED', 'BINDING_TEMPLATE', 'RASTERIZING', 'BOUND', 'REQUEST_COMPLETED']
     times = [e['elapsed_ms'] for e in event['events']]
-    assert times == sorted(times) and event['duration_ms'] >= times[-1]
+    assert times == sorted(times)
+    assert event['duration_ms'] >= times[-1]
     packed = json.dumps(event)
     assert all(secret not in packed for secret in ('private-business', 'private-token', 'private-output', 'spoofed', 'png_base64', 'Authorization'))
     assert client.get('/api/v1/management/activity').json()['entries'] == [event]
@@ -82,9 +84,11 @@ def test_rejected_and_uncertain_requests_are_logged_with_safe_codes(code, status
     response = TestClient(app).post('/api/v1/label-intake', json={'sender': {'system': 'spoofed'}, 'data': 'private'})
     assert response.status_code == status
     event = store.events[0]
-    assert event['status'] == expected and event['error_code'] == code
+    assert event['status'] == expected
+    assert event['error_code'] == code
     assert 'source' not in event
-    assert 'spoofed' not in json.dumps(event) and 'private-error-text' not in json.dumps(event)
+    assert 'spoofed' not in json.dumps(event)
+    assert 'private-error-text' not in json.dumps(event)
 
 
 def test_intake_replay_projection_excludes_images_data_and_item_business_identity():
@@ -104,10 +108,12 @@ def test_intake_replay_projection_excludes_images_data_and_item_business_identit
 
     TestClient(app).post('/api/v1/label-intake')
     event = store.events[0]
-    assert event['replayed'] is True and event['source'] == 'SAP_TEST'
+    assert event['replayed'] is True
+    assert event['source'] == 'SAP_TEST'
     assert event['items'][0]['template']['version'] == 2
     assert event['items'][0]['payload_bytes'] == 42
-    assert 'private-roll' not in json.dumps(event) and 'private-png' not in json.dumps(event)
+    assert 'private-roll' not in json.dumps(event)
+    assert 'private-png' not in json.dumps(event)
 
 
 def test_logging_failure_does_not_change_successful_print_or_retry(caplog):
@@ -127,9 +133,11 @@ def test_logging_failure_does_not_change_successful_print_or_retry(caplog):
         return {'status':'SUBMITTED','confirmed':False}
 
     response = TestClient(app).post('/api/v1/printing/editor')
-    assert response.status_code == 200 and response.json()['confirmed'] is False
+    assert response.status_code == 200
+    assert response.json()['confirmed'] is False
     assert sends == [1]
-    assert 'activity_write_failed' in caplog.text and 'private-dsn' not in caplog.text
+    assert 'activity_write_failed' in caplog.text
+    assert 'private-dsn' not in caplog.text
 
 
 def test_disabled_storage_and_management_access_guards(monkeypatch):
@@ -203,8 +211,10 @@ def test_actual_studio_routes_record_render_stages_and_safe_outcomes(monkeypatch
     assert {'BOUND','RASTERIZING','RASTERIZED','PREPARED'} <= {stage['event'] for stage in event['events']}
     assert len(sends) == (1 if purpose == 'print' else 0)
     if purpose == 'print':
-        assert event['confirmed'] is False and event['target']['host'] == '192.0.2.44'
-    assert 'png_base64' not in json.dumps(event) and 'svg"' not in json.dumps(event)
+        assert event['confirmed'] is False
+        assert event['target']['host'] == '192.0.2.44'
+    assert 'png_base64' not in json.dumps(event)
+    assert 'svg"' not in json.dumps(event)
 
 
 def test_store_bound_and_database_failure_are_sanitized(monkeypatch):

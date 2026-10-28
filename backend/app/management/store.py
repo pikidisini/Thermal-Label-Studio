@@ -10,6 +10,9 @@ from .errors import ManagementError
 from .audit.service import audit_view
 from app.layouts.service import LayoutConflictError, LayoutNotFoundError
 
+
+MANAGEMENT_TRANSACTION_OPTIONS = '-c statement_timeout=10000 -c lock_timeout=3000'
+
 class ManagementStore:
     def __init__(self, database_url):
         import psycopg
@@ -18,7 +21,7 @@ class ManagementStore:
     def read(self):
         try:
             with self.database.connect(self.database_url, connect_timeout=3,
-                    options='-c statement_timeout=10000 -c lock_timeout=3000') as connection:
+                    options=MANAGEMENT_TRANSACTION_OPTIONS) as connection:
                 with connection.cursor() as cursor:
                     cursor.execute('SELECT document FROM app_management.management_state WHERE singleton = true')
                     row = cursor.fetchone()
@@ -33,7 +36,7 @@ class ManagementStore:
     def audit(self):
         try:
             with self.database.connect(self.database_url, connect_timeout=3,
-                    options='-c statement_timeout=10000 -c lock_timeout=3000') as connection:
+                    options=MANAGEMENT_TRANSACTION_OPTIONS) as connection:
                 with connection.cursor() as cursor:
                     cursor.execute('SELECT event FROM app_management.management_audit ORDER BY sequence DESC LIMIT 200')
                     return [row[0] for row in cursor.fetchall()]
@@ -45,7 +48,7 @@ class ManagementStore:
         # No retry: an acknowledgement failure can follow an actual commit.
         try:
             with self.database.connect(self.database_url, connect_timeout=3,
-                    options='-c statement_timeout=10000 -c lock_timeout=3000') as connection:
+                    options=MANAGEMENT_TRANSACTION_OPTIONS) as connection:
                 with connection.cursor() as cursor:
                     cursor.execute('SELECT document FROM app_management.management_state WHERE singleton = true FOR UPDATE')
                     row = cursor.fetchone()
@@ -62,11 +65,7 @@ class ManagementStore:
                     if len(updated.model_dump_json().encode('utf-8')) > 2 * 1024 * 1024:
                         raise ManagementError('management_capacity', 409)
                     validate_transition(previous.policy, updated.policy)
-                    event = dict(event_id=uuid4().hex, at=datetime.now(timezone.utc).isoformat(),
-                                 actor=actor_id.get() or 'DEVELOPMENT_UNAUTHENTICATED', action=action,
-                                 object_id=object_id, note=note, revision=updated.policy.revision,
-                                 before=audit_view(previous, action, object_id),
-                                 after=audit_view(updated, action, object_id))
+                    event = {'event_id': uuid4().hex, 'at': datetime.now(timezone.utc).isoformat(), 'actor': actor_id.get() or 'DEVELOPMENT_UNAUTHENTICATED', 'action': action, 'object_id': object_id, 'note': note, 'revision': updated.policy.revision, 'before': audit_view(previous, action, object_id), 'after': audit_view(updated, action, object_id)}
                     if storage_evidence is not None:
                         event['before'], event['after'] = storage_evidence
                     cursor.execute('UPDATE app_management.management_state SET document = %s::jsonb WHERE singleton = true',

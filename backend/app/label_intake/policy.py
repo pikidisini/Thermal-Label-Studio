@@ -39,6 +39,7 @@ class AccessKey(PolicyModel):
 
 class Source(PolicyModel):
     identity: str = Field(pattern=ID)
+    async_only: bool = False
     deleted: bool = False
     credential_env: str | None = Field(default=None, pattern=r'^TLS_INTAKE_TOKEN_[A-Z0-9_]{1,80}$')
     access_key: AccessKey | None = Field(default=None, repr=False)

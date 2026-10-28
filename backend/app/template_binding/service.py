@@ -42,14 +42,22 @@ def bind_text_template(svg: str, data: dict, *, dpi: float = 203, font_profile: 
     return bind_template(svg,data,dpi=dpi,font_profile=font_profile,text_only=True)
 
 
-def bind_template(svg: str, data: dict, *, dpi: float = 203, font_profile: FontProfile | None = None, text_only: bool = False) -> BoundTemplate:
-    manifest = admit_template(svg)
-    validate_data(data)
-    if type(dpi) not in (int, float) or not math.isfinite(dpi) or not 72 <= dpi <= 600:
-        raise BindingError('invalid_media')
-    width, height = round(manifest.width_mm*dpi/25.4), round(manifest.height_mm*dpi/25.4)
-    if max(width, height) > 4096 or width*height > 4_000_000:
-        raise BindingError('resource_limit')
+@dataclass(frozen=True)
+class _BindingDocument:
+    root: ET.Element
+    nodes: list[ET.Element]
+    parents: dict[ET.Element, ET.Element]
+
+
+def resolve_value(spec, data):
+    value = resolve_composition(spec.template, data, text_output=spec.kind=='text') if spec.template is not None else scalar(data, spec.field)
+    if spec.kind=='text':validate_resolved_text(value)
+    elif spec.kind=='qrcode':qr.validate_payload(value)
+    else:barcode.validate_payload(spec.kind,value)
+    return value
+
+
+def resolved_values(manifest, data, text_only):
     values = []
     placeholders = set()
     for spec in manifest.objects:
@@ -60,18 +68,12 @@ def bind_template(svg: str, data: dict, *, dpi: float = 203, font_profile: FontP
             placeholders.add(spec.element_index)
             values.append(None)
             continue
-        value = resolve_composition(spec.template, data, text_output=spec.kind=='text') if spec.template is not None else scalar(data, spec.field)
-        if spec.kind=='text':validate_resolved_text(value)
-        elif spec.kind=='qrcode':qr.validate_payload(value)
-        else:barcode.validate_payload(spec.kind,value)
+        value = resolve_value(spec, data)
         values.append(value)
-    root = ET.fromstring(validate_safe_svg(svg))
-    nodes = list(root.iter())
-    # Reserve a conservative node budget before font work or tspan creation.
-    spans = sum(len(value) if spec.layout and spec.layout.char_spacing else len(re.split(r'\r?\n', value)) for spec, value in zip(manifest.objects, values) if spec.kind=='text')
-    if len(nodes) + spans + 2 * len(placeholders) > 10000:
-        raise BindingError('resource_limit')
-    parents = {child: parent for parent in nodes for child in parent}
+    return values, placeholders
+
+
+def symbol_plans(manifest, values, nodes, placeholders):
     plans={}
     dynamic_images=set()
     for spec,value in zip(manifest.objects,values):
@@ -84,6 +86,10 @@ def bind_template(svg: str, data: dict, *, dpi: float = 203, font_profile: FontP
         dynamic_images.add(child)
         if spec.element_index in placeholders:continue
         plans[spec.element_index]=symbol_plan(spec,value)
+    return plans, dynamic_images
+
+
+def check_image_budget(nodes, plans, dynamic_images):
     pixels=sum(p.evidence.width_px*p.evidence.height_px for p in plans.values())
     for node in nodes:
         if node.tag.endswith('}image') and node not in dynamic_images:
@@ -92,24 +98,58 @@ def bind_template(svg: str, data: dict, *, dpi: float = 203, font_profile: FontP
                 pixels+=image.width*image.height
     if pixels>4_000_000:
         raise BindingError('resource_limit')
-    if manifest.objects:
-        if font_profile is None:
-            settings = get_settings()
-            font_profile = FontProfile(settings.fixture_font_path, settings.fixture_font_family)
-        metrics = TextMetrics(font_profile)
-        for spec, value in zip(manifest.objects, values):
-            node = nodes[spec.element_index]
-            if spec.kind=='text':
-                bind_text(node, spec, value, fabric=root.get('data-editor-coordinate-profile') == 'fabric7', parents=parents, metrics=metrics)
-            elif spec.element_index in placeholders:
-                replace_symbol_image(node, node[0], metrics)
-            else:
-                url=data_url(plans[spec.element_index])
-                child=node[0]
-                for attr in ('href','{http://www.w3.org/1999/xlink}href'):
-                    if attr in child.attrib:child.set(attr,url)
-            for name in META - {'data-editor-group', 'data-editor-coordinate-profile', 'data-binding-version'}:
-                node.attrib.pop(name, None)
+
+
+def bind_object(document, spec, value, placeholders, plans, metrics):
+    root, nodes, parents = document.root, document.nodes, document.parents
+    node = nodes[spec.element_index]
+    if spec.kind=='text':
+        bind_text(node, spec, value, fabric=root.get('data-editor-coordinate-profile') == 'fabric7', parents=parents, metrics=metrics)
+    elif spec.element_index in placeholders:
+        replace_symbol_image(node, node[0], metrics)
+    else:
+        url=data_url(plans[spec.element_index])
+        child=node[0]
+        for attr in ('href','{http://www.w3.org/1999/xlink}href'):
+            if attr in child.attrib:child.set(attr,url)
+    for name in META - {'data-editor-group', 'data-editor-coordinate-profile', 'data-binding-version'}:
+        node.attrib.pop(name, None)
+
+
+def apply_bindings(document, manifest, values, placeholders, plans, font_profile):
+    if not manifest.objects:
+        return
+    if font_profile is None:
+        settings = get_settings()
+        font_profile = FontProfile(settings.fixture_font_path, settings.fixture_font_family)
+    metrics = TextMetrics(font_profile)
+    for spec, value in zip(manifest.objects, values):
+        bind_object(document, spec, value, placeholders, plans, metrics)
+
+
+def check_node_budget(nodes, manifest, values, placeholders):
+    # Reserve a conservative node budget before font work or tspan creation.
+    spans = sum(len(value) if spec.layout and spec.layout.char_spacing else len(re.split(r'\r?\n', value)) for spec, value in zip(manifest.objects, values) if spec.kind=='text')
+    if len(nodes) + spans + 2 * len(placeholders) > 10000:
+        raise BindingError('resource_limit')
+
+
+def bind_template(svg: str, data: dict, *, dpi: float = 203, font_profile: FontProfile | None = None, text_only: bool = False) -> BoundTemplate:
+    manifest = admit_template(svg)
+    validate_data(data)
+    if type(dpi) not in (int, float) or not math.isfinite(dpi) or not 72 <= dpi <= 600:
+        raise BindingError('invalid_media')
+    width, height = round(manifest.width_mm*dpi/25.4), round(manifest.height_mm*dpi/25.4)
+    if max(width, height) > 4096 or width*height > 4_000_000:
+        raise BindingError('resource_limit')
+    values, placeholders = resolved_values(manifest, data, text_only)
+    root = ET.fromstring(validate_safe_svg(svg))
+    nodes = list(root.iter())
+    check_node_budget(nodes, manifest, values, placeholders)
+    parents = {child: parent for parent in nodes for child in parent}
+    plans, dynamic_images = symbol_plans(manifest, values, nodes, placeholders)
+    check_image_budget(nodes, plans, dynamic_images)
+    apply_bindings(_BindingDocument(root, nodes, parents), manifest, values, placeholders, plans, font_profile)
     output = ET.tostring(root, encoding='unicode')
     if len(output.encode('utf-8')) > 512 * 1024:
         raise BindingError('resource_limit')

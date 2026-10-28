@@ -4,7 +4,7 @@ import { useTranslation } from '../../../shared/i18n';
 import type { ManagementController } from '../hooks/useManagement';
 import type { Section } from '../model/navigation';
 
-export function OverviewSection({ management }: { management: ManagementController }) {
+export function OverviewSection({ management }: Readonly<{ management: ManagementController }>) {
   const t = useTranslation();
   const { templates, policy, snapshot, saving, loading, navigate, services, checkedAt, audit, auditError, date } = management;
   const summaries = [
@@ -13,9 +13,20 @@ export function OverviewSection({ management }: { management: ManagementControll
     { label: 'Integration sources', count: policy?.sources.length ?? 0, available: !!snapshot, destination: 'integrations', icon: Plug },
   ];
   const serviceBadge = (available: boolean) => {
-    const label = loading ? 'Checking…' : available ? 'Available' : 'Unavailable';
-    return <Badge tone={loading ? 'neutral' : available ? 'success' : 'danger'}>{t(label)}</Badge>;
+    if (loading) return <Badge>{t('Checking…')}</Badge>;
+    return <Badge tone={available ? 'success' : 'danger'}>{t(available ? 'Available' : 'Unavailable')}</Badge>;
   };
+  function recentChanges() {
+    if (loading) return <p className="management-muted">{t('Loading recent changes…')}</p>;
+    if (auditError) return <p className="management-muted">{t('Recent changes are unavailable.')}</p>;
+    if (audit.length === 0) return <p className="management-muted">{t('No recorded changes.')}</p>;
+    return <ul className="overview-changes">
+          {audit.slice(0, 3).map(event => <li key={event.event_id} className="overview-change-row">
+            <div className="overview-change-object"><span>{event.action}</span><small>{event.object_id}</small></div>
+            <time dateTime={event.at}>{date(event.at)}</time>
+          </li>)}
+        </ul>;
+  }
   return <div className="management-overview" aria-busy={loading}>
     <p className="management-muted">{t('Manage stored templates and application configuration.')}</p>
     <div className="overview-summary">
@@ -35,12 +46,7 @@ export function OverviewSection({ management }: { management: ManagementControll
       </section>
       <section className="overview-panel" aria-labelledby="overview-changes-title">
         <h3 id="overview-changes-title">{t('Recent changes')}</h3>
-        {loading ? <p className="management-muted">{t('Loading recent changes…')}</p> : auditError ? <p className="management-muted">{t('Recent changes are unavailable.')}</p> : audit.length === 0 ? <p className="management-muted">{t('No recorded changes.')}</p> : <ul className="overview-changes">
-          {audit.slice(0, 3).map(event => <li key={event.event_id} className="overview-change-row">
-            <div className="overview-change-object"><span>{event.action}</span><small>{event.object_id}</small></div>
-            <time dateTime={event.at}>{date(event.at)}</time>
-          </li>)}
-        </ul>}
+        {recentChanges()}
       </section>
     </div>
   </div>;

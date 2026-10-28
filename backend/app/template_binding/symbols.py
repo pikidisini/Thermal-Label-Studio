@@ -58,26 +58,10 @@ def plan(spec, value):
 def image(plan):
     e=plan.evidence
     output=Image.new('RGBA',(e.width_px,e.height_px),'white')
-    if e.kind=='qrcode':
-        # Match npm qrcode's sample-at-floor pixel mapping exactly, including
-        # fractional sizes and the explicit four-pixel minimum-scale behavior.
-        pixels=output.load()
-        for y in range(e.height_px):
-            if not plan.margin<=y<e.height_px-plan.margin:continue
-            row=math.floor((y-plan.margin)/plan.scale)
-            for x in range(e.width_px):
-                if plan.margin<=x<e.width_px-plan.margin:
-                    col=math.floor((x-plan.margin)/plan.scale)
-                    if plan.rows[row][col]=='1':pixels[x,y]=(0,0,0,255)
+    if e.kind == 'qrcode':
+        draw_qr(output, plan)
     else:
-        draw=ImageDraw.Draw(output)
-        for i,bit in enumerate(plan.rows[0]):
-            if bit=='1':
-                x=2+i*int(plan.scale)
-                bottom=e.height_px-3
-                if e.kind=='ean13' and not (i<3 or 45<=i<50 or i>=92):
-                    bottom-=min(12,int(plan.scale)*10)//2+2
-                draw.rectangle((x,2,x+int(plan.scale)-1,bottom),fill='black')
+        draw_barcode(output, plan)
     return output
 
 
@@ -85,3 +69,28 @@ def data_url(plan):
     buffer=io.BytesIO()
     image(plan).save(buffer,format='PNG',compress_level=6)
     return 'data:image/png;base64,'+base64.b64encode(buffer.getvalue()).decode('ascii')
+
+def draw_qr(output, plan):
+    e = plan.evidence
+    # Match npm qrcode's sample-at-floor pixel mapping exactly, including
+    # fractional sizes and the explicit four-pixel minimum-scale behavior.
+    pixels=output.load()
+    for y in range(e.height_px):
+        if not plan.margin<=y<e.height_px-plan.margin:continue
+        row=math.floor((y-plan.margin)/plan.scale)
+        for x in range(e.width_px):
+            if plan.margin<=x<e.width_px-plan.margin:
+                col=math.floor((x-plan.margin)/plan.scale)
+                if plan.rows[row][col]=='1':pixels[x,y]=(0,0,0,255)
+
+
+def draw_barcode(output, plan):
+    e = plan.evidence
+    draw=ImageDraw.Draw(output)
+    for i,bit in enumerate(plan.rows[0]):
+        if bit=='1':
+            x=2+i*int(plan.scale)
+            bottom=e.height_px-3
+            if e.kind=='ean13' and not (i<3 or 45<=i<50 or i>=92):
+                bottom-=min(12,int(plan.scale)*10)//2+2
+            draw.rectangle((x,2,x+int(plan.scale)-1,bottom),fill='black')

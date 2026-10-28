@@ -42,7 +42,8 @@ def test_no_config_no_driver_and_no_generated_key(monkeypatch):
     assert create_runtime_ledger({'TLS_INTAKE_LEDGER_JSON': ''}) is None
     ledger = create_runtime_ledger(environment())
     assert ledger.keys.versions() == {'k1'}
-    assert 'private' not in repr(ledger) and 'AAAA' not in repr(ledger.keys)
+    assert 'private' not in repr(ledger)
+    assert 'AAAA' not in repr(ledger.keys)
 
 
 @pytest.mark.parametrize('problem', ['json', 'duplicate', 'oversize', 'extra', 'missing_dsn',
@@ -94,8 +95,9 @@ def test_key_rotation_retains_old_identity_and_dedicated_connection(monkeypatch)
         rotated.lookup('EXTERNAL_DEMO', request, '11111111-1111-4111-8111-111111111112')
     assert exc.value.code == 'request_in_progress'
     del config['keys']['k1']; env['TLS_INTAKE_LEDGER_JSON'] = json.dumps(config)
+    prepared_create_runtime_ledger = create_runtime_ledger(env)
     with pytest.raises(LedgerUnavailable):
-        create_runtime_ledger(env).lookup('EXTERNAL_DEMO', request, '11111111-1111-4111-8111-111111111112')
+        prepared_create_runtime_ledger.lookup('EXTERNAL_DEMO', request, '11111111-1111-4111-8111-111111111112')
     assert len(calls) == database.closed == 3
     assert all(dsn == env['TLS_INTAKE_DATABASE_URL'] and opts == dict(autocommit=False,
         connect_timeout=3, options='-c statement_timeout=10000 -c lock_timeout=3000') for dsn,opts in calls)
@@ -113,13 +115,17 @@ def test_lifespan_actual_http_ledger_and_replay_without_dependency_override(clea
     assert not main.app.dependency_overrides
     assert not hasattr(main.app.state, 'intake_ledger')
     with TestClient(main.app) as client:
-        assert hasattr(main.app.state, 'intake_ledger') and calls == []
+        assert hasattr(main.app.state, 'intake_ledger')
+        assert calls == []
         headers = {'Authorization': 'Bearer '+TOKEN}
         first = client.post('/api/v1/label-intake',json=envelope(('A',)),headers=headers)
-        assert first.status_code == 200 and first.json()['status'] == 'COMPLETED', first.text
+        assert first.status_code == 200, first.text
+        assert first.json()['status'] == 'COMPLETED', first.text
         repeated = client.post('/api/v1/label-intake',json=envelope(('A',)),headers=headers)
-        assert repeated.status_code == 200 and repeated.json()['replayed']
-        assert repeated.json()['results'] == first.json()['results'] and len(prepared) == 1
+        assert repeated.status_code == 200
+        assert repeated.json()['replayed']
+        assert repeated.json()['results'] == first.json()['results']
+        assert len(prepared) == 1
         assert database.closed == len(calls)
     assert not hasattr(main.app.state, 'intake_ledger')
     monkeypatch.delattr(main.app.state, 'intake_policy_previous', raising=False)
@@ -165,11 +171,14 @@ def test_runtime_failure_is_closed_redacted_and_never_initializes_schema(monkeyp
         return Connection()
     monkeypatch.setitem(sys.modules, 'psycopg', SimpleNamespace(connect=connect))
     ledger = create_runtime_ledger(environment())
+    prepared_envelope = envelope(('A',))
+    prepared_model_validate = IntakeRequest.model_validate(prepared_envelope)
     with pytest.raises(LedgerUnavailable) as raised:
-        ledger.lookup('EXTERNAL_DEMO', IntakeRequest.model_validate(envelope(('A',))),
-                      '11111111-1111-4111-8111-111111111111')
-    assert raised.value.status == 503 and raised.value.code == 'ledger_unavailable'
-    assert 'private' not in str(raised.value) and raised.value.__suppress_context__
+        ledger.lookup('EXTERNAL_DEMO', prepared_model_validate, '11111111-1111-4111-8111-111111111111')
+    assert raised.value.status == 503
+    assert raised.value.code == 'ledger_unavailable'
+    assert 'private' not in str(raised.value)
+    assert raised.value.__suppress_context__
     if failure == 'missing_schema':
         assert calls == ['SELECT key_version,key_check FROM label_intake.key_versions']
         assert lifecycle == ['rollback', 'cursor_close', 'close']

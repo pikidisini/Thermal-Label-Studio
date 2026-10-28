@@ -41,60 +41,170 @@ def skip_later(ledger, receipt, index, total):
         ledger.fail_pre_send(receipt, later, detail=error('TRANSPORT','batch_stopped'), skipped=True)
 
 
-def resolve(request, layouts, admission, started):
-    """Freeze each stored version once and ALL routing/media budgets before render."""
-    cache, pins, grants, details = {}, [], [], []
-    reservation, pixels, copies = BASE_RESERVATION, 0, 0
-    stopped = False
-    for index, item in enumerate(request.items):
-        select_item(index)
-        stage('RESOLVING_LAYOUT')
-        pin = grant = detail = None
-        if stopped:
-            pins.append(None); grants.append(None); details.append(None)
-            continue
-        try:
-            if monotonic() - started >= DEADLINE_SECONDS:
-                raise BindingError('preparation_timeout')
-            copies += item.copies
-            if copies > MAX_COPIES:
+def _read_pin(layouts, label_code):
+    """Map stored-template failures without retaining raw storage exceptions."""
+    try:
+        return pin_layout(layouts.get_layout(label_code), label_code)
+    except LayoutNotFoundError:
+        return error('RESOLUTION', 'unknown_label_code')
+    except LayoutArtifactError:
+        return error('RESOLUTION', 'invalid_template')
+    except LayoutPersistenceError:
+        return error('RESOLUTION', 'layout_unavailable')
+    except TemplateAdmissionError as exc:
+        code = 'unsupported_feature' if exc.code == 'unsupported_feature' else 'invalid_template'
+        return error('RESOLUTION', code)
+    except BindingError:
+        return error('RESOLUTION', 'invalid_media')
+    except (ValueError, AttributeError):
+        return error('RESOLUTION', 'invalid_template')
+    except Exception:
+        return error('RESOLUTION', 'layout_unavailable')
+
+
+class _PrintResolution:
+    """One batch's immutable pins and cumulative pre-render resource accounting."""
+
+    def __init__(self, request, layouts, admission, started):
+        self.request = request
+        self.layouts = layouts
+        self.admission = admission
+        self.started = started
+        self.cache = {}
+        self.reservation = BASE_RESERVATION
+        self.pixels = self.copies = 0
+        self.stopped = False
+
+    def _deadline(self):
+        if monotonic() - self.started >= DEADLINE_SECONDS:
+            raise BindingError('preparation_timeout')
+
+    def _pin(self, label_code):
+        if label_code not in self.cache:
+            if self.reservation + PIN_READ_RESERVATION > MAX_WORKING:
                 raise BindingError('resource_limit')
-            if item.label_code not in cache:
-                if reservation + PIN_READ_RESERVATION > MAX_WORKING:
-                    raise BindingError('resource_limit')
-                try:
-                    cache[item.label_code] = pin_layout(layouts.get_layout(item.label_code), item.label_code)
-                except LayoutNotFoundError: cache[item.label_code] = error('RESOLUTION','unknown_label_code')
-                except LayoutArtifactError: cache[item.label_code] = error('RESOLUTION','invalid_template')
-                except LayoutPersistenceError: cache[item.label_code] = error('RESOLUTION','layout_unavailable')
-                except TemplateAdmissionError as exc:
-                    cache[item.label_code] = error('RESOLUTION','unsupported_feature' if exc.code=='unsupported_feature' else 'invalid_template')
-                except BindingError: cache[item.label_code] = error('RESOLUTION','invalid_media')
-                except (ValueError, AttributeError, UnicodeError): cache[item.label_code] = error('RESOLUTION','invalid_template')
-                except Exception: cache[item.label_code] = error('RESOLUTION','layout_unavailable')
-                if isinstance(cache[item.label_code], PinnedTemplate):
-                    reservation += cache[item.label_code].reservation
-            resolved = cache[item.label_code]
+            resolved = _read_pin(self.layouts, label_code)
+            self.cache[label_code] = resolved
+            if isinstance(resolved, PinnedTemplate):
+                self.reservation += resolved.reservation
+        return self.cache[label_code]
+
+    def item(self, item):
+        pin = grant = detail = None
+        if self.stopped:
+            return pin, grant, detail
+        try:
+            self._deadline()
+            self.copies += item.copies
+            if self.copies > MAX_COPIES:
+                raise BindingError('resource_limit')
+            resolved = self._pin(item.label_code)
             if isinstance(resolved, PinnedTemplate):
                 pin = resolved
-                pixels += pin.pixels
-                if pixels > MAX_PIXELS or reservation > MAX_WORKING:
+                self.pixels += pin.pixels
+                if self.pixels > MAX_PIXELS or self.reservation > MAX_WORKING:
                     raise BindingError('resource_limit')
-                grant = preflight_print(admission, item.label_code, pin.evidence, item.copies, request.target_id)
+                grant = preflight_print(self.admission, item.label_code, pin.evidence,
+                                        item.copies, self.request.target_id)
             else:
                 detail = resolved
-            if monotonic() - started >= DEADLINE_SECONDS:
-                raise BindingError('preparation_timeout')
+            self._deadline()
         except PolicyDenied as exc:
             detail = exc.detail
         except BindingError as exc:
-            detail = error('PREPARATION',exc.code)
-            stopped = True
-        pins.append(pin); grants.append(grant); details.append(detail)
-    return pins, grants, details, reservation
+            detail = error('PREPARATION', exc.code)
+            self.stopped = True
+        return pin, grant, detail
 
 
-def print_durable(request, admission, layouts, ledger, trace_id, factory, current_policy):
+def resolve(request, layouts, admission, started):
+    """Freeze each stored version once and ALL routing/media budgets before render."""
+    resolution = _PrintResolution(request, layouts, admission, started)
+    pins, grants, details = [], [], []
+    for index, item in enumerate(request.items):
+        select_item(index)
+        stage('RESOLVING_LAYOUT')
+        pin, grant, detail = resolution.item(item)
+        pins.append(pin)
+        grants.append(grant)
+        details.append(detail)
+    return pins, grants, details, resolution.reservation
+
+
+class _PrintPreparation:
+    """Account for retained output buffers before any send can be claimed."""
+
+    def __init__(self, started, reservation):
+        self.started = started
+        self.reservation = reservation
+        self.png_total = self.ipl_total = 0
+
+    def prepare(self, item, pin):
+        if monotonic() - self.started >= DEADLINE_SECONDS:
+            raise BindingError('preparation_timeout')
+        output_request = EditorOutputRequest(draft={'svg': pin.svg, 'width_mm': pin.width_mm, 'height_mm': pin.height_mm, 'dpi': pin.dpi, 'binding_version': 1},data=item.data,
+            encoder='IPL',copies=item.copies)
+        _, output = prepare_draft_output(output_request)
+        if (type(output) is not PreparedOutput or type(output.payload) is not bytes or not output.payload
+                or output.language != 'IPL' or type(output.copies) is not int or output.copies != item.copies
+                or (output.bitmap.width_px,output.bitmap.height_px,output.bitmap.dpi) !=
+                   (round(pin.width_mm*pin.dpi/25.4),round(pin.height_mm*pin.dpi/25.4),pin.dpi)):
+            raise IplError('Invalid prepared output.')
+        self.png_total += len(output.bitmap.bitmap_png)
+        self.ipl_total += len(output.payload)
+        if (len(output.payload)>2*MIB or len(output.bitmap.bitmap_png)>MIB or
+                self.png_total>MAX_PNG or self.ipl_total>MAX_IPL or self.reservation+self.png_total+self.ipl_total>MAX_WORKING
+                or 4*((self.png_total+2)//3)+RESULT_METADATA_RESERVATION>MAX_RESPONSE):
+            raise BindingError('resource_limit')
+        if monotonic() - self.started >= DEADLINE_SECONDS:
+            raise BindingError('preparation_timeout')
+        return output
+
+
+def _prepare_item(preparation, item, pin, ledger, receipt, index):
+    try:
+        output = preparation.prepare(item, pin)
+        ledger.prepared(receipt, index, hashlib.sha256(output.payload).hexdigest(), len(output.payload))
+        return output, None
+    except IntakeAdmissionError:
+        raise
+    except BindingError as exc:
+        code=exc.code if exc.code in ('missing_binding','null_binding','empty_binding','invalid_binding',
+            'invalid_symbol','invalid_media','unsupported_feature','resource_limit','preparation_timeout') else 'invalid_symbol'
+        return None, error('PREPARATION' if code in ('resource_limit','preparation_timeout') else 'BINDING',code)
+    except TemplateAdmissionError: return None, error('BINDING','invalid_template')
+    except RasterError: return None, error('PREPARATION','raster_failed')
+    except IplError: return None, error('PREPARATION','codec_failed')
+    except Exception: return None, error('PREPARATION','processing_failed')
+
+
+def _prepare_outputs(request, pins, ledger, receipt, started, reservation, details):
+    preparation = _PrintPreparation(started, reservation)
+    outputs = []
+    for index, (item, pin) in enumerate(zip(request.items, pins)):
+        select_item(index)
+        output, details[index] = _prepare_item(preparation, item, pin, ledger, receipt, index)
+        if details[index] is not None:
+            outputs.clear()
+            return None
+        outputs.append(output)
+    return outputs
+
+
+def _pin_snapshot(request, pins, grants, policy_revision):
+    snapshot = []
+    for index, (item, pin, grant) in enumerate(zip(request.items, pins, grants)):
+        snapshot.append({'item_index': index, 'item_id': item.item_id,
+            'label_code': item.label_code, 'copies': item.copies,
+            'template': pin.evidence.model_dump() if pin else None,
+            'media': {'width_mm': pin.width_mm, 'height_mm': pin.height_mm,
+                      'dpi': pin.dpi} if pin else None,
+            'target_id': grant.target_id if grant else None,
+            'policy_revision': policy_revision})
+    return snapshot
+
+
+def print_durable(request, admission, layouts, ledger, trace_id, factory, current_policy, *, receipt=None, before_send=None):
     request = IntakeRequest.model_validate(request.model_dump())
     authorize(admission, request)
     if request.mode != 'print':
@@ -102,66 +212,35 @@ def print_durable(request, admission, layouts, ledger, trace_id, factory, curren
     if ledger is None:
         raise LedgerUnavailable()
     sender = admission.source.identity
-    replay = ledger.lookup(sender, request, trace_id)
+    replay = ledger.lookup(sender, request, trace_id) if receipt is None else None
     if replay is not None:
         return PrintOutcome.model_validate(replay)
     if layouts is None:
         raise IntakeAdmissionError(503,'intake_unavailable')
     started = monotonic()
     pins, grants, details, reservation = resolve(request, layouts, admission, started)
-    snapshot = []
-    for index, (item, pin, grant) in enumerate(zip(request.items,pins,grants)):
-        snapshot.append(dict(item_index=index,item_id=item.item_id,label_code=item.label_code,copies=item.copies,
-            template=pin.evidence.model_dump() if pin else None,
-            media=dict(width_mm=pin.width_mm,height_mm=pin.height_mm,dpi=pin.dpi) if pin else None,
-            target_id=grant.target_id if grant else None,policy_revision=admission.policy.revision))
-    receipt = ledger.admit(sender,request,trace_id,snapshot)
+    snapshot = _pin_snapshot(request, pins, grants, admission.policy.revision)
+    if receipt is None:
+        receipt = ledger.admit(sender,request,trace_id,snapshot)
+    else:
+        ledger.pin_received(receipt, snapshot)
     if not isinstance(receipt, Receipt):
         return PrintOutcome.model_validate(receipt)
     if any(details):
         fail_batch(ledger,receipt,details)
         return finish(ledger,receipt,request)
 
-    outputs, png_total, ipl_total = [], 0, 0
-    for index, (item, pin) in enumerate(zip(request.items,pins)):
-        select_item(index)
-        try:
-            if monotonic() - started >= DEADLINE_SECONDS:
-                raise BindingError('preparation_timeout')
-            output_request = EditorOutputRequest(draft=dict(svg=pin.svg,width_mm=pin.width_mm,
-                height_mm=pin.height_mm,dpi=pin.dpi,binding_version=1),data=item.data,
-                encoder='IPL',copies=item.copies)
-            _, output = prepare_draft_output(output_request)
-            if (type(output) is not PreparedOutput or type(output.payload) is not bytes or not output.payload
-                    or output.language != 'IPL' or type(output.copies) is not int or output.copies != item.copies
-                    or (output.bitmap.width_px,output.bitmap.height_px,output.bitmap.dpi) !=
-                       (round(pin.width_mm*pin.dpi/25.4),round(pin.height_mm*pin.dpi/25.4),pin.dpi)):
-                raise IplError('Invalid prepared output.')
-            png_total += len(output.bitmap.bitmap_png)
-            ipl_total += len(output.payload)
-            if (len(output.payload)>2*MIB or len(output.bitmap.bitmap_png)>MIB or
-                    png_total>MAX_PNG or ipl_total>MAX_IPL or reservation+png_total+ipl_total>MAX_WORKING
-                    or 4*((png_total+2)//3)+RESULT_METADATA_RESERVATION>MAX_RESPONSE):
-                raise BindingError('resource_limit')
-            if monotonic() - started >= DEADLINE_SECONDS:
-                raise BindingError('preparation_timeout')
-            ledger.prepared(receipt,index,hashlib.sha256(output.payload).hexdigest(),len(output.payload))
-            outputs.append(output)
-        except IntakeAdmissionError:
-            raise
-        except BindingError as exc:
-            code=exc.code if exc.code in ('missing_binding','null_binding','empty_binding','invalid_binding',
-                'invalid_symbol','invalid_media','unsupported_feature','resource_limit','preparation_timeout') else 'invalid_symbol'
-            details[index]=error('PREPARATION' if code in ('resource_limit','preparation_timeout') else 'BINDING',code)
-        except TemplateAdmissionError: details[index]=error('BINDING','invalid_template')
-        except RasterError: details[index]=error('PREPARATION','raster_failed')
-        except IplError: details[index]=error('PREPARATION','codec_failed')
-        except Exception: details[index]=error('PREPARATION','processing_failed')
-        if details[index] is not None:
-            outputs.clear()
-            fail_batch(ledger,receipt,details)
-            return finish(ledger,receipt,request)
+    outputs = _prepare_outputs(request, pins, ledger, receipt, started, reservation, details)
+    if outputs is None:
+        fail_batch(ledger, receipt, details)
+        return finish(ledger, receipt, request)
 
+    _reserve_outcome(request, pins, grants, trace_id)
+    return _send_outputs(request, admission, ledger, receipt, grants, outputs,
+                         factory, current_policy, before_send)
+
+
+def _reserve_outcome(request, pins, grants, trace_id):
     # Validate/reserve the largest public outcome BEFORE any claim/socket. Raw
     # output remains transient; every state uses the same bounded public fields.
     worst = [PrintItem(item_index=i,item_id=item.item_id,label_code=item.label_code,copies=item.copies,
@@ -171,42 +250,60 @@ def print_durable(request, admission, layouts, ledger, trace_id, factory, curren
         mode='print',replayed=False,status='UNCERTAIN',summary=PrintSummary(total=len(worst),
         simulated=0,submitted=0,failed=0,uncertain=len(worst),skipped=0),results=worst).model_dump(),
         RESULT_METADATA_RESERVATION)
+
+
+def _checked_grant(grant, admission, current_policy, ledger, receipt, index, total):
+    try:
+        return revalidate_claim(grant, admission, current_policy())
+    except (PolicyDenied, IntakeAdmissionError) as exc:
+        detail = exc.detail if isinstance(exc, PolicyDenied) else error('POLICY', 'target_not_allowed')
+        ledger.fail_pre_send(receipt, index, detail=detail)
+        skip_later(ledger, receipt, index, total)
+        return None
+
+
+def _submit_claimed(output, checked, factory, ledger, receipt, index, total):
+    # Construction follows the durable claim. Injected factories must not do IO.
+    try:
+        transport = factory(checked.target)
+    except Exception:
+        ledger.settle_not_sent(receipt, index)
+        skip_later(ledger, receipt, index, total)
+        return False
+    try:
+        stage('SUBMITTING')
+        submit_prepared_output(output, transport)
+    except (PrintBeforeSendError, PrintInputError):
+        ledger.settle_not_sent(receipt, index)
+        skip_later(ledger, receipt, index, total)
+        return False
+    except PrintSubmissionError:
+        ledger.settle_send(receipt, index, 'UNCERTAIN')
+        stage('UNCERTAIN')
+        return False  # Settlement atomically skips all later unclaimed items.
+    ledger.settle_send(receipt, index, 'SUBMITTED')
+    stage('SUBMITTED')
+    return True
+
+
+def _send_outputs(request, admission, ledger, receipt, grants, outputs,
+                  factory, current_policy, before_send):
     claim_attempted = False
+    if before_send is not None:
+        before_send()
     try:
         for index, (grant, output) in enumerate(zip(grants,outputs)):
             select_item(index)
-            try:
-                checked = revalidate_claim(grant,admission,current_policy())
-            except (PolicyDenied, IntakeAdmissionError) as exc:
-                detail = exc.detail if isinstance(exc,PolicyDenied) else error('POLICY','target_not_allowed')
-                ledger.fail_pre_send(receipt,index,detail=detail)
-                skip_later(ledger,receipt,index,len(outputs))
+            checked = _checked_grant(grant, admission, current_policy,
+                                     ledger, receipt, index, len(outputs))
+            if checked is None:
                 break
             claim_attempted = True  # Lost commit ACK may have durably claimed it.
             if ledger.claim_send(receipt,index,target_id=checked.target_id,policy_revision=checked.policy_revision) is not True:
                 raise LedgerUnavailable()
             stage('SEND_CLAIMED')
-            try:
-                # Factory construction is AFTER durable claim. Failure here has
-                # no submit invocation; injected factories must not perform IO.
-                transport = factory(checked.target)
-            except Exception:
-                ledger.settle_not_sent(receipt,index)
-                skip_later(ledger,receipt,index,len(outputs))
+            if not _submit_claimed(output, checked, factory, ledger, receipt, index, len(outputs)):
                 break
-            try:
-                stage('SUBMITTING')
-                submit_prepared_output(output,transport)
-            except (PrintBeforeSendError,PrintInputError):
-                ledger.settle_not_sent(receipt,index)
-                skip_later(ledger,receipt,index,len(outputs))
-                break
-            except PrintSubmissionError:
-                ledger.settle_send(receipt,index,'UNCERTAIN')
-                stage('UNCERTAIN')
-                break  # Ledger atomically skips all later unclaimed items.
-            ledger.settle_send(receipt,index,'SUBMITTED')
-            stage('SUBMITTED')
         return finish(ledger,receipt,request)
     except IntakeAdmissionError:
         if claim_attempted:

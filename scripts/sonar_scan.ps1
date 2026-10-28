@@ -2,7 +2,8 @@
 param(
     [string]$SonarHostUrl = $(if ($env:SONAR_HOST_URL) { $env:SONAR_HOST_URL } else { 'http://127.0.0.1:9004' }),
     [switch]$SkipSourceChecks,
-    [string]$CoverageDirectory
+    [string]$CoverageDirectory,
+    [string]$TokenFile
 )
 
 $ErrorActionPreference = 'Stop'
@@ -14,8 +15,19 @@ if ($SonarHostUrl -match '^http://(127\.0\.0\.1|localhost):9004/?$') {
     $SonarHostUrl = 'http://host.docker.internal:9004'
 }
 
-if ([string]::IsNullOrWhiteSpace($env:SONAR_TOKEN)) {
-    throw 'SONAR_TOKEN is required. Create a project analysis token in SonarQube and set it only in the current shell or secret store.'
+$analysisToken = $env:SONAR_TOKEN
+if ([string]::IsNullOrWhiteSpace($analysisToken) -and $TokenFile) {
+    try {
+        $tokenItem = Get-Item -LiteralPath $TokenFile -ErrorAction Stop
+        if ($tokenItem.PSIsContainer -or $tokenItem.Length -gt 16384) { throw 'Invalid token file.' }
+        $tokenLines = @(Get-Content -LiteralPath $tokenItem.FullName -ErrorAction Stop | Where-Object { $_ -match '^SONAR_TOKEN=' })
+        if ($tokenLines.Count -ne 1) { throw 'Invalid token file.' }
+        $analysisToken = $tokenLines[0].Substring('SONAR_TOKEN='.Length).Trim().Trim('"').Trim("'")
+        if ($analysisToken -and $analysisToken -notmatch '^[A-Za-z0-9_-]{20,256}$') { throw 'Invalid token file.' }
+    } catch { throw 'The private analysis token file could not be read or is invalid.' }
+}
+if ([string]::IsNullOrWhiteSpace($analysisToken)) {
+    throw 'SONAR_TOKEN is required. Set it in the current shell or pass -TokenFile with a private SONAR_TOKEN=... file. Never put the token in command arguments.'
 }
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     throw 'Docker CLI was not found. Pull the pinned scanner image after Docker Desktop is running, then rerun this script.'
@@ -54,7 +66,9 @@ function Copy-CuratedFile([string]$relativePath, [string]$destinationRoot) {
 
 Push-Location $projectRoot
 $scanSnapshot = $null
+$previousAnalysisToken = $env:SONAR_TOKEN
 try {
+    $env:SONAR_TOKEN = $analysisToken
     if (-not $SkipSourceChecks) {
         & python -B scripts/check_project.py --run-source-checks
         if ($LASTEXITCODE -ne 0) {
@@ -113,6 +127,8 @@ try {
         throw "SonarScanner or the SonarQube quality gate failed with exit code $LASTEXITCODE."
     }
 } finally {
+    $env:SONAR_TOKEN = $previousAnalysisToken
+    $analysisToken = $null
     if ($null -ne $scanSnapshot -and $scanSnapshot -like (Join-Path $projectRoot '.tmp/sonar-scan-*')) {
         Remove-Item -LiteralPath $scanSnapshot -Recurse -Force -ErrorAction SilentlyContinue
     }

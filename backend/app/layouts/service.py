@@ -13,6 +13,10 @@ from app.svg_safety import validate_safe_svg
 from .models import LayoutSummary, SaveLayoutRequest, StoredLayout, published_version
 
 
+LAYOUT_NOT_FOUND = 'Layout was not found.'
+LAYOUT_ADVISORY_LOCK_SQL = 'SELECT pg_advisory_xact_lock(hashtext(%s))'
+
+
 class LayoutNotFoundError(ValueError):
     pass
 
@@ -119,7 +123,7 @@ class LayoutService:
                         ORDER BY v.version DESC""", (label_code,))
                     rows = cursor.fetchall()
             if not rows:
-                raise LayoutNotFoundError("Layout was not found.")
+                raise LayoutNotFoundError(LAYOUT_NOT_FOUND)
             return [self._summary(row) for row in rows]
         except LayoutNotFoundError:
             raise
@@ -140,20 +144,20 @@ class LayoutService:
                 with connection.cursor() as cursor:
                     # Keep an acknowledged rename's cleanup from removing the
                     # selected old object between metadata lookup and download.
-                    cursor.execute('SELECT pg_advisory_xact_lock(hashtext(%s))', (label_code,))
+                    cursor.execute(LAYOUT_ADVISORY_LOCK_SQL, (label_code,))
                     if version is None:
                         cursor.execute(query, (label_code,))
                     else:
                         cursor.execute(query.replace('v.version = l.active_version', 'v.version = %s'), (version, label_code))
                     row = cursor.fetchone()
                     if row is None:
-                        raise LayoutNotFoundError("Layout was not found.")
+                        raise LayoutNotFoundError(LAYOUT_NOT_FOUND)
                     summary = self._summary(row)
                     svg_bytes = self._verified_object_bytes(summary.object_key, summary.svg_sha256)
             try:
                 svg = svg_bytes.decode("utf-8")
                 validate_safe_svg(svg)
-            except (ValueError, UnicodeError) as exc:
+            except ValueError as exc:
                 raise LayoutArtifactError("Stored layout artifact is invalid.") from exc
             # Return the exact checksum-verified artifact, not a second XML
             # serialization whose bytes no longer identify the stored version.
@@ -166,17 +170,17 @@ class LayoutService:
     def manage_template(self, cursor, label_code, *, version, checksum, previous_title, title=None, new_code=None, delete=False, relocations=None):
         """Copy verified SVGs before committing their new references and audit."""
         for code in sorted({label_code, new_code or label_code}):
-            cursor.execute('SELECT pg_advisory_xact_lock(hashtext(%s))', (code,))
+            cursor.execute(LAYOUT_ADVISORY_LOCK_SQL, (code,))
         cursor.execute("""SELECT l.active_version, v.svg_sha256, COALESCE(l.title_override, v.title)
             FROM label_studio.layouts l JOIN label_studio.layout_versions v
             ON v.label_code = l.label_code AND v.version = l.active_version
             WHERE l.label_code = %s AND l.deleted_at IS NULL FOR UPDATE OF l""", (label_code,))
         row = cursor.fetchone()
         if row is None:
-            raise LayoutNotFoundError('Layout was not found.')
+            raise LayoutNotFoundError(LAYOUT_NOT_FOUND)
         if row[0] != version or row[1] != checksum or row[2] != previous_title:
             raise LayoutConflictError('Template changed. Refresh before saving again.')
-        before = dict(label_code=label_code, title=row[2], version=row[0], svg_sha256=row[1])
+        before = {'label_code': label_code, 'title': row[2], 'version': row[0], 'svg_sha256': row[1]}
         if delete:
             cursor.execute('UPDATE label_studio.layouts SET deleted_at = now(), updated_at = now() WHERE label_code = %s', (label_code,))
             return before, dict(before, deleted=True)
@@ -236,7 +240,7 @@ class LayoutService:
                 if self._verified_object_bytes(target, checksum) != payload:
                     raise LayoutConflictError('Destination object content differs.') from None
             self._verified_object_bytes(target, checksum)
-            moves.append(dict(version=version, source=source, target=target, svg_sha256=checksum))
+            moves.append({'version': version, 'source': source, 'target': target, 'svg_sha256': checksum})
         for move in moves:
             cursor.execute('UPDATE label_studio.layout_versions SET object_key = %s WHERE label_code = %s AND version = %s',
                            (move['target'], label_code, move['version']))
@@ -253,7 +257,7 @@ class LayoutService:
             with connection.cursor() as cursor:
                 codes = {move[key].split('/')[1] for move in moves for key in ('source', 'target')}
                 for code in sorted(codes):
-                    cursor.execute('SELECT pg_advisory_xact_lock(hashtext(%s))', (code,))
+                    cursor.execute(LAYOUT_ADVISORY_LOCK_SQL, (code,))
                 for move in moves:
                     cursor.execute('SELECT label_code FROM label_studio.layout_versions WHERE object_key = %s', (move['source'],))
                     if cursor.fetchone() is not None:
@@ -289,7 +293,7 @@ class LayoutService:
         try:
             with self._database.connect(self.settings.database_url) as connection:
                 with connection.cursor() as cursor:
-                    cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (label_code,))
+                    cursor.execute(LAYOUT_ADVISORY_LOCK_SQL, (label_code,))
                     if title is None:
                         cursor.execute(
                             """UPDATE label_studio.layouts SET deleted_at = now(), updated_at = now()
@@ -303,7 +307,7 @@ class LayoutService:
                             (title, label_code),
                         )
                     if cursor.fetchone() is None:
-                        raise LayoutNotFoundError("Layout was not found.")
+                        raise LayoutNotFoundError(LAYOUT_NOT_FOUND)
                     if title is None:
                         return None
                     cursor.execute(
@@ -328,7 +332,7 @@ class LayoutService:
             now = datetime.now(timezone.utc)
             with self._database.connect(self.settings.database_url) as connection:
                 with connection.cursor() as cursor:
-                    cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (stored_request.label_code,))
+                    cursor.execute(LAYOUT_ADVISORY_LOCK_SQL, (stored_request.label_code,))
                     self._release_renamed_code(cursor, stored_request.label_code)
                     cursor.execute(
                         "SELECT COALESCE(MAX(version), 0) + 1 FROM label_studio.layout_versions WHERE label_code = %s",

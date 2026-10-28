@@ -378,3 +378,18 @@ Publikasi memerlukan otorisasi tersendiri. Backup/restore, retensi, rotasi rahas
 penanganan objek tanpa referensi, koordinasi banyak worker, kontrol akses
 deployment, dan UAT perangkat tetap merupakan pekerjaan operasional dengan target
 bernama serta verifikasi independen.
+
+## Permintaan cetak SAP dengan antrean
+
+Implementasi source 22 Oktober 2026 menambahkan API asinkron dan dua worker Linux.
+SAP menerima nomor permintaan setelah data tersimpan dalam antrean terenkripsi,
+lalu membaca status setiap lima detik. Printer berbeda dapat dilayani bersamaan;
+pengiriman ke satu printer mengikuti giliran. Hasil tidak pasti ditahan untuk
+pemeriksaan operator dan penyelesaian oleh Admin, tanpa cetak ulang otomatis.
+
+Aktivitas Permintaan SAP menampilkan status dan hasil per item. Deployment Ubuntu
+dengan HTTPS internal, backup terenkripsi, serta latihan restore terisolasi
+disiapkan melalui konfigurasi dan utilitas yang tidak menjalankan perubahan
+secara bawaan. Ini adalah implementasi source, bukan bukti layanan production
+sudah diaktifkan. Detail dan gerbang yang wajib dibuktikan tersedia dalam
+[Production queue](PRODUCTION_QUEUE.md).

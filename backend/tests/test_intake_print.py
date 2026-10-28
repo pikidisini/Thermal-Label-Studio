@@ -93,7 +93,8 @@ def test_http_print_without_any_approval_uses_source_route_and_replays_without_r
     assert all(item['target_id'] == 'PRINTER_DEMO' for item in result['results'])
     assert len(recorder.calls) == len(prepare) == 3
     replay = post().json()
-    assert replay['replayed'] and replay['results'] == result['results']
+    assert replay['replayed']
+    assert replay['results'] == result['results']
     assert len(recorder.calls) == len(prepare) == 3
 
 
@@ -110,13 +111,18 @@ def test_native_copies_one_payload_each_replay_no_storage_or_render(setup,prepar
     assert all(b'<RS>'+str(copies).encode() in payload for payload in recorder.calls)
     assert layouts.calls==['A','B']
     layouts.values.clear()
-    replay=post(value);assert replay.status_code==200 and replay.json()['replayed']
-    assert replay.json()['results']==result['results'] and len(recorder.calls)==3 and len(prepare)==3
+    replay=post(value);assert replay.status_code == 200; assert replay.json()['replayed']
+    assert replay.json()['results'] == result['results']
+    assert len(recorder.calls) == 3
+    assert len(prepare) == 3
     assert result['original_trace_id']==replay.json()['original_trace_id']!=replay.json()['trace_id']
     changed=body(copies=copies);changed['items'][0]['data']={'FLAG':True}
-    assert post(changed).status_code==409 and len(recorder.calls)==3
+    assert post(changed).status_code == 409
+    assert len(recorder.calls) == 3
     saved=str(database.rows('SELECT metadata FROM requests'))+str(database.rows('SELECT metadata FROM items'))
-    assert TOKEN not in saved and 'bitmap_png' not in saved and 'png_base64' not in saved
+    assert TOKEN not in saved
+    assert 'bitmap_png' not in saved
+    assert 'png_base64' not in saved
 
 
 @pytest.mark.parametrize('problem',['unknown','route_missing','target','binding','copies','deadline','payload','pixels','memory'])
@@ -136,15 +142,17 @@ def test_whole_batch_failure_never_constructs_transport(setup,prepare,monkeypatc
     response=post(value)
     if problem in ('route_missing','target'):
         assert response.status_code==403
-        assert recorder.calls==recorder.constructed==[] and prepare==[]
+        assert recorder.calls == recorder.constructed == []
+        assert prepare == []
         return
     assert response.status_code==200,response.text
-    result=response.json();assert result['status']=='FAILED' and result['summary']['failed']>=1
-    assert result['summary']['submitted']==0 and len(result['results'])==len(value['items'])
+    result=response.json();assert result['status'] == 'FAILED'; assert result['summary']['failed'] >= 1
+    assert result['summary']['submitted'] == 0
+    assert len(result['results']) == len(value['items'])
     assert all(i['status'] in ('FAILED','SKIPPED') and i['error'] for i in result['results'])
     assert recorder.calls==recorder.constructed==[]
     if problem not in ('binding','payload'):assert prepare==[]
-    repeated=post(value);assert repeated.json()['replayed'] and repeated.json()['results']==result['results']
+    repeated=post(value);assert repeated.json()['replayed']; assert repeated.json()['results'] == result['results']
 
 
 @pytest.mark.parametrize('failure,expected',[(OSError('synthetic partial write'),'UNCERTAIN'),
@@ -155,10 +163,12 @@ def test_first_submitted_second_failure_third_skipped(setup,prepare,failure,expe
     value=response.json();assert value['status']==expected
     states=['SUBMITTED','UNCERTAIN' if expected=='UNCERTAIN' else 'FAILED','SKIPPED']
     assert [item['status'] for item in value['results']]==states
-    assert len(prepare)==3 and len(recorder.calls)==len(recorder.constructed)==2
+    assert len(prepare) == 3
+    assert len(recorder.calls) == len(recorder.constructed) == 2
     assert value['results'][0]['confirmed'] is False
     assert value['results'][1]['error']['code']==('submission_uncertain' if expected=='UNCERTAIN' else 'transport_failed_before_send')
-    assert post().json()['results']==value['results'] and len(recorder.calls)==2
+    assert post().json()['results'] == value['results']
+    assert len(recorder.calls) == 2
 
 
 def test_factory_failure_is_proven_no_submit(setup,prepare):
@@ -207,14 +217,15 @@ def test_commit_ambiguity_stops_all_later_effects_and_replay_cannot_resend(setup
     # A rejected admission commit created no identity; a repeated request may
     # freshly process only in that proven pre-send case.
     if operation=='admit' and fault=='before':
-        assert repeated.status_code==200 and len(recorder.calls)==3
+        assert repeated.status_code == 200
+        assert len(recorder.calls) == 3
         return
     assert len(recorder.calls)==count
     assert repeated.status_code in (200,409)
     rows=database.rows('SELECT ledger_id,state FROM requests')
     if rows and rows[0][1]=='RECEIVED':
         ledger.recover_quiesced(rows[0][0])  # Synthetic owner is now stopped, no auto resume.
-        recovered=post();assert recovered.status_code==200 and recovered.json()['replayed']
+        recovered=post();assert recovered.status_code == 200; assert recovered.json()['replayed']
         assert len(recorder.calls)==count
         if operation=='claim_send' and fault=='after' or operation in ('settle_send','complete_print'):
             assert recovered.json()['status']=='UNCERTAIN'
@@ -227,7 +238,8 @@ def test_crash_after_claim_before_transport_requires_explicit_recovery(setup,pre
     request=IntakeRequest.model_validate(body());admission=authenticate(p,'Bearer '+TOKEN,{ENV:TOKEN})
     with pytest.raises(Crash):print_service.print_durable(request,admission,layouts,ledger,str(uuid4()),crash,lambda:p)
     assert database.rows('SELECT state FROM items ORDER BY item_index')==[('SEND_CLAIMED',),('PREPARED',),('PREPARED',)]
-    assert post().status_code==409 and recorder.calls==[]
+    assert post().status_code == 409
+    assert recorder.calls == []
     ledger.recover_quiesced(database.rows('SELECT ledger_id FROM requests')[0][0])
     result=post().json();assert [i['status'] for i in result['results']]==['UNCERTAIN','SKIPPED','SKIPPED']
     assert recorder.calls==[]
@@ -261,13 +273,15 @@ def test_native_studio_stored_print_payload_and_decoded_pixels_identical(setup,m
     layout=stored(svg=svg,width=width,height=height);layouts.values={'A':layout}
     p=policy(sources=(source(label_codes=('A',)),),audit=(event(svg_sha256=layout.svg_sha256),))
     monkeypatch.setenv('TLS_INTAKE_POLICY_JSON',p.model_dump_json())
-    monkeypatch.setenv('TLS_RENDERER_PATH',str(ROOT/'engine/bin/resvg.exe'))
-    monkeypatch.setenv('TLS_FIXTURE_FONT_PATH','C:/Windows/Fonts/arial.ttf')
+    from .conftest import test_font_path
+    from .conftest import test_renderer_path
+    monkeypatch.setenv('TLS_RENDERER_PATH',str(test_renderer_path()))
+    monkeypatch.setenv('TLS_FIXTURE_FONT_PATH', str(test_font_path()))
     request=EditorOutputRequest(draft=dict(svg=svg,width_mm=layout.width_mm,height_mm=layout.height_mm,
         dpi=layout.dpi,binding_version=1),data=data,encoder='IPL',copies=copies)
     _,expected=prepare_draft_output(request)
     value=body(('A',),copies);value['items'][0]['data']=data
-    result=post(value);assert result.status_code==200 and result.json()['status']=='COMPLETED',result.text
+    result=post(value);assert result.status_code == 200, result.text; assert result.json()['status'] == 'COMPLETED', result.text
     assert recorder.calls==[expected.payload]
     import base64
     preview=TestClient(app).post('/api/v1/simulation/editor-preview',json=request.model_dump())
@@ -281,7 +295,8 @@ def test_native_studio_stored_print_payload_and_decoded_pixels_identical(setup,m
 def test_simulation_route_never_constructs_transport(setup,monkeypatch):
     app.dependency_overrides[http.intake_transport_factory]=lambda:lambda target:pytest.fail('simulation transport')
     value=envelope(('A',))
-    monkeypatch.setenv('TLS_RENDERER_PATH',str(ROOT/'engine/bin/resvg.exe'))
+    from .conftest import test_renderer_path
+    monkeypatch.setenv('TLS_RENDERER_PATH',str(test_renderer_path()))
     assert post(value).status_code==200
 
 
@@ -298,10 +313,11 @@ def test_lost_response_after_terminal_commit_cannot_repeat_submission(setup,prep
             failures.append(True);raise RuntimeError('synthetic response failure')
         return real(*args,**kwargs)
     monkeypatch.setattr(http,'JSONResponse',serialize)
-    response=post();assert response.status_code==503 and response.json()['detail']['code']=='response_unavailable'
+    response=post();assert response.status_code == 503; assert response.json()['detail']['code'] == 'response_unavailable'
     assert len(recorder.calls)==3
-    repeated=post();assert repeated.status_code==200 and repeated.json()['replayed']
-    assert repeated.json()['status']=='COMPLETED' and len(recorder.calls)==3
+    repeated=post();assert repeated.status_code == 200; assert repeated.json()['replayed']
+    assert repeated.json()['status'] == 'COMPLETED'
+    assert len(recorder.calls) == 3
 
 
 @pytest.mark.parametrize('fault',['before','after'])
@@ -311,9 +327,11 @@ def test_proven_no_send_settlement_commit_failure_remains_conservative(setup,pre
     real=ledger.settle_not_sent
     def broken(*args):database.commit_fault=fault;return real(*args)
     ledger.settle_not_sent=broken
-    response=post();assert response.status_code==503 and response.json()['detail']['code']=='response_unavailable'
-    assert len(recorder.calls)==2 and len(recorder.constructed)==2
-    assert post().status_code==409 and len(recorder.calls)==2
+    response=post();assert response.status_code == 503; assert response.json()['detail']['code'] == 'response_unavailable'
+    assert len(recorder.calls) == 2
+    assert len(recorder.constructed) == 2
+    assert post().status_code == 409
+    assert len(recorder.calls) == 2
     ledger.recover_quiesced(database.rows('SELECT ledger_id FROM requests')[0][0])
-    recovered=post();assert recovered.status_code==200 and recovered.json()['status']=='UNCERTAIN'
+    recovered=post();assert recovered.status_code == 200; assert recovered.json()['status'] == 'UNCERTAIN'
     assert len(recorder.calls)==2

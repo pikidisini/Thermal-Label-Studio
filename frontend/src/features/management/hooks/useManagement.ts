@@ -36,11 +36,11 @@ export function useManagement() {
     setLoading(true); setErrors([]); setEditor(null); setNeedsRefresh(false); setIssuedKey(null);
     const results = await Promise.allSettled([
       managementApi.snapshot(controller.signal),
-      fetch(`${API_BASE}/layouts`, { signal: controller.signal }).then(async response => { if (!response.ok) throw new Error('Layout storage is unavailable.'); return response.json() as Promise<PersistedLayoutSummary[]>; }),
+      fetch(`${API_BASE}/layouts`, { signal: controller.signal }).then(async response => { if (!response.ok) { throw new Error('Layout storage is unavailable.'); } return response.json() as Promise<PersistedLayoutSummary[]>; }),
       managementApi.audit(controller.signal),
       fetch('/health', { signal: controller.signal }).then(response => response.ok),
     ]);
-    if (controller.signal.aborted || !alive.current) return;
+    if (controller.signal.aborted || !alive.current) { return; }
     setSnapshot(results[0].status === 'fulfilled' ? results[0].value : null);
     setTemplates(results[1].status === 'fulfilled' ? results[1].value : []);
     setAudit(results[2].status === 'fulfilled' ? results[2].value : []);
@@ -52,23 +52,23 @@ export function useManagement() {
   React.useEffect(() => { alive.current = true; void refresh(); return () => { alive.current = false; refreshController.current?.abort(); }; }, [refresh]);
   React.useEffect(() => {
     const clearKey = () => setIssuedKey(null);
-    const restoredPage = (event: PageTransitionEvent) => { if (event.persisted) clearKey(); };
+    const restoredPage = (event: PageTransitionEvent) => { if (event.persisted) { clearKey(); } };
     window.addEventListener('pagehide', clearKey);
     window.addEventListener('pageshow', restoredPage);
     return () => { window.removeEventListener('pagehide', clearKey); window.removeEventListener('pageshow', restoredPage); };
   }, []);
   const { preview, previewError } = useTemplatePreview(editor);
 
-  function navigate(next: Section) { if (next !== section && !window.dispatchEvent(new Event('management:before-navigate', { cancelable: true }))) return; setSection(next); setEditor(null); setIssuedKey(null); setSearch(''); setMessage(''); const url = new URL(window.location.href); url.searchParams.set('section',next); window.history.replaceState(null, '', url.pathname + url.search); }
+  function navigate(next: Section) { if (next !== section && !window.dispatchEvent(new Event('management:before-navigate', { cancelable: true }))) { return; } setSection(next); setEditor(null); setIssuedKey(null); setSearch(''); setMessage(''); const url = new URL(window.location.href); url.searchParams.set('section',next); window.history.replaceState(null, '', url.pathname + url.search); }
   function open(next: Editor) {
     setEditor(next); setMessage(''); setIssuedKey(null);
   }
   async function mutate<T>(action: () => Promise<T>, completed?: (result: T) => void) {
-    if (locked.current || !writable) return;
+    if (locked.current || !writable) { return; }
     locked.current = true; setSaving(true); setMessage('');
     try { const result = await action(); await refresh(); if (alive.current) { setMessage('Changes saved.'); completed?.(result); } }
     catch (error) { if (alive.current) { setMessage(error instanceof Error ? error.message : 'Management request failed. Refresh before trying again.'); setNeedsRefresh(!(error instanceof HttpError && error.isInputError)); } }
-    finally { locked.current = false; if (alive.current) setSaving(false); }
+    finally { locked.current = false; if (alive.current) { setSaving(false); } }
   }
   const matches = (value: string) => value.toLowerCase().includes(search.toLowerCase());
   const date = (value: string) => new Date(value).toLocaleString();

@@ -100,7 +100,8 @@ def test_target_inspection_no_network_and_unconfigured_print_stops_before_raster
     response = client.get("/api/v1/printing/target")
     assert response.json() == {"available": False, "host": None, "port": None, "encoder": "IPL"}
     response = client.post("/api/v1/printing/editor", json=REQUEST)
-    assert response.status_code == 503 and response.json()["detail"]["code"] == "printer_unavailable"
+    assert response.status_code == 503
+    assert response.json()['detail']['code'] == 'printer_unavailable'
 
 def test_configured_target_get_does_not_probe():
     app.dependency_overrides[http.configured_target] = lambda: PrinterTarget("192.0.2.44")
@@ -114,12 +115,16 @@ def test_editor_http_prepares_once_submits_exact_payload_and_reports_unconfirmed
     response = TestClient(app).post("/api/v1/printing/editor", json=REQUEST)
     assert response.status_code == 200
     result = response.json()
-    assert result["status"] == "SUBMITTED" and result["confirmed"] is False
+    assert result['status'] == 'SUBMITTED'
+    assert result['confirmed'] is False
     assert result["copies"] == 1
     assert (result["width_px"], result["height_px"], result["dpi"]) == (160, 96, 203.2)
     assert result["payload_bytes"] == len(prepared.payload)
-    assert len(calls) == 1 and calls[0].draft.svg == SVG and calls[0].copies == 1
-    assert fake.calls == [prepared.payload] and fake.calls[0] is prepared.payload
+    assert len(calls) == 1
+    assert calls[0].draft.svg == SVG
+    assert calls[0].copies == 1
+    assert fake.calls == [prepared.payload]
+    assert fake.calls[0] is prepared.payload
 
 @pytest.mark.parametrize("extra", [{"host": "192.0.2.99"}, {"port": 9101}, {"encoder": "ZPL"}, {"copies_extra": 2}])
 def test_unknown_top_level_destination_fields_rejected(monkeypatch, extra):
@@ -127,12 +132,14 @@ def test_unknown_top_level_destination_fields_rejected(monkeypatch, extra):
     app.dependency_overrides[http.print_transport_factory] = lambda: lambda target: fake
     monkeypatch.setattr(http, "prepare_draft_output", lambda *a, **k: pytest.fail("Invalid request rendered"))
     response = TestClient(app).post("/api/v1/printing/editor", json={**REQUEST, **extra})
-    assert response.status_code == 422 and fake.calls == []
+    assert response.status_code == 422
+    assert fake.calls == []
 
 def test_invalid_svg_never_submits():
     fake = FakeTransport(); app.dependency_overrides[http.print_transport_factory] = lambda: lambda target: fake
     response = TestClient(app).post("/api/v1/printing/editor", json={**REQUEST, "draft": {**REQUEST["draft"], "svg": '<svg><script>bad</script></svg>'}})
-    assert response.status_code == 422 and fake.calls == []
+    assert response.status_code == 422
+    assert fake.calls == []
 
 def test_send_failure_has_bounded_uncertain_result_without_retry(monkeypatch):
     prepared = output(); fake = FakeTransport(TimeoutError("private host"))
@@ -141,7 +148,8 @@ def test_send_failure_has_bounded_uncertain_result_without_retry(monkeypatch):
     response = TestClient(app).post("/api/v1/printing/editor", json=REQUEST)
     assert response.status_code == 502
     assert response.json()["detail"]["code"] == "print_submission_uncertain"
-    assert "private" not in response.text and "Check the printer" in response.json()["detail"]["message"]
+    assert 'private' not in response.text
+    assert 'Check the printer' in response.json()['detail']['message']
     assert len(fake.calls) == 1
 
 
@@ -152,8 +160,10 @@ def test_known_preparation_failure_returns_500_before_submission(monkeypatch, fa
     def fail(*args, **kwargs): raise failure
     monkeypatch.setattr(http, "prepare_draft_output", fail)
     response = TestClient(app).post("/api/v1/printing/editor", json=REQUEST)
-    assert response.status_code == 500 and response.json()["detail"]["code"] == "print_preparation_failed"
-    assert fake.calls == [] and "private" not in response.text
+    assert response.status_code == 500
+    assert response.json()['detail']['code'] == 'print_preparation_failed'
+    assert fake.calls == []
+    assert 'private' not in response.text
 
 
 @pytest.mark.parametrize("default", [None, PrinterTarget("192.0.2.44")])
@@ -165,7 +175,8 @@ def test_explicit_action_target_overrides_optional_default(monkeypatch, default)
     monkeypatch.setattr(http, "prepare_draft_output", lambda *a, **k: (provenance(), output()))
     response = TestClient(app).post("/api/v1/printing/editor", json={**REQUEST, "target": {"host": "2001:db8::44", "port": 9200}})
     assert response.status_code == 200
-    assert constructed == [PrinterTarget("2001:db8::44", 9200)] and len(fake.calls) == 1
+    assert constructed == [PrinterTarget('2001:db8::44', 9200)]
+    assert len(fake.calls) == 1
     assert response.json()["target"] == {"host": "2001:db8::44", "port": 9200}
     assert default == (None if default is None else PrinterTarget("192.0.2.44"))
 
@@ -191,7 +202,8 @@ def test_invalid_copies_rejected_before_prepare_and_transport(monkeypatch, copie
     app.dependency_overrides[http.print_transport_factory] = lambda: lambda *a: pytest.fail("Invalid copies created transport")
     monkeypatch.setattr(http, "prepare_draft_output", lambda *a, **k: pytest.fail("Invalid copies prepared"))
     response = TestClient(app).post("/api/v1/printing/editor", json={**REQUEST, "copies": copies})
-    assert response.status_code == 422 and response.json()["detail"]["code"] == "invalid_print_copies"
+    assert response.status_code == 422
+    assert response.json()['detail']['code'] == 'invalid_print_copies'
 
 
 def test_multiple_copies_prepare_encode_and_send_once_using_native_quantity(monkeypatch):
@@ -205,9 +217,13 @@ def test_multiple_copies_prepare_encode_and_send_once_using_native_quantity(monk
     monkeypatch.setattr(registry, "encode_png", encode)
     app.dependency_overrides[http.print_transport_factory] = lambda: lambda target: fake
     response = TestClient(app).post("/api/v1/printing/editor", json={**REQUEST, "copies": 3})
-    assert response.status_code == 200 and response.json()["copies"] == 3
-    assert len(rendered) == 1 and encoded == [{"copies": 3}] and len(fake.calls) == 1
-    assert b"<RS>3" in fake.calls[0] and fake.calls[0].count(b"<STX><ETB>") == 1
+    assert response.status_code == 200
+    assert response.json()['copies'] == 3
+    assert len(rendered) == 1
+    assert encoded == [{'copies': 3}]
+    assert len(fake.calls) == 1
+    assert b'<RS>3' in fake.calls[0]
+    assert fake.calls[0].count(b'<STX><ETB>') == 1
 
 
 def test_print_copy_error_mapping_does_not_change_other_request_contracts():

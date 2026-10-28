@@ -12,6 +12,32 @@ from .store import ActivityUnavailable, configured_activity_store
 logger = logging.getLogger('thermal_label_studio.activity')
 
 
+def _uncertain_route(route, activity):
+    return route[1] == 'print' or activity.get('mode') == 'print'
+
+
+def _finish_activity(activity, status, error_body):
+    activity['status_code'] = status or 500
+    record_error(activity, error_body)
+    activity.pop('item_index', None)
+    stage('REQUEST_FAILED' if activity['status_code'] >= 400 else 'REQUEST_COMPLETED')
+    activity['duration_ms'] = round((monotonic() - activity.pop('started')) * 1000, 2)
+
+
+def record_error(activity, error_body):
+    if not error_body:
+        return
+    try:
+        detail = json.loads(error_body).get('detail', {})
+        code = detail.get('code') if isinstance(detail, dict) else None
+        if isinstance(code, str) and code in ERROR_CODES:
+            activity['error_code'] = code
+            if code in ('print_submission_uncertain', 'submission_uncertain', 'response_unavailable'):
+                activity['status'] = 'UNCERTAIN'
+    except (ValueError, AttributeError):
+        pass
+
+
 class ActivityMiddleware:
     def __init__(self, app, api_prefix='/api/v1'):
         self.app = app
@@ -33,8 +59,7 @@ class ActivityMiddleware:
             store = None
         if store is None:
             return await self.app(scope, receive, send)
-        activity = dict(trace_id=current_request_id(), at=datetime.now(timezone.utc).isoformat(),
-                        actor=actor_id.get(), origin=route[0], mode=route[1], status='FAILED', events=[], started=monotonic())
+        activity = {'trace_id': current_request_id(), 'at': datetime.now(timezone.utc).isoformat(), 'actor': actor_id.get(), 'origin': route[0], 'mode': route[1], 'status': 'FAILED', 'events': [], 'started': monotonic()}
         token = current_activity.set(activity)
         status, error_body = None, bytearray()
 
@@ -53,25 +78,12 @@ class ActivityMiddleware:
             await self.app(scope, receive, capture)
         except Exception:
             activity['error_code'] = 'processing_failed'
-            if route[1] == 'print' or activity.get('mode') == 'print':
+            if _uncertain_route(route, activity):
                 # An interrupted response cannot prove that submission did not occur.
                 activity['status'] = 'UNCERTAIN'
             raise
         finally:
-            activity['status_code'] = status or 500
-            if error_body:
-                try:
-                    detail = json.loads(error_body).get('detail', {})
-                    code = detail.get('code') if isinstance(detail, dict) else None
-                    if isinstance(code, str) and code in ERROR_CODES:
-                        activity['error_code'] = code
-                        if code in ('print_submission_uncertain', 'submission_uncertain', 'response_unavailable'):
-                            activity['status'] = 'UNCERTAIN'
-                except (ValueError, AttributeError):
-                    pass
-            activity.pop('item_index', None)
-            stage('REQUEST_FAILED' if activity['status_code'] >= 400 else 'REQUEST_COMPLETED')
-            activity['duration_ms'] = round((monotonic() - activity.pop('started')) * 1000, 2)
+            _finish_activity(activity, status, error_body)
             current_activity.reset(token)
             try:
                 # Do not replace/retry an already submitted print when logging fails.

@@ -18,14 +18,14 @@ export function PreferencesButton() {
   const item = React.useRef<HTMLButtonElement>(null);
   const t = useTranslation();
   React.useEffect(() => {
-    if (!menuOpen) return;
+    if (!menuOpen) { return; }
     const focusFrame = requestAnimationFrame(() => item.current?.focus());
     const outside = (event: MouseEvent) => {
-      if (!trigger.current?.contains(event.target as Node) && !overlay.current?.contains(event.target as Node)) setMenuOpen(false);
+      if (!trigger.current?.contains(event.target as Node) && !overlay.current?.contains(event.target as Node)) { setMenuOpen(false); }
     };
     const key = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { event.preventDefault(); setMenuOpen(false); trigger.current?.focus(); }
-      if (event.key === 'Tab') setMenuOpen(false);
+      if (event.key === 'Tab') { setMenuOpen(false); }
       if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) { event.preventDefault(); item.current?.focus(); }
     };
     document.addEventListener('mousedown', outside); document.addEventListener('keydown', key);
@@ -40,7 +40,7 @@ export function PreferencesButton() {
     <PreferencesDialog open={open} onClose={() => setOpen(false)} /></>;
 }
 
-export function PreferencesDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function PreferencesDialog({ open, onClose }: Readonly<{ open: boolean; onClose: () => void }>) {
   const t = useTranslation();
   const preferences = usePreferencesStore();
   const [selectedTheme, setSelectedTheme] = React.useState<Theme>(preferences.theme);
@@ -50,18 +50,19 @@ export function PreferencesDialog({ open, onClose }: { open: boolean; onClose: (
   }, [open]);
   const dialogRef = useModalA11y(open, onClose);
   return <>
-    {open && createPortal(<div className="fixed inset-0 z-[var(--ui-layer-modal)] flex items-center justify-center p-4" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }} data-ui-backdrop="true">
+    {open && createPortal(<div className="fixed inset-0 z-[var(--ui-layer-modal)] flex items-center justify-center p-4" data-ui-backdrop="true">
+      <button type="button" className="absolute inset-0" tabIndex={-1} aria-hidden="true" onClick={onClose} />
       <Dialog ref={dialogRef} tabIndex={-1} aria-labelledby="preferences-title" data-testid="preferences-dialog" className="w-full max-w-[710px] max-h-[calc(100dvh-2rem)] overflow-y-auto" onKeyDown={event => {
         // Chrome can undo a previously focused canvas field while a button is
         // focused here. Settings contains only selects/buttons; consume browser
         // history shortcuts outside editable custom HEX fields as well as
         // keeping them out of editor shortcuts.
-        if (!(event.target instanceof HTMLInputElement) && (event.ctrlKey || event.metaKey) && ['z', 'y'].includes(event.key.toLowerCase())) event.preventDefault();
+        if (!(event.target instanceof HTMLInputElement) && (event.ctrlKey || event.metaKey) && ['z', 'y'].includes(event.key.toLowerCase())) { event.preventDefault(); }
       }}>
         <DialogHeader><h2 id="preferences-title">{t('Preference')}</h2></DialogHeader>
         <DialogBody className="space-y-4">
           <Field label={t('Language')}><Select data-testid="preferences-language" value={preferences.language} onChange={event => preferences.setLanguage(event.target.value as Language)}><option value="en">English</option><option value="id">Bahasa Indonesia</option></Select></Field>
-          <Field label={t('Theme')}><Select data-testid="preferences-theme" value={selectedTheme} onChange={event => { const value = event.target.value as Theme; setSelectedTheme(value); if (value === 'label-studio-signature') setDraft(signatureDraft()); if (value !== 'custom') preferences.setTheme(value); }}><option value="label-studio-signature">Label Studio Signature</option><option value="dark">{t('Dark')}</option><option value="light">{t('Light')}</option><option value="industrial-dark">{t('Industrial Dark')}</option><option value="industrial-light">{t('Industrial Light')}</option><option value="system">{t('System')}</option><option value="custom">{t('Custom')}</option></Select></Field>
+          <Field label={t('Theme')}><Select data-testid="preferences-theme" value={selectedTheme} onChange={event => { const value = event.target.value as Theme; setSelectedTheme(value); if (value === 'label-studio-signature') { setDraft(signatureDraft()); } if (value !== 'custom') { preferences.setTheme(value); } }}><option value="label-studio-signature">Label Studio Signature</option><option value="dark">{t('Dark')}</option><option value="light">{t('Light')}</option><option value="industrial-dark">{t('Industrial Dark')}</option><option value="industrial-light">{t('Industrial Light')}</option><option value="system">{t('System')}</option><option value="custom">{t('Custom')}</option></Select></Field>
           <CustomThemeEditor draft={draft} onChange={value => { setDraft(value); setSelectedTheme('custom'); }} />
           <p className="text-xs text-on-surface-variant">{t('Preferences are saved in this browser. Label content and exports are unchanged.')}</p>
         </DialogBody>

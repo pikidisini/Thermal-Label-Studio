@@ -10,6 +10,7 @@ from threading import Event
 from types import SimpleNamespace
 import pytest
 from .auth_test_support import TestClient
+from .conftest import test_font_path
 from PIL import Image
 from app.main import app
 from app.label_intake import http, service
@@ -92,7 +93,8 @@ def test_two_codes_order_pins_complete_wire(admitted, prepared):
     response = TestClient(app).post('/api/v1/label-intake', json=envelope(copies=999))
     assert response.status_code == 200
     data = response.json()
-    assert data['status'] == 'COMPLETED' and data['replayed'] is False
+    assert data['status'] == 'COMPLETED'
+    assert data['replayed'] is False
     assert data['request_id'] == 'REQ-001'
     assert data['trace_id'] == data['original_trace_id'] == response.headers['x-request-id']
     assert data['trace_id'] != data['request_id']
@@ -101,7 +103,8 @@ def test_two_codes_order_pins_complete_wire(admitted, prepared):
     assert [item['item_index'] for item in data['results']] == [0, 1]
     assert all(item['copies'] == 999 and item['error'] is None for item in data['results'])
     assert all(item['simulation']['payload_bytes'] > 0 for item in data['results'])
-    assert admitted.calls == ['A', 'B'] and len(prepared) == 2
+    assert admitted.calls == ['A', 'B']
+    assert len(prepared) == 2
 
 
 def test_default_admission_denies_asserted_sender_before_storage(monkeypatch):
@@ -109,7 +112,8 @@ def test_default_admission_denies_asserted_sender_before_storage(monkeypatch):
     app.dependency_overrides[http.stored_layouts] = lambda: pytest.fail('Unauthorized storage')
     try:
         response = TestClient(app).post('/api/v1/label-intake', json=envelope())
-        assert response.status_code == 401 and response.json()['detail']['code'] == 'unauthenticated'
+        assert response.status_code == 401
+        assert response.json()['detail']['code'] == 'unauthenticated'
         assert response.json()['detail']['stage'] == 'ADMISSION'
         assert response.json()['request_id'] == 'REQ-001'
     finally:
@@ -124,7 +128,8 @@ def test_print_sender_and_missing_service_fail_closed(admitted, prepared):
     assert client.post('/api/v1/label-intake', json=body).json()['detail']['code'] == 'sender_not_allowed'
     app.dependency_overrides[http.stored_layouts] = lambda: None
     assert client.post('/api/v1/label-intake', json=envelope()).json()['detail']['code'] == 'intake_unavailable'
-    assert admitted.calls == [] and prepared == []
+    assert admitted.calls == []
+    assert prepared == []
 
 
 @pytest.mark.parametrize('body,status,code', [
@@ -136,8 +141,11 @@ def test_print_sender_and_missing_service_fail_closed(admitted, prepared):
     (b'{}', 422, 'invalid_request')], ids=['syntax','bom','duplicate','nested-duplicate','nan','utf8','size','shape'])
 def test_raw_admission(body, status, code, admitted, prepared):
     response = TestClient(app).post('/api/v1/label-intake', content=body, headers={'Content-Type': 'application/json'})
-    assert response.status_code == status and response.json()['detail']['code'] == code
-    assert response.json()['request_id'] is None and admitted.calls == [] and prepared == []
+    assert response.status_code == status
+    assert response.json()['detail']['code'] == code
+    assert response.json()['request_id'] is None
+    assert admitted.calls == []
+    assert prepared == []
 
 
 @pytest.mark.parametrize('media', ['text/plain', 'application/json; charset=latin1'])
@@ -149,7 +157,8 @@ def test_content_type(media, admitted, prepared):
 @pytest.mark.parametrize('copies', [True, '1', 0, 1000, 1.5])
 def test_bad_copies_before_storage(copies, admitted, prepared):
     response = TestClient(app).post('/api/v1/label-intake', json=envelope(copies=copies))
-    assert response.status_code == 422 and response.json()['detail']['code'] == 'invalid_copies'
+    assert response.status_code == 422
+    assert response.json()['detail']['code'] == 'invalid_copies'
     assert admitted.calls == []
 
 
@@ -174,10 +183,14 @@ def test_resolution_partial_no_fallback(value, code, prepared):
     data = process(layouts=layouts).wire()
     assert data['status'] == 'PARTIAL'
     failed = data['results'][0]
-    assert failed['status'] == 'FAILED' and failed['error']['code'] == code
-    assert failed['error']['stage'] == 'RESOLUTION' and 'simulation' not in failed
-    assert data['summary']['failed'] == 1 and data['summary']['simulated'] == 1
-    assert 'private' not in json.dumps(data) and len(prepared) == 1
+    assert failed['status'] == 'FAILED'
+    assert failed['error']['code'] == code
+    assert failed['error']['stage'] == 'RESOLUTION'
+    assert 'simulation' not in failed
+    assert data['summary']['failed'] == 1
+    assert data['summary']['simulated'] == 1
+    assert 'private' not in json.dumps(data)
+    assert len(prepared) == 1
 
 
 def test_all_pinned_once_before_processing_and_nested_input_snapshot(monkeypatch, prepared):
@@ -209,8 +222,10 @@ def test_preparation_failure_continues(exc, code, stage, monkeypatch, prepared):
         return original(request)
     monkeypatch.setattr(service, 'prepare_draft_output', fail_first)
     result = process()
-    assert result.results[0].error.code == code and result.results[0].error.stage == stage
-    assert result.results[1].status == 'SIMULATED' and result.status == 'PARTIAL'
+    assert result.results[0].error.code == code
+    assert result.results[0].error.stage == stage
+    assert result.results[1].status == 'SIMULATED'
+    assert result.status == 'PARTIAL'
 
 
 def test_copies_aggregate_before_any_prepare(prepared):
@@ -227,7 +242,8 @@ def test_pixel_and_memory_reservation_before_prepare(monkeypatch, prepared):
     assert [item['status'] for item in data['results']] == ['FAILED','SKIPPED']
     monkeypatch.setattr(service, 'MAX_WORKING', service.BASE_RESERVATION)
     layouts = Layouts(); data = process(layouts=layouts).wire()
-    assert layouts.calls == [] and prepared == []
+    assert layouts.calls == []
+    assert prepared == []
 
 
 @pytest.mark.parametrize('budget', ['MAX_PNG','MAX_IPL','MAX_RESPONSE'])
@@ -235,7 +251,8 @@ def test_actual_retention_budget_no_truncation(monkeypatch, prepared, budget):
     monkeypatch.setattr(service, budget, 1)
     data = process().wire()
     assert [item['status'] for item in data['results']] == ['FAILED','SKIPPED']
-    assert all('simulation' not in item for item in data['results']) and len(prepared) == 1
+    assert all(('simulation' not in item for item in data['results']))
+    assert len(prepared) == 1
 
 
 def test_late_prepare_is_discarded_and_remaining_skipped(monkeypatch, prepared):
@@ -248,7 +265,8 @@ def test_late_prepare_is_discarded_and_remaining_skipped(monkeypatch, prepared):
     data = process().wire()
     assert data['results'][0]['error']['code'] == 'preparation_timeout'
     assert data['results'][1]['status'] == 'SKIPPED'
-    assert len(prepared) == 1 and all('simulation' not in item for item in data['results'])
+    assert len(prepared) == 1
+    assert all(('simulation' not in item for item in data['results']))
 
 
 def test_single_inflight_no_queue_and_slot_released(admitted, prepared, monkeypatch):
@@ -262,7 +280,8 @@ def test_single_inflight_no_queue_and_slot_released(admitted, prepared, monkeypa
         assert entered.wait(5)
         try:
             busy = TestClient(app).post('/api/v1/label-intake', json=envelope())
-            assert busy.status_code == 429 and busy.json()['detail']['code'] == 'intake_busy'
+            assert busy.status_code == 429
+            assert busy.json()['detail']['code'] == 'intake_busy'
         finally:
             release.set()
         assert future.result(timeout=5).status_code == 200
@@ -288,7 +307,8 @@ def test_blocked_resolution_exposes_cooperative_deadline_limit(monkeypatch, prep
             release.set()
         result = future.result(timeout=5)
     assert result.results[0].error.code == 'preparation_timeout'
-    assert result.results[1].status == 'SKIPPED' and prepared == []
+    assert result.results[1].status == 'SKIPPED'
+    assert prepared == []
 
 
 def pixels(png):
@@ -299,10 +319,13 @@ def pixels(png):
 @pytest.mark.parametrize('kind', ['static','text','symbol'])
 @pytest.mark.parametrize('copies', [1, 999])
 def test_native_stored_intake_matches_studio_and_decoded_ipl(kind, copies, monkeypatch, admitted):
-    renderer = ROOT/'engine/bin/resvg.exe'
-    if not renderer.is_file() or not Path('C:/Windows/Fonts/arial.ttf').is_file():
-        pytest.skip('Native resvg/Arial unavailable; local native parity NOT RUN.')
+    from .conftest import test_renderer_path
+    renderer = test_renderer_path()
+    font = test_font_path()
+    if not renderer.is_file() or not font.is_file():
+        pytest.skip('Native renderer/test font unavailable; local native parity NOT RUN.')
     monkeypatch.setenv('TLS_RENDERER_PATH', str(renderer))
+    monkeypatch.setenv('TLS_FIXTURE_FONT_PATH', str(font))
     svg, values, width, height = STATIC, {}, 40, 30
     if kind != 'static':
         name = 'text_binding_fabric.json' if kind == 'text' else 'symbol_binding_fabric.json'
@@ -322,7 +345,8 @@ def test_native_stored_intake_matches_studio_and_decoded_ipl(kind, copies, monke
     assert result['simulation']['payload_sha256'] == hashlib.sha256(prepared.payload).hexdigest()
     assert b'<RS>' + str(copies).encode() in prepared.payload
     studio = TestClient(app).post('/api/v1/simulation/editor-preview', json=output.model_dump())
-    assert studio.status_code == 200 and pixels(base64.b64decode(studio.json()['png_base64'])) == pixels(png)
+    assert studio.status_code == 200
+    assert pixels(base64.b64decode(studio.json()['png_base64'])) == pixels(png)
 
 
 def test_no_fixture_or_dataset_dependency_and_simulation_has_no_transport():

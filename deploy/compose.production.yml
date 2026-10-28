@@ -1,0 +1,149 @@
+# Standalone deployment. Do not layer on the local-development Compose ports.
+# Every image must be supplied as an immutable image@sha256:digest.
+name: thermal-label-production
+x-runtime: &runtime
+  image: ${TLS_RELEASE_IMAGE:?Set the tested application image digest}
+  platform: linux/amd64
+  env_file:
+    - ${TLS_RUNTIME_ENV_FILE:?Set an absolute private runtime environment file}
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 64
+  restart: "no"
+  stop_grace_period: 30s
+  networks: [application]
+
+services:
+  proxy:
+    image: ${TLS_PROXY_IMAGE:?Set the tested nginx image digest}
+    ports:
+      - "${TLS_LAN_BIND_IP:?Set the server LAN address}:443:8443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${TLS_CERTIFICATE_FILE:?Set certificate chain path}:/etc/tls/server.crt:ro
+      - ${TLS_PRIVATE_KEY_FILE:?Set certificate private key path}:/etc/tls/server.key:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+      - /var/cache/nginx:rw,noexec,nosuid,size=64m
+      - /var/run:rw,noexec,nosuid,size=1m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 32
+    restart: "no"
+    networks:
+      application:
+        ipv4_address: ${TLS_PROXY_IP:?Set the explicit internal proxy address}
+    depends_on: [app]
+  app:
+    <<: *runtime
+    environment:
+      TLS_QUEUE_ENABLED: "true"
+      TLS_STORAGE_INITIALIZE: "false"
+      TLS_AUTH_LOCAL_HTTP: "false"
+      TLS_BIND_HOST: 0.0.0.0
+      TLS_TRUSTED_PROXY_IPS: ${TLS_PROXY_IP:?Set the explicit internal proxy address}
+      TLS_AUTH_ORIGINS: https://${TLS_HOSTNAME:?Set the internal DNS hostname}
+    mem_limit: 512m
+    cpus: 1.0
+    depends_on:
+      postgres: {condition: service_healthy}
+      minio: {condition: service_started}
+  worker-1:
+    <<: *runtime
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+      - /run/tls-queue-health:rw,noexec,nosuid,size=1m,mode=0700,uid=10001,gid=10001
+    env_file:
+      - ${TLS_WORKER_ENV_FILE:?Set a private least-privilege worker environment file}
+    command: [python, -B, -m, app.intake_queue.worker]
+    environment:
+      TLS_QUEUE_ENABLED: "true"
+      TLS_STORAGE_INITIALIZE: "false"
+      TLS_QUEUE_WORKER_ID: worker-1
+    mem_limit: 128m
+    memswap_limit: 128m
+    cpus: 1.0
+    healthcheck:
+      test: [CMD, python, -B, -m, app.intake_queue.health]
+      interval: 15s
+      timeout: 8s
+      start_period: 15s
+      retries: 2
+    depends_on:
+      postgres: {condition: service_healthy}
+      minio: {condition: service_started}
+  worker-2:
+    <<: *runtime
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+      - /run/tls-queue-health:rw,noexec,nosuid,size=1m,mode=0700,uid=10001,gid=10001
+    env_file:
+      - ${TLS_WORKER_ENV_FILE:?Set a private least-privilege worker environment file}
+    command: [python, -B, -m, app.intake_queue.worker]
+    environment:
+      TLS_QUEUE_ENABLED: "true"
+      TLS_STORAGE_INITIALIZE: "false"
+      TLS_QUEUE_WORKER_ID: worker-2
+    mem_limit: 128m
+    memswap_limit: 128m
+    cpus: 1.0
+    healthcheck:
+      test: [CMD, python, -B, -m, app.intake_queue.health]
+      interval: 15s
+      timeout: 8s
+      start_period: 15s
+      retries: 2
+    depends_on:
+      postgres: {condition: service_healthy}
+      minio: {condition: service_started}
+  postgres:
+    image: ${TLS_POSTGRES_IMAGE:?Set the tested PostgreSQL image digest}
+    environment:
+      POSTGRES_DB: thermal_label_studio
+      POSTGRES_USER: thermal_label
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    networks: [application]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U thermal_label -d thermal_label_studio"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: "no"
+  minio:
+    image: ${TLS_MINIO_IMAGE:?Set the tested MinIO image digest}
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER_FILE: /run/secrets/minio_user
+      MINIO_ROOT_PASSWORD_FILE: /run/secrets/minio_password
+    secrets: [minio_user, minio_password]
+    volumes: [minio-data:/data]
+    networks: [application]
+    restart: "no"
+
+networks:
+  application:
+    ipam:
+      config:
+        - subnet: ${TLS_CONTAINER_SUBNET:?Set a non-overlapping private container subnet}
+volumes:
+  postgres-data:
+    external: true
+    name: ${TLS_POSTGRES_VOLUME:?Set the authorized PostgreSQL volume}
+  minio-data:
+    external: true
+    name: ${TLS_MINIO_VOLUME:?Set the authorized MinIO volume}
+secrets:
+  postgres_password:
+    file: ${TLS_POSTGRES_PASSWORD_FILE:?Set private password file}
+  minio_user:
+    file: ${TLS_MINIO_USER_FILE:?Set private MinIO user file}
+  minio_password:
+    file: ${TLS_MINIO_PASSWORD_FILE:?Set private MinIO password file}

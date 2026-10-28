@@ -62,7 +62,8 @@ def test_exact_image_bytes_roundtrip_and_static_svg_admission(service, fmt):
     value = graphic(fmt)
     summary = service.create(value)
     assert summary['name'] == value['name']
-    assert summary['version'] == 1 and 'data_uri' not in summary
+    assert summary['version'] == 1
+    assert 'data_uri' not in summary
     assert service.get(summary['id'])['data_uri'] == value['data_uri']
     svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="20mm" height="10mm" viewBox="0 0 80 40"><image width="8" height="4" href="{value["data_uri"]}"/></svg>'
     admit_template(svg)
@@ -124,7 +125,8 @@ def test_bounds_json_duplicates_unconfigured_and_failures(client, service):
     assert not service._database.sql
     service._database.fail = True
     response = client.get('/graphics')
-    assert response.status_code == 503 and 'secret' not in response.text
+    assert response.status_code == 503
+    assert 'secret' not in response.text
     with pytest.raises(GraphicsUnavailable, match='^Graphics storage is unavailable.$'): service.list()
     del client.app.state.graphics_service
     assert client.get('/graphics').status_code == 503

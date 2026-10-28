@@ -27,7 +27,7 @@ interface AlignBtnProps {
   onClick: () => void;
 }
 
-function AlignBtn({ icon, title, caption, testId, disabled, onClick }: AlignBtnProps) {
+function AlignBtn({ icon, title, caption, testId, disabled, onClick }: Readonly<AlignBtnProps>) {
   useTranslation();
   return (
     <div className="flex min-w-0 flex-col gap-0.5 text-center">
@@ -106,14 +106,14 @@ export function TransformMatrixTab({
         </div>
         <p className="mt-1.5 text-[11px] text-on-surface-variant">{t('Origin for X / Y coordinates')}</p>
         <div className="mt-2 flex items-center gap-3">
-          <div data-testid="origin-anchor-grid" role="group" aria-label={t('Reference point')} className="grid shrink-0 grid-cols-3 gap-0.5">
+          <fieldset data-testid="origin-anchor-grid"  aria-label={t('Reference point')} className="min-w-0 grid shrink-0 grid-cols-3 gap-0.5">
             {ANCHORS.map((anc) => (
               <IconButton key={anc} data-testid={`anchor-btn-${anc}`} onClick={() => setActiveAnchor(anc)} disabled={noSel}
                 label={anc.replace(/-/g, ' ')} variant="compact" selected={activeAnchor === anc} aria-pressed={activeAnchor === anc}>
                 <Icon size={16} glyph={anc === 'center' ? 'my_location' : 'radio_button_unchecked'} />
               </IconButton>
             ))}
-          </div>
+          </fieldset>
           <div className="min-w-0 text-[11px]">
             <p data-testid="origin-anchor-active-label" className="capitalize">{anchorLabel ? t(anchorLabel) : '—'}</p>
             <p className="text-on-surface-variant">{t('Keeps object in place')}</p>

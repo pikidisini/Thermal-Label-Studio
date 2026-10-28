@@ -53,6 +53,11 @@ function GuidesToggle() {
   );
 }
 
+const OBJECT_GLYPHS = new Map([
+  ['text', 'title'], ['i-text', 'title'], ['image', 'image'],
+  ['rect', 'crop_square'], ['circle', 'circle'], ['line', 'horizontal_rule'],
+]);
+
 export function PropertyRibbon({
   selectedObject,
   onUpdateProperty,
@@ -65,6 +70,7 @@ export function PropertyRibbon({
 }: PropertyRibbonProps) {
   useTranslation();
   const objType = selectedObject?.type ?? null;
+  const typeLabel = objType === 'i-text' ? t('Text') : objType;
 
   return (
     <div
@@ -76,14 +82,9 @@ export function PropertyRibbon({
       <div data-testid="container-ribbon-left-section" className="flex min-w-0 flex-1 items-center gap-0 overflow-x-auto">
         {/* Object type chip */}
         <div data-testid="ribbon-object-type-chip" className="flex items-center gap-1 text-on-surface-variant font-medium mr-2">
-          <Icon className=" text-primary"  size={14} glyph={objType === 'text' || objType === 'i-text' ? "title"
-              : objType === 'image' ? "image"
-              : objType === 'rect' ? "crop_square"
-              : objType === 'circle' ? "circle"
-              : objType === 'line' ? "horizontal_rule"
-              : "near_me"} />
+          <Icon className=" text-primary" size={14} glyph={OBJECT_GLYPHS.get(objType ?? '') ?? 'near_me'} />
           <span data-testid="ribbon-object-type-text" className="text-[11px]">
-            {objType ? (objType === 'i-text' ? t("Text") : objType) : t("No Selection")}
+            {typeLabel || t('No Selection')}
           </span>
         </div>
 

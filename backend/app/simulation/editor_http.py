@@ -35,7 +35,7 @@ class EditorPreviewResponse(BaseModel):
     png_base64: str = Field(min_length=1)
 
 
-@router.post("/simulation/editor-preview", response_model=EditorPreviewResponse)
+@router.post('/simulation/editor-preview', response_model=EditorPreviewResponse, responses={422: {'description': 'Unprocessable Content'}, 500: {'description': 'Internal Server Error'}})
 def simulate_editor_preview(request: EditorPreviewRequest) -> EditorPreviewResponse:
     """Render the current local canvas to the same server-owned bitmap used by preview."""
     with request_context() as request_id:

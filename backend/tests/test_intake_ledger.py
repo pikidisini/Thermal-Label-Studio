@@ -118,16 +118,22 @@ def test_http_simulation_replay_uses_original_pins_no_storage_or_raster(admitted
     second=client.post('/api/v1/label-intake',json=body)
     assert second.status_code==200
     old,new=first.json(),second.json()
-    assert new['replayed'] is True and old['replayed'] is False
-    assert new['trace_id']!=old['trace_id'] and new['original_trace_id']==old['trace_id']
-    assert new['results']==old['results'] and len(prepared)==2 and admitted.calls==['A','B']
+    assert new['replayed'] is True
+    assert old['replayed'] is False
+    assert new['trace_id'] != old['trace_id']
+    assert new['original_trace_id'] == old['trace_id']
+    assert new['results'] == old['results']
+    assert len(prepared) == 2
+    assert admitted.calls == ['A', 'B']
 
 
 def test_http_missing_or_unavailable_ledger_fail_closed(admitted,prepared):
     app.dependency_overrides[http.durable_ledger]=lambda:None
     response=TestClient(app).post('/api/v1/label-intake',json=envelope())
-    assert response.status_code==503 and response.json()['detail']['code']=='ledger_unavailable'
-    assert admitted.calls==[] and prepared==[]
+    assert response.status_code == 503
+    assert response.json()['detail']['code'] == 'ledger_unavailable'
+    assert admitted.calls == []
+    assert prepared == []
 
 
 def test_http_replay_checks_current_sender_authorization(admitted,prepared):
@@ -159,7 +165,8 @@ def test_commit_crash_matrix_never_auto_sends(database,operation,fault):
     rows=database.rows('SELECT ledger_id,state FROM requests')
     restarted=database.ledger()
     if not rows:
-        assert operation=='admit' and fault=='before'
+        assert operation == 'admit'
+        assert fault == 'before'
         assert restarted.lookup('EXTERNAL_DEMO',body,str(uuid4())) is None
         return
     ledger_id,state=rows[0]
@@ -186,7 +193,8 @@ def test_duplicate_claim_and_post_uncertainty_claim_are_denied(database):
     assert_error('ledger_unavailable',lambda:claim(ledger,receipt,1))
     ledger.complete_print(receipt)
     result=ledger.lookup('EXTERNAL_DEMO',request(),str(uuid4()))
-    assert result['status']=='UNCERTAIN' and [item['status'] for item in result['results']]==['UNCERTAIN','SKIPPED']
+    assert result['status'] == 'UNCERTAIN'
+    assert [item['status'] for item in result['results']] == ['UNCERTAIN', 'SKIPPED']
     assert result['results'][0]['confirmed'] is False
 
 
@@ -199,7 +207,8 @@ def test_success_replay_after_repository_restart_no_second_claim(database):
     ledger.complete_print(receipt)
     restarted=database.ledger()
     result=restarted.lookup('EXTERNAL_DEMO',body,str(uuid4()))
-    assert result['status']=='COMPLETED' and result['summary']['submitted']==2
+    assert result['status'] == 'COMPLETED'
+    assert result['summary']['submitted'] == 2
     assert_error('ledger_unavailable',lambda:claim(restarted,receipt))
     assert database.rows('SELECT count(*) FROM simulation_results')==[(0,)]
 
@@ -209,15 +218,19 @@ def test_route_and_simulation_terminal_commit_failure_are_not_success(admitted,p
     app.dependency_overrides[http.durable_ledger]=lambda:ledger
     database.fail_sql='INSERT INTO label_intake.simulation_results'
     first=TestClient(app).post('/api/v1/label-intake',json=envelope())
-    assert first.status_code==503 and first.json()['detail']['code']=='ledger_unavailable'
+    assert first.status_code == 503
+    assert first.json()['detail']['code'] == 'ledger_unavailable'
     assert database.rows('SELECT state FROM items ORDER BY item_index')==[('PREPARED',),('PREPARED',)]
     database.fail_sql=None
     repeated=TestClient(app).post('/api/v1/label-intake',json=envelope())
-    assert repeated.status_code==409 and repeated.json()['detail']['code']=='request_in_progress'
+    assert repeated.status_code == 409
+    assert repeated.json()['detail']['code'] == 'request_in_progress'
     assert len(prepared)==2
     ledger.recover_quiesced(database.rows('SELECT ledger_id FROM requests')[0][0])
     recovered=TestClient(app).post('/api/v1/label-intake',json=envelope())
-    assert recovered.status_code==200 and recovered.json()['status']=='FAILED' and len(prepared)==2
+    assert recovered.status_code == 200
+    assert recovered.json()['status'] == 'FAILED'
+    assert len(prepared) == 2
 
 
 @pytest.mark.parametrize('mode,retention',[('simulation',86400),('print',90*86400)])
@@ -262,8 +275,11 @@ def test_no_raw_input_key_external_request_id_payload_or_png_in_print_ledger(dat
     assert claim(ledger,receipt) is True
     ledger.settle_send(receipt,0,'UNCERTAIN'); ledger.complete_print(receipt)
     raw=repr(database.rows('SELECT * FROM requests')+database.rows('SELECT * FROM items'))
-    assert 'synthetic-business-value' not in raw and 'REQ-001' not in raw and 'AAAA' not in raw
-    assert 'png_base64' not in raw and 'data' not in json.loads(database.rows('SELECT metadata FROM items')[0][0])
+    assert 'synthetic-business-value' not in raw
+    assert 'REQ-001' not in raw
+    assert 'AAAA' not in raw
+    assert 'png_base64' not in raw
+    assert 'data' not in json.loads(database.rows('SELECT metadata FROM items')[0][0])
 
 
 def test_pinned_target_revision_cannot_change_at_claim(database):

@@ -35,7 +35,8 @@ def test_editor_preview_renders_a_server_bitmap(monkeypatch):
     ))
     assert (response.width_px, response.height_px, response.dpi) == (640, 1600, 203.2)
     with Image.open(BytesIO(base64.b64decode(response.png_base64))) as image:
-        assert image.size == (640,1600) and image.mode == "1"
+        assert image.size == (640, 1600)
+        assert image.mode == '1'
         assert image.getpixel((2,801)) == 0
         assert image.getpixel((801 % 640,2)) == 255
     assert len(calls) == 1
@@ -89,7 +90,8 @@ def test_editor_response_comes_from_exact_encoded_payload(monkeypatch):
     monkeypatch.setattr(registry, "decode_png", decode)
     request = editor_http.EditorPreviewRequest(draft=dict(svg=VALID_SVG.replace("80mm", "10mm").replace("200mm", "10mm").replace("320 800", "40 40"), width_mm=10, height_mm=10, dpi=203.2, binding_version=1), data={}, encoder="IPL", copies=1)
     response = editor_http.simulate_editor_preview(request)
-    assert seen == [payload] and seen[0] is payload
+    assert seen == [payload]
+    assert seen[0] is payload
     assert base64.b64decode(response.png_base64) == b"decoder result"
 
     def fail(*args):

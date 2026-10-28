@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-10-12 (Asia/Jakarta).
+Updated: 2026-10-23 (Asia/Jakarta).
 This file is the authoritative current implementation status. The current table and latest checkpoint take precedence over dated execution notes and historical result/review reports, which remain unchanged.
 
 Package state: T01, T02 and T03 DONE with independent review PASS. T04 DONE with primary-agent source self-review PASS (no independent second-agent review). T05 DONE with primary-agent source self-review PASS for declared profiles. T06 source implementation and native shared-output parity are complete; current-app mock browser acceptance is BLOCKED. T07 local intake simulation is implemented and source-validated; full resource acceptance is NEEDS_REPLAN, and external admission stays closed. T08 durable identity source/transactional-fake acceptance is DONE with source self-review PASS; local PostgreSQL schema/setup and actual process-restart replay are PASS; broader operational acceptance remains open. T09 source/synthetic policy and preflight are DONE with self-review PASS; default external admission and intake print remain denied.
@@ -23,7 +23,180 @@ The main implementation sequence ends at T11. T12 is optional and its PENDING/NO
 | T11 | NEEDS_REPLAN | [T11_RESULT](results/T11_RESULT.md) | [CHANGES_REQUIRED - resource/runtime findings](results/T11_REVIEW.md) | Opt-in standard ledger wiring implemented; mandatory resource limits, policy/credential lifecycle, live runtime and restart evidence remain open |
 | T12 | BLOCKED | [T12_RESULT](results/T12_RESULT.md) | [BLOCKED physical; local preparation PASS](results/T12_REVIEW.md) | Nine local cases prepared; name/authorize target, counts and slots; resolve relevant T11 resource/runtime gates before sends |
 
-## Current checkpoint: all-template simulation permission (2026-10-12)
+## Current pilot-candidate source validation (2026-10-26)
+
+The internal-pilot scope remains HTTPS application access with synthetic data and
+local Admin/Designer/Operator roles. SAP RFC, external intake, and physical
+printer delivery remain disabled/fail-closed; no named server, storage, SAP, or
+printer target has been authorized for this checkpoint.
+
+The native-renderer test fixture now resolves its fallback renderer path to an
+absolute path before passing it to the fail-closed runtime configuration. This
+removes the prior relative-path configuration failure without relaxing runtime
+path validation. The focused regression for the sanitized source-gate fixture
+PASSed. The source gate now separates the complete backend suite into non-native
+and native-parity groups, each retaining its 600-second budget and all existing
+tests. Both groups PASSed, as did frontend TypeScript, production build, and
+frontend regression. Current evidence:
+`.tmp/source-checks-eb53f833-a162-4d87-b7d2-229fdc67c495/report.json`.
+
+Candidate quality, Linux image build, exact-image runtime/browser acceptance,
+isolated persistence, and Sonar analysis are NOT RUN for this source fingerprint.
+The candidate is not ready for a named-target pilot until the remaining planned
+quality, image/runtime, and isolated persistence gates have current evidence. No
+deployment, provisioning, container, database, MinIO, SAP, or printer action was
+performed.
+
+## Current checkpoint: candidate quality remediation (2026-10-22)
+
+The clean candidate below is rejected by its fresh Sonar gate: 884 new issues
+and 78.8% new-code coverage (80% required). Rules, exclusions and thresholds are
+unchanged. Remediation has changed application source, tests and deployment
+configuration; the old image/coverage no longer represent the current workspace.
+A new complete source/coverage gate, image build, exact-image runtime tests and
+Sonar analysis are NOT RUN for the repaired source and remain required.
+
+Targeted regressions PASS after further repairs: 93 print/routing/queue checks,
+109 simulation/ledger/runtime checks, and 519 SAP-contract/data/policy/backup/
+symbol/binding checks. A pure differential check of SAP parameter conversion
+matches the rejected candidate for 504 inputs. Frontend TypeScript and production
+build PASS; 226 unit tests passed before the latest UI message refactors. Twenty
+mock browser cases covering Label Print, printing and text round-trip PASS.
+Earlier validator and codec differential reports remain separate scoped evidence.
+
+Complete backend coverage PASS: 1,890 tests. That run then failed the full frontend
+TypeScript check with two SVGElement/HTMLElement comparison errors. The DOM query
+type was repaired to include both supported element types; full TypeScript now
+PASS. Production frontend build and all 226 unit coverage tests also PASS.
+Browser coverage then failed at Chrome's `download.createReadStream: canceled`.
+Five SVG-export specs now share a helper that asserts the download event/name
+and reads the exact Blob associated with the download URL; geometry/content
+assertions remain. Targeted alignment/text round-trip PASS. The following complete
+browser run finished with 205 PASS and 3 FAIL: two preview viewport sizing tests
+and one language-dependent download selector. Explicit full-width button styling
+and a language-independent action selector repaired these regressions; all three
+focused tests PASS. Nine duplicate CSS rules were consolidated with unchanged
+final declaration values; palette/geometry acceptance PASS in the complete run below.
+
+Complete frontend coverage PASS in
+`coverage-837c7d3d-f821-4584-8a7b-74224f61745d` on source fingerprint
+`5082e308fb6d79ad34ad15d24cbe5e5f8cd11f37d0d8a55975cff83ef6d372b2`.
+All frontend stages were rerun: full TypeScript, coverage build, 226 unit tests
+and 208 browser tests PASS. Unit files ran with concurrency 1 to reduce host RAM
+pressure; counts/assertions are unchanged. Source/report integrity PASS. Measured
+backend line/branch coverage is 89.75% / 80.86%; frontend is 97.23% / 81.77%.
+The passing backend report is reused only after verifying unchanged inputs,
+with explicit provenance. Original failed reports remain unchanged; no browser
+coverage from a failed or aborted run is reused in this run.
+Fresh Sonar analysis completed FAIL: new-code coverage 91.9% PASS (80% minimum),
+new duplicated lines 1.77223% PASS (3% maximum), and 90 new issues FAIL (0 required),
+down from 884 in the rejected candidate. The complete 284-open-issue inventory
+and matching 90-new-issue classification are retained in
+`sonar-remediation-01d3e533fa4741239be9832a508c71c2`. Further repairs, a replacement
+image and exact-image Linux runtime acceptance remain required.
+No server, SAP or physical printer action occurred during remediation.
+
+## Rejected clean production candidate (2026-10-22)
+
+A clean Linux/amd64 production build and exact-image local acceptance PASS.
+The tested image is `thermal-label-studio:rc-c07f0c879292`, digest
+`sha256:9c0900ff4d3947667cdb896160f9058b6c117973c8417f79ccb910abb4f535df`.
+Eleven runtime reports cover native rendering/IPL, two-worker FIFO/parallelism,
+replay/isolation and memory/deadline/crash/database/shutdown faults. The exported
+archive and all OCI blobs passed integrity checks. The test project is stopped
+with volumes retained. Current measured coverage and browser acceptance PASS with explicit
+incremental provenance. Fresh Sonar acceptance FAIL: new coverage 78.8% versus
+80%, and 884 new issues versus 0. Remediation is in progress; this candidate is
+NO-GO for server release. A valid local analysis token was used with permission. No account/password/quality-rule change was made.
+
+See [candidate evidence and server handoff](results/RELEASE_CANDIDATE_2026-10-22.md).
+This does not establish Ubuntu server/HTTPS, SAP-Simulator E2E, restore or physical
+printer acceptance. Earlier quality statuses are not reused for this candidate.
+
+## Current checkpoint: local Docker Linux queue acceptance (2026-10-22)
+
+The user authorized the isolated `tls-queue-local-test` project on this computer.
+Actual PostgreSQL/MinIO, two Linux worker containers and two fake TCP receivers
+were provisioned on new volumes/internal-only networking. No operational app
+volume, SAP or physical printer was used. This supersedes the earlier NOT RUN
+entries only for the locally exercised cases; Ubuntu/HTTPS, SAP, physical output,
+off-server restore and production capacity remain open.
+
+A repeated burst exposed real OOM failures because the health probe imported a
+third application stack. The probe now reads a small private marker published by
+PID 1 only after committed database heartbeats. The 128 MiB ceiling is unchanged.
+Queue/operations/heartbeat regressions PASS (57 tests). Final complete source
+validation after this correction PASS in one invocation: backend regression,
+TypeScript, frontend build and frontend regression. Evidence:
+`.tmp/source-checks-561f48d2-7497-4b02-99d7-c5ff3193b98c/report.json`.
+
+Local runtime PASS: 20 concurrent HTTP clients; no duplicate claim/delivery;
+same-printer FIFO and different-printer overlap; v1/v2 replay; conflict/isolation;
+simulation without TCP; terminal ciphertext removal; renderer hang/descendant
+cleanup; intentional OOM; storage deadline; pre/post-send container death and
+explicit recovery; UNCERTAIN holds and audited release; queue-full/expiry;
+permission revocation; lost HTTP acceptance response; database outage; graceful
+shutdown. Final one-CPU/128-MiB burst: 20 print jobs, 0.688 jobs/second measured
+between first admission and final completion, 25.01 seconds maximum queue wait,
+four sampled database connections, worker peaks 104890368/111665152 bytes with
+zero OOM. This synthetic static-label result is not a production capacity quota.
+All seven test containers were stopped after the run; volumes and evidence were
+retained. Final queue view contained no QUEUED or PROCESSING jobs. Source/image
+hashes matched for all 137 backend Python files. Aggregated evidence:
+`.tmp/queue-local-acceptance-5a0e93b2909247f3b4590f925f58e3a6/verification.json`.
+
+See [the local runtime result](results/LOCAL_QUEUE_LINUX_2026-10-22.md) and
+[the test instructions](../../../deploy/queue-local-test/README.md).
+Production remains NO-GO. Candidate Sonar is BLOCKED (analysis token unavailable);
+measured coverage acceptance is NOT RUN. Historical phase states below are not
+closed by this bounded local queue test.
+
+## Earlier checkpoint: asynchronous queue source (2026-10-22)
+
+The approved new rollout adds API v2, PostgreSQL encrypted transient payloads,
+two separately fenced Linux workers, shared physical-printer ownership, operator
+inspection/hold resolution, an internal HTTPS Compose definition and plan-only
+backup/isolated-restore utilities. V1 and V2 share permanent identity. The queued
+route requires persisted Management policy and is disabled without explicit
+configuration; schema provisioning is separate and starts the queue paused.
+
+Final source checks PASS: complete backend regression plus frontend TypeScript,
+build and regression rechecked after a dictionary-only correction. Targeted
+queue, supervision, encryption, recovery and operations tests PASS (50 tests).
+The synthetic load test enqueues 20 requests sequentially, then uses two concurrent
+consumers with SQLite transactions and recording transports; concurrent HTTP
+admission and native PostgreSQL capacity remain unverified. Built-assets affected
+browser scenarios PASS (18 distinct scenarios across queue, Home, auth and logs).
+No operational storage writes, application-container lifecycle actions, SAP
+requests or physical-printer commands were performed.
+
+The first complete source run recorded 1,851 backend PASS and one composition
+import-allowlist failure; the allowlist was explicitly extended only for the
+implemented queue owners. TypeScript, fresh build and frontend regression PASS
+in that run. Its FAIL evidence is retained at
+`.tmp/source-checks-e6b94707-ed81-4e81-8303-9a6eb4116a76/report.json`.
+The complete backend subsequently passed in
+`.tmp/source-checks-7e2a8fa6-4c63-4dfe-ac9d-ee22780f7f66/report.json`.
+After correcting the duplicate frontend dictionary entry, all three frontend
+checks passed in
+`.tmp/source-checks-25096439-bd64-4886-8cd8-78fd92e0329a/report.json`.
+Backend source/tests were unchanged. Aggregated evidence and fingerprints:
+`.tmp/async-queue-acceptance-4517d016776345aba8215e86e485e2dc/verification.json`.
+See [the source checkpoint](results/ASYNC_QUEUE_SOURCE_2026-10-22.md) for scope.
+
+Live PostgreSQL locking/concurrency, Linux memory/deadline/OOM and process-tree
+cleanup, package/HTTPS, SAP outbound integration, off-server backup/restore and
+physical-printer acceptance remain NOT RUN. Current-candidate Sonar analysis is
+BLOCKED because the analysis token is unavailable to the execution environment.
+Measured coverage acceptance is NOT RUN.
+Hostname, Ubuntu/Docker versions, capacity, named targets, backup destination and
+recovery objectives remain unset operational gates. Production remains NO-GO.
+See [queue operations](../../PRODUCTION_QUEUE.md) for the contract and rollout.
+The phase table above is retained: this source change does not close the older
+v1 cooperative-resource or browser acceptance records without corresponding
+new evidence.
+
+## Local checkpoint: all-template simulation permission (2026-10-12)
 
 The user authorized selecting any stored template for simulation without a
 per-code permission list. `Source.simulation_all_label_codes` is an explicit

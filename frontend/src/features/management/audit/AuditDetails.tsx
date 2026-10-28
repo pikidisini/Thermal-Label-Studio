@@ -8,16 +8,16 @@ function changedFields(before: unknown, after: unknown, path = '$'): Array<{fiel
   const object = (value: unknown): value is Record<string,unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
   if ((object(before) || before === undefined || before === null) && (object(after) || after === undefined || after === null) && (object(before) || object(after))) {
     const left = object(before) ? before : {}; const right = object(after) ? after : {};
-    const keys = Array.from(new Set([...Object.keys(left),...Object.keys(right)])).sort();
+    const keys = Array.from(new Set([...Object.keys(left),...Object.keys(right)])).sort((left, right) => Number(left > right) - Number(left < right));
     if (keys.length) return keys.flatMap(key => changedFields(left[key],right[key],path === '$' ? key : `${path}.${key}`));
   }
   if (JSON.stringify(before) === JSON.stringify(after)) return [];
   return [{field:path,before,after}];
 }
 
-export function AuditDetails({ management }: { management: ManagementController }) {
+export function AuditDetails({ management }: Readonly<{ management: ManagementController }>) {
   const t = useTranslation(); const { editor } = management;
-  if (!editor || editor.kind !== 'audit') return null;
+  if (editor?.kind !== 'audit') return null;
   const value = editor.value; const changes = changedFields(value.before,value.after);
   const format = (field: unknown) => field === undefined ? t('Not present') : JSON.stringify(field,null,2);
   return <>

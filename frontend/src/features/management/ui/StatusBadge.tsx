@@ -1,6 +1,9 @@
 import { Badge } from '../../../shared/ui';
 import { useTranslation } from '../../../shared/i18n';
-export function StatusBadge({ value }: { value: string }) {
+export function StatusBadge({ value }: Readonly<{ value: string }>) {
   const t = useTranslation();
-  return <Badge tone={value === 'Approved' || value === 'Enabled' ? 'success' : value === 'Pending review' ? 'warning' : 'neutral'}>{t(value)}</Badge>;
+  let tone: 'success' | 'warning' | 'neutral' = 'neutral';
+  if (value === 'Pending review') tone = 'warning';
+  if (value === 'Approved' || value === 'Enabled') tone = 'success';
+  return <Badge tone={tone}>{t(value)}</Badge>;
 }

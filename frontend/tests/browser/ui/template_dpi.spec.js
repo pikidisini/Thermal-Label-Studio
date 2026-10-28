@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/coverage.js';
 import { mockBuiltApplication, openStudio, saveLayout, reopenLayout } from '../helpers/studio.js';
 
 test.beforeEach(async ({ page }) => {
@@ -57,7 +57,7 @@ for (const theme of ['label-studio-signature', 'light', 'dark']) {
         await button.click();
         await expect(button).toHaveAttribute('aria-pressed', 'true');
         await expect(button).toHaveAttribute('data-selected', 'true');
-        await expect(dialog.locator('button[aria-pressed="true"]')).toHaveCount(1);
+        await expect(dialog.getByRole('button', { name: /DPI \(/ }).and(dialog.locator('[aria-pressed="true"]'))).toHaveCount(1);
         const other = dialog.getByRole('button', { name: label.startsWith('203') ? '300 DPI (12 dpmm)' : '203.2 DPI (8 dpmm)', exact: true });
         await page.mouse.move(0, 0);
         await expect.poll(async () => {

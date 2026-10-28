@@ -8,8 +8,12 @@ def public_source(source):
     value['access_key'] = None if key is None else key.model_dump(mode='json', exclude={'sha256', 'ciphertext'})
     if key is not None:
         value['access_key']['reveal_available'] = key.state == 'active' and bool(key.ciphertext)
-    value['key_status'] = (key.state if key else
-                           'legacy' if credential_digest(source) else 'missing')
+    status = 'missing'
+    if key:
+        status = key.state
+    elif credential_digest(source):
+        status = 'legacy'
+    value['key_status'] = status
     return value
 
 

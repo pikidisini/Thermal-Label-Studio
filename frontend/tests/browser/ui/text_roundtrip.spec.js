@@ -1,5 +1,6 @@
+import { downloadTemplateSvg } from '../helpers/svgDownload.js';
 import { mockAccountSession } from '../helpers/studio.js';
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/coverage.js';
 import { openStudio, saveLayout, reopenLayout, mockBuiltApplication } from '../helpers/studio.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -37,14 +38,7 @@ test('text positions survive repeated template reopen and page refresh', async (
       <path d="M20 20 L780 300 M20 300 L780 20" stroke="black" fill="none"/>
     </svg>`),
   });
-  const exportSvg = async () => {
-    await page.getByTestId('topbar-menu-btn-file').click();
-    const pending = page.waitForEvent('download');
-    await page.getByRole('menuitem', { name: 'Download template SVG', exact: true }).click();
-    const stream = await (await pending).createReadStream();
-    let svg = ''; for await (const chunk of stream) svg += chunk.toString();
-    return svg;
-  };
+  const exportSvg = () => downloadTemplateSvg(page);
   const bounds = async () => page.evaluate(svg => {
     const root = new DOMParser().parseFromString(svg, 'image/svg+xml').documentElement;
     document.body.appendChild(root);

@@ -36,22 +36,21 @@ class TextMetrics:
         path = self.profile.path
         if bold or italic:
             if path.name.lower() == 'arial.ttf':
-                name = 'arialbi.ttf' if bold and italic else 'arialbd.ttf' if bold else 'ariali.ttf'
+                variants = ('arialbd.ttf', 'ariali.ttf', 'arialbi.ttf')
             elif path.name == 'LiberationSans-Regular.ttf':
-                name = 'LiberationSans-BoldItalic.ttf' if bold and italic else 'LiberationSans-Bold.ttf' if bold else 'LiberationSans-Italic.ttf'
+                variants = ('LiberationSans-Bold.ttf', 'LiberationSans-Italic.ttf', 'LiberationSans-BoldItalic.ttf')
             else:
                 raise BindingError('unsupported_feature')
+            variant = {(True, False): 0, (False, True): 1, (True, True): 2}[(bold, italic)]
+            name = variants[variant]
             path = path.with_name(name)
         try:
             with TTFont(path, lazy=False) as font:
                 family = font['name'].getDebugName(1)
-                if family != self.profile.family:
+                compatible = {family, self.profile.family} <= {'Arial', 'Liberation Sans'}
+                if family != self.profile.family and not compatible:
                     raise BindingError('unsupported_feature')
-                kern = {}
-                if 'kern' in font:
-                    for table in font['kern'].kernTables:
-                        if table.format == 0 and table.coverage & 1:
-                            kern.update(table.kernTable)
+                kern = kerning(font)
                 return font.getBestCmap(), dict(font['hmtx'].metrics), kern, font['head'].unitsPerEm
         except (OSError, ValueError, TTLibError):
             raise BindingError('unsupported_feature') from None
@@ -80,6 +79,15 @@ class TextMetrics:
         return graphemes, widths, kerned
 
 
+def kerning(font):
+    kern = {}
+    if 'kern' in font:
+        for table in font['kern'].kernTables:
+            if table.format == 0 and table.coverage & 1:
+                kern.update(table.kernTable)
+    return kern
+
+
 def presentation(node, parents, name, default):
     current = node
     while current is not None:
@@ -101,8 +109,47 @@ def fixed(value):
 def bind_text(node: ET.Element, spec: BindingSpec, value: str, *, fabric: bool, parents: dict, metrics: TextMetrics):
     options = dict(spec.options)
     size, line_height, align = options['font_size'], options['line_height'], options['text_align']
+    weight, style, span_style = text_style(node, parents, metrics, fabric, align)
+    lines = re.split(r'\r?\n', value)
+    if any('\r' in line for line in lines):
+        raise BindingError('unsupported_feature')
+    spacing = spec.layout.char_spacing * size / 1000 if spec.layout else 0
+    measured = [metrics.advances(line, size, weight, style) for line in lines]
+    widths = [max(0, sum(advances) + max(0, len(graphemes)-1)*spacing) for graphemes, _, advances in measured]
+    width = max(2, max(widths))
+    height = size * 1.13 * (1 + (len(lines)-1)*line_height)
+    fixed(width); fixed(height)
+    x, y = text_origin(node, spec, fabric, width, height, size)
+    children = tuple(node)
+    for child in children:
+        node.remove(child)
+    node.text = None
+    node.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve')
+    layout = _TextLayout(x, y, width, size, line_height, align, spacing, fabric, span_style)
+    for index, (line, line_width, measurement) in enumerate(zip(lines, widths, measured)):
+        append_line(node, layout, line, line_width, measurement, index)
+
+
+@dataclass(frozen=True)
+class _TextLayout:
+    x: float
+    y: float
+    width: float
+    size: float
+    line_height: float
+    align: str
+    spacing: float
+    fabric: bool
+    span_style: str
+
+
+def text_style(node, parents, metrics, fabric, align):
     family = presentation(node, parents, 'font-family', metrics.profile.family).strip("'\"")
-    if family != metrics.profile.family:
+    # Linux fixtures use Liberation Sans as the pinned Arial-compatible
+    # profile.  Keep authored Arial templates portable while still rejecting
+    # unrelated document-selected fonts.
+    compatible = {family, metrics.profile.family} <= {'Arial', 'Liberation Sans'}
+    if family != metrics.profile.family and not compatible:
         raise BindingError('unsupported_feature')
     weight = presentation(node, parents, 'font-weight', 'normal')
     style = presentation(node, parents, 'font-style', 'normal')
@@ -112,6 +159,11 @@ def bind_text(node: ET.Element, spec: BindingSpec, value: str, *, fabric: bool, 
     for prop in ('letter-spacing', 'dominant-baseline'):
         if presentation(node, parents, prop, 'normal') not in ('normal', '0'):
             raise BindingError('unsupported_feature')
+    span_style = uniform_span_style(node)
+    return weight, style, span_style
+
+
+def uniform_span_style(node):
     span_styles = set()
     for child in node:
         if set(child.attrib) - {'x', 'y', 'style', '{http://www.w3.org/XML/1998/namespace}space'}:
@@ -123,15 +175,10 @@ def bind_text(node: ET.Element, spec: BindingSpec, value: str, *, fabric: bool, 
     if len(span_styles) > 1:
         raise BindingError('unsupported_feature')
     span_style = next(iter(span_styles), '')
-    lines = re.split(r'\r?\n', value)
-    if any('\r' in line for line in lines):
-        raise BindingError('unsupported_feature')
-    spacing = spec.layout.char_spacing * size / 1000 if spec.layout else 0
-    measured = [metrics.advances(line, size, weight, style) for line in lines]
-    widths = [max(0, sum(advances) + max(0, len(graphemes)-1)*spacing) for graphemes, _, advances in measured]
-    width = max(2, max(widths))
-    height = size * 1.13 * (1 + (len(lines)-1)*line_height)
-    fixed(width); fixed(height)
+    return span_style
+
+
+def text_origin(node, spec, fabric, width, height, size):
     if fabric:
         if node.get('x') is not None or node.get('y') is not None or node.get('text-anchor') not in (None, 'start'):
             raise BindingError('unsupported_feature')
@@ -146,25 +193,35 @@ def bind_text(node: ET.Element, spec: BindingSpec, value: str, *, fabric: bool, 
         first = next(iter(node), None)
         x = float(node.get('x', first.get('x', '0') if first is not None else '0'))
         y = float(node.get('y', first.get('y', '0') if first is not None else '0'))
-    for child in list(node):
-        node.remove(child)
-    node.text = None
-    node.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve')
-    for index, (line, line_width, (graphemes, char_widths, advances)) in enumerate(zip(lines, widths, measured)):
-        left = x + ((width-line_width)/2 if align == 'center' else width-line_width if align == 'right' else 0) if fabric else x
-        top = y + index * size * 1.13 * line_height
-        fragments = graphemes if spacing else [line]
-        for char_index, fragment in enumerate(fragments):
-            # Fabric emits no tspan for an empty line, but that line still
-            # contributes to vertical layout and subsequent baselines.
-            if not fragment:
-                continue
-            offset = advances[char_index] - char_widths[char_index] if spacing else 0
-            span = ET.SubElement(node, f'{{{SVG_NS}}}tspan', {'x': fixed(left+offset), 'y': fixed(top)})
-            if span_style:
-                span.set('style', span_style)
-            if not fabric:
-                span.set('text-anchor', {'left': 'start', 'center': 'middle', 'right': 'end'}[align])
-            span.text = fragment
-            if spacing:
-                left += advances[char_index] + spacing
+    return x, y
+
+
+def append_line(node, layout, line, line_width, measurement, index):
+    x, y, width, size = layout.x, layout.y, layout.width, layout.size
+    line_height, align, spacing = layout.line_height, layout.align, layout.spacing
+    fabric, span_style = layout.fabric, layout.span_style
+    graphemes, char_widths, advances = measurement
+    left = _line_left(x, width, line_width, fabric, align)
+    top = y + index * size * 1.13 * line_height
+    fragments = graphemes if spacing else [line]
+    for char_index, fragment in enumerate(fragments):
+        # Fabric emits no tspan for an empty line, but that line still
+        # contributes to vertical layout and subsequent baselines.
+        if not fragment:
+            continue
+        offset = advances[char_index] - char_widths[char_index] if spacing else 0
+        span = ET.SubElement(node, f'{{{SVG_NS}}}tspan', {'x': fixed(left+offset), 'y': fixed(top)})
+        if span_style:
+            span.set('style', span_style)
+        if not fabric:
+            span.set('text-anchor', {'left': 'start', 'center': 'middle', 'right': 'end'}[align])
+        span.text = fragment
+        if spacing:
+            left += advances[char_index] + spacing
+
+
+def _line_left(x, width, line_width, fabric, align):
+    if not fabric:
+        return x
+    offsets = {'center': (width-line_width)/2, 'right': width-line_width}
+    return x + offsets.get(align, 0)

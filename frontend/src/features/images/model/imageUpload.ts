@@ -13,9 +13,12 @@ export function validateImageFile(file: Pick<File, 'size' | 'type'>): void {
 
 export function validateImageSignature(bytes: Uint8Array, mime: string): void {
   const matches = (offset: number, values: number[]) => values.every((value, index) => bytes[offset + index] === value);
-  const valid = mime === 'image/png' ? matches(0, [137, 80, 78, 71, 13, 10, 26, 10])
-    : mime === 'image/jpeg' ? matches(0, [255, 216, 255])
-    : mime === 'image/webp' && matches(0, [82, 73, 70, 70]) && matches(8, [87, 69, 66, 80]);
+  let valid = false;
+  switch (mime) {
+    case 'image/png': valid = matches(0, [137, 80, 78, 71, 13, 10, 26, 10]); break;
+    case 'image/jpeg': valid = matches(0, [255, 216, 255]); break;
+    case 'image/webp': valid = matches(0, [82, 73, 70, 70]) && matches(8, [87, 69, 66, 80]); break;
+  }
   if (!valid) throw new Error(IMAGE_READ_ERROR);
 }
 

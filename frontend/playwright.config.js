@@ -10,6 +10,10 @@ const runDirectory = fileURLToPath(new URL(`../.tmp/playwright-${runId}/`, impor
 const baseURL = process.env.E2E_BASE_URL || 'http://127.0.0.1:8002';
 const channel = process.env.E2E_BROWSER_CHANNEL || undefined;
 if (channel && !['chrome', 'msedge'].includes(channel)) throw new Error('E2E_BROWSER_CHANNEL must be chrome or msedge.');
+const executablePath = process.env.PLAYWRIGHT_EXECUTABLE_PATH || undefined;
+const reporter = process.env.TLS_COVERAGE_BUILD
+  ? [['list']]
+  : [['list'], ['html', { outputFolder: `${runDirectory}/playwright-report`, open: 'never' }]];
 const target = new URL(baseURL);
 if (target.protocol !== 'http:' || target.hostname !== '127.0.0.1' || target.username || target.password || target.pathname !== '/' || target.search || target.hash) {
   throw new Error('E2E_BASE_URL must be an HTTP loopback origin, for example http://127.0.0.1:8002.');
@@ -23,13 +27,14 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  reporter: [['list'], ['html', { outputFolder: `${runDirectory}/playwright-report`, open: 'never' }]],
+  reporter,
   use: {
     ...devices['Desktop Chrome'], baseURL,
     channel,
     viewport: { width: 1440, height: 900 },
     storageState: { cookies: [], origins: [] },
     serviceWorkers: 'block',
+    launchOptions: executablePath ? { executablePath } : undefined,
     screenshot: 'only-on-failure', trace: 'retain-on-failure',
   },
   projects: [

@@ -77,7 +77,8 @@ def test_http_identity_denial_before_dependencies(runtime, monkeypatch, header, 
     try:
         response = runtime.post('/api/v1/label-intake', json=envelope(),
                                 headers={} if header is None else {'Authorization': header})
-        assert response.status_code == status and response.json()['detail']['code'] == code
+        assert response.status_code == status
+        assert response.json()['detail']['code'] == code
         assert response.headers['www-authenticate'] == 'Bearer'
         assert TOKEN not in response.text
     finally:
@@ -93,7 +94,8 @@ def test_http_capability_denied_before_storage(runtime, monkeypatch, change, cod
     app.dependency_overrides[http.stored_layouts] = lambda: pytest.fail('storage')
     try:
         response=runtime.post('/api/v1/label-intake', json=envelope(), headers={'Authorization':'Bearer '+TOKEN})
-        assert response.status_code == 403 and response.json()['detail']['code'] == code
+        assert response.status_code == 403
+        assert response.json()['detail']['code'] == code
     finally:
         app.dependency_overrides.pop(http.stored_layouts)
 
@@ -101,7 +103,8 @@ def test_http_capability_denied_before_storage(runtime, monkeypatch, change, cod
 def test_asserted_sender_cannot_authenticate(runtime):
     body=envelope(); body['sender']['system']='OTHER'
     response=runtime.post('/api/v1/label-intake',json=body,headers={'Authorization':'Bearer '+TOKEN})
-    assert response.status_code==403 and response.json()['detail']['code']=='sender_not_allowed'
+    assert response.status_code == 403
+    assert response.json()['detail']['code'] == 'sender_not_allowed'
     response=runtime.post('/api/v1/label-intake',json=envelope(),
         headers=[('Authorization','Bearer '+TOKEN),('Authorization','Bearer '+TOKEN)])
     assert response.status_code==401
@@ -148,7 +151,8 @@ def test_all_templates_unknown_code_fails_and_disabling_mode_blocks_replay(runti
         existing = envelope(('A',))
         existing['request_id'] = 'ALL-EXISTING-001'
         successful = runtime.post('/api/v1/label-intake', json=existing, headers=headers)
-        assert successful.status_code == 200 and successful.json()['results'][0]['status'] == 'SIMULATED'
+        assert successful.status_code == 200
+        assert successful.json()['results'][0]['status'] == 'SIMULATED'
         assert len(prepared) == 1
         monkeypatch.setenv('TLS_INTAKE_POLICY_JSON', policy(revision='ALL2', sources=(source(label_codes=(), modes=('print',)),)).model_dump_json())
         assert runtime.post('/api/v1/label-intake', json=body, headers=headers).status_code == 403
@@ -166,7 +170,8 @@ def test_configured_print_requires_durable_ledger_before_storage_read(runtime, m
     try:
         body=envelope(); body['mode']='print'
         response=runtime.post('/api/v1/label-intake',json=body,headers={'Authorization':'Bearer '+TOKEN})
-        assert response.status_code==503 and response.json()['detail']['code']=='ledger_unavailable'
+        assert response.status_code == 503
+        assert response.json()['detail']['code'] == 'ledger_unavailable'
         assert layouts.calls==[]
     finally:
         app.dependency_overrides.pop(http.stored_layouts)
@@ -183,13 +188,15 @@ def test_real_auth_replay_rechecks_current_permissions(runtime, prepared, monkey
         first=runtime.post('/api/v1/label-intake',json=envelope(),headers=headers)
         assert first.status_code==200
         second=runtime.post('/api/v1/label-intake',json=envelope(),headers=headers)
-        assert second.status_code==200 and second.json()['replayed']
+        assert second.status_code == 200
+        assert second.json()['replayed']
         changes={'source':{'enabled':False},'mode':{'modes':('print',)},'code':{'label_codes':('A',)}}
         if revoke=='token': monkeypatch.setenv(ENV,'rotated_synthetic_unit_test_token_0002')
         else: monkeypatch.setenv('TLS_INTAKE_POLICY_JSON',policy(revision='P2',sources=(source(**changes[revoke]),)).model_dump_json())
         denied=runtime.post('/api/v1/label-intake',json=envelope(),headers=headers)
         assert denied.status_code==(401 if revoke=='token' else 403)
-        assert len(prepared)==2 and layouts.calls==['A','B']
+        assert len(prepared) == 2
+        assert layouts.calls == ['A', 'B']
     finally:
         app.dependency_overrides.pop(http.stored_layouts)
         app.dependency_overrides.pop(http.durable_ledger)
@@ -202,7 +209,9 @@ def test_preflight_target_deterministic_and_no_effects(monkeypatch, host, copies
     monkeypatch.setattr(service,'prepare_draft_output',lambda *a:pytest.fail('render'))
     p=policy(targets=(Target(target_id='PRINTER_DEMO',host=host,port=9100,enabled=True),))
     pin=preflight_print(auth(p),'A',EVIDENCE,copies, 'PRINTER_DEMO')
-    assert pin.target.host==host and pin.target_id=='PRINTER_DEMO' and pin.policy_revision=='P1'
+    assert pin.target.host == host
+    assert pin.target_id == 'PRINTER_DEMO'
+    assert pin.policy_revision == 'P1'
     assert pin==preflight_print(auth(p),'A',EVIDENCE,copies, 'PRINTER_DEMO')
     assert revalidate_claim(pin,auth(p),p,{ENV:TOKEN})==pin
 
@@ -239,7 +248,8 @@ def test_payload_network_values_are_label_data_only():
     body['items'][0]['data']={'host':'203.0.113.99','port':1234,'target_id':'UNTRUSTED'}
     request=IntakeRequest.model_validate(body);admission=auth();authorize(admission,request)
     pin=preflight_print(admission,'A',EVIDENCE,1, 'PRINTER_DEMO')
-    assert pin.target.host=='192.0.2.44' and pin.target.port==9100
+    assert pin.target.host == '192.0.2.44'
+    assert pin.target.port == 9100
     body['items'][0]['target']={'host':'203.0.113.99','port':1234}
     with pytest.raises(ValueError): IntakeRequest.model_validate(body)
 
@@ -280,8 +290,13 @@ def test_bad_secrets_duplicates_no_secret_repr_or_unbounded_error():
     denial('unauthenticated',lambda:authenticate(policy(sources=(source(),other)),
         'Bearer '+TOKEN,{ENV:TOKEN,'TLS_INTAKE_TOKEN_OTHER':TOKEN}))
     assert TOKEN not in repr(auth())
-    with pytest.raises(ValidationError):policy(sources=(source(),source()))
-    with pytest.raises(ValidationError):policy(audit=(event(at=STAMP.replace(tzinfo=None)),))
+    prepared_source = source()
+    prepared_source_2 = source()
+    with pytest.raises(ValidationError):
+        policy(sources=(prepared_source, prepared_source_2))
+    prepared_replace = STAMP.replace(tzinfo=None)
+    with pytest.raises(ValidationError):
+        event(at=prepared_replace)
     with pytest.raises(ValidationError):policy().revision='EDIT'
 
 
@@ -297,7 +312,8 @@ def test_missing_policy_valid_bearer_denies_before_storage(runtime, monkeypatch)
     app.dependency_overrides[http.stored_layouts]=lambda:pytest.fail('storage')
     try:
         response=runtime.post('/api/v1/label-intake',json=envelope(),headers={'Authorization':'Bearer '+TOKEN})
-        assert response.status_code==503 and response.json()['detail']['code']=='policy_unavailable'
+        assert response.status_code == 503
+        assert response.json()['detail']['code'] == 'policy_unavailable'
     finally:
         app.dependency_overrides.pop(http.stored_layouts)
 
@@ -328,8 +344,10 @@ def test_documentation_example_loads_without_credential_and_cannot_print():
     text=path.read_text(encoding='utf-8')
     raw=text.split('```json\n',1)[1].split('```',1)[0]
     p=load_policy({'TLS_INTAKE_POLICY_JSON':raw})
-    assert p.sources[0].modes==('simulation',) and not p.targets[0].enabled
-    assert TOKEN not in text and '192.168.' not in text
+    assert p.sources[0].modes == ('simulation',)
+    assert not p.targets[0].enabled
+    assert TOKEN not in text
+    assert '192.168.' not in text
     denial('template_not_allowed',lambda:preflight_print(auth(p),'ROLL_DEMO',EVIDENCE,1, 'PRINTER_DEMO'))
 
 
@@ -337,7 +355,8 @@ def test_configured_routing_needs_no_approval_for_any_valid_stored_version():
     for evidence in (EVIDENCE, TemplateEvidence(version=7, svg_sha256='b' * 64)):
         configured = policy(audit=())
         pin = preflight_print(auth(configured), 'A', evidence, 10, 'PRINTER_DEMO')
-        assert pin.template == evidence and pin.target_id == 'PRINTER_DEMO'
+        assert pin.template == evidence
+        assert pin.target_id == 'PRINTER_DEMO'
         historical = policy(audit=(event(), event(event_id='E2', action='revoke')))
         assert preflight_print(auth(historical), 'A', evidence, 10, 'PRINTER_DEMO').target_id == pin.target_id
 

@@ -1,5 +1,17 @@
 # Decisions
 
+## 2026-10-22 - Durable asynchronous SAP printing
+
+The approved rollout uses Ubuntu containers, internal HTTPS, API v2, PostgreSQL
+as the durable queue and two worker containers. Reuse existing engine and ledger
+identity; do not add Redis/RabbitMQ or a parallel renderer. Temporary business
+payloads are encrypted outside-keyed AES-GCM queue records and erased on terminal
+completion/queued expiry, explicitly extending the earlier no-raw-persistence
+contract. Physical-address ownership includes manual sends/status queries; stale
+heartbeats never transfer ownership. Retain source/runtime/device gates separately.
+See [production queue](PRODUCTION_QUEUE.md); this decision does not activate targets.
+
+
 ## 2026-10-21 - Local accounts and shared-browser access
 
 AUTH_CONTRACT.md supersedes earlier no-login/local-only browser assumptions.

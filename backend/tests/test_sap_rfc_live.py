@@ -28,17 +28,20 @@ def test_live_uses_saved_credentials_and_returns_actual_evidence_without_config_
     setup_live(client, store, monkeypatch)
     calls = []
     def call(connection, operation, parameters, password):
-        assert connection.host == CONNECTION['host'] and password == SECRET
+        assert connection.host == CONNECTION['host']
+        assert password == SECRET
         calls.append(parameters)
         return fake_response()
     monkeypatch.setattr(rfc_runtime, 'call', call)
     events = len(database.events)
     result = client.post('/api/v1/management/sap-operations/ROLL/execute', json={'revision': store.read().policy.revision, 'values': {'IV_ROLL': '0000000001'}})
     assert result.status_code == 200
-    assert result.json()['evidence'] == 'sap' and result.json()['sap_contacted'] is True
+    assert result.json()['evidence'] == 'sap'
+    assert result.json()['sap_contacted'] is True
     assert result.json()['items'][0]['label_code'] == 'SYNTHETIC'
     assert result.headers['cache-control'] == 'no-store'
-    assert calls == [{'IV_ROLL': '0000000001'}] and len(database.events) == events
+    assert calls == [{'IV_ROLL': '0000000001'}]
+    assert len(database.events) == events
     assert SECRET not in result.text
 
 
@@ -52,8 +55,10 @@ def test_live_failure_is_bounded_without_retry(runtime, monkeypatch, code, statu
         raise rfc_runtime.RfcError(code)
     monkeypatch.setattr(rfc_runtime, 'call', call)
     result = client.post('/api/v1/management/sap-operations/ROLL/execute', json={'revision': store.read().policy.revision, 'values': {'IV_ROLL': '001'}})
-    assert result.status_code == status and result.json()['detail']['code'] == code
-    assert len(calls) == 1 and SECRET not in result.text
+    assert result.status_code == status
+    assert result.json()['detail']['code'] == code
+    assert len(calls) == 1
+    assert SECRET not in result.text
 
 
 def test_configuration_change_during_call_discards_response(runtime, monkeypatch):
@@ -64,7 +69,8 @@ def test_configuration_change_during_call_discards_response(runtime, monkeypatch
         return fake_response()
     monkeypatch.setattr(rfc_runtime, 'call', call)
     result = client.post('/api/v1/management/sap-operations/ROLL/execute', json={'revision': store.read().policy.revision, 'values': {'IV_ROLL': '001'}})
-    assert result.status_code == 409 and 'SYNTHETIC' not in result.text
+    assert result.status_code == 409
+    assert 'SYNTHETIC' not in result.text
 
 
 @pytest.fixture
@@ -90,7 +96,8 @@ def test_worker_uses_stdin_secrets_and_timeout_without_retry(configured_worker, 
     monkeypatch.setenv('TLS_DATABASE_URL', 'private-DB-secret')
     calls = []
     def run(args, **kwargs):
-        assert SECRET not in str(args) and SECRET not in str(kwargs['env'])
+        assert SECRET not in str(args)
+        assert SECRET not in str(kwargs['env'])
         assert 'TLS_DATABASE_URL' not in kwargs['env']
         assert json.loads(kwargs['input'])['connection']['passwd'] == SECRET
         calls.append(True)

@@ -5,7 +5,7 @@ import { LabelStudioLogo } from './LabelStudioLogo';
 import { Button } from './primitives';
 
 /** Application chrome only; never styles label artwork or export content. */
-export function ApplicationStartup({ failed = false }: { failed?: boolean }) {
+export function ApplicationStartup({ failed = false }: Readonly<{ failed?: boolean }>) {
   const t = useTranslation();
   return <main data-ui-root="true" className="ui-startup" data-testid="application-startup" aria-busy={!failed}>
     <div className="ui-startup-content">

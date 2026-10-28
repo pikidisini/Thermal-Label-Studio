@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../helpers/coverage.js';
 import { mockBuiltApplication } from '../helpers/studio.js';
 
 const template = { label_code: 'A', title: 'Synthetic label', version: 1, width_mm: 80, height_mm: 100, dpi: 203.2, svg_sha256: 'a'.repeat(64) };

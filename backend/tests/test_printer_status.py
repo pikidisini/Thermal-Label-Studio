@@ -39,7 +39,8 @@ def test_query_never_prints_or_invents_ready(network, response, state, reason):
     connection.chunks = [response]
     result = status.query_ipl_status(PrinterTarget('192.0.2.44', 9100))
     assert (result['state'], result['reason']) == (state, reason)
-    assert result['confirmed'] is False and result['checked_at']
+    assert result['confirmed'] is False
+    assert result['checked_at']
     assert [item for item in operations if isinstance(item, tuple) and item[0] == 'send'] == [('send', b'\x05')]
     assert operations[-1] == 'closed'
 
@@ -78,7 +79,8 @@ def test_status_is_explicit_and_no_store(client, registered):
     assert result.status_code == 200
     assert result.headers['cache-control'] == 'no-store'
     assert result.json()['reason'] == 'media_out'
-    assert len(calls) == 1 and calls[0].host == '192.0.2.44'
+    assert len(calls) == 1
+    assert calls[0].host == '192.0.2.44'
 
 
 @pytest.mark.parametrize('changes,code', [({'target_id':'OTHER'},409), ({'expected_host':'192.0.2.99'},409), ({'expected_port':9101},409), ({'host':'192.0.2.99'},422)])

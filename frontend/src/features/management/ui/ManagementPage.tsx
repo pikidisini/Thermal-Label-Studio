@@ -29,11 +29,11 @@ export function ManagementPage() {
     <div className="management-header"><div className="management-header-title"><div><div className="management-muted">{t('Workspace')}</div><h1>{t('Application Management')}</h1></div></div><Button onClick={() => { window.location.href = '/studio'; }} disabled={saving}><Icon component={ArrowLeft} /> {t('Back to Studio')}</Button></div>
     <div className="management-layout" data-ui-motion data-sidebar-collapsed={!sidebarExpanded}><ManagementSidebar management={management} expanded={sidebarExpanded} onToggle={() => setSidebarExpanded(expanded => !expanded)} />
     <main className="management-main"><div className="management-heading"><h2>{t(sectionName)}</h2><div className="management-heading-actions">{section !== 'graphics' && <Button onClick={() => { setMessage(''); void refresh(); }} disabled={loading || saving}><Icon component={RefreshCw} /> {t('Refresh')}</Button>}{section === 'printers' && <AddPrinterButton management={management} />}</div></div>
-      {section !== 'users' && loading && <p role="status">{t('Loading application management…')}</p>}
-      {section !== 'users' && errors.map((error, i) => <p key={i} role="alert" className="management-error">{t(error)}</p>)}
+      {section !== 'users' && loading && <output data-ui-status-block  >{t('Loading application management…')}</output>}
+      {section !== 'users' && errors.map((error) => <p key={error} role="alert" className="management-error">{t(error)}</p>)}
       {section !== 'users' && section !== 'datasets' && section !== 'graphics' && !loading && snapshot && !snapshot.writable && <p className="management-notice">{t('Management changes are unavailable until persistent management storage is provisioned. Existing configuration is shown read-only.')}</p>}
       {needsRefresh && <p className="management-notice">{t('Refresh before making further changes. Your last submission will not be retried automatically.')}</p>}
-      {message && <p role="status" className="management-notice">{t(message)}</p>}
+      {message && <output data-ui-status-block  className="management-notice">{t(message)}</output>}
       {section === 'users' && <UsersSection />}
       {section === 'overview' && <OverviewSection management={management} />}
       {section === 'datasets' && <TestDataSection />}

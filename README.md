@@ -11,6 +11,10 @@ Mulai dari [indeks dokumentasi](docs/README.md) dan
 [panduan utama proyek](docs/PROJECT_HANDBOOK.md) untuk memahami keseluruhan aplikasi.
 [Referensi source](docs/SOURCE_REFERENCE.md) memetakan route, modul, dan konfigurasi.
 
+Maintenance melalui Jenkins, migrasi CI server, quality gate, rilis otomatis,
+dan pengawasan dasar dijelaskan dalam [runbook CI server](tools/jenkins/server/README.md).
+Status eksekusi setiap gate tetap terpisah dari keberadaan source pipeline.
+
 [Design MCP](tools/mcp/DESIGN.md) bersifat opsional dan mendukung pembuatan SVG
 melalui AI, validasi, pratinjau PNG, serta penyimpanan template berversi yang
 diaktifkan secara eksplisit melalui API aplikasi lokal. Desain tersimpan dapat
@@ -108,7 +112,7 @@ tersebut tidak menutup gerbang yang masih terbuka. Penerimaan fisik T12 berstatu
 `BLOCKED` dan bersifat opsional, bukan gerbang wajib penerimaan perangkat lunak.
 
 Studio kini memiliki login akun lokal, sesi server, dan peran Admin/Designer/Operator.
-Aktivasi akun/database dan HTTPS LAN mengikuti [kontrak login](docs/AUTH_CONTRACT.md);
+Aktivasi akun/database dan profil HTTPS/cloud atau HTTP LAN eksplisit mengikuti [kontrak login](docs/AUTH_CONTRACT.md);
 belum ada akun bawaan atau provisioning otomatis. Keamanan produksi, integrasi SAP
 ECC aktual, penerimaan operasional paket, dan pencetakan fisik tetap merupakan
 pekerjaan terpisah. Graphics mendukung pustaka lokal PNG/JPEG/WebP dengan
@@ -201,6 +205,28 @@ skema/bucket saat startup; aktivasi ledger intake merupakan operasi eksplisit
 terpisah. Build memerlukan checksum arsip renderer yang telah diverifikasi
 secara independen. Hindari penulis lokal dan aplikasi paket yang bersaing pada
 penyimpanan yang sama.
+
+### Profil self-hosted LAN
+
+Untuk server internal yang dipercaya, gunakan override LAN setelah target
+penyimpanan dan schema/auth awal diprovisikan secara eksplisit. Profil ini
+mempertahankan login dan role aplikasi, tetapi menerbitkan HTTP hanya pada IP
+privat server yang dipilih. Contoh target `192.168.254.58` menggunakan port
+khusus `18082`:
+
+```text
+TLS_LAN_BIND_IP=192.168.254.58
+TLS_LAN_PORT=18082
+```
+
+```powershell
+docker compose -f docker-compose.yml -f deploy/compose.lan.yml up --build -d
+```
+
+Pengguna LAN lalu membuka `http://192.168.254.58:18082`. PostgreSQL dan MinIO
+tetap loopback-only; SAP, printer, dan queue tidak diaktifkan oleh override ini.
+Untuk cloud atau internet-hosted, jangan gunakan override ini: gunakan profil
+HTTPS production dan origin `https://` yang tepat.
 
 Gunakan hot reload untuk iterasi source, lalu lakukan build dan uji singkat image
 untuk bukti packaging. Lihat [Pengembangan](docs/DEVELOPMENT.md) untuk siklus hidup
@@ -347,3 +373,16 @@ print. Izin sumber Management menyediakan pilihan printer tambahan yang diizinka
 IP/port tetap dikelola server. Lihat [kontrak API](docs/API_CONTRACT.md) dan
 `PRINTER_TEST.md` milik simulator di direktori saudara untuk prosedur penerimaan
 loopback dua stasiun.
+
+## Antrean permintaan SAP dan dua worker
+
+Source API asinkron `/api/v2/label-intake`, antrean PostgreSQL dengan payload
+terenkripsi, dua worker Linux, koordinasi printer bersama, dan layar Permintaan
+SAP tersedia. HTTP 202 berarti permintaan tersimpan; SAP membaca hasil melalui
+URL status. Tidak ada cetak ulang otomatis setelah hasil pengiriman tidak pasti.
+Konfigurasi Ubuntu/HTTPS tersedia di `deploy/compose.production.yml`; antrean
+dimulai dalam keadaan dijeda dan tidak menerapkan migrasi saat startup.
+
+Lihat [kontrak, backup/restore, dan gerbang production](docs/PRODUCTION_QUEUE.md).
+Implementasi source ini belum membuktikan deployment, batas memori Linux, SAP
+aktual, pemulihan data, atau printer fisik pada target operasional.

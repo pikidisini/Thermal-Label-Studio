@@ -1,3 +1,4 @@
+import { sourceKeyLabel } from './StoredKey';
 import { useId, useState } from 'react';
 import { ChevronDown, ChevronUp, KeyRound, Trash2 } from 'lucide-react';
 import { Button, Field, Icon, IconButton, Input, Select } from '../../../shared/ui';
@@ -7,22 +8,22 @@ import { managementApi, type Source } from '../api/managementApi';
 import { SourceKeyControls } from './SourceKeyControls';
 
 function settings(source: Source) {
-  return JSON.stringify([source.identity, source.enabled, [...source.modes].sort(), [...(source.allowed_print_target_ids ?? [])].sort(), source.print_max_copies ?? 1]);
+  return JSON.stringify([source.identity, source.enabled, source.async_only ?? false, [...source.modes].sort((left, right) => Number(left > right) - Number(left < right)), [...(source.allowed_print_target_ids ?? [])].sort((left, right) => Number(left > right) - Number(left < right)), source.print_max_copies ?? 1]);
 }
 
-export function SourceDialog({ management }: { management: ManagementController }) {
+export function SourceDialog({ management }: Readonly<{ management: ManagementController }>) {
   const t = useTranslation();
   const [keyExpanded, setKeyExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmation, setConfirmation] = useState('');
   const id = useId();
   const { editor, setEditor, policy, mutate, writable, actionsDisabled, setIssuedKey, saving } = management;
-  if (!editor || editor.kind !== 'source') return null;
+  if (editor?.kind !== 'source') return null;
   const source = editor.value;
   const saved = policy?.sources.find(item => item.identity === source.identity);
   const dirty = !editor.existing || !saved || settings(source) !== settings(saved);
   const update = (changes: Partial<Source>) => setEditor({ ...editor, value: { ...source, ...changes } });
-  const keyStatus = t(source.key_status === 'active' ? 'Active key' : source.key_status === 'revoked' ? 'Key revoked' : source.key_status === 'legacy' ? 'Previous server key' : 'No access key');
+  const keyStatus = t(sourceKeyLabel(source.key_status));
   return <form className="management-source-form" onSubmit={event => {
         event.preventDefault(); if (!policy) return;
         if (editor.existing) void mutate(() => managementApi.source(policy.revision, source));
@@ -33,6 +34,7 @@ export function SourceDialog({ management }: { management: ManagementController 
           <div className="management-fields">
             <Field label={t('Source identity')}><Input required maxLength={128} disabled={!writable || editor.existing} value={source.identity} onChange={event => update({ identity: event.target.value })} /></Field>
             <Field label={t('Configuration')}><Select aria-label={t('Configuration')} disabled={!writable} value={String(source.enabled)} onChange={event => update({ enabled: event.target.value === 'true' })}><option value="false">{t('Disabled')}</option><option value="true">{t('Enabled')}</option></Select></Field>
+            <Field label={t('Request processing')}><Select aria-label={t('Request processing')} disabled={!writable} value={String(source.async_only ?? false)} onChange={event => update({ async_only: event.target.value === 'true' })}><option value="false">{t('Synchronous and queued APIs')}</option><option value="true">{t('Queued API only')}</option></Select></Field>
             <Field className="management-field-wide" label={t('Allowed modes')}><Select aria-label={t('Allowed modes')} disabled={!writable} value={source.modes.join(',')} onChange={event => update({ modes: event.target.value ? event.target.value.split(',') as Source['modes'] : [] })}>
               <option value="">{t('No modes')}</option><option value="simulation">{t('Simulation')}</option><option value="print">{t('Print')}</option><option value="simulation,print">{t('Simulation and print')}</option>
             </Select></Field>
@@ -55,15 +57,15 @@ export function SourceDialog({ management }: { management: ManagementController 
           </fieldset>
         </section>}
         <div className="management-key-summary"><Icon component={KeyRound} /><div><strong>{keyStatus}</strong><small>{t(editor.existing ? 'Managed by the server.' : 'An access key is created together with this source. You can choose Enabled immediately.')}</small></div><Button id={id + '-key-toggle'} aria-expanded={keyExpanded} aria-controls={id + '-key-panel'} disabled={saving} onClick={() => setKeyExpanded(expanded => !expanded)}>{t('Access key')}<Icon component={keyExpanded ? ChevronUp : ChevronDown} /></Button></div>
-        <div id={id + '-key-panel'} role="region" aria-labelledby={id + '-key-toggle'} hidden={!keyExpanded}>
+        <section id={id + '-key-panel'}  aria-labelledby={id + '-key-toggle'} hidden={!keyExpanded}>
           {keyExpanded && <div className="management-key-panel"><h3>{t('Access key')}</h3><SourceKeyControls key={source.identity} management={management} /></div>}
-        </div>
-        {confirmDelete && <div className="management-notice" role="group" aria-label={t('Delete source confirmation')}>
+        </section>
+        {confirmDelete && <fieldset className="min-w-0 management-notice"  aria-label={t('Delete source confirmation')}>
           <p>{t('Delete this integration source?')} <strong>{source.identity}</strong></p>
           <p>{t('Its access key will stop working. Audit history is retained and this identity cannot be reused.')}</p>
           <Field label={t('Type the source identity to confirm')}><Input aria-label={t('Type the source identity to confirm')} disabled={saving} value={confirmation} onChange={event => setConfirmation(event.target.value)} /></Field>
           <div className="management-tools"><Button tone="danger" disabled={actionsDisabled || confirmation !== source.identity} onClick={() => policy && void mutate(() => managementApi.deleteSource(policy.revision, source.identity))}>{t('Confirm delete')}</Button><Button disabled={saving} onClick={() => { setConfirmDelete(false); setConfirmation(''); }}>{t('Cancel deletion')}</Button></div>
-        </div>}
-        <div className="management-source-footer">{editor.existing && <IconButton label="Delete source" tone="danger" disabled={actionsDisabled} onClick={() => { setConfirmDelete(true); setKeyExpanded(false); setIssuedKey(null); }}><Icon component={Trash2} /></IconButton>}<span className="management-draft-status" role="status" data-dirty={dirty}>{t(dirty ? 'Unsaved changes' : 'No unsaved changes')}</span><Button disabled={saving} onClick={() => { setEditor(null); setIssuedKey(null); }}>{t('Cancel')}</Button><Button tone="primary" type="submit" disabled={actionsDisabled || (source.enabled && source.modes.length > 0 && !(source.allowed_print_target_ids?.length))}>{t(editor.existing ? 'Save changes' : 'Create source & key')}</Button></div>
+        </fieldset>}
+        <div className="management-source-footer">{editor.existing && <IconButton label="Delete source" tone="danger" disabled={actionsDisabled} onClick={() => { setConfirmDelete(true); setKeyExpanded(false); setIssuedKey(null); }}><Icon component={Trash2} /></IconButton>}<output className="management-draft-status"  data-dirty={dirty}>{t(dirty ? 'Unsaved changes' : 'No unsaved changes')}</output><Button disabled={saving} onClick={() => { setEditor(null); setIssuedKey(null); }}>{t('Cancel')}</Button><Button tone="primary" type="submit" disabled={actionsDisabled || (source.enabled && source.modes.length > 0 && !(source.allowed_print_target_ids?.length))}>{t(editor.existing ? 'Save changes' : 'Create source & key')}</Button></div>
       </form>;
 }

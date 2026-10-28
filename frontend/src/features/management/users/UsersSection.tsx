@@ -10,7 +10,7 @@ export function UsersSection() {
   const [role, setRole] = useState<Role>('Operator'); const [password, setPassword] = useState('');
   async function load() {
     const response = await authFetch('/api/v1/management/users');
-    if (!response.ok) throw new Error('Unable to load accounts.');
+    if (!response.ok) { throw new Error('Unable to load accounts.'); }
     setUsers(await response.json());
   }
   useEffect(() => { void load().catch(() => setMessage('Unable to load accounts.')); }, []);
@@ -18,19 +18,21 @@ export function UsersSection() {
     if (body && typeof body === 'object' && 'password' in body && (typeof body.password !== 'string' || !validPassword(body.password))) {
       setMessage('Passwords must contain 7–128 characters.'); return;
     }
-    if (busy) return; setBusy(true); setMessage('');
+    if (busy) { return; } setBusy(true); setMessage('');
     try {
       const response = await authFetch('/api/v1/management/users' + path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (!response.ok) {
         const result = await response.json();
-        throw new Error(result.detail?.code === 'last_admin' ? 'The last active administrator must be preserved.' : result.detail?.code === 'username_exists' ? 'Username already exists.' : 'Account change rejected. Refresh before trying again.');
+        if (result.detail?.code === 'last_admin') throw new Error('The last active administrator must be preserved.');
+        if (result.detail?.code === 'username_exists') throw new Error('Username already exists.');
+        throw new Error('Account change rejected. Refresh before trying again.');
       }
       setPassword(''); setMessage('Account updated.'); await load();
     } catch (e) { setPassword(''); setMessage(e instanceof Error ? e.message : 'Account outcome uncertain. Refresh before trying again.'); }
     finally { setBusy(false); }
   }
   return <section className="auth-users"><p>{t('Administrators create accounts and assign temporary passwords. Users must change them before accessing the application.')}</p>
-    {message && <p role="status">{t(message)}</p>}<Button disabled={busy} onClick={() => { void load().catch(() => setMessage('Unable to load accounts.')); }}>{t('Refresh')}</Button>
+    {message && <output data-ui-status-block  >{t(message)}</output>}<Button disabled={busy} onClick={() => { void load().catch(() => setMessage('Unable to load accounts.')); }}>{t('Refresh')}</Button>
     <form onSubmit={e => { e.preventDefault(); void command('', { username, display_name: name, role, password }); }}>
       <Field label={t('Username')}><Input required value={username} maxLength={64} autoComplete="off" onChange={e => setUsername(e.target.value)} /></Field>
       <Field label={t('Display name')}><Input required value={name} maxLength={128} onChange={e => setName(e.target.value)} /></Field>
@@ -42,7 +44,7 @@ export function UsersSection() {
   </section>;
 }
 
-function UserRow({ user, busy, command }: { user: Account; busy: boolean; command: (path: string, body: unknown, method?: string) => Promise<void> }) {
+function UserRow({ user, busy, command }: Readonly<{ user: Account; busy: boolean; command: (path: string, body: unknown, method?: string) => Promise<void> }>) {
   const t = useTranslation(); const [name, setName] = useState(user.display_name); const [role, setRole] = useState(user.role);
   const [active, setActive] = useState(user.active); const [password, setPassword] = useState('');
   return <article><h3>{user.username}</h3><small>{user.id} · {t(user.must_change_password ? 'Password change required' : 'Active password')}</small>

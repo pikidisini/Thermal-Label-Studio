@@ -42,12 +42,14 @@ def test_exact_payload_decoded_and_item_failures_preserve_order(client, monkeypa
     assert result.status_code == 200, result.text
     items = result.json()['items']
     assert [item['status'] for item in items] == ['PREVIEWED', 'FAILED', 'PREVIEWED', 'PREVIEWED'], items
-    assert items[1]['error_code'] == 'batch_not_found' and items[1]['png_base64'] is None
+    assert items[1]['error_code'] == 'batch_not_found'
+    assert items[1]['png_base64'] is None
     assert items[0]['template_version'] == 'fixture-ipl-v1'
     assert len(decoded) == 3
     assert items[0]['payload_sha256'] == hashlib.sha256(decoded[0]).hexdigest()
     with Image.open(BytesIO(base64.b64decode(items[0]['png_base64']))) as image:
-        assert image.size == (640, 480) and image.getpixel((15, 20)) == 0
+        assert image.size == (640, 480)
+        assert image.getpixel((15, 20)) == 0
 
 @pytest.mark.parametrize('changes', [dict(encoder='ZPL'), dict(source='sap'), dict(batches=[]),
     dict(batches=['0010245801']*101), dict(batches=[123]), dict(batches=[' bad']),
@@ -64,7 +66,8 @@ def test_render_failure_stays_failed_no_sample_fallback(client, monkeypatch):
     def fail(*args): raise http.RasterError('renderer_unavailable')
     monkeypatch.setattr(pipeline, 'render_svg_bitmap', fail)
     item = client.post('/api/v1/label-print/preview', json=body()).json()['items'][0]
-    assert item['status'] == 'FAILED' and item['png_base64'] is None
+    assert item['status'] == 'FAILED'
+    assert item['png_base64'] is None
     assert item['error_code'] == 'renderer_unavailable'
 
 def test_busy_request_is_rejected_without_processing(client):
@@ -85,11 +88,13 @@ def test_pipeline_diagnostics_stop_at_actual_failure(client, monkeypatch, failed
     if failed_stage == 'DECODE_IPL': monkeypatch.setattr(registry, 'decode_png', fail)
     response = client.post('/api/v1/label-print/preview', json=body())
     item = response.json()['items'][0]
-    assert item['failed_stage'] == failed_stage and item['png_base64'] is None
+    assert item['failed_stage'] == failed_stage
+    assert item['png_base64'] is None
     statuses = [step['status'] for step in item['steps']]
     position = [step['stage'] for step in item['steps']].index(failed_stage)
     assert statuses == ['PASSED'] * position + ['FAILED'] + ['NOT_RUN'] * (7 - position)
-    assert item['label_code'] and item['template_version']
+    assert item['label_code']
+    assert item['template_version']
     if failed_stage == 'DECODE_IPL': assert item['payload_sha256']
     assert 'PRIVATE INTERNAL DETAIL' not in response.text
 

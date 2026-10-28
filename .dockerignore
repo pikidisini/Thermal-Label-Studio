@@ -13,6 +13,7 @@ output
 tmp
 backend/data
 .env
+deploy/private
 .env.*
 !.env*.example
 playwright-report
@@ -31,6 +32,14 @@ stitch_design
 **/test-results
 **/__pycache__
 **/dist
+**/.env
+**/.env.*
+!**/.env*.example
+**/.venv
+.auth
+.history
+.coverage
+*.log
 
 # Disposable pytest directories left by interrupted local runs.
 pytest-cache-files-*

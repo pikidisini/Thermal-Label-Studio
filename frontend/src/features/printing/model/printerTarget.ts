@@ -6,32 +6,37 @@ function ipv4Parts(host: string): number[] | null {
   if (parts.length !== 4 || parts.some(part => !/^(0|[1-9]\d{0,2})$/.test(part) || Number(part) > 255)) return null;
   return parts.map(Number);
 }
-export function isNumericPrinterHost(host: string): boolean {
-  if (!host || host.length > 63 || host !== host.trim() || /[%\[\]\s]/.test(host)) return false;
-  const v4 = ipv4Parts(host);
-  if (v4) return v4.some(value => value !== 0) && (v4[0] < 224 || v4[0] > 239);
-  if (!host.includes(':')) return false;
+function ipv6Groups(host: string): string[] | null {
   let source = host.toLowerCase();
   if (source.includes('.')) {
     const index = source.lastIndexOf(':');
     const tail = ipv4Parts(source.slice(index + 1));
-    if (!tail) return false;
+    if (!tail) return null;
     source = source.slice(0, index + 1) + ((tail[0] << 8) | tail[1]).toString(16) + ':' + ((tail[2] << 8) | tail[3]).toString(16);
   }
-  if (!/^[0-9a-f:]+$/.test(source)) return false;
+  if (!/^[0-9a-f:]+$/.test(source)) return null;
   const halves = source.split('::');
-  if (halves.length > 2) return false;
+  if (halves.length > 2) return null;
   const parts = halves.flatMap(half => half ? half.split(':') : []);
-  if (parts.some(part => !/^[0-9a-f]{1,4}$/.test(part))) return false;
-  if ((halves.length === 1 && parts.length !== 8) || (halves.length === 2 && parts.length >= 8)) return false;
-  const groups = halves.length === 2
-    ? [...(halves[0] ? halves[0].split(':') : []), ...Array(8 - parts.length).fill('0'), ...(halves[1] ? halves[1].split(':') : [])]
-    : parts;
-  return groups.some(group => parseInt(group, 16) !== 0) && (parseInt(groups[0], 16) & 0xff00) !== 0xff00;
+  if (parts.some(part => !/^[0-9a-f]{1,4}$/.test(part))) return null;
+  if ((halves.length === 1 && parts.length !== 8) || (halves.length === 2 && parts.length >= 8)) return null;
+  if (halves.length === 1) return parts;
+  const head = halves[0] ? halves[0].split(':') : [];
+  const tail = halves[1] ? halves[1].split(':') : [];
+  return [...head, ...new Array(8 - parts.length).fill('0'), ...tail];
+}
+export function isNumericPrinterHost(host: string): boolean {
+  if (!host || host.length > 63 || host !== host.trim() || /[%[\]\s]/.test(host)) return false;
+  const v4 = ipv4Parts(host);
+  if (v4) return v4.some(value => value !== 0) && (v4[0] < 224 || v4[0] > 239);
+  if (!host.includes(':')) return false;
+  const groups = ipv6Groups(host);
+  return groups !== null && groups.some(group => Number.parseInt(group, 16) !== 0)
+    && (Number.parseInt(groups[0], 16) & 0xff00) !== 0xff00;
 }
 export function targetFromFields(host: string, port: string): PrinterTarget | null {
   const normalized = host.trim();
-  if (!isNumericPrinterHost(normalized) || !/^[0-9]{1,5}$/.test(port)) return null;
+  if (!isNumericPrinterHost(normalized) || !/^\d{1,5}$/.test(port)) return null;
   const number = Number(port);
   return number >= 1 && number <= 65535 ? { host: normalized, port: number } : null;
 }

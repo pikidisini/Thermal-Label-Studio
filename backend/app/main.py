@@ -1,6 +1,7 @@
 """HTTP composition: acceptance foundation plus explicit fixture simulation."""
 
 from contextlib import asynccontextmanager
+import os
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -28,6 +29,9 @@ from .studio_datasets.service import StudioDatasetService, DatasetPersistenceErr
 from .label_intake.http import router as intake_router, IntakeBodyMiddleware, admission_exception
 from .label_intake.results import IntakeAdmissionError
 from .label_intake.runtime import create_runtime_ledger
+from .intake_queue.runtime import create_queue
+from .intake_queue.http import machine as queue_router, operator as queue_operator_router, queue_exception
+from .intake_queue.store import QueueError
 from .management.router import router as management_router
 from .management.errors import management_exception, ManagementError
 from .management.middleware import ManagementBodyMiddleware
@@ -38,41 +42,59 @@ from .graphics.service import GraphicsService
 settings = get_settings()
 
 
+def initialize_storage(app):
+    if settings.persistence is None:
+        return
+    initialize = os.environ.get('TLS_STORAGE_INITIALIZE','true')
+    if initialize not in ('true','false'):
+        raise RuntimeError('Invalid storage initialization setting.')
+    layout_service = LayoutService(settings.persistence)
+    try:
+        if initialize == 'true':
+            layout_service.initialize()
+    except LayoutPersistenceError as exc:
+        raise RuntimeError("Layout persistence startup failed.") from exc
+    app.state.layout_service = layout_service
+    dataset_service = StudioDatasetService(settings.persistence)
+    try:
+        if initialize == 'true':
+            dataset_service.initialize()
+    except DatasetPersistenceError as exc:
+        raise RuntimeError("Sample dataset persistence startup failed.") from exc
+    app.state.studio_dataset_service = dataset_service
+    # Construction only. Graphics DDL requires separate named-target provisioning.
+    app.state.graphics_service = GraphicsService(settings.persistence)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Validate explicit intake configuration before any persistence initialization.
     # Construction is local only: never connect or apply intake schema here.
     intake_ledger = create_runtime_ledger()
+    queue = create_queue()
+    if queue is not None and getattr(app.state,'intake_queue',None) is not None:
+        raise RuntimeError('Intake queue is already configured.')
     if intake_ledger is not None and getattr(app.state, 'intake_ledger', None) is not None:
         raise RuntimeError('Intake ledger is already configured.')
-    if settings.persistence is not None:
-        layout_service = LayoutService(settings.persistence)
-        try:
-            layout_service.initialize()
-        except LayoutPersistenceError as exc:
-            raise RuntimeError("Layout persistence startup failed.") from exc
-        app.state.layout_service = layout_service
-        dataset_service = StudioDatasetService(settings.persistence)
-        try:
-            dataset_service.initialize()
-        except DatasetPersistenceError as exc:
-            raise RuntimeError("Sample dataset persistence startup failed.") from exc
-        app.state.studio_dataset_service = dataset_service
-        # Construction only. Graphics DDL requires separate named-target provisioning.
-        app.state.graphics_service = GraphicsService(settings.persistence)
+    initialize_storage(app)
     if intake_ledger is not None:
         app.state.intake_ledger = intake_ledger
+    if queue is not None:
+        app.state.intake_queue = queue
     try:
         yield
     finally:
         if intake_ledger is not None:
             del app.state.intake_ledger
+        if queue is not None:
+            del app.state.intake_queue
 
 
 app = FastAPI(title=settings.application_name, lifespan=lifespan)
 from .engine.editor_request import EditorBodyMiddleware
 app.add_middleware(EditorBodyMiddleware)
 app.add_middleware(IntakeBodyMiddleware, path=f"{settings.api_prefix}/label-intake")
+app.add_middleware(IntakeBodyMiddleware, path='/api/v2/label-intake', queued=True)
 app.add_middleware(ManagementBodyMiddleware, prefix=f"{settings.api_prefix}/management")
 app.add_middleware(ActivityMiddleware, api_prefix=settings.api_prefix)
 app.add_middleware(AuthenticationMiddleware, api_prefix=settings.api_prefix)
@@ -84,9 +106,12 @@ async def auth_exception(_request, exc):
 
 app.include_router(auth_router, prefix=settings.api_prefix)
 app.add_exception_handler(IntakeAdmissionError, admission_exception)
+app.add_exception_handler(QueueError, queue_exception)
 app.add_exception_handler(ManagementError, management_exception)
 app.include_router(management_router, prefix=settings.api_prefix)
 app.include_router(intake_router, prefix=settings.api_prefix)
+app.include_router(queue_router, prefix='/api/v2')
+app.include_router(queue_operator_router, prefix=settings.api_prefix)
 app.include_router(simulation_router, prefix=settings.api_prefix)
 app.include_router(editor_simulation_router, prefix=settings.api_prefix)
 app.include_router(design_router, prefix=settings.api_prefix)

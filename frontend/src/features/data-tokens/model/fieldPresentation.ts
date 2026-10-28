@@ -7,9 +7,9 @@ export function getFieldLabel(key: string, descriptions: Record<string, string> 
   return duplicate ? `${description} (${key})` : description;
 }
 
-export function hasFieldValue(value: unknown): boolean {
-  return value !== undefined && value !== null && typeof value !== 'object'
-    && String(value).length > 0;
+export function hasFieldValue(value: unknown): value is string | number | boolean {
+  if (typeof value === 'string') return value.length > 0;
+  return typeof value === 'number' || typeof value === 'boolean';
 }
 
 export function getFieldStatus(value: unknown): string {

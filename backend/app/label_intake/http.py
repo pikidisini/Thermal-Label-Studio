@@ -1,5 +1,6 @@
 """Fail-closed HTTP admission with a non-queued process-wide intake slot."""
-from threading import Lock
+from app.http_body import BodyLimitExceeded, read_bounded_body, replay_body
+from threading import Lock, BoundedSemaphore
 from uuid import uuid4
 from fastapi import APIRouter, Depends, Request
 from fastapi.security import HTTPBearer
@@ -16,6 +17,7 @@ from app.activity.context import intake_identity, intake_outcome
 
 router = APIRouter()
 _slot = Lock()
+_queue_body_slots = BoundedSemaphore(4)
 _policy_lock = Lock()
 _bearer = HTTPBearer(auto_error=False)
 
@@ -29,50 +31,43 @@ def admission_response(status, code, request_id=None):
 
 class IntakeBodyMiddleware:
     """Reserve the slot before buffering/parsing; release after response or failure."""
-    def __init__(self, app, path='/api/v1/label-intake'):
+
+    def __init__(self, app, path='/api/v1/label-intake', queued=False):
         self.app, self.path = app, path
+        self.slot = _queue_body_slots if queued else _slot
+
+    @staticmethod
+    def accepts_json(headers):
+        media = headers.get(b'content-type', b'').decode('latin1').lower().split(';')
+        parameters = [part.strip() for part in media[1:]]
+        return media[0].strip() == 'application/json' and not any(
+            part.startswith('charset=') and part.split('=', 1)[1].strip('" ') not in ('utf-8', 'utf8')
+            for part in parameters)
 
     async def __call__(self, scope, receive, send):
         if scope['type'] != 'http' or scope.get('method') != 'POST' or scope.get('path') != self.path:
             return await self.app(scope, receive, send)
-        if not _slot.acquire(blocking=False):
+        if not self.slot.acquire(blocking=False):
             return await admission_response(429, 'intake_busy')(scope, receive, send)
         try:
-            headers = dict(scope.get('headers', []))
-            media = headers.get(b'content-type', b'').decode('latin1').lower().split(';')
-            parameters = [part.strip() for part in media[1:]]
-            if media[0].strip() != 'application/json' or any(
-                    part.startswith('charset=') and part.split('=', 1)[1].strip('" ') not in ('utf-8', 'utf8')
-                    for part in parameters):
+            if not self.accepts_json(dict(scope.get('headers', []))):
                 return await admission_response(415, 'unsupported_media_type')(scope, receive, send)
-            body = bytearray()
-            while True:
-                message = await receive()
-                if message['type'] == 'http.disconnect':
-                    return
-                chunk = message.get('body', b'')
-                if len(body) + len(chunk) > MAX_BYTES:
-                    return await admission_response(413, 'request_too_large')(scope, receive, send)
-                body.extend(chunk)
-                if not message.get('more_body', False):
-                    break
             try:
-                payload = admit_json(bytes(body))
+                body = await read_bounded_body(receive, MAX_BYTES)
+            except BodyLimitExceeded:
+                return await admission_response(413, 'request_too_large')(scope, receive, send)
+            if body is None:
+                return
+            try:
+                payload = admit_json(body)
             except LabelDataError as exc:
-                status = 400 if exc.code in ('malformed_json', 'duplicate_member') else (
-                    413 if exc.code == 'request_too_large' else 422)
+                status = {'malformed_json': 400, 'duplicate_member': 400, 'request_too_large': 413}.get(exc.code, 422)
                 return await admission_response(status, exc.code)(scope, receive, send)
             scope.setdefault('state', {})['intake_request_id'] = payload['request_id']
-            delivered = False
-            async def replay():
-                nonlocal delivered
-                if delivered:
-                    return await receive()
-                delivered = True
-                return {'type': 'http.request', 'body': bytes(body), 'more_body': False}
-            return await self.app(scope, replay, send)
+            return await self.app(scope, replay_body(body, receive), send)
         finally:
-            _slot.release()
+            self.slot.release()
+
 
 
 def configured_policy(transport: Request):
@@ -104,6 +99,8 @@ def authorized_sender(request: IntakeRequest, transport: Request,
     if credential is None or len(headers) != 1:
         raise IntakeAdmissionError(401, 'unauthenticated')
     admission = authenticate(configured_policy(transport), headers[0])
+    if admission.source.async_only and transport.url.path == '/api/v1/label-intake':
+        raise IntakeAdmissionError(403, 'mode_not_allowed')
     intake_identity(request, admission)
     authorize(admission, request)
     return admission
@@ -144,5 +141,5 @@ def intake(request: IntakeRequest, connection: Request, sender: Admission = Depe
         raise
 
 
-async def admission_exception(request: Request, exc: IntakeAdmissionError):
+def admission_exception(request: Request, exc: IntakeAdmissionError):
     return admission_response(exc.status, exc.code, getattr(request.state, 'intake_request_id', None))

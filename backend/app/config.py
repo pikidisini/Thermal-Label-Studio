@@ -52,13 +52,7 @@ def _absolute_path(value: str) -> Path:
     return path
 
 
-def get_settings(environment: Mapping[str, str] | None = None) -> Settings:
-    """Validate only server-owned configuration, without filesystem effects."""
-    values = os.environ if environment is None else environment
-    defaults = Settings()
-    family = values.get("TLS_FIXTURE_FONT_FAMILY", defaults.fixture_font_family)
-    if family not in {"Arial", "Liberation Sans"}:
-        raise ValueError("Unsupported fixture font family.")
+def persistence_settings(values):
     persistence_keys = (
         "TLS_DATABASE_URL", "TLS_MINIO_ENDPOINT", "TLS_MINIO_ACCESS_KEY",
         "TLS_MINIO_SECRET_KEY", "TLS_MINIO_BUCKET",
@@ -83,6 +77,17 @@ def get_settings(environment: Mapping[str, str] | None = None) -> Settings:
             minio_bucket=bucket,
             minio_secure=secure_value == "true",
         )
+    return persistence
+
+
+def get_settings(environment: Mapping[str, str] | None = None) -> Settings:
+    """Validate only server-owned configuration, without filesystem effects."""
+    values = os.environ if environment is None else environment
+    defaults = Settings()
+    family = values.get("TLS_FIXTURE_FONT_FAMILY", defaults.fixture_font_family)
+    if family not in {"Arial", "Liberation Sans"}:
+        raise ValueError("Unsupported fixture font family.")
+    persistence = persistence_settings(values)
     printer = None
     printer_host = values.get("TLS_PRINTER_HOST", "")
     printer_port = values.get("TLS_PRINTER_PORT", "9100")
