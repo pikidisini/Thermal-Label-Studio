@@ -20,6 +20,7 @@ RUN printf '%s' "$RESVG_SHA256" | grep -Eq '^[a-f0-9]{64}$' \
     && chmod 755 /renderer/resvg
 
 FROM ${APPLICATION_BASE_IMAGE} AS application-runner
+USER 0
 RUN apt-get update && apt-get install -y --no-install-recommends fonts-liberation \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --uid 10001 --create-home fixture
