@@ -12,8 +12,16 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 import ci_build
 
 
-def test_sap_runtime_rejects_changed_base_image_before_build(monkeypatch, tmp_path):
-    config = tmp_path / 'runtime.json'
+@pytest.fixture
+def runtime_config_path():
+    parent = ROOT / '.tmp'
+    parent.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='sap-runtime-test-', dir=parent) as directory:
+        yield Path(directory)
+
+
+def test_sap_runtime_rejects_changed_base_image_before_build(monkeypatch, runtime_config_path):
+    config = runtime_config_path / 'runtime.json'
     config.write_text(json.dumps({'base_image': 'thermal-label-sap-base:private',
                                   'base_image_id': 'sha256:' + 'a' * 64}))
     monkeypatch.setattr(ci_build, 'run', lambda args: json.dumps([{
@@ -23,8 +31,8 @@ def test_sap_runtime_rejects_changed_base_image_before_build(monkeypatch, tmp_pa
         ci_build.sap_runtime_base(config)
 
 
-def test_sap_runtime_is_optional_and_requires_identified_private_image(monkeypatch, tmp_path):
-    config = tmp_path / 'runtime.json'
+def test_sap_runtime_is_optional_and_requires_identified_private_image(monkeypatch, runtime_config_path):
+    config = runtime_config_path / 'runtime.json'
     assert ci_build.sap_runtime_base(config) == ([], None)
     identity = 'sha256:' + 'a' * 64
     config.write_text(json.dumps({'base_image': 'thermal-label-sap-base:private',
