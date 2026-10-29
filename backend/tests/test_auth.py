@@ -216,6 +216,28 @@ def test_trusted_lan_http_requires_explicit_opt_in(monkeypatch, origin):
         allowed_origins()
 
 
+@pytest.mark.parametrize('origin', [
+    'http://10.0.0.1', 'http://172.16.0.1', 'http://172.31.255.254',
+    'http://192.168.0.1', 'http://[fc00::1]', 'http://[fdff::1]',
+])
+def test_bundled_private_lan_policy_accepts_only_explicitly_enabled_ranges(monkeypatch, origin):
+    monkeypatch.setenv('TLS_AUTH_ORIGINS', origin)
+    monkeypatch.setenv('TLS_AUTH_TRUSTED_LAN_HTTP', 'true')
+    monkeypatch.setenv('TLS_AUTH_LOCAL_HTTP', 'false')
+    assert allowed_origins() == {origin}
+
+
+@pytest.mark.parametrize('origin', [
+    'http://172.15.255.255', 'http://172.32.0.1', 'http://192.169.0.1',
+    'http://169.254.1.1', 'http://[fe80::1]',
+])
+def test_bundled_private_lan_policy_rejects_adjacent_and_link_local_ranges(monkeypatch, origin):
+    monkeypatch.setenv('TLS_AUTH_ORIGINS', origin)
+    monkeypatch.setenv('TLS_AUTH_TRUSTED_LAN_HTTP', 'true')
+    with pytest.raises(AuthError):
+        allowed_origins()
+
+
 @pytest.mark.parametrize('origin', ['http://example.test', 'http://203.0.113.1'])
 def test_trusted_lan_http_rejects_non_private_origins(monkeypatch, origin):
     monkeypatch.setenv('TLS_AUTH_ORIGINS', origin)

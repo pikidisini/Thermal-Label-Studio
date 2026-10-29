@@ -1,5 +1,7 @@
 """Explicit browser session endpoints and admin-only account commands."""
 import os
+import json
+from pathlib import Path
 from urllib.parse import urlsplit
 import ipaddress
 
@@ -12,12 +14,10 @@ from .store import AuthStore
 
 router = APIRouter()
 COOKIE = 'tls_session'
-TRUSTED_LAN_NETWORKS = (
-    ipaddress.ip_network('10.0.0.0/8'),
-    ipaddress.ip_network('172.16.0.0/12'),
-    ipaddress.ip_network('192.168.0.0/16'),
-    ipaddress.ip_network('fc00::/7'),
-)
+# Declarative, bundled RFC 1918 / RFC 4193 policy; these are network ranges,
+# never remote endpoint defaults. Loading failure prevents auth startup.
+TRUSTED_LAN_NETWORKS = tuple(ipaddress.ip_network(prefix) for prefix in
+    json.loads(Path(__file__).with_name('private_lan_networks.json').read_text())['networks'])
 
 
 def service(request):

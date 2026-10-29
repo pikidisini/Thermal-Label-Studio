@@ -163,6 +163,8 @@ def test_failed_candidate_restores_image_configuration_and_link(target, monkeypa
         ci.deploy(workspace, 'a' * 40, 'sha256:' + 'b' * 64)
     assert (app / 'current').resolve() == old
     assert (config / 'pilot.env').read_bytes() == original
-    assert calls[-1][0] == old and calls[-1][2] == 'old-image'
+    assert calls[-1][0] == old
+    assert calls[-1][2] == 'old-image'
     report = json.loads((state / 'last-release.json').read_text())
-    assert report['status'] == 'FAILED' and report['rollback'] == 'PASS'
+    assert report['status'] == 'FAILED'
+    assert report['rollback'] == 'PASS'

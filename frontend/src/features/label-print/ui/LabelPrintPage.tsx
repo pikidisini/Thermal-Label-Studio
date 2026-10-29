@@ -212,6 +212,24 @@ export function LabelPrintPage() {
   const activeDelivery = deliveryStatus(activeOutcome);
   const statusMessage = printStatusMessage({ demo, serverMessage: serverPrint.message, message, labels,
     sapSource, testData, language, translate: t });
+  function renderLabelGallery() {
+    return (!busy && (!labels.length ? <div className="label-print-empty"><Icon component={ScanLine} size={32} /><h2>{t('No label results yet')}</h2><p>{t(emptyResultMessage(testData, demo))}</p></div> :
+            <div className="label-print-gallery">{labels.map(label => <article key={label.id} className={`label-print-card${label.selected ? ' is-selected' : ''}${activeLabel?.id === label.id ? ' is-active' : ''}`}>
+              <div className="label-print-card-heading"><label className="label-print-check"><input type="checkbox" disabled={operationBusy || !!label.error} checked={label.selected} onChange={event => setLabels(labels.map(item => item.id === label.id ? { ...item, selected: event.target.checked } : item))} /><span className="label-print-batch">{label.batch}</span></label></div>
+              <Button variant="compact" className="label-print-thumbnail" aria-pressed={activeLabel?.id === label.id} aria-label={t('Inspect batch {batch}', { batch: label.batch })} onClick={() => setActiveLabelId(label.id)}>
+                {label.error ? <span className="label-print-thumbnail-error"><strong>{t(label.notAttempted ? 'Not attempted' : 'Failed')}</strong><span>{label.code ?? label.error}</span></span> : <img src={label.image} alt={t((testData || sapSource) ? 'IPL preview for batch {batch}' : 'Demo label for batch {batch}', { batch: label.batch })} />}
+              </Button>
+              <div className="label-print-card-footer"><span>{label.code ?? (demo ? 'SAMPLE_ROLL' : '—')}{label.version ? ` · ${label.version}` : ''}</span><Badge tone={label.error ? 'danger' : 'neutral'}>{t(previewStatus(label))}</Badge></div>
+            </article>)}</div>));
+  }
+
+  function renderPrinterChoice() {
+    return (<Field label={t('Printer')}><Select data-variant="compact" aria-label={t('Printer')} value={demo ? printer : configuredPrinterId} disabled={!demo && (printersLoading || !!printersError || !configuredPrinters.some(item => item.enabled))} onChange={event => { if (demo) { setPrinter(event.target.value); setLanguage(event.target.value === 'intermec' ? 'IPL' : 'ZPL'); } else { setConfiguredPrinterId(event.target.value); setLanguage('IPL'); setConnection('Ethernet'); } setMessage(''); }}>
+              {!demo && <><option value="">{t(printerChoiceLabel(printersLoading, printersError, configuredPrinters))}</option>{configuredPrinters.map(item => <option key={item.target_id} value={item.target_id} disabled={!item.enabled}>{item.target_id}{!item.enabled ? ` (${t('Disabled')})` : ''}</option>)}</>}
+              {demo && <><option value="intermec">{t('Intermec — Example')}</option><option value="zebra">{t('Zebra — Example')}</option></>}
+            </Select></Field>);
+  }
+
   return <ApplicationPageShell className="label-print-page">
     <ApplicationHeader testId="label-print-brand-home"><span>Label Print</span></ApplicationHeader>
     <main className="label-print-content label-print-split">
@@ -231,14 +249,7 @@ export function LabelPrintPage() {
           {testData && <p className="label-print-demo-note">{t('Test Data — real server binding and IPL decode. Print sends the selected test labels to a real printer.')}</p>}
           {busy && <output data-ui-status-block className="label-print-process" ><Icon component={LoaderCircle} className="label-print-spinner" /><div><h2>{t('Preparing IPL previews…')}</h2><p>{t('Waiting for the server response. Results will appear when processing completes.')}</p><p>{t('{count} batches', { count: requestedBatches.length })}</p></div></output>}
           {busy && <div className="label-print-gallery" aria-hidden="true">{requestedBatches.slice(0, 6).map((batch) => <div className="label-print-card label-print-placeholder" key={batch}><span>{batch}</span><div className="label-print-skeleton" /><div className="label-print-skeleton" /></div>)}</div>}
-          {!busy && (!labels.length ? <div className="label-print-empty"><Icon component={ScanLine} size={32} /><h2>{t('No label results yet')}</h2><p>{t(emptyResultMessage(testData, demo))}</p></div> :
-            <div className="label-print-gallery">{labels.map(label => <article key={label.id} className={`label-print-card${label.selected ? ' is-selected' : ''}${activeLabel?.id === label.id ? ' is-active' : ''}`}>
-              <div className="label-print-card-heading"><label className="label-print-check"><input type="checkbox" disabled={operationBusy || !!label.error} checked={label.selected} onChange={event => setLabels(labels.map(item => item.id === label.id ? { ...item, selected: event.target.checked } : item))} /><span className="label-print-batch">{label.batch}</span></label></div>
-              <Button variant="compact" className="label-print-thumbnail" aria-pressed={activeLabel?.id === label.id} aria-label={t('Inspect batch {batch}', { batch: label.batch })} onClick={() => setActiveLabelId(label.id)}>
-                {label.error ? <span className="label-print-thumbnail-error"><strong>{t(label.notAttempted ? 'Not attempted' : 'Failed')}</strong><span>{label.code ?? label.error}</span></span> : <img src={label.image} alt={t((testData || sapSource) ? 'IPL preview for batch {batch}' : 'Demo label for batch {batch}', { batch: label.batch })} />}
-              </Button>
-              <div className="label-print-card-footer"><span>{label.code ?? (demo ? 'SAMPLE_ROLL' : '—')}{label.version ? ` · ${label.version}` : ''}</span><Badge tone={label.error ? 'danger' : 'neutral'}>{t(previewStatus(label))}</Badge></div>
-            </article>)}</div>)}
+          {renderLabelGallery()}
 
           <div className="label-print-message">
 
@@ -257,10 +268,7 @@ export function LabelPrintPage() {
               <fieldset disabled={operationBusy} className="label-print-operation-fields">
           <section className="label-print-settings" aria-labelledby="print-settings-title">
             <h2 className="label-print-settings-title" id="print-settings-title">{t('Print settings')}</h2>
-            <Field label={t('Printer')}><Select data-variant="compact" aria-label={t('Printer')} value={demo ? printer : configuredPrinterId} disabled={!demo && (printersLoading || !!printersError || !configuredPrinters.some(item => item.enabled))} onChange={event => { if (demo) { setPrinter(event.target.value); setLanguage(event.target.value === 'intermec' ? 'IPL' : 'ZPL'); } else { setConfiguredPrinterId(event.target.value); setLanguage('IPL'); setConnection('Ethernet'); } setMessage(''); }}>
-              {!demo && <><option value="">{t(printerChoiceLabel(printersLoading, printersError, configuredPrinters))}</option>{configuredPrinters.map(item => <option key={item.target_id} value={item.target_id} disabled={!item.enabled}>{item.target_id}{!item.enabled ? ` (${t('Disabled')})` : ''}</option>)}</>}
-              {demo && <><option value="intermec">{t('Intermec — Example')}</option><option value="zebra">{t('Zebra — Example')}</option></>}
-            </Select></Field>
+            {renderPrinterChoice()}
             {!demo && <>
               <div className="label-print-printer-tools"><Button variant="compact" disabled={operationBusy || printersLoading} onClick={() => { setCatalogRevision(value => value + 1); invalidate(); }}>{t('Refresh printers')}</Button>{account?.role === 'Admin' && <a href="/management?section=printers">{t('Manage printers')}</a>}</div>
               {printersError && <p role="alert">{t(printersError)}</p>}

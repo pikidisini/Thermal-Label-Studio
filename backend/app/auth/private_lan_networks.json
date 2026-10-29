@@ -1,0 +1,4 @@
+{
+  "description": "Private HTTP pilot origin policy: RFC 1918 IPv4 and RFC 4193 IPv6 ULA. No endpoint defaults.",
+  "networks": ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"]
+}

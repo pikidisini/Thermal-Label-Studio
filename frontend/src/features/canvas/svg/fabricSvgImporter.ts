@@ -34,6 +34,73 @@ function nearestAncestorWith(element: Element | null, attribute: string): Elemen
   return null;
 }
 
+function restoreCanonicalText(elem: Element, obj: fabric.FabricObject, metrics: any, textLayout: string | null) {
+  const spans = Array.from(elem.querySelectorAll('tspan'));
+  obj.set({ fontSize: metrics.font_size, lineHeight: metrics.line_height, textAlign: metrics.text_align });
+  if (!spans.length || !spans.every((span) => span.hasAttribute('y'))) return;
+  const layout = textLayout ? decodeSpec(textLayout) : null;
+  const step = metrics.font_size * 1.13 * metrics.line_height;
+  const firstY = layout ? -layout.height / 2 + metrics.font_size * 1.13 * (1 - .222) : Number(spans[0].getAttribute('y'));
+  const count = layout ? Math.round((layout.height / (metrics.font_size * 1.13) - 1) / metrics.line_height) + 1 : 1;
+  if (!Number.isFinite(count) || count < 1 || count > 100) { throw new Error('Unsupported canonical text line count.'); }
+  const lines = Array.from({ length: count }, () => '');
+  for (const span of spans) {
+    const index = Math.round((Number(span.getAttribute('y')) - firstY) / step);
+    if (index < 0 || index > 99) { throw new Error('Unsupported canonical text baseline.'); }
+    while (lines.length <= index) lines.push('');
+    lines[index] += span.textContent ?? '';
+  }
+  obj.set('text', lines.join('\n'));
+
+}
+
+function restoreCanonicalGeometry(elem: Element, obj: fabric.FabricObject, document: Document,
+  groupKey: (source: Element, kind: 'group') => string) {
+  const chain: Element[] = [];
+  let cursor: Element | null = elem.parentElement;
+  while (cursor) { chain.unshift(cursor); cursor = cursor.parentElement; }
+  let world: fabric.TMat2D = [1, 0, 0, 1, 0, 0];
+  const groupPath: { key: string; matrix: fabric.TMat2D }[] = [];
+  for (const source of chain) {
+    const transform = source.getAttribute('transform');
+    if (transform && document.documentElement.dataset.editorCoordinateProfile === 'fabric7') {
+      const parsed = /^matrix\(([^)]+)\)$/.exec(transform.trim());
+      if (!parsed) { throw new Error('Canonical Fabric transform is unsupported.'); }
+      const matrix = parsed[1].trim().split(/[ ,]+/).map(Number);
+      if (matrix.length !== 6 || matrix.some((value) => !Number.isFinite(value))) { throw new Error('Invalid canonical transform.'); }
+      world = fabric.util.multiplyTransformMatrices(world, matrix as fabric.TMat2D);
+    }
+    if (source.attributes.getNamedItem('data-editor-group') !== null) { groupPath.push({ key: groupKey(source, 'group'), matrix: world }); }
+  }
+  if (document.documentElement.dataset.editorCoordinateProfile === 'fabric7') {
+    (obj as any).__canonicalWorldMatrix = world;
+    (obj as any).__canonicalGroupPath = groupPath;
+  }
+}
+
+function restoreBarcodeHints(obj: fabric.FabricObject, barcodeAttr: string | null, previewValue: string | null,
+  qrAttr: string | null, barcodeType: string | null, payloadSpec: string | null) {
+  if (barcodeAttr) {
+    (obj as any).set('dataBarcode', barcodeAttr);
+    (obj as any).set('barcodeValue', barcodeAttr);
+    (obj as any).set('isBarcode', true);
+    (obj as any).set('barcodeType', barcodeType || 'code128');
+  }
+  if (previewValue && !barcodeAttr && !qrAttr) {
+    (obj as any).set('barcodeValue', previewValue);
+    (obj as any).set('isBarcode', true);
+    (obj as any).set('barcodeType', barcodeType || 'code128');
+  }
+  restorePayloadTemplate(obj, payloadSpec);
+  if (qrAttr) {
+    (obj as any).set('dataQr', qrAttr);
+    (obj as any).set('barcodeValue', qrAttr);
+    (obj as any).set('isBarcode', true);
+    (obj as any).set('barcodeType', 'qrcode');
+  }
+  if (previewValue && qrAttr) { (obj as any).set('barcodeValue', previewValue); }
+}
+
 export function importSvgIntoFabricCanvas(
   canvas: fabric.Canvas,
   svgString: string,
@@ -123,44 +190,9 @@ export function importSvgIntoFabricCanvas(
       }
       if (textSpec) {
         const metrics = decodeSpec(textSpec);
-        const spans = Array.from(elem.querySelectorAll('tspan'));
-        obj.set({ fontSize: metrics.font_size, lineHeight: metrics.line_height, textAlign: metrics.text_align });
-        if (spans.length && spans.every((span) => span.hasAttribute('y'))) {
-          const layout = textLayout ? decodeSpec(textLayout) : null;
-          const step = metrics.font_size * 1.13 * metrics.line_height;
-          const firstY = layout ? -layout.height / 2 + metrics.font_size * 1.13 * (1 - .222) : Number(spans[0].getAttribute('y'));
-          const count = layout ? Math.round((layout.height / (metrics.font_size * 1.13) - 1) / metrics.line_height) + 1 : 1;
-          if (!Number.isFinite(count) || count < 1 || count > 100) { throw new Error('Unsupported canonical text line count.'); }
-          const lines = Array.from({ length: count }, () => '');
-          for (const span of spans) {
-            const index = Math.round((Number(span.getAttribute('y')) - firstY) / step);
-            if (index < 0 || index > 99) { throw new Error('Unsupported canonical text baseline.'); }
-            while (lines.length <= index) lines.push('');
-            lines[index] += span.textContent ?? '';
-          }
-          obj.set('text', lines.join('\n'));
-        }
+        restoreCanonicalText(elem, obj, metrics, textLayout);
       }
-      const chain: Element[] = [];
-      let cursor: Element | null = elem.parentElement;
-      while (cursor) { chain.unshift(cursor); cursor = cursor.parentElement; }
-      let world: fabric.TMat2D = [1, 0, 0, 1, 0, 0];
-      const groupPath: { key: string; matrix: fabric.TMat2D }[] = [];
-      for (const source of chain) {
-        const transform = source.getAttribute('transform');
-        if (transform && document.documentElement.dataset.editorCoordinateProfile === 'fabric7') {
-          const parsed = /^matrix\(([^)]+)\)$/.exec(transform.trim());
-          if (!parsed) { throw new Error('Canonical Fabric transform is unsupported.'); }
-          const matrix = parsed[1].trim().split(/[ ,]+/).map(Number);
-          if (matrix.length !== 6 || matrix.some((value) => !Number.isFinite(value))) { throw new Error('Invalid canonical transform.'); }
-          world = fabric.util.multiplyTransformMatrices(world, matrix as fabric.TMat2D);
-        }
-        if (source.attributes.getNamedItem('data-editor-group') !== null) { groupPath.push({ key: groupKey(source, 'group'), matrix: world }); }
-      }
-      if (document.documentElement.dataset.editorCoordinateProfile === 'fabric7') {
-        (obj as any).__canonicalWorldMatrix = world;
-        (obj as any).__canonicalGroupPath = groupPath;
-      }
+      restoreCanonicalGeometry(elem, obj, document, groupKey);
       const editorGroupSource = nearestAncestorWith(elem, 'data-editor-group');
       if (editorGroupSource) {
         (obj as any).__editorGroupKey = groupKey(editorGroupSource, 'group');
@@ -172,25 +204,7 @@ export function importSvgIntoFabricCanvas(
 
       if (elemId) { (obj as any).set('id', elemId); }
 
-      if (barcodeAttr) {
-        (obj as any).set('dataBarcode', barcodeAttr);
-        (obj as any).set('barcodeValue', barcodeAttr);
-        (obj as any).set('isBarcode', true);
-        (obj as any).set('barcodeType', barcodeType || 'code128');
-      }
-      if (previewValue && !barcodeAttr && !qrAttr) {
-        (obj as any).set('barcodeValue', previewValue);
-        (obj as any).set('isBarcode', true);
-        (obj as any).set('barcodeType', barcodeType || 'code128');
-      }
-      restorePayloadTemplate(obj, payloadSpec);
-      if (qrAttr) {
-        (obj as any).set('dataQr', qrAttr);
-        (obj as any).set('barcodeValue', qrAttr);
-        (obj as any).set('isBarcode', true);
-        (obj as any).set('barcodeType', 'qrcode');
-      }
-      if (previewValue && qrAttr) { (obj as any).set('barcodeValue', previewValue); }
+      restoreBarcodeHints(obj, barcodeAttr, previewValue, qrAttr, barcodeType, payloadSpec);
       if (dynamicField) {
         (obj as any).set('dataField', dynamicField);
         (obj as any).set('dataPlaceholder', dynamicField);

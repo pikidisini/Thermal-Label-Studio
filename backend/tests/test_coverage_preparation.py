@@ -21,5 +21,6 @@ def test_coverage_runs_typecheck_then_fresh_frontend_build():
 
 
 def test_missing_build_prerequisite_fails_before_tests_use_stale_assets():
+    checks = [c for c in source_checks() if c.name != 'frontend_build']
     with pytest.raises(KeyError, match='frontend_build'):
-        frontend_preparation([c for c in source_checks() if c.name != 'frontend_build'])
+        frontend_preparation(checks)
