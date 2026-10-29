@@ -230,6 +230,35 @@ export function LabelPrintPage() {
             </Select></Field>);
   }
 
+  function renderPrinterSettings() {
+    return (<section className="label-print-settings" aria-labelledby="print-settings-title">
+            <h2 className="label-print-settings-title" id="print-settings-title">{t('Print settings')}</h2>
+            {renderPrinterChoice()}
+            {!demo && <>
+              <div className="label-print-printer-tools"><Button variant="compact" disabled={operationBusy || printersLoading} onClick={() => { setCatalogRevision(value => value + 1); invalidate(); }}>{t('Refresh printers')}</Button>{account?.role === 'Admin' && <a href="/management?section=printers">{t('Manage printers')}</a>}</div>
+              {printersError && <p role="alert">{t(printersError)}</p>}
+              {configuredPrinter && <p className="label-print-printer-address">{configuredPrinter.host.includes(':') ? `[${configuredPrinter.host}]` : configuredPrinter.host}:{configuredPrinter.port} · {configuredPrinter.transport}</p>}
+              <p className="label-print-muted">{t('Registered and enabled describes configuration only. Use Check status for a device response.')}</p>
+              {configuredPrinter && <PrinterStatusPanel key={`${configuredPrinter.target_id}:${configuredPrinter.host}:${configuredPrinter.port}`} printer={configuredPrinter} disabled={operationBusy} />}
+            </>}
+            <div className="label-print-pair">
+              <Field label={t('Printer language')}><Select data-variant="compact" aria-label={t('Printer language')} disabled={!demo} value={demo ? language : 'IPL'} onChange={event => { setLanguage(event.target.value); invalidate(); }}><option>IPL</option><option disabled={testData}>ZPL</option></Select></Field>
+              <Field label={t('Printer connection')}><Select data-variant="compact" aria-label={t('Printer connection')} disabled={!demo} value={demo ? connection : 'Ethernet'} onChange={event => { setConnection(event.target.value); setMessage(''); }}><option>Ethernet</option><option>USB</option></Select></Field>
+            </div>
+            {demo && <><div className="label-print-agent"><span>{t('Local agent')}</span><Badge tone={agent ? 'success' : 'neutral'}>{t(agent ? 'Connected (demo)' : 'Disconnected (demo)')}</Badge></div><Button variant="compact" onClick={() => { setAgent(!agent); setMessage(''); }}>{t(agent ? 'Disconnect demo agent' : 'Connect demo agent')}</Button></>}
+            <p className="label-print-muted">{t(demo ? 'Example printers and agent status are simulated.' : 'LAN printing is sent directly by the server. No local agent is required.')}</p>
+          </section>);
+  }
+
+  function renderPrintSubmission() {
+    return (<div className="label-print-submit">
+            <Field label={t('Copies per label')}><Input data-variant="compact" disabled={operationBusy} aria-label={t('Copies per label')} type="number" min={1} max={999} step={1} value={copies} onChange={event => { setCopies(event.target.value); setMessage(''); }} /></Field>
+            {!validCopies && <p role="alert">{t('Copies must be an integer from 1 to 999.')}</p>}
+            <span>{t('{selected} selected × {copies} copies = {total} prints', { selected, copies: validCopies ? quantity : '—', total: validCopies ? selected * quantity : '—' })}</span>
+            <Button aria-describedby={!demo ? "label-print-block-reason" : undefined} className="inline-flex items-center gap-2" tone="primary" disabled={operationBusy || !!serverPrint.locked || !selected || !validCopies || (demo ? !agent : busy || !configuredPrinter || labels.some(label => label.selected && !label.artifact))} onClick={async () => { if (operationBusy) { return; } if (demo) { setDemoPrinting(true); try { await new Promise(resolve => setTimeout(resolve, 600)); setMessage(t('Demo: {count} prints prepared via {connection}. Nothing was sent to a printer.', { count: selected * quantity, connection })); } finally { setDemoPrinting(false); } } else if (configuredPrinter) { setMessage(''); void serverPrint.print(configuredPrinter, labels.filter(label => label.selected && label.artifact).map(label => label.artifact!), quantity, labels.filter(label => label.selected).map(label => label.batch)); } }}><Icon component={serverPrint.printing || demoPrinting ? LoaderCircle : Printer} className={serverPrint.printing || demoPrinting ? 'label-print-spinner' : undefined} />{t(submitLabel(demoPrinting, serverPrint.printing, demo))}</Button>
+          </div>);
+  }
+
   return <ApplicationPageShell className="label-print-page">
     <ApplicationHeader testId="label-print-brand-home"><span>Label Print</span></ApplicationHeader>
     <main className="label-print-content label-print-split">
@@ -266,30 +295,9 @@ export function LabelPrintPage() {
             <PrintTabs<'printer' | 'source'> id="print-settings" label="Settings tabs" tabs={[{ value: 'printer', label: 'Printer' }, { value: 'source', label: 'Data source' }]} value={settingsTab} onChange={setSettingsTab} />
             <div role="tabpanel" id="print-settings-panel-printer" aria-labelledby="print-settings-tab-printer" hidden={settingsTab !== 'printer'}>
               <fieldset disabled={operationBusy} className="label-print-operation-fields">
-          <section className="label-print-settings" aria-labelledby="print-settings-title">
-            <h2 className="label-print-settings-title" id="print-settings-title">{t('Print settings')}</h2>
-            {renderPrinterChoice()}
-            {!demo && <>
-              <div className="label-print-printer-tools"><Button variant="compact" disabled={operationBusy || printersLoading} onClick={() => { setCatalogRevision(value => value + 1); invalidate(); }}>{t('Refresh printers')}</Button>{account?.role === 'Admin' && <a href="/management?section=printers">{t('Manage printers')}</a>}</div>
-              {printersError && <p role="alert">{t(printersError)}</p>}
-              {configuredPrinter && <p className="label-print-printer-address">{configuredPrinter.host.includes(':') ? `[${configuredPrinter.host}]` : configuredPrinter.host}:{configuredPrinter.port} · {configuredPrinter.transport}</p>}
-              <p className="label-print-muted">{t('Registered and enabled describes configuration only. Use Check status for a device response.')}</p>
-              {configuredPrinter && <PrinterStatusPanel key={`${configuredPrinter.target_id}:${configuredPrinter.host}:${configuredPrinter.port}`} printer={configuredPrinter} disabled={operationBusy} />}
-            </>}
-            <div className="label-print-pair">
-              <Field label={t('Printer language')}><Select data-variant="compact" aria-label={t('Printer language')} disabled={!demo} value={demo ? language : 'IPL'} onChange={event => { setLanguage(event.target.value); invalidate(); }}><option>IPL</option><option disabled={testData}>ZPL</option></Select></Field>
-              <Field label={t('Printer connection')}><Select data-variant="compact" aria-label={t('Printer connection')} disabled={!demo} value={demo ? connection : 'Ethernet'} onChange={event => { setConnection(event.target.value); setMessage(''); }}><option>Ethernet</option><option>USB</option></Select></Field>
-            </div>
-            {demo && <><div className="label-print-agent"><span>{t('Local agent')}</span><Badge tone={agent ? 'success' : 'neutral'}>{t(agent ? 'Connected (demo)' : 'Disconnected (demo)')}</Badge></div><Button variant="compact" onClick={() => { setAgent(!agent); setMessage(''); }}>{t(agent ? 'Disconnect demo agent' : 'Connect demo agent')}</Button></>}
-            <p className="label-print-muted">{t(demo ? 'Example printers and agent status are simulated.' : 'LAN printing is sent directly by the server. No local agent is required.')}</p>
-          </section>
+          {renderPrinterSettings()}
               </fieldset>
-          <div className="label-print-submit">
-            <Field label={t('Copies per label')}><Input data-variant="compact" disabled={operationBusy} aria-label={t('Copies per label')} type="number" min={1} max={999} step={1} value={copies} onChange={event => { setCopies(event.target.value); setMessage(''); }} /></Field>
-            {!validCopies && <p role="alert">{t('Copies must be an integer from 1 to 999.')}</p>}
-            <span>{t('{selected} selected × {copies} copies = {total} prints', { selected, copies: validCopies ? quantity : '—', total: validCopies ? selected * quantity : '—' })}</span>
-            <Button aria-describedby={!demo ? "label-print-block-reason" : undefined} className="inline-flex items-center gap-2" tone="primary" disabled={operationBusy || !!serverPrint.locked || !selected || !validCopies || (demo ? !agent : busy || !configuredPrinter || labels.some(label => label.selected && !label.artifact))} onClick={async () => { if (operationBusy) { return; } if (demo) { setDemoPrinting(true); try { await new Promise(resolve => setTimeout(resolve, 600)); setMessage(t('Demo: {count} prints prepared via {connection}. Nothing was sent to a printer.', { count: selected * quantity, connection })); } finally { setDemoPrinting(false); } } else if (configuredPrinter) { setMessage(''); void serverPrint.print(configuredPrinter, labels.filter(label => label.selected && label.artifact).map(label => label.artifact!), quantity, labels.filter(label => label.selected).map(label => label.batch)); } }}><Icon component={serverPrint.printing || demoPrinting ? LoaderCircle : Printer} className={serverPrint.printing || demoPrinting ? 'label-print-spinner' : undefined} />{t(submitLabel(demoPrinting, serverPrint.printing, demo))}</Button>
-          </div>
+          {renderPrintSubmission()}
             </div>
             <div role="tabpanel" id="print-settings-panel-source" aria-labelledby="print-settings-tab-source" hidden={settingsTab !== 'source'}>
               <fieldset disabled={operationBusy} className="label-print-operation-fields">
