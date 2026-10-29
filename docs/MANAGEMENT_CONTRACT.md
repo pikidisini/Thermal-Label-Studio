@@ -524,6 +524,13 @@ container runtime acceptance is separate. The local installed worker runtime can
 be independent of the application's Python version. The app invokes its own worker,
 not the MCP service, using saved application credentials through stdin only.
 
+An optional private Linux/amd64 runtime can be built with
+[`tools/sap-rfc-runtime`](../tools/sap-rfc-runtime/README.md). It packages a separate
+Python 3.12/PyRFC interpreter into the application image without enabling SAP
+execution. The default image remains SDK-free. CI can pin the private base image
+by identity and checks its import/version offline before candidate acceptance;
+that check does not establish SAP connectivity or function acceptance.
+
 The worker verifies the SAP client, calls the allowed function once and closes the
 connection. It never retries or issues a commit. Restrict allowlists to functions
 whose read-only behavior has been inspected; arbitrary RFCs may have SAP effects.

@@ -12,6 +12,32 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 import ci_build
 
 
+def test_sap_runtime_rejects_changed_base_image_before_build(monkeypatch, tmp_path):
+    config = tmp_path / 'runtime.json'
+    config.write_text(json.dumps({'base_image': 'thermal-label-sap-base:private',
+                                  'base_image_id': 'sha256:' + 'a' * 64}))
+    monkeypatch.setattr(ci_build, 'run', lambda args: json.dumps([{
+        'Id': 'sha256:' + 'b' * 64, 'Config': {'Labels': {
+            'io.thermal-label.sap-runtime': '750.12-hf1-pyrfc3.3.1-py312'}}}]).encode())
+    with pytest.raises(ValueError, match='identity changed'):
+        ci_build.sap_runtime_base(config)
+
+
+def test_sap_runtime_is_optional_and_requires_identified_private_image(monkeypatch, tmp_path):
+    config = tmp_path / 'runtime.json'
+    assert ci_build.sap_runtime_base(config) == ([], None)
+    identity = 'sha256:' + 'a' * 64
+    config.write_text(json.dumps({'base_image': 'thermal-label-sap-base:private',
+                                  'base_image_id': identity}))
+    metadata = {'Id': identity, 'Config': {'Labels': {}}}
+    monkeypatch.setattr(ci_build, 'run', lambda args: json.dumps([metadata]).encode())
+    with pytest.raises(ValueError, match='Unrecognized'):
+        ci_build.sap_runtime_base(config)
+    metadata['Config']['Labels']['io.thermal-label.sap-runtime'] = '750.12-hf1-pyrfc3.3.1-py312'
+    assert ci_build.sap_runtime_base(config) == (
+        ['--build-arg', 'APPLICATION_BASE_IMAGE=thermal-label-sap-base:private'], identity)
+
+
 @pytest.mark.parametrize(('accepted', 'owned', 'remove'), [
     (False, True, True), (True, True, False), (False, False, False),
 ])

@@ -1,0 +1,6 @@
+#!/bin/sh
+# The application intentionally passes a minimal environment to RFC workers.
+export PYTHONHOME=/opt/sap-rfc/python
+export SAPNWRFC_HOME=/opt/sap-rfc/sdk
+export LD_LIBRARY_PATH=/opt/sap-rfc/python/lib:/opt/sap-rfc/sdk/lib
+exec /opt/sap-rfc/python/bin/python3.12 "$@"
