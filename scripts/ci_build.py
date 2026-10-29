@@ -69,17 +69,46 @@ def sonar(sha):
     print(json.dumps({'quality_gate': 'PASS', 'commit': sha}))
 
 
+def sap_runtime_base(runtime_config=Path('/etc/thermal-label-studio/sap-runtime.json')):
+    """Accept only the operator's exact, locally available private runtime image."""
+    runtime_args = []
+    runtime_id = None
+    if runtime_config.exists():
+        runtime = json.loads(runtime_config.read_text())
+        runtime_id = runtime['base_image_id']
+        runtime_ref = runtime['base_image']
+        if not re.fullmatch(r'sha256:[0-9a-f]{64}', runtime_id):
+            raise ValueError('SAP runtime base image must be pinned by image ID.')
+        if not re.fullmatch(r'thermal-label-sap-base:[A-Za-z0-9_.-]+', runtime_ref):
+            raise ValueError('Invalid private SAP runtime base image reference.')
+        base = json.loads(run(['docker', 'image', 'inspect', runtime_ref]))[0]
+        if base['Id'] != runtime_id:
+            raise ValueError('SAP runtime base image identity changed.')
+        if base['Config'].get('Labels', {}).get('io.thermal-label.sap-runtime') != '750.12-hf1-pyrfc3.3.1-py312':
+            raise ValueError('Unrecognized private SAP runtime base image.')
+        runtime_args = ['--build-arg', 'APPLICATION_BASE_IMAGE=' + runtime_ref]
+    return runtime_args, runtime_id
+
+
 def image(sha):
     image = 'thermal-label-studio:git-' + sha
     source_checksum = hashlib.sha256(run(['git', 'archive', '--format=tar', sha])).hexdigest()
+    runtime_args, runtime_id = sap_runtime_base()
     run(['docker', 'build', '--platform', 'linux/amd64', '--label', 'io.thermal-label.ci.release=true',
          '--label', 'org.opencontainers.image.revision=' + sha,
          '--build-arg', 'RESVG_SHA256=450cfeaf8122f7389a8acf698888804e1ed46980b611d5253204049c51c87087',
-         '-t', image, '.'], log=REPORTS / 'application-build.log')
+         *runtime_args, '-t', image, '.'], log=REPORTS / 'application-build.log')
     identity = json.loads(run(['docker', 'image', 'inspect', image]))[0]['Id']
+    if runtime_id:
+        run(['docker', 'run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
+             '--security-opt', 'no-new-privileges:true', '--entrypoint', '/opt/sap-rfc/bin/python',
+             image, '-I', '-c', 'import pyrfc; print(pyrfc.get_nwrfclib_version())'],
+            log=REPORTS / 'sap-runtime-offline.log')
     from ci_candidate import qualify
     result = qualify(image)
     result.update(commit=sha, image=image, image_id=identity, source_archive_sha256=source_checksum)
+    if runtime_id:
+        result.update(sap_runtime_base_image_id=runtime_id, sap_runtime_offline='PASS', sap_connection='NOT RUN')
     (REPORTS / 'candidate.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result))
 

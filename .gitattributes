@@ -1,3 +1,4 @@
 # Ensure canonical templates and shell scripts retain LF line endings across all platforms
 *.svg text eol=lf
 *.sh text eol=lf
+tools/sap-rfc-runtime/python-rfc text eol=lf

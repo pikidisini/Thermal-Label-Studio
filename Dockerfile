@@ -1,4 +1,5 @@
 # Application image for Studio, rendering and layout persistence.
+ARG APPLICATION_BASE_IMAGE=python:3.14-slim-bookworm
 FROM node:22-alpine AS frontend-builder
 WORKDIR /build/frontend
 COPY frontend/package.json frontend/package-lock.json ./
@@ -18,7 +19,7 @@ RUN printf '%s' "$RESVG_SHA256" | grep -Eq '^[a-f0-9]{64}$' \
     && mkdir /renderer && tar -xzf /tmp/resvg.tar.gz -C /renderer \
     && chmod 755 /renderer/resvg
 
-FROM python:3.14-slim-bookworm AS application-runner
+FROM ${APPLICATION_BASE_IMAGE} AS application-runner
 RUN apt-get update && apt-get install -y --no-install-recommends fonts-liberation \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --uid 10001 --create-home fixture
