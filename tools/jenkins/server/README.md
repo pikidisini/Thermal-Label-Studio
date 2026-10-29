@@ -1,5 +1,8 @@
 # Server maintenance and CI/CD
 
+See [panduan operasi](OPERATIONS.md) for issue/feature handling, dashboard
+diagnosis, release holds, image recovery, and CI backup/restore boundaries.
+
 The approved target is `192.168.254.58`: Jenkins on port 8081, SonarQube on
 9004, and the existing application on 18082. HTTP LAN transport is the current
 owner-selected pilot setting. Keep authentication and the migrated authorization
