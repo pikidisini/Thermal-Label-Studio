@@ -20,7 +20,7 @@ services:
       SONAR_SCANNER_JAVA_OPTS: -Xmx512m
     command: ["-url", "http://jenkins:8080", "-secret", "@/run/tls-agents/tls-build.secret", "-name", "tls-build", "-webSocket", "-workDir", "/opt/thermal-label-ci/work/build"]
     volumes:
-      - /etc/thermal-label-ci/agents:/run/tls-agents:ro
+      - /etc/thermal-label-ci/agents/tls-build.secret:/run/tls-agents/tls-build.secret:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/thermal-label-ci:/opt/thermal-label-ci
       - /opt/thermal-label-ci/work/build/home:/var/jenkins_home
@@ -37,7 +37,7 @@ services:
     user: "1000:1000"
     command: ["-url", "http://jenkins:8080", "-secret", "@/run/tls-agents/tls-monitor.secret", "-name", "tls-monitor", "-webSocket", "-workDir", "/opt/thermal-label-ci/work/monitor"]
     volumes:
-      - /etc/thermal-label-ci/agents:/run/tls-agents:ro
+      - /etc/thermal-label-ci/agents/tls-monitor.secret:/run/tls-agents/tls-monitor.secret:ro
       - /opt/thermal-label-ci/work/monitor:/opt/thermal-label-ci/work/monitor
       - /opt/thermal-label-ci/work/monitor/home:/var/jenkins_home
       - /var/lib/thermal-label-ci/monitor:/monitor:ro

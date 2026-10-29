@@ -24,6 +24,12 @@ def test_ci_storage_is_separate_and_only_build_agent_receives_docker_socket():
     for name in ('jenkins', 'monitor-agent'):
         assert all(v['target'] != '/var/run/docker.sock' for v in model['services'][name]['volumes'])
     assert any(v['target'] == '/var/run/docker.sock' for v in model['services']['build-agent']['volumes'])
+    for agent, secret in (('build-agent', 'tls-build.secret'), ('monitor-agent', 'tls-monitor.secret')):
+        secrets = [v for v in model['services'][agent]['volumes'] if '/run/tls-agents' in v['target']]
+        assert len(secrets) == 1
+        assert secrets[0]['source'] == '/etc/thermal-label-ci/agents/' + secret
+        assert secrets[0]['target'] == '/run/tls-agents/' + secret
+        assert secrets[0]['read_only'] is True
     assert model['services']['sonarqube']['tmpfs'] == ['/tmp:size=256m,mode=1777']
     assert all(v['external'] and v['name'].startswith('thermal-label-ci-') for v in model['volumes'].values())
     assert not model['services']['sonar-db'].get('ports')
