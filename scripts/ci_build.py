@@ -71,6 +71,7 @@ def sonar(sha):
 
 def image(sha):
     image = 'thermal-label-studio:git-' + sha
+    source_checksum = hashlib.sha256(run(['git', 'archive', '--format=tar', sha])).hexdigest()
     run(['docker', 'build', '--platform', 'linux/amd64', '--label', 'io.thermal-label.ci.release=true',
          '--label', 'org.opencontainers.image.revision=' + sha,
          '--build-arg', 'RESVG_SHA256=450cfeaf8122f7389a8acf698888804e1ed46980b611d5253204049c51c87087',
@@ -78,7 +79,7 @@ def image(sha):
     identity = json.loads(run(['docker', 'image', 'inspect', image]))[0]['Id']
     from ci_candidate import qualify
     result = qualify(image)
-    result.update(commit=sha, image=image, image_id=identity)
+    result.update(commit=sha, image=image, image_id=identity, source_archive_sha256=source_checksum)
     (REPORTS / 'candidate.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result))
 
@@ -106,6 +107,16 @@ def clean(sha):
                 raise ValueError('Refuse cleanup of an unrelated resource.')
             operation = ['docker', kind, 'rm'] + (['-f'] if kind == 'container' else []) + [identity]
             run(operation)
+    candidate = REPORTS / 'candidate.json'
+    accepted = candidate.exists() and json.loads(candidate.read_text()).get('status') == 'PASS'
+    if not accepted:
+        tag = 'thermal-label-studio:git-' + sha
+        inspected = subprocess.run(['docker', 'image', 'inspect', tag], capture_output=True)
+        if inspected.returncode == 0:
+            labels = json.loads(inspected.stdout)[0]['Config'].get('Labels') or {}
+            if labels.get('io.thermal-label.ci.release') == 'true' and labels.get('org.opencontainers.image.revision') == sha:
+                # No force: an active container always protects its image.
+                subprocess.run(['docker', 'image', 'rm', tag], capture_output=True)
     if REPORTS.exists():
         expected = ROOT.resolve() / '.tmp'
         if REPORTS.is_symlink() or REPORTS.resolve().parent != expected:
