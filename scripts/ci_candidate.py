@@ -142,6 +142,10 @@ def qualify(image):
             for _ in range(45):
                 try:
                     run(['docker', 'exec', containers[2], 'python', '-c', "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready',timeout=2).read()"], timeout=5)
+                    state = json.loads(run(['docker', 'inspect', containers[2]]))[0]['State']
+                    if state.get('Health', {}).get('Status') != 'healthy':
+                        time.sleep(1)
+                        continue
                     return
                 except RuntimeError: time.sleep(1)
             logs = run(['docker', 'logs', '--tail', '20', containers[2]])
@@ -171,7 +175,9 @@ def qualify(image):
                     ci_host.APP, ci_host.STATE, ci_host.BACKUPS = sandbox/'app', sandbox/'state', sandbox/'backups'
                     ci_host.CONTAINERS = dict(zip(('postgres', 'minio', 'app'), containers))
                     ci_host.healthy = fixture_health
-                    ci_host.monitor(); assert ci_host.monitor()['state'] == 'UP'
+                    ci_host.monitor()
+                    observed = ci_host.monitor()
+                    assert observed['state'] == 'UP', json.dumps(observed['services'])
                     run(['docker', 'stop', containers[2]])
                     ci_host.monitor(); ci_host.monitor()
                     assert ci_host.monitor()['state'] == 'DOWN'
