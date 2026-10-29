@@ -80,6 +80,11 @@ if (newMonitor) monitorJob = instance.createProject(WorkflowJob, 'thermal-label-
 ['qualification', 'release'].each { kind ->
     def marker = new File('/run/tls-agents/' + kind + '-ready')
     if (marker.isFile()) {
+        if (kind == 'release') {
+            def qualification = instance.getItem('thermal-label-qualification')
+            qualification.setDisabled(true)
+            qualification.save()
+        }
         def job = instance.getItem('thermal-label-' + kind)
         job.setDisabled(false)
         job.save()
