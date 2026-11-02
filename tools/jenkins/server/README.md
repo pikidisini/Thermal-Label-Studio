@@ -49,6 +49,14 @@ Admin/Designer/Operator enforcement, immutable template save/read, Test Data PNG
 preview, logout and restart persistence. CI storage/network names are unique and
 labeled; only those resources are removed. No physical SAP/printer test is run.
 
+Code-only releases preserve the intake ledger configuration already running on
+this named host. Candidate ledger JSON, database connection and every retained
+`TLS_INTAKE_HMAC_*` value must match the active application exactly. Activating,
+disabling or changing the ledger still requires separately authorized maintenance;
+a release cannot perform those changes implicitly. The default printer transport
+must remain unset. Validation runs before any application stop or backup, and
+errors never include configuration values.
+
 The release lock prevents concurrent deployment. Only the current `main` SHA may
 replace the application. Any schema SQL difference blocks automatic deployment.
 The application stops briefly for a consistent encrypted PostgreSQL/MinIO backup;

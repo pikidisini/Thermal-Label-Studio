@@ -74,7 +74,7 @@ def schema_hashes(root):
             for p in sorted((root / 'backend/schema').glob('*.sql'))}
 
 
-def validate_model(model):
+def validate_model(model, active_environment=None):
     if set(model['services']) != {'app', 'postgres', 'minio'}:
         raise ValueError('Unexpected operational services.')
     expected = {'postgres-data': 'thermal-label-studio-lan-postgres',
@@ -91,9 +91,17 @@ def validate_model(model):
     for key in ('TLS_STORAGE_INITIALIZE', 'TLS_SAP_RFC_ENABLED', 'TLS_QUEUE_ENABLED'):
         if app['environment'].get(key) != 'false':
             raise ValueError('Pilot execution scope changed.')
-    for key in ('TLS_PRINTER_HOST', 'TLS_INTAKE_LEDGER_JSON'):
-        if app['environment'].get(key, ''):
-            raise ValueError('Operational transport activation changed.')
+    if app['environment'].get('TLS_PRINTER_HOST', ''):
+        raise ValueError('Operational transport activation changed.')
+    # Code-only releases preserve the ledger already active on this named host.
+    # Activation, removal, database changes and key rotation need separate approval.
+    active = active_environment or {}
+    candidate = app['environment']
+    ledger_keys = {'TLS_INTAKE_LEDGER_JSON', 'TLS_INTAKE_DATABASE_URL'}
+    ledger_keys.update(key for key in set(active) | set(candidate)
+                       if key.startswith('TLS_INTAKE_HMAC_'))
+    if any(candidate.get(key, '') != active.get(key, '') for key in ledger_keys):
+        raise ValueError('Operational intake ledger configuration changed.')
 
 
 def healthy(*, include_auth=False):
@@ -219,10 +227,10 @@ def deploy(workspace, sha, image_id):
         if schema_hashes(old_source) != schema_hashes(workspace):
             raise ValueError('Schema SQL changed; separate migration required.')
         model = json.loads(compose(workspace, 'config', '--format', 'json', image=tag))
-        validate_model(model)
         running = inspect(CONTAINERS['app'])
         old_image = running['Config']['Image']
         environment = dict(value.split('=', 1) for value in running['Config']['Env'])
+        validate_model(model, environment)
         destination = APP / 'releases' / sha / 'source'
         if not destination.exists():
             destination.mkdir(parents=True)
