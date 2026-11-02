@@ -25,6 +25,9 @@ export async function authFetch(input: RequestInfo | URL, init?: RequestInit): P
 }
 
 export async function authCommand(path: string, body?: unknown, method = 'POST'): Promise<Session> {
+  // The pre-login session can expire or its cookie can change in another tab.
+  // Synchronize CSRF before each deliberate attempt; never replay credentials.
+  if (path === 'login') setSession(await readSession());
   const response = await authFetch(`/api/v1/auth/${path}`, { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
   if (!response.ok) {
     if (response.status === 429) throw new Error('Too many login attempts. Try again in 15 minutes.');

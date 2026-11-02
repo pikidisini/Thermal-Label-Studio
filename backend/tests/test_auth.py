@@ -172,6 +172,25 @@ def sign_in(client, auth, role='Admin', temporary=False):
     return user
 
 
+def test_wrong_password_then_correct_with_expired_pre_session(web, auth):
+    client, _ = web
+    auth.create_user('alice', 'Alice', 'Operator', PASSWORD)
+    initial = client.get('/api/v1/auth/session').json()
+    client.headers['X-CSRF-Token'] = initial['csrf_token']
+    wrong = client.post('/api/v1/auth/login', json={'username': 'alice', 'password': 'wrong'})
+    assert wrong.status_code == 401
+    assert wrong.json()['detail']['code'] == 'invalid_credentials'
+    auth.test_time[0] += 901
+    body = {'username': 'alice', 'password': PASSWORD}
+    assert client.post('/api/v1/auth/login', json=body).status_code == 401
+    renewed = client.get('/api/v1/auth/session').json()
+    assert renewed['csrf_token'] != initial['csrf_token']
+    client.headers['X-CSRF-Token'] = renewed['csrf_token']
+    accepted = client.post('/api/v1/auth/login', json=body)
+    assert accepted.status_code == 200
+    assert accepted.json()['user']['username'] == 'alice'
+
+
 def test_http_csrf_cookie_and_no_effects_before_admission(web, auth):
     client, app = web
     assert client.post('/api/v1/printing/editor', json={}).status_code == 401
