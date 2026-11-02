@@ -81,6 +81,12 @@ entries remain unchanged. Activity history remains best-effort, independently
 enabled, and never controls print retries.
 
 The UI fetch wrapper attaches CSRF to same-origin interactive calls only. A 401
+from login leaves the form available for another deliberate attempt. Before each
+login submission, the client reads `/auth/session` and updates its in-memory CSRF
+token, recovering expired or replaced pre-login sessions without a page refresh.
+Failure to read the session prevents credentials from being submitted. Credentials
+are submitted once per deliberate attempt and are never automatically replayed.
+A 401 from other interactive feature requests
 returns the user to login without retrying a request. Logout/account replacement
 reloads the document to clear in-memory data; cross-tab notification and bfcache
 restore revalidation prevent showing another account's current state. Editor

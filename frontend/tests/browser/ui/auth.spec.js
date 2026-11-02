@@ -4,6 +4,37 @@ import { mockBuiltApplication } from '../helpers/studio.js';
 const user = { id: 'alice', username: 'alice', display_name: 'Alice', role: 'Operator', active: true, must_change_password: false };
 const session = account => ({ user: account, csrf_token: 'synthetic-csrf', expires_at: Date.now() / 1000 + 43200 });
 
+for (const stale of [false, true]) {
+  test(`wrong password then correct password succeeds without refresh (stale pre-session: ${stale})`, async ({ page }) => {
+    await mockBuiltApplication(page);
+    let current = null; let csrf = 'initial-csrf'; let attempts = 0;
+    await page.route('**/api/v1/auth/session', route => route.fulfill({ json: { ...session(current), csrf_token: csrf } }));
+    await page.route('**/api/v1/auth/login', route => {
+      attempts++;
+      if (route.request().headers()['x-csrf-token'] !== csrf) {
+        return route.fulfill({ status: 403, json: { detail: { code: 'csrf_rejected' } } });
+      }
+      if (route.request().postDataJSON().password !== 'synthetic correct password') {
+        return route.fulfill({ status: 401, json: { detail: { code: 'invalid_credentials' } } });
+      }
+      current = user;
+      return route.fulfill({ json: session(current) });
+    });
+    await page.goto('/login');
+    await page.getByLabel('Username', { exact: true }).fill('alice');
+    await page.getByLabel('Password', { exact: true }).fill('synthetic wrong password');
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.getByLabel('Password', { exact: true })).toHaveValue('');
+    expect(attempts).toBe(1);
+    if (stale) csrf = 'renewed-csrf';
+    await page.getByLabel('Password', { exact: true }).fill('synthetic correct password');
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await expect(page.getByRole('link', { name: /Label Print/ })).toBeVisible();
+    expect(attempts).toBe(2);
+  });
+}
+
 test('anonymous login rotates state, sends CSRF, and shows only Operator activities', async ({ page }) => {
   await mockBuiltApplication(page); let current = null; const writes = [];
   await page.route('**/api/v1/auth/session', route => route.fulfill({ json: session(current) }));

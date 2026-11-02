@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { authFetch, setSession, clearAccount, currentAccount, validPassword, readSession } from '../src/shared/auth/client.ts';
+import { authCommand, authFetch, setSession, clearAccount, currentAccount, validPassword, readSession } from '../src/shared/auth/client.ts';
 import { studioPrintLocked, lockStudioPrint, clearStudioPrint } from '../src/features/printing/model/studioPrintLock.ts';
 
 test('interactive requests attach in-memory CSRF without forwarding it to other origins', async t => {
@@ -51,4 +51,31 @@ test('concurrent session reads share one pre-login cookie request', async t => {
   globalThis.fetch = async () => { calls++; return new Response(JSON.stringify({ user: null, csrf_token: 'synthetic', expires_at: 123, idle_expires_at: 123 })); };
   const [first, second] = await Promise.all([readSession(), readSession()]);
   assert.equal(calls, 1); assert.equal(first.csrf_token, second.csrf_token);
+});
+
+test('login refreshes CSRF before each attempt and never replays rejected credentials', async t => {
+  const original = globalThis.fetch;
+  t.after(() => { globalThis.fetch = original; clearAccount(); });
+  const calls = [];
+  let token = 'first-token';
+  globalThis.fetch = async (input, init) => {
+    calls.push(String(input));
+    if (String(input).endsWith('/session')) return new Response(JSON.stringify({ user: null, csrf_token: token }));
+    assert.equal(new Headers(init.headers).get('X-CSRF-Token'), token);
+    return new Response('{}', { status: JSON.parse(init.body).password === 'correct' ? 200 : 401 });
+  };
+  await assert.rejects(authCommand('login', { username: 'alice', password: 'wrong' }));
+  assert.equal(calls.length, 2);
+  token = 'replacement-token';
+  await authCommand('login', { username: 'alice', password: 'correct' });
+  assert.deepEqual(calls, ['/api/v1/auth/session', '/api/v1/auth/login', '/api/v1/auth/session', '/api/v1/auth/login']);
+});
+
+test('unavailable session prevents sending login credentials', async t => {
+  const original = globalThis.fetch;
+  t.after(() => { globalThis.fetch = original; clearAccount(); });
+  const calls = [];
+  globalThis.fetch = async input => { calls.push(String(input)); return new Response('{}', { status: 503 }); };
+  await assert.rejects(authCommand('login', { username: 'alice', password: 'synthetic' }), /storage is unavailable/);
+  assert.deepEqual(calls, ['/api/v1/auth/session']);
 });
