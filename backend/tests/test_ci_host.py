@@ -68,6 +68,49 @@ def test_exact_pilot_model_is_admitted():
     ci.validate_model(model())
 
 
+def ledger_environment():
+    return {
+        'TLS_INTAKE_LEDGER_JSON': json.dumps({
+            'database_env': 'TLS_INTAKE_DATABASE_URL', 'active_key': 'k1',
+            'keys': {'k1': 'TLS_INTAKE_HMAC_K1'}}),
+        'TLS_INTAKE_DATABASE_URL': 'postgresql://synthetic/ledger',
+        'TLS_INTAKE_HMAC_K1': 'synthetic-key-for-policy-tests-only',
+    }
+
+
+def test_code_release_preserves_existing_ledger():
+    candidate = model()
+    active = ledger_environment()
+    candidate['services']['app']['environment'].update(active)
+    ci.validate_model(candidate, active)
+
+
+@pytest.mark.parametrize('change', ['activate', 'disable', 'json', 'database', 'key', 'add-key', 'remove-key'])
+def test_ledger_changes_require_separate_authorization(change):
+    candidate = model()
+    active = ledger_environment()
+    env = candidate['services']['app']['environment']
+    env.update(active)
+    if change == 'activate': active = {}
+    if change == 'disable': env['TLS_INTAKE_LEDGER_JSON'] = ''
+    if change == 'json': env['TLS_INTAKE_LEDGER_JSON'] = '{}'
+    if change == 'database': env['TLS_INTAKE_DATABASE_URL'] = 'postgresql://synthetic/other'
+    if change == 'key': env['TLS_INTAKE_HMAC_K1'] = 'replacement-key'
+    if change == 'add-key': env['TLS_INTAKE_HMAC_K2'] = 'added-key'
+    if change == 'remove-key': del env['TLS_INTAKE_HMAC_K1']
+    with pytest.raises(ValueError, match='ledger configuration changed') as error:
+        ci.validate_model(candidate, active)
+    assert 'postgresql://' not in str(error.value)
+    assert 'key-for-policy' not in str(error.value)
+
+
+def test_default_printer_transport_still_rejected_even_if_already_active():
+    candidate = model()
+    candidate['services']['app']['environment']['TLS_PRINTER_HOST'] = 'synthetic-printer'
+    with pytest.raises(ValueError, match='transport activation changed'):
+        ci.validate_model(candidate, {'TLS_PRINTER_HOST': 'synthetic-printer'})
+
+
 def test_process_failures_never_disclose_captured_private_output(monkeypatch):
     class Result:
         returncode = 1
@@ -168,3 +211,34 @@ def test_failed_candidate_restores_image_configuration_and_link(target, monkeypa
     report = json.loads((state / 'last-release.json').read_text())
     assert report['status'] == 'FAILED'
     assert report['rollback'] == 'PASS'
+
+
+@pytest.mark.parametrize('changed', [False, True])
+def test_deploy_validates_active_ledger_before_any_operational_mutation(target, monkeypatch, changed):
+    _, _, workspace, _, state = target
+    (state / 'auto-release.enabled').touch()
+    active = ledger_environment()
+    monkeypatch.setattr(ci, 'inspect', lambda name: {'Config': {
+        'Image': 'old-image', 'Env': [f'{key}={value}' for key, value in active.items()]}})
+    candidate = model()
+    candidate['services']['app']['environment'].update(active)
+    if changed:
+        candidate['services']['app']['environment']['TLS_INTAKE_DATABASE_URL'] += '-changed'
+    calls = []
+    def compose(source, *args, **kwargs):
+        calls.append(args[0])
+        assert args[0] == 'config', 'Validation must precede application stop'
+        return json.dumps(candidate).encode()
+    monkeypatch.setattr(ci, 'compose', compose)
+    if changed:
+        with pytest.raises(ValueError, match='ledger configuration changed'):
+            ci.deploy(workspace, 'a' * 40, 'sha256:' + 'b' * 64)
+    else:
+        # Stop at the first post-validation write rather than operating a runtime.
+        def stop_before_write(*args, **kwargs):
+            raise RuntimeError('Validation passed; no operational write performed')
+        monkeypatch.setattr(ci, 'atomic_json', stop_before_write)
+        with pytest.raises(RuntimeError, match='Validation passed'):
+            ci.deploy(workspace, 'a' * 40, 'sha256:' + 'b' * 64)
+    assert calls == ['config']
+    assert not (state / 'last-release.json').exists()
