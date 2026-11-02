@@ -2,6 +2,8 @@
 import base64
 import hashlib
 import pytest
+
+pytestmark = pytest.mark.usefixtures("print_safety")
 from .auth_test_support import TestClient
 from app.main import app
 from app.config import PrinterTarget
@@ -76,7 +78,7 @@ def test_studio_intake_actual_sinks_exact_parity(case, changed, copies, native_r
         preview = client.post('/api/v1/simulation/editor-preview', json=body)
         assert preview.status_code == 200, preview.text
         assert pixels(base64.b64decode(preview.json()['png_base64'])) == pixels(prepared.bitmap.bitmap_png)
-        manual = client.post('/api/v1/printing/editor', json=body)
+        manual = client.post('/api/v1/printing/editor', json={**body,'job_id': '11111111-1111-4111-8111-111111111111'})
         assert manual.status_code == 200, manual.text
         assert calls == [prepared.payload]
         value = envelope(('A',), copies)

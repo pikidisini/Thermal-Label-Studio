@@ -4,7 +4,7 @@ import { API_BASE } from '../../../shared/api';
 import { isNumericPrinterHost, type PrinterTarget } from '../model/printerTarget';
 
 export interface PrintTarget { available: boolean; host: string | null; port: number | null; encoder: 'IPL' }
-export interface EditorPrintRequest extends EditorOutputSnapshot { target?: PrinterTarget }
+export interface EditorPrintRequest extends EditorOutputSnapshot { job_id: string; target?: PrinterTarget }
 export interface EditorPrintResult { requestId: string; status: 'SUBMITTED'; confirmed: false; widthPx: number; heightPx: number; dpi: number; payloadBytes: number; target: PrinterTarget; copies: number }
 export type PrintFailureKind = 'unavailable' | 'target' | 'copies' | 'invalid' | 'preparation' | 'uncertain';
 export class PrintFailure extends Error {

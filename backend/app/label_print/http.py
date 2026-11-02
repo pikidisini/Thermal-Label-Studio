@@ -298,13 +298,22 @@ class ServerPrintRequest(PrintPackageRequest):
     expected_port: int = Field(ge=1, le=65535)
 
 
-_server_print_lock = Lock()
 
 
 @router.post('/label-print/print', responses={409: {'description': 'Conflict'}, 410: {'description': 'Preview expired'}, 413: {'description': 'Print package exceeds its size limit'}, 422: {'description': 'Unprocessable Content'}, 429: {'description': 'Too Many Requests'}})
 def print_registered_labels(body: ServerPrintRequest, request: Request, response: Response,
                             factory: Annotated[Callable, Depends(print_transport_factory)]):
     """Explicit single-attempt LAN delivery using only a registered target."""
+    from app.printing.durable import configured_store as safety_store, fingerprint
+    from fastapi.responses import JSONResponse
+    store = safety_store(request)
+    account = request.state.auth_user['id']
+    digest = fingerprint('label-print', body.model_dump())
+    existing = store.lookup(body.job_id, account, digest)
+    if existing is not None:
+        result = {key: existing[key] for key in ('job_id','status','confirmed','items')}
+        return JSONResponse(result, status_code=202 if existing['status']=='PROCESSING' else 200,
+                            headers={'Cache-Control':'no-store'})
     label_print_identity(operation='print', count=len(body.artifacts), target_id=body.target_id, copies=body.copies)
     package = print_package(body, request, response)
     target = package['target']
@@ -314,37 +323,13 @@ def print_registered_labels(body: ServerPrintRequest, request: Request, response
         payloads = [wire_payload(base64.b64decode(item['payload_base64'])) for item in package['items']]
     except ValueError:
         raise HTTPException(422, detail={'code': 'invalid_print_payload'}) from None
-    if not _server_print_lock.acquire(blocking=False):
-        raise HTTPException(429, detail={'code': 'print_busy'})
-    try:
-        results = []
-        stopped = False
-        for index, payload in enumerate(payloads):
-            status = 'NOT_ATTEMPTED'
-            if not stopped:
-                status = submit_registered(factory, target, payload, index)
-                stopped = status != 'SUBMITTED'
-            results.append({'index': index, 'status': status})
-        label_delivery_outcome(results)
-        return {'job_id': str(body.job_id), 'status': 'STOPPED' if stopped else 'SUBMITTED',
-                'confirmed': False, 'items': results}
-    finally:
-        _server_print_lock.release()
+    result = store.execute(body.job_id, account, 'label-print', digest,
+                           PrinterTarget(target['host'], target['port']), payloads, factory)
+    label_delivery_outcome(result['items'])
+    public = {key: result[key] for key in ('job_id','status','confirmed','items')}
+    return JSONResponse(public,status_code=202 if result['status']=='PROCESSING' else 200,
+                        headers={'Cache-Control':'no-store'})
 
-
-def submit_registered(factory, target, payload, index):
-    try:
-        transport = factory(PrinterTarget(target['host'], target['port']))
-    except Exception:
-        return 'FAILED_BEFORE_SEND'
-    try:
-        stage('SUBMITTING', item_index=index)
-        transport.submit(payload)
-        return 'SUBMITTED'
-    except PrintBeforeSendError:
-        return 'FAILED_BEFORE_SEND'
-    except Exception:
-        return 'UNCERTAIN'
 
 
 class PrinterStatusRequest(BaseModel):
@@ -370,21 +355,16 @@ def registered_printer_status(body: PrinterStatusRequest, request: Request, resp
                    if entry['target_id'] == body.target_id and entry['enabled']), None)
     if target is None or (target['host'], target['port']) != (body.expected_host, body.expected_port):
         raise HTTPException(409, detail={'code': 'printer_configuration_changed'})
-    # Share serialization with LAN printing: do not query during a submission.
-    if not _server_print_lock.acquire(blocking=False):
-        raise HTTPException(429, detail={'code': 'print_busy'})
+    stage('CHECKING_STATUS')
+    from app.intake_queue.printers import printer_operation
     try:
-        stage('CHECKING_STATUS')
-        from app.intake_queue.printers import printer_operation
-        try:
-            with printer_operation(PrinterTarget(target['host'], target['port']), probe=True):
-                result = probe(PrinterTarget(target['host'], target['port']))
-        except PrintBeforeSendError:
-            raise HTTPException(429, detail={'code':'print_busy'}) from None
-        label_status_outcome(result)
-        return {**result, 'target_id': target['target_id'], 'host': target['host'], 'port': target['port']}
-    finally:
-        _server_print_lock.release()
+        with printer_operation(PrinterTarget(target['host'], target['port']), probe=True):
+            result = probe(PrinterTarget(target['host'], target['port']))
+    except PrintBeforeSendError:
+        raise HTTPException(429, detail={'code':'print_busy'}) from None
+    label_status_outcome(result)
+    return {**result, 'target_id': target['target_id'], 'host': target['host'], 'port': target['port']}
+
 
 
 @router.get('/label-print/operations')

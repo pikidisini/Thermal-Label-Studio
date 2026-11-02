@@ -1136,5 +1136,16 @@ export const indonesian = {
   'Checking…': 'Memeriksa…',
   'Loading recent changes…': 'Memuat perubahan terbaru…',
   'Recent changes are unavailable.': 'Perubahan terbaru tidak tersedia.',
+  "Check previous job status": "Periksa status pekerjaan sebelumnya",
+  "Check printer holds": "Periksa penahanan printer",
+  "The job is processing or requires recovery. No retry was made.": "Pekerjaan sedang diproses atau memerlukan pemulihan. Tidak ada pengiriman ulang.",
+  "The job stopped. Check the printer before a new print.": "Pekerjaan berhenti. Periksa printer sebelum mencetak lagi.",
+  "Server print status is unavailable. Printing remains locked.": "Status cetak server tidak tersedia. Pencetakan tetap terkunci.",
+  "Physical check recorded. An administrator can release the hold.": "Pemeriksaan fisik tercatat. Admin dapat melepaskan penahanan.",
+  "Printer hold released. No job was resent.": "Penahanan printer dilepas. Tidak ada pekerjaan yang dikirim ulang.",
+  "Printer hold was not released. Check that the operation has stopped and a physical check is recorded.": "Penahanan printer belum dilepas. Pastikan operasi berhenti dan pemeriksaan fisik tercatat.",
+  "Physical printer check note": "Catatan pemeriksaan fisik printer",
+  "Record physical printer check": "Catat pemeriksaan fisik printer",
+  "Release printer hold without reprinting": "Lepaskan penahanan printer tanpa mencetak ulang",
 } as const;
 export type TranslationKey = keyof typeof indonesian;

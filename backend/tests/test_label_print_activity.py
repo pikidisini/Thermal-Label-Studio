@@ -3,6 +3,8 @@ import json
 from types import SimpleNamespace
 from uuid import uuid4
 import pytest
+
+pytestmark = pytest.mark.usefixtures("print_safety")
 from .auth_test_support import TestClient
 from app.main import app
 from app.label_print import http

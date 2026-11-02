@@ -35,5 +35,14 @@ class QueueCursor(Cursor):
         return self.cursor.rowcount
 
     def execute(self,sql,parameters=()):
+        if 'to_regclass' in sql:
+            table=sql.split("label_intake.",1)[1].split("'",1)[0]
+            self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?",(table,))
+            if self.cursor.fetchone() is None: self.cursor.execute('SELECT NULL')
+            else: self.cursor.execute('SELECT 1')
+            return
+        if 'pg_try_advisory' in sql:
+            self.cursor.execute('SELECT 1')
+            return
         sql = sql.replace('now()', 'unixepoch()').replace(' FOR UPDATE OF q SKIP LOCKED','').replace("interval '24 hours'",'86400')
         super().execute(sql,parameters)

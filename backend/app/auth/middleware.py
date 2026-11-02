@@ -42,6 +42,9 @@ POLICY = [
     (r'/graphics', {'GET', 'POST'}, DESIGN),
     (r'/graphics/[^/]+(?:/content)?', {'GET'}, DESIGN),
     (r'/printing/target', {'GET'}, DESIGN),
+    (r'/printing/(?:jobs/[^/]+|holds)', {'GET'}, ALL),
+    (r'/printing/holds/[^/]+/physical-check', {'POST'}, ALL),
+    (r'/printing/holds/[^/]+/release-hold', {'POST'}, {'Admin'}),
     (r'/(?:design/validate|simulation/editor-preview|simulation/fixture|printing/editor|labels/process)', {'POST'}, DESIGN),
 ]
 

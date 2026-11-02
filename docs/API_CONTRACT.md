@@ -561,7 +561,7 @@ Studio Print uses that boundary through the configured print endpoint below.
 This reads configuration only; no printer probe occurs. A missing/failed default
 lookup does not prevent a client from providing an explicit target.
 
-`POST /api/v1/printing/editor` accepts `{draft:{svg,width_mm,height_mm,dpi,binding_version:1},
+`POST /api/v1/printing/editor` accepts `{job_id:<UUIDv4>,draft:{svg,width_mm,height_mm,dpi,binding_version:1},
 data,encoder:"IPL",copies,target?:{host,port},field_descriptions?:{...}}`. Copies is required
 and must be an integral JSON number1..999 (the UI starts at1). Native IPL `<RS>N`/`<US>1` requests that many identical rendered labels.
 The explicit target overrides the optional server default
@@ -716,16 +716,16 @@ The operator Print action uses POST /api/v1/label-print/print with job_id
 (UUID v4), target_id, expected_host, expected_port, artifacts and copies (1..999).
 The target is resolved exclusively from enabled Application Management targets;
 expected_host/port only detect stale UI configuration and cannot override it.
-This route retains the existing loopback/local-origin admission boundary.
+This route retains authenticated session, exact Origin/CSRF and role admission.
 All artifacts and IPL framing are validated before the first device effect.
 Expired artifacts return 410; changed/disabled targets return 409; oversized
-packages return 413; concurrent server delivery returns 429 before sending.
+packages return 413. Busy physical ownership produces FAILED_BEFORE_SEND without a socket attempt.
 The server reuses prepared previews, converts readable IPL controls to wire
 bytes and submits once per selected item, stopping on the first failure.
-Response: job_id, status SUBMITTED/STOPPED, confirmed=false, and indexed item
+Response: job_id, status SUBMITTED/STOPPED (or HTTP 202 PROCESSING), confirmed=false, and indexed item
 statuses SUBMITTED/FAILED_BEFORE_SEND/UNCERTAIN/NOT_ATTEMPTED. Physical printing
 is unconfirmed. Browser pending-job protection survives reload in the same tab;
-there is no durable server job ledger or global request deduplication.
+direct-print identity and physical ownership are durable; see [Direct print safety](DIRECT_PRINT_SAFETY.md).
 The server must have network access to the LAN printer. No local agent or token
 is needed for this operator path. The retained print-package endpoint and
 standalone local_agent package are separate tools, not prerequisites for LAN.
@@ -874,3 +874,6 @@ through existing source changes. See [queue operations](PRODUCTION_QUEUE.md) for
 encrypted temporary business-data retention, two-worker ownership, resource limits,
 operator APIs `/api/v1/sap-requests`, physical-check/release-hold actions, operational
 checks and the mandatory deployment/SAP/device acceptance gates.
+
+
+The durable direct-print and shared-printer contract is defined in [Direct print safety](DIRECT_PRINT_SAFETY.md). Missing print safety storage denies transport. Schema cutover and device acceptance remain separately authorized.

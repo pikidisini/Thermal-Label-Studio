@@ -272,7 +272,12 @@ def _submit_claimed(output, checked, factory, ledger, receipt, index, total):
         return False
     try:
         stage('SUBMITTING')
-        submit_prepared_output(output, transport)
+        from app.intake_queue.printers import transport_owner
+        owner_token = transport_owner.set(receipt.ledger_id)
+        try:
+            submit_prepared_output(output, transport)
+        finally:
+            transport_owner.reset(owner_token)
     except (PrintBeforeSendError, PrintInputError):
         ledger.settle_not_sent(receipt, index)
         skip_later(ledger, receipt, index, total)

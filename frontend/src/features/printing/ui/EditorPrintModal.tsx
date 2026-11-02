@@ -1,3 +1,5 @@
+import { PrintSafetyPanel } from './PrintSafetyPanel';
+import { studioPrintJobId } from '../model/studioPrintLock';
 import type { EditorOutputSnapshot } from '../../canvas';
 import { studioPrintLocked, lockStudioPrint, clearStudioPrint } from '../model/studioPrintLock';
 import React from 'react';
@@ -78,8 +80,9 @@ export function EditorPrintModal({ isOpen, onClose, getSnapshot, widthMm, height
     rememberPrinterTarget(target);
     setBusy(true); setAttempted(true);
     try {
-      lockStudioPrint();
-      setResult(await printEditorLabel({ ...snapshot, encoder, target }));
+      const jobId = crypto.randomUUID();
+      lockStudioPrint(jobId);
+      setResult(await printEditorLabel({ ...snapshot, encoder, target, job_id: jobId }));
       clearStudioPrint();
       attemptedRef.current = false; setAttempted(false);
     } catch (cause) {
@@ -100,6 +103,7 @@ export function EditorPrintModal({ isOpen, onClose, getSnapshot, widthMm, height
         <IconButton label={t('Close print dialog')} onClick={close} disabled={busy}>×</IconButton>
       </DialogHeader>
       <DialogBody className="grid gap-[15px] p-[var(--ui-space-4)]">
+        {attempted && !busy && <PrintSafetyPanel jobId={studioPrintJobId()} onSubmitted={() => { clearStudioPrint(); attemptedRef.current=false; setAttempted(false); setError(null); }} />}
         {attempted && !busy && <Button onClick={() => { try { clearStudioPrint(); attemptedRef.current = false; setAttempted(false); setError(null); } catch { setError(failureMessages.uncertain); } }}>{t('I checked the printer; clear print lock')}</Button>}
         <div><p className="text-on-surface-variant">{t('Label size')}</p>
           <p data-testid="print-layout-summary" className="font-medium tabular-nums">{widthMm} × {heightMm} mm <span className="font-normal text-on-surface-variant">· {dpi} DPI</span></p>

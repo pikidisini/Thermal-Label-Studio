@@ -67,3 +67,12 @@ def feature_test_auth_environment(request, monkeypatch):
     }):
         monkeypatch.setenv('TLS_FIXTURE_FONT_PATH', str(test_font_path()))
         monkeypatch.setenv('TLS_FIXTURE_FONT_FAMILY', 'Liberation Sans')
+
+
+@pytest.fixture
+def print_safety(monkeypatch):
+    from .print_safety_fake import SafetyDatabase
+    from app.printing import durable
+    database = SafetyDatabase()
+    monkeypatch.setattr(durable, 'runtime_store', database.store)
+    return database

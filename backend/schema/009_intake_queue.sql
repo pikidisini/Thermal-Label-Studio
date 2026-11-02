@@ -7,7 +7,7 @@ CREATE TABLE label_intake.queue_control (
     max_pending integer NOT NULL DEFAULT 1000 CHECK (max_pending BETWEEN 1 AND 10000)
 );
 INSERT INTO label_intake.queue_control(singleton) VALUES (true);
-CREATE TABLE label_intake.printer_owners (
+CREATE TABLE IF NOT EXISTS label_intake.printer_owners (
     destination varchar(96) PRIMARY KEY,
     owner uuid,
     held boolean NOT NULL DEFAULT false,

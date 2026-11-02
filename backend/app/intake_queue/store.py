@@ -227,9 +227,24 @@ class QueueStore:
             cursor.execute('SELECT owner FROM label_intake.printer_owners WHERE owner=%s AND held=true FOR UPDATE', (owner,))
             if cursor.fetchone() is None:
                 raise QueueError('hold_not_found',409)
+            cursor.execute('SELECT destination FROM label_intake.printer_owners WHERE owner=%s',(owner,))
+            address = cursor.fetchone()[0]
+            from .printers import lock_printer
+            if not lock_printer(cursor,address,transaction=True):
+                raise QueueError('owner_not_stopped',409)
             cursor.execute('SELECT state FROM label_intake.queue WHERE ledger_id=%s', (owner,))
             queued = cursor.fetchone()
             if queued is not None and queued[0] != 'TERMINAL':
+                raise QueueError('owner_not_stopped',409)
+            cursor.execute("SELECT to_regclass('label_intake.direct_print_jobs')")
+            if cursor.fetchone()[0] is not None:
+                cursor.execute("SELECT state FROM label_intake.direct_print_jobs WHERE job_id=%s",(owner,))
+                direct=cursor.fetchone()
+                if direct is not None and direct[0]!='TERMINAL':
+                    raise QueueError('owner_not_stopped',409)
+            cursor.execute('SELECT state FROM label_intake.requests WHERE ledger_id=%s',(owner,))
+            intake=cursor.fetchone()
+            if intake is not None and intake[0]!='TERMINAL':
                 raise QueueError('owner_not_stopped',409)
             if action == 'RELEASE_HOLD':
                 cursor.execute("SELECT 1 FROM label_intake.queue_audit WHERE printer_owner=%s AND action='PHYSICAL_CHECK'", (owner,))

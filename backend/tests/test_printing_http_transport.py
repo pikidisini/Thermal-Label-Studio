@@ -4,6 +4,8 @@ import socket
 from PIL import Image
 from .auth_test_support import TestClient
 import pytest
+
+pytestmark = pytest.mark.usefixtures("print_safety")
 from app.config import PrinterTarget, get_settings
 from app.engine.bitmap import RenderedLabel
 from app.engine.pipeline import prepare_bitmap
@@ -14,7 +16,7 @@ from app.printing.service import PrintBeforeSendError
 REAL_TCP_SUBMIT = transport.TcpRawTransport.submit
 
 SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="20mm" height="12mm" viewBox="0 0 80 48"><rect width="4" height="4"/></svg>'
-REQUEST = {"draft": {"svg": SVG, "width_mm": 20., "height_mm": 12., "dpi": 203.2, "binding_version": 1}, "data": {}, "encoder": "IPL", "copies": 1}
+REQUEST = {"job_id": "11111111-1111-4111-8111-111111111111","draft": {"svg": SVG, "width_mm": 20., "height_mm": 12., "dpi": 203.2, "binding_version": 1}, "data": {}, "encoder": "IPL", "copies": 1}
 
 @pytest.fixture(autouse=True)
 def no_printer_network(monkeypatch):
@@ -147,9 +149,9 @@ def test_send_failure_has_bounded_uncertain_result_without_retry(monkeypatch):
     monkeypatch.setattr(http, "prepare_draft_output", lambda *a, **k: (provenance(), prepared))
     response = TestClient(app).post("/api/v1/printing/editor", json=REQUEST)
     assert response.status_code == 502
-    assert response.json()["detail"]["code"] == "print_submission_uncertain"
+    assert response.json()["items"][0]["status"] == "UNCERTAIN"
     assert 'private' not in response.text
-    assert 'Check the printer' in response.json()['detail']['message']
+    assert response.json()['status'] == 'STOPPED'
     assert len(fake.calls) == 1
 
 

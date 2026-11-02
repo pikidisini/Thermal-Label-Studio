@@ -5,5 +5,6 @@ const storage = () => globalThis.window?.sessionStorage ?? globalThis.sessionSto
 export function studioPrintLocked(): boolean {
   try { return !!storage().getItem(KEY); } catch { return true; }
 }
-export function lockStudioPrint(): void { storage().setItem(KEY, 'pending'); }
+export function studioPrintJobId(): string { try { return storage().getItem(KEY) ?? ''; } catch { return ''; } }
+export function lockStudioPrint(jobId = 'pending'): void { storage().setItem(KEY, jobId); }
 export function clearStudioPrint(): void { storage().removeItem(KEY); }
