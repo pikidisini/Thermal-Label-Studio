@@ -1,3 +1,4 @@
+import { PrintSafetyPanel } from '../../printing/ui/PrintSafetyPanel';
 import { ApplicationHeader } from '../../../shared/ui/ApplicationHeader';
 import { useAccount, authFetch as fetch } from '../../../shared/auth/client';
 
@@ -283,6 +284,7 @@ export function LabelPrintPage() {
           <div className="label-print-message">
 
           {(serverPrint.printing || demoPrinting) && <output data-ui-status-block className="label-print-process" ><Icon component={LoaderCircle} className="label-print-spinner" /><div><h2>{t(demoPrinting ? 'Simulating print…' : 'Sending from server to printer...')}</h2><p>{t('Waiting for the final response. Per-batch delivery progress is not available.')}</p><p>{t('{count} labels', { count: demoPrinting ? selected : serverPrint.batches.length })} · {t('Copies per label')}: {copies}</p></div></output>}
+          {!demo && <PrintSafetyPanel jobId={serverPrint.locked} onSubmitted={() => serverPrint.confirmSubmitted()} />}
           {!demo && serverPrint.locked && <div className="label-print-demo-note"><p>{t('Printing is locked until the previous job is checked. Job ID: {id}', { id: serverPrint.locked })}</p><Button disabled={operationBusy} onClick={() => { if (window.confirm(t('Have you checked the printer and previous print results? Clearing this lock permits another deliberate print and can duplicate labels.'))) { serverPrint.unlock(); } }}>{t('Printer checked; allow a new print')}</Button></div>}
           {!demo && serverPrint.result && <div className="label-print-job-results"><p>{t('Job ID: {id}', { id: serverPrint.result.job_id })}</p><ol>{serverPrint.result.items.map(item => <li key={item.index}>{t('Batch {batch}', { batch: serverPrint.batches[item.index] ?? String(item.index + 1) })}: {t(deliveryStatus(item.status) ?? 'Not attempted')}</li>)}</ol></div>}
           {!demo && printBlockReason && <p id="label-print-block-reason" className="label-print-muted">{t(printBlockReason)}</p>}

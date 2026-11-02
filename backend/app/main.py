@@ -163,6 +163,12 @@ async def stable_request_validation_error(
 @app.exception_handler(HTTPException)
 async def correlated_http_error(_request: Request, exc: HTTPException) -> JSONResponse:
     safe_messages = {
+        "print_safety_unavailable": "Print safety storage is unavailable. Nothing can be resent automatically.",
+        "print_job_not_found": "The print job was not found for this account.",
+        "print_job_conflict": "This job ID belongs to a different print request. No new data was sent.",
+        "owner_not_stopped": "The operation has not been proven stopped. Printer hold remains active.",
+        "physical_check_required": "Record a physical printer check before releasing the hold.",
+        "hold_not_found": "The printer hold was not found.",
         "graphics_local_only": "Graphics is available locally only.",
         "graphics_unavailable": "Graphics storage is unavailable. Contact the application administrator.",
         "graphic_not_found": "The graphic was not found.",

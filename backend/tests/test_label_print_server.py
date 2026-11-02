@@ -1,6 +1,8 @@
 """Server LAN delivery with fake transports only; no sockets or operational storage."""
 from uuid import uuid4
 import pytest
+
+pytestmark = pytest.mark.usefixtures("print_safety")
 from app.engine.bitmap import RenderedLabel
 from app.engine.output import PreparedOutput
 from app.label_print import http
@@ -78,11 +80,58 @@ def test_invalid_later_payload_prevents_all_delivery(client, setup):
     assert calls == []
 
 
-def test_busy_print_never_sends(client, setup):
+def test_busy_print_never_sends(client, setup, print_safety):
     body, calls, _, _ = setup
-    assert http._server_print_lock.acquire(blocking=False)
-    try:
-        assert client.post('/api/v1/label-print/print', json=body).status_code == 429
-    finally:
-        http._server_print_lock.release()
+    from app.intake_queue.printers import printer_operation
+    from app.config import PrinterTarget
+    from contextvars import Context
+    # Different execution contexts share the physical owner through storage.
+    with printer_operation(PrinterTarget('192.0.2.44',9100),store=print_safety.store()):
+        response = Context().run(lambda:client.post('/api/v1/label-print/print',json=body))
+    assert response.json()['items'][0]['status']=='FAILED_BEFORE_SEND'
     assert calls == []
+
+
+
+def test_replay_after_artifact_expiry_never_revalidates_or_resends(client,setup,monkeypatch):
+    body,calls,_,cache=setup
+    first=client.post('/api/v1/label-print/print',json=body)
+    assert first.status_code==200
+    cache.entries.clear()
+    monkeypatch.setattr(http,'read_snapshot',lambda *args:pytest.fail('Replay resolved current target'))
+    second=client.post('/api/v1/label-print/print',json=body)
+    assert second.json()==first.json()
+    assert len(calls)==3
+    conflict=client.post('/api/v1/label-print/print',json={**body,'copies':2})
+    assert conflict.status_code==409
+    assert len(calls)==3
+
+
+def test_status_is_account_owned_and_hold_release_requires_admin(client,setup):
+    from app.printing.http import router
+    client.app.include_router(router,prefix='/api/v1')
+    body,calls,_,_=setup
+    assert client.post('/api/v1/label-print/print',json=body).status_code==200
+    assert client.get('/api/v1/printing/jobs/'+body['job_id']).json()['status']=='SUBMITTED'
+    auth=client.app.state.auth_service
+    with auth.transaction() as repo:
+        user=repo.get('users','synthetic-admin')
+        user={**user,'id':'other-operator','username':'other','username_key':'other','role':'Operator'}
+        repo.put('users',user['id'],user)
+        token,csrf,_=auth._new_session(repo,user)
+    client.cookies.set('tls_session',token)
+    client.headers['X-CSRF-Token']=csrf
+    assert client.get('/api/v1/printing/jobs/'+body['job_id']).status_code==404
+    assert client.post('/api/v1/printing/holds/'+body['job_id']+'/release-hold',json={'note':'Checked'}).status_code==403
+    assert len(calls)==3
+
+
+
+def test_unavailable_safety_storage_never_resolves_or_sends(client,setup,monkeypatch):
+    from app.printing import durable
+    body,calls,_,_=setup
+    def unavailable(): raise durable.PrintSafetyError()
+    monkeypatch.setattr(durable,'runtime_store',unavailable)
+    monkeypatch.setattr(http,'read_snapshot',lambda *args:pytest.fail('Unavailable safety storage resolved output'))
+    assert client.post('/api/v1/label-print/print',json=body).status_code==503
+    assert calls==[]

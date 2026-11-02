@@ -9,6 +9,8 @@ import subprocess
 from PIL import Image
 import pytest
 
+pytestmark = pytest.mark.usefixtures("print_safety")
+
 from app.engine.bitmap import RenderedLabel
 from app.printing import service
 from app.printing.service import PrintInputError, PrintSubmissionError, submit_prepared_output

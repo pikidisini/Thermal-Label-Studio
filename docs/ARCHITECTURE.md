@@ -9,8 +9,9 @@ encodes the selected copy quantity from the bound bitmap, converts IPL controls
 to wire bytes and submits once using TCP/RAW. No agent token or mapping is
 required for LAN. Preview, catalog and Demo never contact a printer.
 Browser pending-job/uncertainty protection is local to the tab; this route has
-no durable server job ledger or global replay prevention. It remains separate
-from intake identity/ledger and Studio editor printing.
+durable direct-print identity and shared physical printer ownership; see
+[Direct print safety](DIRECT_PRINT_SAFETY.md). Intake and direct request identities
+remain separate; they coordinate the same physical printer ownership table.
 The retained print-package endpoint prepares payloads without transport. The
 standalone local_agent package separately supports workstation Ethernet/USB
 maps and SQLite job identity. It is not mounted in the operator LAN flow.
@@ -462,16 +463,16 @@ The operator Print action uses POST /api/v1/label-print/print with job_id
 (UUID v4), target_id, expected_host, expected_port, artifacts and copies (1..999).
 The target is resolved exclusively from enabled Application Management targets;
 expected_host/port only detect stale UI configuration and cannot override it.
-This route retains the existing loopback/local-origin admission boundary.
+This route retains authenticated session, exact Origin/CSRF and role admission.
 All artifacts and IPL framing are validated before the first device effect.
 Expired artifacts return 410; changed/disabled targets return 409; oversized
-packages return 413; concurrent server delivery returns 429 before sending.
+packages return 413. Busy physical ownership produces FAILED_BEFORE_SEND without a socket attempt.
 The server reuses prepared previews, converts readable IPL controls to wire
 bytes and submits once per selected item, stopping on the first failure.
-Response: job_id, status SUBMITTED/STOPPED, confirmed=false, and indexed item
+Response: job_id, status SUBMITTED/STOPPED (or HTTP 202 PROCESSING), confirmed=false, and indexed item
 statuses SUBMITTED/FAILED_BEFORE_SEND/UNCERTAIN/NOT_ATTEMPTED. Physical printing
 is unconfirmed. Browser pending-job protection survives reload in the same tab;
-there is no durable server job ledger or global request deduplication.
+direct-print identity and physical ownership are durable; see [Direct print safety](DIRECT_PRINT_SAFETY.md).
 The server must have network access to the LAN printer. No local agent or token
 is needed for this operator path. The retained print-package endpoint and
 standalone local_agent package are separate tools, not prerequisites for LAN.
@@ -585,3 +586,6 @@ printer address/port ownership serializes all application TCP operations.
 Persisted Management policy/audit is required; default configuration remains off.
 See [production queue](PRODUCTION_QUEUE.md). Source/fake success does not establish
 PostgreSQL concurrency, Linux resource, deployment, SAP or physical acceptance.
+
+
+The durable direct-print and shared-printer contract is defined in [Direct print safety](DIRECT_PRINT_SAFETY.md). Missing print safety storage denies transport. Schema cutover and device acceptance remain separately authorized.

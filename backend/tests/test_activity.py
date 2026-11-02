@@ -4,6 +4,8 @@ import json
 from types import SimpleNamespace
 from uuid import uuid4
 import pytest
+
+pytestmark=pytest.mark.usefixtures("print_safety")
 from fastapi import FastAPI, Request
 from .auth_test_support import TestClient
 from starlette.responses import JSONResponse
@@ -199,6 +201,7 @@ def test_actual_studio_routes_record_render_stages_and_safe_outcomes(monkeypatch
         width_mm=20.,height_mm=12.,dpi=203.2,binding_version=1),data={},encoder='IPL',copies=1)
     if purpose == 'print':
         body['target'] = dict(host='192.0.2.44',port=9100)
+        body['job_id'] = '11111111-1111-4111-8111-111111111111'
         path = '/api/v1/printing/editor'
     else:
         body['purpose'] = purpose

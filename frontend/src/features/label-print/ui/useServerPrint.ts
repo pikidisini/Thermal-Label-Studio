@@ -25,7 +25,8 @@ export function useServerPrint() {
       if (response.status === 'SUBMITTED') {
         sessionStorage.removeItem(LOCK); setLocked('');
         setMessage('Submitted to transport. Physical printing is not confirmed.');
-      } else setMessage('Printing stopped. Check the per-label results before another print.');
+      } else if (response.status === 'PROCESSING') setMessage('The job is processing or requires recovery. No retry was made.');
+      else setMessage('Printing stopped. Check the per-label results before another print.');
     } catch (error) {
       if (error instanceof PrintRejected) {
         sessionStorage.removeItem(LOCK); setLocked(''); setMessage(error.message);
@@ -36,6 +37,11 @@ export function useServerPrint() {
     if (inFlight.current) return;
     try { sessionStorage.removeItem(LOCK); setLocked(''); setMessage('Print lock cleared after operator check. No automatic retry was made.'); } catch { setMessage('Browser session storage is unavailable. Printing remains locked.'); }
   }
+  function confirmSubmitted() {
+    if (inFlight.current) return;
+    try { sessionStorage.removeItem(LOCK); setLocked(''); setMessage('Submitted to transport. Physical printing is not confirmed.'); }
+    catch { setMessage('Browser session storage is unavailable. Printing remains locked.'); }
+  }
   function resetView() { if (!inFlight.current) { setMessage(''); setResult(null); } }
-  return { printing, locked, result, message, print, unlock, batches, resetView };
+  return { printing, locked, result, message, print, unlock, batches, resetView, confirmSubmitted };
 }

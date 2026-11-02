@@ -282,3 +282,6 @@ Retain their statuses until the corresponding evidence is current. T12 remains
 optional for general software acceptance; the named device gate is required for
 this requested production-printing rollout. `SUBMITTED` always has
 `confirmed=false` and never claims physical completion.
+
+
+Direct Studio/Label Print jobs now share physical printer ownership without enabling queue execution. See [Direct print safety](DIRECT_PRINT_SAFETY.md) for schema 010, replay, stopped-owner recovery and physical holds.

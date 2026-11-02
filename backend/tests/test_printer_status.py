@@ -1,6 +1,8 @@
 """IPL status tests use fake sockets exclusively; no physical device traffic."""
 import socket
 import pytest
+
+pytestmark = pytest.mark.usefixtures("print_safety")
 from app.config import PrinterTarget
 from app.label_print import http, printer_status as status
 from tests.test_label_print import client
@@ -90,14 +92,16 @@ def test_admission_prevents_arbitrary_or_stale_targets(client, registered, chang
     assert calls == []
 
 
-def test_disabled_origin_and_busy_checks_do_not_probe(client, registered):
+def test_disabled_origin_and_busy_checks_do_not_probe(client, registered, print_safety):
     body, calls, targets = registered
     assert client.post('/api/v1/label-print/printer-status', json=body, headers={'Origin':'https://untrusted.invalid'}).status_code == 403
     targets[0]['enabled'] = False
     assert client.post('/api/v1/label-print/printer-status', json=body).status_code == 409
     targets[0]['enabled'] = True
-    assert http._server_print_lock.acquire(blocking=False)
-    try:
-        assert client.post('/api/v1/label-print/printer-status', json=body).status_code == 429
-    finally: http._server_print_lock.release()
+    from app.intake_queue.printers import printer_operation
+    from app.config import PrinterTarget
+    from contextvars import Context
+    with printer_operation(PrinterTarget(body['expected_host'],body['expected_port']),store=print_safety.store()):
+        response=Context().run(lambda:client.post('/api/v1/label-print/printer-status',json=body))
+        assert response.status_code==429
     assert calls == []

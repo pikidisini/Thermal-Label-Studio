@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from PIL import Image
 import pytest
+
+pytestmark = pytest.mark.usefixtures("print_safety")
 from .auth_test_support import TestClient
 from .conftest import test_font_path
 from app.main import app
@@ -78,7 +80,7 @@ def test_real_shared_raster_payload_and_sinks(case,copies,native_renderer,fake_t
     assert pixels(prepared.bitmap.bitmap_png)==pixels(simulate_prepared_output(prepared).bitmap_png)
     client=TestClient(app)
     preview=client.post('/api/v1/simulation/editor-preview',json=body)
-    printed=client.post('/api/v1/printing/editor',json=body)
+    printed=client.post('/api/v1/printing/editor',json={**body,'job_id': '11111111-1111-4111-8111-111111111111'})
     assert preview.status_code==printed.status_code==200
     assert pixels(base64.b64decode(preview.json()['png_base64']))==pixels(prepared.bitmap.bitmap_png)
     assert fake_transport==[prepared.payload]
@@ -107,7 +109,7 @@ def test_fallbacks_use_same_native_preview_and_print_bitmap(kind, data, native_r
     bound, prepared = pipeline.prepare_draft_output(EditorOutputRequest(**body))
     client = TestClient(app)
     preview = client.post('/api/v1/simulation/editor-preview', json=body)
-    printed = client.post('/api/v1/printing/editor', json=body)
+    printed = client.post('/api/v1/printing/editor', json={**body,'job_id': '11111111-1111-4111-8111-111111111111'})
     assert preview.status_code == printed.status_code == 200
     assert pixels(base64.b64decode(preview.json()['png_base64'])) == pixels(prepared.bitmap.bitmap_png)
     assert fake_transport == [prepared.payload]
